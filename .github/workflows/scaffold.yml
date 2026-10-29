@@ -1,0 +1,23 @@
+
+name: SOBYA Chain Scaffold
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Check Go environment
+        run: |
+          go version
+          go env GOPATH
+          git --version
