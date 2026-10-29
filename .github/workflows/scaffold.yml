@@ -4,6 +4,9 @@ name: SOBYA Blockchain Scaffold
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   create-chain:
     runs-on: ubuntu-latest
@@ -16,12 +19,12 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Install Ignite CLI v30
+      - name: Install Ignite CLI
         run: |
-          curl https://get.ignite.com/cli! | bash
+          curl -fsSL https://get.ignite.com/cli! | bash
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
-      - name: Verify Ignite
+      - name: Verify Ignite installation
         run: |
           ignite version
 
@@ -32,15 +35,26 @@ jobs:
             --no-module \
             --skip-git
 
+      - name: Check generated files
+        run: |
+          echo "Checking generated SOBYA files..."
+          if [ ! -d sobya ]; then
+            echo "ERROR: SOBYA directory was not created."
+            exit 1
+          fi
+          find sobya -maxdepth 2 -type f | sort
+          test -f sobya/go.mod
+
       - name: Build SOBYA chain
         run: |
           cd sobya
           go mod tidy
           go build ./...
 
-      - name: Save generated chain
+      - name: Upload SOBYA source
         uses: actions/upload-artifact@v4
         with:
           name: sobya-chain-source
           path: sobya/
+          if-no-files-found: error
           retention-days: 7
