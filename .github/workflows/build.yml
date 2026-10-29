@@ -1,0 +1,20 @@
+
+name: SOBYA Build Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show project files
+        run: |
+          echo "SOBYA Chain repository"
+          find . -maxdepth 3 -type f -not -path './.git/*' | sort
