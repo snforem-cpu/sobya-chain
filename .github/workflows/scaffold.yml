@@ -1,11 +1,11 @@
 
-name: SOBYA Chain Scaffold
+name: SOBYA Blockchain Scaffold
 
 on:
   workflow_dispatch:
 
 jobs:
-  scaffold:
+  create-chain:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -16,8 +16,31 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Check Go environment
+      - name: Install Ignite CLI v30
         run: |
-          go version
-          go env GOPATH
-          git --version
+          curl https://get.ignite.com/cli! | bash
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Ignite
+        run: |
+          ignite version
+
+      - name: Generate SOBYA chain
+        run: |
+          ignite cosmos scaffold chain sobya \
+            --address-prefix sobya \
+            --no-module \
+            --skip-git
+
+      - name: Build SOBYA chain
+        run: |
+          cd sobya
+          go mod tidy
+          go build ./...
+
+      - name: Save generated chain
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-chain-source
+          path: sobya/
+          retention-days: 7
