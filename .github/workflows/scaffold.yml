@@ -1,11 +1,59 @@
+
 name: SOBYA Blockchain Scaffold
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  create-chain:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Test workflow
-        run: echo "SOBYA workflow is running"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: false
+
+      - name: Install Ignite CLI
+        run: |
+          curl -fsSL https://get.ignite.com/cli! | bash
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Ignite
+        run: |
+          ignite version
+
+      - name: Generate SOBYA chain
+        run: |
+          ignite cosmos scaffold chain sobya \
+            --address-prefix sobya \
+            --no-module \
+            --skip-git
+
+      - name: Verify generated source
+        run: |
+          test -d sobya
+          test -f sobya/go.mod
+          echo "SOBYA source files generated successfully."
+          find sobya -maxdepth 2 -type f | sort
+
+      - name: Build SOBYA chain
+        run: |
+          cd sobya
+          go mod tidy
+          go build ./...
+
+      - name: Upload SOBYA source
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-chain-source
+          path: sobya/
+          if-no-files-found: error
+          retention-days: 7
