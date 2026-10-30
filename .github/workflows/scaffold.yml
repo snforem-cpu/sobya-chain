@@ -1,3 +1,4 @@
+
 name: SOBYA Blockchain Scaffold
 
 on:
@@ -20,19 +21,22 @@ jobs:
           go-version: '1.26.7'
           cache: false
 
-      - name: Verify Go
+      - name: Install Go 1.26.5 toolchain
         run: |
-          go version
-          go env GOTOOLCHAIN
-          which go
+          go install golang.org/dl/go1.26.5@latest
+          go1.26.5 download
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          go1.26.5 version
 
       - name: Install Ignite CLI
         run: |
           curl -fsSL https://get.ignite.com/cli! | bash
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
-      - name: Verify Ignite
+      - name: Verify tools
         run: |
+          go version
+          go1.26.5 version
           ignite version
 
       - name: Generate SOBYA chain
