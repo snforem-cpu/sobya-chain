@@ -11,6 +11,9 @@ jobs:
   create-chain:
     runs-on: ubuntu-latest
 
+    env:
+      GOTOOLCHAIN: local
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,25 +24,27 @@ jobs:
           go-version: '1.26.7'
           cache: false
 
-      - name: Install Go 1.26.5 toolchain
+      - name: Verify Go configuration
         run: |
-          go install golang.org/dl/go1.26.5@latest
-          go1.26.5 download
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-          go1.26.5 version
+          echo "Go version:"
+          go version
+          echo "Go toolchain mode:"
+          go env GOTOOLCHAIN
+          echo "Go executable:"
+          which go
 
       - name: Install Ignite CLI
         run: |
           curl -fsSL https://get.ignite.com/cli! | bash
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
-      - name: Verify tools
+      - name: Verify Ignite
         run: |
-          go version
-          go1.26.5 version
           ignite version
 
       - name: Generate SOBYA chain
+        env:
+          GOTOOLCHAIN: local
         run: |
           ignite cosmos scaffold chain sobya \
             --address-prefix sobya \
@@ -54,8 +59,10 @@ jobs:
           find sobya -maxdepth 2 -type f | sort
 
       - name: Build SOBYA chain
+        working-directory: sobya
+        env:
+          GOTOOLCHAIN: local
         run: |
-          cd sobya
           go mod tidy
           go build ./...
 
