@@ -1,4 +1,3 @@
-
 name: SOBYA Blockchain Scaffold
 
 on:
@@ -18,16 +17,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.5'
+          go-version: '1.26.7'
           cache: false
 
-      - name: Register Go toolchain command
+      - name: Verify Go
         run: |
-          GO_BIN="$(command -v go)"
-          GO_DIR="$(dirname "$GO_BIN")"
-          sudo ln -sf "$GO_BIN" "$GO_DIR/go1.26.5"
           go version
-          go1.26.5 version
+          go env GOTOOLCHAIN
+          which go
 
       - name: Install Ignite CLI
         run: |
