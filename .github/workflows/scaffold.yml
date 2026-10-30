@@ -11,9 +11,6 @@ jobs:
   create-chain:
     runs-on: ubuntu-latest
 
-    env:
-      GOTOOLCHAIN: auto
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,10 +21,13 @@ jobs:
           go-version: '1.26.5'
           cache: false
 
-      - name: Verify Go
+      - name: Register Go toolchain command
         run: |
+          GO_BIN="$(command -v go)"
+          GO_DIR="$(dirname "$GO_BIN")"
+          sudo ln -sf "$GO_BIN" "$GO_DIR/go1.26.5"
           go version
-          go env GOTOOLCHAIN
+          go1.26.5 version
 
       - name: Install Ignite CLI
         run: |
