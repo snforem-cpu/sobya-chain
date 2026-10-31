@@ -28,28 +28,24 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace_exact(path, old, new, expected=1):
+          def replace_or_accept(path, old, new):
               p = Path(path)
               text = p.read_text()
               count = text.count(old)
-              if count != expected:
-                  raise SystemExit(f"{path}: expected {expected} occurrence(s) of {old!r}, found {count}")
-              p.write_text(text.replace(old, new))
+              if count:
+                  p.write_text(text.replace(old, new))
+                  print(f"{path}: updated {count} legacy occurrence(s)")
+              elif new in text:
+                  print(f"{path}: already uses {new}; no change needed")
+              else:
+                  raise SystemExit(f"{path}: neither expected legacy value {old!r} nor target value {new!r} was found")
 
-          replace_exact("project/app/config.go",
-                        'sdk.DefaultBondDenom = "stake"',
-                        'sdk.DefaultBondDenom = "usobya"')
-
-          config = Path("project/config.yml")
-          config_text = config.read_text()
-          if "stake" not in config_text:
-              raise SystemExit("project/config.yml: expected stake denomination entries were not found")
-          config.write_text(config_text.replace("stake", "usobya"))
-
-          replace_exact("project/cmd/sobyad/cmd/config.go",
-                        '"0stake"', '"0usobya"')
-          replace_exact("project/cmd/sobyad/cmd/testnet_multi_node.go",
-                        '0.001stake', '0.001usobya')
+          replace_or_accept("project/app/config.go",
+                            'sdk.DefaultBondDenom = "stake"',
+                            'sdk.DefaultBondDenom = "usobya"')
+          replace_or_accept("project/config.yml", "stake", "usobya")
+          replace_or_accept("project/cmd/sobyad/cmd/config.go", '"0stake"', '"0usobya"')
+          replace_or_accept("project/cmd/sobyad/cmd/testnet_multi_node.go", '0.001stake', '0.001usobya')
           PY
 
           rm -f 26031.updated
