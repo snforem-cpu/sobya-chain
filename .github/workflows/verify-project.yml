@@ -26,12 +26,9 @@ jobs:
       - name: Inspect original denomination settings (read-only)
         run: |
           echo '--- Relevant source/config files ---'
-          find project -type f \\( -name '*.go' -o -name '*.yml' -o -name '*.yaml' -o -name '*.json' -o -name '*.toml' \\) \\
-            -not -path '*/vendor/*' -not -path '*/.git/*' | sort
+          find project -type f | grep -E '\.(go|yml|yaml|json|toml)$' | grep -v '/vendor/' | grep -v '/.git/' | sort || true
           echo '--- Denomination and project-name references in original archive ---'
-          grep -RInE 'DefaultBondDenom|BondDenom|default_denom|bond_denom|stake|usobya|SOBY|SOBYA' project \\
-            --include='*.go' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.toml' \\
-            --exclude-dir=vendor --exclude-dir=.git || true
+          grep -RInE 'DefaultBondDenom|BondDenom|default_denom|bond_denom|stake|usobya|SOBY|SOBYA' project --include='*.go' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.toml' --exclude-dir=vendor --exclude-dir=.git || true
 
       - name: Set up Go
         uses: actions/setup-go@v5
