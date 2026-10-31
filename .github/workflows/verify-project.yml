@@ -23,6 +23,16 @@ jobs:
           test -f project/go.mod
           test -f project/cmd/sobyad/main.go
 
+      - name: Apply SOBYA native denomination
+        working-directory: project
+        run: |
+          sed -i 's/sdk.DefaultBondDenom = "stake"/sdk.DefaultBondDenom = "usobya"/' app/config.go
+          sed -i 's/default_denom: stake/default_denom: usobya/' config.yml
+          sed -i 's/stake/usobya/g' config.yml
+          grep -q 'sdk.DefaultBondDenom = "usobya"' app/config.go
+          grep -q 'default_denom: usobya' config.yml
+          if grep -q 'stake' config.yml; then exit 1; fi
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
