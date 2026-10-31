@@ -144,7 +144,8 @@ jobs:
           BEFORE_TO="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/before-to.json")"
           AMOUNT=1000
 
-          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}usobya" \
+          echo "Transfer starting balances: sender=$BEFORE_FROM receiver=$BEFORE_TO amount=$AMOUNT"
+          if ! ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}usobya" \
             --chain-id sobya-multinode-ci-1 \
             --node tcp://127.0.0.1:26657 \
             --home "$NET/validator0" \
@@ -153,9 +154,14 @@ jobs:
             --gas 200000 \
             --broadcast-mode sync \
             --yes \
-            --output json > "$RUNNER_TEMP/transfer.json"
-
-          TRANSFER_CODE="$(jq -r '.code // 0' "$RUNNER_TEMP/transfer.json")"
+            --output json > "$RUNNER_TEMP/transfer.json" 2> "$RUNNER_TEMP/transfer.err"; then
+            cat "$RUNNER_TEMP/transfer.err"
+            cat "$RUNNER_TEMP/transfer.json" || true
+            exit 1
+          fi
+          echo "Transfer response:"
+          cat "$RUNNER_TEMP/transfer.json"
+          TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
           test "$TRANSFER_CODE" = "0"
 
           CONFIRMED=0
