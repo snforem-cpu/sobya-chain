@@ -24,6 +24,11 @@ A workflow passing does not mean a public testnet is running.
 - **SOBYA Localnet Smoke Test**: creates a new disposable local chain, starts
   one validator, checks RPC, waits for block production, and checks its
   `usobya` balance.
+- **SOBYA Multi-Node Localnet**: uses SOBYA's native `multi-node` command to
+  generate two validator homes with one canonical genesis, starts both
+  validators as separate processes, and verifies RPC, P2P peer connections,
+  synchronized block production, and the two-validator set. This runs on one
+  temporary CI runner and is not an independently hosted public testnet.
 - **SOBYA Node Build**: builds a Linux AMD64 node binary and uploads a
   `sobya-linux-amd64.tar.gz` artifact for 30 days. It runs manually, on
   relevant maintenance-branch changes, and weekly.
