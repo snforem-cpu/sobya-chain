@@ -23,15 +23,15 @@ jobs:
           test -f project/go.mod
           test -f project/cmd/sobyad/main.go
 
-      - name: Apply SOBYA native denomination
-        working-directory: project
+      - name: Inspect original denomination settings (read-only)
         run: |
-          sed -i 's/sdk.DefaultBondDenom = "stake"/sdk.DefaultBondDenom = "usobya"/' app/config.go
-          sed -i 's/default_denom: stake/default_denom: usobya/' config.yml
-          sed -i 's/stake/usobya/g' config.yml
-          grep -q 'sdk.DefaultBondDenom = "usobya"' app/config.go
-          grep -q 'default_denom: usobya' config.yml
-          if grep -q 'stake' config.yml; then exit 1; fi
+          echo '--- Relevant source/config files ---'
+          find project -type f \\( -name '*.go' -o -name '*.yml' -o -name '*.yaml' -o -name '*.json' -o -name '*.toml' \\) \\
+            -not -path '*/vendor/*' -not -path '*/.git/*' | sort
+          echo '--- Denomination and project-name references in original archive ---'
+          grep -RInE 'DefaultBondDenom|BondDenom|default_denom|bond_denom|stake|usobya|SOBY|SOBYA' project \\
+            --include='*.go' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.toml' \\
+            --exclude-dir=vendor --exclude-dir=.git || true
 
       - name: Set up Go
         uses: actions/setup-go@v5
