@@ -59,7 +59,7 @@ jobs:
             --list-ports 26657,26654 \
             --starting-ip-address 127.0.0.1 \
             --keyring-backend test \
-            --min-gas-prices 0usobya
+            --minimum-gas-prices 0usobya
           test -s "$NET/validator0/config/genesis.json"
           test -s "$NET/validator1/config/genesis.json"
           cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
