@@ -123,16 +123,56 @@ jobs:
           test "$PEERS0" -ge 1
           test "$PEERS1" -ge 1
 
-          echo "=== validator0 keys ==="
-          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json | tee "$RUNNER_TEMP/keys0.json"
-          echo "=== validator1 keys ==="
-          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json | tee "$RUNNER_TEMP/keys1.json"
-          echo "=== transaction CLI ==="
-          ./sobyad tx bank send --help | head -100
           ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
           VALIDATORS="$(jq '.validators | length' "$RUNNER_TEMP/validators.json")"
           test "$VALIDATORS" -ge 2
+
+          # Use two distinct validator keyrings as two independent wallet identities.
+          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
+          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
+          FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
+          FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
+          TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
+          test -n "$FROM_NAME"
+          test -n "$FROM_ADDR"
+          test -n "$TO_ADDR"
+          test "$FROM_ADDR" != "$TO_ADDR"
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
+          BEFORE_FROM="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/before-from.json")"
+          BEFORE_TO="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/before-to.json")"
+          AMOUNT=1000
+
+          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}usobya" \
+            --chain-id sobya-multinode-ci-1 \
+            --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" \
+            --keyring-backend test \
+            --fees 0usobya \
+            --gas 200000 \
+            --broadcast-mode sync \
+            --yes \
+            --output json > "$RUNNER_TEMP/transfer.json"
+
+          TRANSFER_CODE="$(jq -r '.code // 0' "$RUNNER_TEMP/transfer.json")"
+          test "$TRANSFER_CODE" = "0"
+
+          CONFIRMED=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+            AFTER_FROM="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/after-from.json")"
+            AFTER_TO="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/after-to.json")"
+            if [ "$AFTER_FROM" -eq "$((BEFORE_FROM - AMOUNT))" ] && [ "$AFTER_TO" -eq "$((BEFORE_TO + AMOUNT))" ]; then
+              CONFIRMED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$CONFIRMED" -eq 1
           echo "PASS: chain=$N0 heights=$H0/$H1 p2p_peers=$PEERS0/$PEERS1 validators=$VALIDATORS"
+          echo "PASS: transfer=${AMOUNT}usobya from=$FROM_ADDR to=$TO_ADDR balances=$BEFORE_FROM->$AFTER_FROM and $BEFORE_TO->$AFTER_TO"
 
       - name: Upload diagnostic logs on failure
         if: failure()
