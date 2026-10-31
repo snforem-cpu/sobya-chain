@@ -2,6 +2,9 @@ name: SOBYA Localnet Smoke Test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
 
 permissions:
   contents: read
