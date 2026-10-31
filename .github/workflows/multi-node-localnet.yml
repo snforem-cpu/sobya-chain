@@ -123,6 +123,12 @@ jobs:
           test "$PEERS0" -ge 1
           test "$PEERS1" -ge 1
 
+          echo "=== validator0 keys ==="
+          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json | tee "$RUNNER_TEMP/keys0.json"
+          echo "=== validator1 keys ==="
+          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json | tee "$RUNNER_TEMP/keys1.json"
+          echo "=== transaction CLI ==="
+          ./sobyad tx bank send --help | head -100
           ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
           VALIDATORS="$(jq '.validators | length' "$RUNNER_TEMP/validators.json")"
           test "$VALIDATORS" -ge 2
