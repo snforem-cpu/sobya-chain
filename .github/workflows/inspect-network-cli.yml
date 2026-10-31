@@ -29,7 +29,7 @@ jobs:
           unzip -q 26031 -d project
           echo '=== testnet_multi_node.go ==='
           if [ -f project/cmd/sobyad/cmd/testnet_multi_node.go ]; then
-            sed -n '1,280p' project/cmd/sobyad/cmd/testnet_multi_node.go
+            sed -n '1,520p' project/cmd/sobyad/cmd/testnet_multi_node.go
           else
             echo 'FILE_NOT_FOUND'
           fi
@@ -37,5 +37,9 @@ jobs:
           grep -RInE 'NewTestnet|testnet_multi_node|testnet.*Command|AddCommand.*testnet|multi-node' project/cmd/sobyad/cmd project/app --include='*.go' | head -240 || true
           echo '=== node config defaults ==='
           grep -nE 'P2P|p2p|persistent_peers|seeds|external_address|laddr|proxy_app|rpc' project/config.yml | head -120 || true
+          echo '=== command registration ==='
+          sed -n '1,100p' project/cmd/sobyad/cmd/commands.go
+          echo '=== testnet multi-node source continuation ==='
+          sed -n '281,520p' project/cmd/sobyad/cmd/testnet_multi_node.go
           echo '=== source module and SDK versions ==='
           grep -nE 'cosmos-sdk|cometbft|tendermint' project/go.mod | head -40
