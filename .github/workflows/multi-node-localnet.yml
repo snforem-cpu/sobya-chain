@@ -1,0 +1,144 @@
+name: SOBYA Multi-Node Localnet
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - '26031'
+      - '.github/workflows/multi-node-localnet.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-multi-node-localnet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  two-validator-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Extract SOBYA source
+        run: |
+          set -euo pipefail
+          mkdir -p project
+          unzip -q 26031 -d project
+          test -f project/go.mod
+          grep -q 'DefaultBondDenom = "usobya"' project/app/config.go
+          grep -q 'default_denom: usobya' project/config.yml
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: project/go.mod
+          cache: true
+          cache-dependency-path: project/go.sum
+
+      - name: Build SOBYA node
+        working-directory: project
+        run: go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Generate two independent validator homes from the native multi-node command
+        env:
+          NET: ${{ runner.temp }}/sobya-multi-node
+        run: |
+          set -euo pipefail
+          ./sobyad multi-node \
+            --v 2 \
+            --output-dir "$NET" \
+            --chain-id sobya-multinode-ci-1 \
+            --validators-stake-amount 1000000000,1000000000 \
+            --list-ports 26657,26654 \
+            --starting-ip-address 127.0.0.1 \
+            --keyring-backend test \
+            --min-gas-prices 0usobya
+          test -s "$NET/validator0/config/genesis.json"
+          test -s "$NET/validator1/config/genesis.json"
+          cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
+          test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-multinode-ci-1"
+          for node in validator0 validator1; do
+            grep -q 'usobya' "$NET/$node/config/genesis.json"
+            grep -q '2665' "$NET/$node/config/config.toml"
+          done
+          echo "Both node homes share one canonical SOBYA genesis."
+
+      - name: Start both validators and verify P2P, RPC, and consensus
+        env:
+          NET: ${{ runner.temp }}/sobya-multi-node
+        run: |
+          set -euo pipefail
+          ./sobyad start --home "$NET/validator0" > "$RUNNER_TEMP/sobya-validator0.log" 2>&1 &
+          PID0=$!
+          ./sobyad start --home "$NET/validator1" > "$RUNNER_TEMP/sobya-validator1.log" 2>&1 &
+          PID1=$!
+          cleanup() {
+            kill "$PID0" "$PID1" 2>/dev/null || true
+            wait "$PID0" "$PID1" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY0=0
+          READY1=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"; then READY0=1; fi
+            if curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"; then READY1=1; fi
+            if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ]; then break; fi
+            if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
+              cat "$RUNNER_TEMP/sobya-validator0.log"
+              cat "$RUNNER_TEMP/sobya-validator1.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$READY0" -eq 1
+          test "$READY1" -eq 1
+
+          for attempt in $(seq 1 120); do
+            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"
+            curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"
+            H0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status0.json")"
+            H1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status1.json")"
+            N0="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status0.json")"
+            N1="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status1.json")"
+            if [ "$N0" = "sobya-multinode-ci-1" ] && [ "$N1" = "$N0" ] && [ "$H0" -ge 3 ] && [ "$H1" -ge 3 ]; then break; fi
+            sleep 2
+          done
+          test "$N0" = "sobya-multinode-ci-1"
+          test "$N1" = "$N0"
+          test "$H0" -ge 3
+          test "$H1" -ge 3
+
+          curl -fsS http://127.0.0.1:26657/net_info > "$RUNNER_TEMP/net0.json"
+          curl -fsS http://127.0.0.1:26654/net_info > "$RUNNER_TEMP/net1.json"
+          PEERS0="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net0.json")"
+          PEERS1="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net1.json")"
+          test "$PEERS0" -ge 1
+          test "$PEERS1" -ge 1
+
+          ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
+          VALIDATORS="$(jq '.validators | length' "$RUNNER_TEMP/validators.json")"
+          test "$VALIDATORS" -ge 2
+          echo "PASS: chain=$N0 heights=$H0/$H1 p2p_peers=$PEERS0/$PEERS1 validators=$VALIDATORS"
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-multi-node-failure-logs
+          path: |
+            ${{ runner.temp }}/sobya-validator0.log
+            ${{ runner.temp }}/sobya-validator1.log
+            ${{ runner.temp }}/status0.json
+            ${{ runner.temp }}/status1.json
+            ${{ runner.temp }}/net0.json
+            ${{ runner.temp }}/net1.json
+          if-no-files-found: ignore
+          retention-days: 7
