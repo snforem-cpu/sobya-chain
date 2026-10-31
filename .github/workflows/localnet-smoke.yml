@@ -51,56 +51,9 @@ jobs:
           ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000usobya --home "$SOBYA_HOME"
           ./sobyad genesis gentx validator 1000000000usobya --chain-id sobya-local-1 --keyring-backend test --home "$SOBYA_HOME"
           ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
-          jq -e '.app_state.bank.denom_metadata != null or .app_state.bank.balances != null' "$SOBYA_HOME/config/genesis.json" >/dev/null
-          # Cosmos SDK requires a non-empty minimum gas price before the node can start.
+          jq -e '.app_state.bank.balances != null' "$SOBYA_HOME/config/genesis.json" >/dev/null
           sed -i 's/^minimum-gas-prices = ""/minimum-gas-prices = "0usobya"/' "$SOBYA_HOME/config/app.toml"
-          grep -n '^minimum-gas-prices = "0usobya"
-
-      - name: Start node and verify RPC, block production, and SOBYA balance
-        env:
-          SOBYA_HOME: ${{ runner.temp }}/sobya-localnet
-        run: |
-          set -euo pipefail
-          ./sobyad start --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-node.log" 2>&1 &
-          NODE_PID=$!
-          trap 'kill "$NODE_PID" 2>/dev/null || true' EXIT
-          READY=0
-          for attempt in $(seq 1 90); do
-            if curl --silent --fail http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"; then
-              READY=1
-              break
-            fi
-            if ! kill -0 "$NODE_PID" 2>/dev/null; then
-              cat "$RUNNER_TEMP/sobya-node.log"
-              exit 1
-            fi
-            sleep 2
-          done
-          test "$READY" -eq 1
-          NETWORK="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status.json")"
-          test "$NETWORK" = "sobya-local-1"
-          for attempt in $(seq 1 60); do
-            HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status.json")"
-            if [ "$HEIGHT" -ge 1 ]; then break; fi
-            sleep 2
-            curl --silent --fail http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"
-          done
-          test "$HEIGHT" -ge 1
-          ./sobyad query bank balances "$VALIDATOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/balances.json"
-          jq -e '.balances[] | select(.denom == "usobya" and (.amount | tonumber) > 0)' "$RUNNER_TEMP/balances.json" >/dev/null
-          echo "PASS: chain ID=$NETWORK, block height=$HEIGHT, validator has a positive usobya balance."
-          cat "$RUNNER_TEMP/status.json"
-          cat "$RUNNER_TEMP/balances.json"
-
-      - name: Upload node log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sobya-localnet-failure-log
-          path: ${{ runner.temp }}/sobya-node.log
-          if-no-files-found: ignore
-          retention-days: 7
- "$SOBYA_HOME/config/app.toml"
+          grep -n 'minimum-gas-prices = "0usobya"' "$SOBYA_HOME/config/app.toml"
           echo "Fresh genesis created with validator $VALIDATOR_ADDRESS"
 
       - name: Start node and verify RPC, block production, and SOBYA balance
@@ -126,11 +79,12 @@ jobs:
           test "$READY" -eq 1
           NETWORK="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status.json")"
           test "$NETWORK" = "sobya-local-1"
+          HEIGHT=0
           for attempt in $(seq 1 60); do
+            curl --silent --fail http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"
             HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status.json")"
             if [ "$HEIGHT" -ge 1 ]; then break; fi
             sleep 2
-            curl --silent --fail http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"
           done
           test "$HEIGHT" -ge 1
           ./sobyad query bank balances "$VALIDATOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/balances.json"
