@@ -27,8 +27,11 @@ A workflow passing does not mean a public testnet is running.
 - **SOBYA Multi-Node Localnet**: uses SOBYA's native `multi-node` command to
   generate two validator homes with one canonical genesis, starts both
   validators as separate processes, and verifies RPC, P2P peer connections,
-  synchronized block production, and the two-validator set. This runs on one
-  temporary CI runner and is not an independently hosted public testnet.
+  synchronized block production, and the two-validator set. It also signs and
+  commits a 1,000 `usobya` transfer between the two generated validator wallet
+  keyrings, then verifies the exact sender and recipient balance changes and
+  the 20 `usobya` minimum fee. This runs on one temporary CI runner and is not
+  an independently hosted public testnet.
 - **SOBYA Node Build**: builds a Linux AMD64 node binary and uploads a
   `sobya-linux-amd64.tar.gz` artifact for 30 days. It runs manually, on
   relevant maintenance-branch changes, and weekly.
@@ -36,6 +39,11 @@ A workflow passing does not mean a public testnet is running.
 Open the repository's **Actions** tab, choose a workflow, then select
 **Run workflow** to start a manual run. Download successful build artifacts
 from the workflow run's **Artifacts** section.
+
+## Public testnet preparation guide
+
+See [PUBLIC_TESTNET_OPERATOR_GUIDE.md](PUBLIC_TESTNET_OPERATOR_GUIDE.md) for
+operator preparation, key safety, genesis coordination, and launch gates.
 
 ## Public testnet readiness checklist
 
