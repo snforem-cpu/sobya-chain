@@ -7,7 +7,7 @@ on:
       - maintenance/verify-build
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -23,31 +23,82 @@ jobs:
           test -f project/go.mod
           test -f project/cmd/sobyad/main.go
 
-      - name: Inspect original denomination settings (read-only)
+      - name: Set SOBYA base denomination
         run: |
-          echo '--- Relevant source/config files ---'
-          find project -type f | grep -E '\.(go|yml|yaml|json|toml)$' | grep -v '/vendor/' | grep -v '/.git/' | sort || true
-          echo '--- Denomination and project-name references in original archive ---'
-          grep -RInE 'DefaultBondDenom|BondDenom|default_denom|bond_denom|stake|usobya|SOBY|SOBYA' project --include='*.go' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.toml' --exclude-dir=vendor --exclude-dir=.git || true
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path, old, new, expected=1):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} occurrence(s) of {old!r}, found {count}")
+              p.write_text(text.replace(old, new))
+
+          replace_exact("project/app/config.go",
+                        'sdk.DefaultBondDenom = "stake"',
+                        'sdk.DefaultBondDenom = "usobya"')
+
+          config = Path("project/config.yml")
+          config_text = config.read_text()
+          if "stake" not in config_text:
+              raise SystemExit("project/config.yml: expected stake denomination entries were not found")
+          config.write_text(config_text.replace("stake", "usobya"))
+
+          replace_exact("project/cmd/sobyad/cmd/config.go",
+                        '"0stake"', '"0usobya"')
+          replace_exact("project/cmd/sobyad/cmd/testnet_multi_node.go",
+                        '"0.001stake"', '"0.001usobya"')
+          PY
+
+          rm -f 26031.updated
+          (cd project && zip -qr ../26031.updated .)
+          mv 26031.updated 26031
+
+      - name: Verify denomination changes in updated archive
+        run: |
+          rm -rf verify-project
+          mkdir verify-project
+          unzip -q 26031 -d verify-project
+          grep -n 'DefaultBondDenom = "usobya"' verify-project/app/config.go
+          grep -n 'default_denom: usobya' verify-project/config.yml
+          if grep -RInE 'stake([[:space:]]|$|,|")' verify-project/app verify-project/config.yml --include='*.go' --include='*.yml'; then
+            echo "Unexpected legacy stake denomination reference remains in active app/config files."
+            exit 1
+          fi
+          grep -RIn 'usobya' verify-project/app/config.go verify-project/config.yml verify-project/cmd/sobyad/cmd/config.go verify-project/cmd/sobyad/cmd/testnet_multi_node.go
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: project/go.mod
+          go-version-file: verify-project/go.mod
           cache: true
-          cache-dependency-path: project/go.sum
+          cache-dependency-path: verify-project/go.sum
 
       - name: Verify dependencies
-        working-directory: project
+        working-directory: verify-project
         run: go mod verify
 
       - name: Run tests
-        working-directory: project
+        working-directory: verify-project
         run: go test -mod=readonly ./...
 
       - name: Build node binary
-        working-directory: project
+        working-directory: verify-project
         run: go build -mod=readonly -o ../sobyad ./cmd/sobyad
 
       - name: Report binary
         run: file sobyad
+
+      - name: Commit updated source archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 26031
+          if git diff --cached --quiet; then
+            echo "Archive already contains the requested denomination."
+          else
+            git commit -m "fix: set SOBYA base denomination to usobya"
+            git push origin HEAD:maintenance/verify-build
+          fi
