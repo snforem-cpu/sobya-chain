@@ -150,7 +150,7 @@ jobs:
             --node tcp://127.0.0.1:26657 \
             --home "$NET/validator0" \
             --keyring-backend test \
-            --fees 0usobya \
+            --fees 20usobya \
             --gas 200000 \
             --broadcast-mode sync \
             --yes \
@@ -170,7 +170,7 @@ jobs:
             ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
             AFTER_FROM="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/after-from.json")"
             AFTER_TO="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/after-to.json")"
-            if [ "$AFTER_FROM" -eq "$((BEFORE_FROM - AMOUNT))" ] && [ "$AFTER_TO" -eq "$((BEFORE_TO + AMOUNT))" ]; then
+            if [ "$AFTER_FROM" -eq "$((BEFORE_FROM - AMOUNT - 20))" ] && [ "$AFTER_TO" -eq "$((BEFORE_TO + AMOUNT))" ]; then
               CONFIRMED=1
               break
             fi
@@ -178,7 +178,7 @@ jobs:
           done
           test "$CONFIRMED" -eq 1
           echo "PASS: chain=$N0 heights=$H0/$H1 p2p_peers=$PEERS0/$PEERS1 validators=$VALIDATORS"
-          echo "PASS: transfer=${AMOUNT}usobya from=$FROM_ADDR to=$TO_ADDR balances=$BEFORE_FROM->$AFTER_FROM and $BEFORE_TO->$AFTER_TO"
+          echo "PASS: transfer=${AMOUNT}usobya from=$FROM_ADDR to=$TO_ADDR balances=$BEFORE_FROM->$AFTER_FROM and $BEFORE_TO->$AFTER_TO (20usobya fee)"
 
       - name: Upload diagnostic logs on failure
         if: failure()
