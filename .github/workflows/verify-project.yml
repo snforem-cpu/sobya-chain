@@ -49,7 +49,7 @@ jobs:
           replace_exact("project/cmd/sobyad/cmd/config.go",
                         '"0stake"', '"0usobya"')
           replace_exact("project/cmd/sobyad/cmd/testnet_multi_node.go",
-                        '"0.001stake"', '"0.001usobya"')
+                        '0.001stake', '0.001usobya')
           PY
 
           rm -f 26031.updated
