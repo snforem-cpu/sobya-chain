@@ -55,7 +55,7 @@ jobs:
             --v 2 \
             --output-dir "$NET" \
             --chain-id sobya-multinode-ci-1 \
-            --validators-stake-amount 1000000000,1000000000 \
+            --validators-stake-amount 100000000,100000000 \
             --list-ports 26657,26654 \
             --starting-ip-address 127.0.0.1 \
             --keyring-backend test \
