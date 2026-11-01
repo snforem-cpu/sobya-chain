@@ -93,6 +93,8 @@ jobs:
           set -euo pipefail
           mkdir -p bundle
           tar -xzf bundle-download/sobya-gsrn-bundle.tar.gz -C bundle
+          NODE_LABEL="a"
+          PEER_LABEL="b"
           SECRET_A="$(cat bundle/relay/secret-a)"
           SECRET_B="$(cat bundle/relay/secret-b)"
           echo "::add-mask::$SECRET_A"
@@ -112,7 +114,31 @@ jobs:
             wait "$PID_CLIENT" "$PID_LISTEN" "$PID_NODE" 2>/dev/null || true
           }
           PID_NODE=""
-          trap cleanup EXIT
+
+          dump_diagnostics() {
+            echo "===== GSRN listener log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-listener-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== GSRN client log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-client-${PEER_LABEL}.log" 2>/dev/null || true
+            echo "===== SOBYA node log ====="
+            tail -n 200 "$RUNNER_TEMP/sobya-node-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== listening TCP sockets ====="
+            ss -lntp 2>&1 || true
+            echo "===== relevant processes ====="
+            ps -eo pid,ppid,stat,etime,args | grep -E 'gs-netcat|sobyad' | grep -v grep || true
+          }
+
+          on_exit() {
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "::group::Failure diagnostics (exit=$rc)"
+              dump_diagnostics
+              echo "::endgroup::"
+            fi
+            cleanup
+            exit "$rc"
+          }
+          trap on_exit EXIT
 
           for attempt in $(seq 1 60); do
             kill -0 "$PID_LISTEN"
@@ -193,6 +219,8 @@ jobs:
           set -euo pipefail
           mkdir -p bundle
           tar -xzf bundle-download/sobya-gsrn-bundle.tar.gz -C bundle
+          NODE_LABEL="b"
+          PEER_LABEL="a"
           SECRET_A="$(cat bundle/relay/secret-a)"
           SECRET_B="$(cat bundle/relay/secret-b)"
           echo "::add-mask::$SECRET_A"
@@ -212,7 +240,31 @@ jobs:
             wait "$PID_CLIENT" "$PID_LISTEN" "$PID_NODE" 2>/dev/null || true
           }
           PID_NODE=""
-          trap cleanup EXIT
+
+          dump_diagnostics() {
+            echo "===== GSRN listener log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-listener-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== GSRN client log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-client-${PEER_LABEL}.log" 2>/dev/null || true
+            echo "===== SOBYA node log ====="
+            tail -n 200 "$RUNNER_TEMP/sobya-node-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== listening TCP sockets ====="
+            ss -lntp 2>&1 || true
+            echo "===== relevant processes ====="
+            ps -eo pid,ppid,stat,etime,args | grep -E 'gs-netcat|sobyad' | grep -v grep || true
+          }
+
+          on_exit() {
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "::group::Failure diagnostics (exit=$rc)"
+              dump_diagnostics
+              echo "::endgroup::"
+            fi
+            cleanup
+            exit "$rc"
+          }
+          trap on_exit EXIT
 
           for attempt in $(seq 1 60); do
             kill -0 "$PID_LISTEN"
