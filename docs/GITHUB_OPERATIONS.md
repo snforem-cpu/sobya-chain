@@ -36,6 +36,8 @@ A workflow passing does not mean a public testnet is running.
   `sobya-linux-amd64.tar.gz` artifact for 30 days. It runs manually, on
   relevant maintenance-branch changes, and weekly.
 
+- **Enzonic Free Go Hosting Preparation**: records the provider-confirmed one-port P2P model, CometBFT address settings, outstanding network checks, and launch gates. It is a preparation guide, not a live deployment.
+
 Open the repository's **Actions** tab, choose a workflow, then select
 **Run workflow** to start a manual run. Download successful build artifacts
 from the workflow run's **Artifacts** section.
@@ -44,6 +46,11 @@ from the workflow run's **Artifacts** section.
 
 See [PUBLIC_TESTNET_OPERATOR_GUIDE.md](PUBLIC_TESTNET_OPERATOR_GUIDE.md) for
 operator preparation, key safety, genesis coordination, and launch gates.
+
+For the current free Go host preparation, see
+[ENZONIC_FREE_GO_DEPLOYMENT.md](ENZONIC_FREE_GO_DEPLOYMENT.md). Do not deploy
+until the provider-assigned P2P endpoint and the chain's launch parameters are
+confirmed.
 
 ## Public testnet readiness checklist
 
