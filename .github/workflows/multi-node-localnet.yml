@@ -194,3 +194,5 @@ jobs:
             ${{ runner.temp }}/net1.json
           if-no-files-found: ignore
           retention-days: 7
+
+# Re-run trigger: validate the existing two-validator CI test on a fresh GitHub-hosted runner.
