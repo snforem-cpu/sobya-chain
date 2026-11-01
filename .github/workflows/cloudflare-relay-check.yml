@@ -7,10 +7,12 @@ on:
     paths:
       - 'cloudflare-relay/**'
       - '.github/workflows/cloudflare-relay-check.yml'
+      - '.github/workflows/cloudflare-relay-deploy.yml'
   pull_request:
     paths:
       - 'cloudflare-relay/**'
       - '.github/workflows/cloudflare-relay-check.yml'
+      - '.github/workflows/cloudflare-relay-deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -37,3 +39,8 @@ jobs:
 
       - name: Install pinned bridge dependency
         run: python3 -m pip install -r cloudflare-relay/requirements.txt
+
+      - name: Validate Wrangler build without deploying
+        run: |
+          npm install --global wrangler@4
+          wrangler deploy --dry-run --config cloudflare-relay/wrangler.toml
