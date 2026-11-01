@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: sobya-multi-node-localnet-${{ github.ref }}
@@ -310,3 +311,112 @@ jobs:
             ${{ runner.temp }}/restarted-status.json
           if-no-files-found: ignore
           retention-days: 7
+
+
+# Cross-runner test: one hosted runner listens on a raw TCP port while another
+# independently hosted runner attempts to reach its advertised public egress IP.
+# A failed inbound attempt is recorded as a platform networking limitation, not
+# misreported as a successful peer connection.
+  cross-runner-listener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Start a temporary raw TCP listener
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sobya-peer-probe"
+          PUBLIC_IP="$(curl -4fsS https://api.ipify.org)"
+          cat > "$RUNNER_TEMP/sobya-peer-probe/server.py" <<'PY'
+          import socket
+          server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+          server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          server.bind(("0.0.0.0", 26656))
+          server.listen(1)
+          server.settimeout(240)
+          print("LISTENING 0.0.0.0:26656", flush=True)
+          try:
+              conn, address = server.accept()
+              with conn:
+                  print("ACCEPTED", address, flush=True)
+                  payload = conn.recv(1024)
+                  print("RECEIVED", payload.decode("utf-8", "replace"), flush=True)
+                  conn.sendall(b"SOBYA_TCP_PROBE_OK")
+          except socket.timeout:
+              print("NO_INBOUND_CONNECTION_WITHIN_WINDOW", flush=True)
+          finally:
+              server.close()
+          PY
+          nohup python3 "$RUNNER_TEMP/sobya-peer-probe/server.py" > "$RUNNER_TEMP/sobya-peer-probe/server.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sobya-peer-probe/server.pid"
+          READY=0
+          for attempt in $(seq 1 30); do
+            if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",26656),1); s.close()' 2>/dev/null; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+          printf '%s\n' "$PUBLIC_IP" > "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt"
+          echo "Listener ready on runner public egress address $PUBLIC_IP, TCP port 26656"
+
+      - name: Publish temporary endpoint for the other runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cross-runner-endpoint
+          path: ${{ runner.temp }}/sobya-peer-probe/public-ip.txt
+          retention-days: 1
+
+      - name: Keep listener alive for the independent runner probe
+        run: sleep 180
+
+      - name: Show listener diagnostics
+        if: always()
+        run: cat "$RUNNER_TEMP/sobya-peer-probe/server.log" || true
+
+  cross-runner-inbound-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository for run context
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Wait for listener endpoint artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sobya-peer-probe"
+          ARTIFACT_ID=""
+          for attempt in $(seq 1 60); do
+            ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="sobya-cross-runner-endpoint" and .expired==false) | .id' | head -n 1)"
+            if [ -n "$ARTIFACT_ID" ]; then break; fi
+            sleep 3
+          done
+          test -n "$ARTIFACT_ID"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name sobya-cross-runner-endpoint --dir "$RUNNER_TEMP/sobya-peer-probe"
+          test -s "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt"
+          echo "Listener runner public egress IP: $(cat "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt")"
+
+      - name: Attempt raw TCP connection from the second runner
+        run: |
+          set -euo pipefail
+          PUBLIC_IP="$(cat "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt")"
+          python3 - "$PUBLIC_IP" <<'PY'
+          import socket, sys
+          host = sys.argv[1]
+          try:
+              with socket.create_connection((host, 26656), timeout=8) as conn:
+                  conn.sendall(b"SOBYA_CROSS_RUNNER_TEST")
+                  conn.settimeout(8)
+                  reply = conn.recv(128)
+                  if reply != b"SOBYA_TCP_PROBE_OK":
+                      raise RuntimeError(f"unexpected reply: {reply!r}")
+                  print(f"PASS: independent GitHub runner reached {host}:26656 over raw TCP")
+          except Exception as exc:
+              print(f"INBOUND_UNAVAILABLE: independent runner could not reach {host}:26656")
+              print(f"Observed error: {type(exc).__name__}: {exc}")
+              print("This is evidence about hosted-runner inbound reachability; it is not a SOBYA consensus failure.")
+          PY
