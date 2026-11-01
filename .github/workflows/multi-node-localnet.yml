@@ -415,3 +415,139 @@ jobs:
               print(f"Observed error: {type(exc).__name__}: {exc}")
               print("This is evidence about hosted-runner inbound reachability; it is not a SOBYA consensus failure.")
           PY
+
+  gsrn-relay-prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      relay_secret: ${{ steps.secret.outputs.value }}
+    steps:
+      - name: Create a one-run relay secret
+        id: secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          VALUE="$(openssl rand -hex 32)"
+          echo "value=$VALUE" >> "$GITHUB_OUTPUT"
+
+  gsrn-relay-server:
+    needs: gsrn-relay-prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Download the official static gs-netcat binary
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o gs-netcat https://github.com/hackerschoice/gsocket/releases/download/v1.4.43/gs-netcat_linux-x86_64
+          chmod 700 gs-netcat
+          ./gs-netcat -h | head -n 8
+
+      - name: Start a local TCP echo service and publish it through GSRN
+        env:
+          GSRN_SECRET: ${{ needs.gsrn-relay-prepare.outputs.relay_secret }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/echo.py" <<'PY'
+          import socket
+          s = socket.socket()
+          s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          s.bind(("127.0.0.1", 26656))
+          s.listen(5)
+          print("LOCAL_ECHO_READY", flush=True)
+          while True:
+              c, a = s.accept()
+              with c:
+                  data = c.recv(4096)
+                  print("RELAY_RECEIVED", repr(data), flush=True)
+                  c.sendall(b"SOBYA_GSRN_RELAY_OK:" + data)
+          PY
+          python3 "$RUNNER_TEMP/echo.py" > "$RUNNER_TEMP/gsrn-echo.log" 2>&1 &
+          ECHO_PID=$!
+          ./gs-netcat -v -s "$GSRN_SECRET" -l -d 127.0.0.1 -p 26656 > "$RUNNER_TEMP/gsrn-server.log" 2>&1 &
+          RELAY_PID=$!
+          cleanup() {
+            kill "$RELAY_PID" "$ECHO_PID" 2>/dev/null || true
+            wait "$RELAY_PID" "$ECHO_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          sleep 3
+          kill -0 "$ECHO_PID"
+          kill -0 "$RELAY_PID"
+          echo "GSRN listener started; keeping it available for the independent runner."
+          sleep 180
+
+      - name: Show GSRN server diagnostics
+        if: always()
+        run: |
+          cat "$RUNNER_TEMP/gsrn-server.log" 2>/dev/null || true
+          cat "$RUNNER_TEMP/gsrn-echo.log" 2>/dev/null || true
+
+  gsrn-relay-client:
+    needs: gsrn-relay-prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download the official static gs-netcat binary
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o gs-netcat https://github.com/hackerschoice/gsocket/releases/download/v1.4.43/gs-netcat_linux-x86_64
+          chmod 700 gs-netcat
+          ./gs-netcat -h | head -n 8
+
+      - name: Connect through GSRN and verify bidirectional TCP data
+        env:
+          GSRN_SECRET: ${{ needs.gsrn-relay-prepare.outputs.relay_secret }}
+        run: |
+          set -euo pipefail
+          ./gs-netcat -v -s "$GSRN_SECRET" -p 26657 > "$RUNNER_TEMP/gsrn-client.log" 2>&1 &
+          CLIENT_PID=$!
+          cleanup() {
+            kill "$CLIENT_PID" 2>/dev/null || true
+            wait "$CLIENT_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$CLIENT_PID" 2>/dev/null; then
+              cat "$RUNNER_TEMP/gsrn-client.log"
+              exit 1
+            fi
+            if python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.settimeout(1)
+          try:
+              s.connect(("127.0.0.1", 26657))
+              s.close()
+              raise SystemExit(0)
+          except OSError:
+              raise SystemExit(1)
+          PY
+            then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          python3 - <<'PY'
+          import socket, time
+          payload = b"SOBYA_GSRN_CROSS_RUNNER_TCP_TEST"
+          last = None
+          for attempt in range(30):
+              try:
+                  with socket.create_connection(("127.0.0.1", 26657), timeout=5) as s:
+                      s.settimeout(10)
+                      s.sendall(payload)
+                      reply = s.recv(4096)
+                  expected = b"SOBYA_GSRN_RELAY_OK:" + payload
+                  if reply != expected:
+                      raise RuntimeError(f"Unexpected response: {reply!r}")
+                  print("PASS: separate GitHub runner exchanged bidirectional TCP data through GSRN.")
+                  raise SystemExit(0)
+              except OSError as exc:
+                  last = exc
+                  time.sleep(2)
+          raise SystemExit(f"GSRN relay test failed: {last!r}")
+          PY
+
+          echo "GSRN cross-runner TCP relay test passed."
+          cat "$RUNNER_TEMP/gsrn-client.log"
