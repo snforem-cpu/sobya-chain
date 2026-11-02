@@ -36,8 +36,8 @@ func validateNativeSupply(supply sdkmath.Int) error {
 	return nil
 }
 
-func nativeDenomMetadata() *banktypes.Metadata {
-	return &banktypes.Metadata{
+func nativeDenomMetadata() banktypes.Metadata {
+	return banktypes.Metadata{
 		Description: "SOBYA native token; 1 SOBY = 1,000,000 usobya.",
 		DenomUnits: []*banktypes.DenomUnit{
 			{Denom: BaseDenom, Exponent: 0, Aliases: []string{"microSOBY"}},
