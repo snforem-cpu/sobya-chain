@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sobya-18-decimal-multinode-\${{ github.ref }}
+  group: sobya-18-decimal-multinode-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout exact feature commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -45,7 +45,7 @@ jobs:
 
       - name: Generate, run, and test two validators in one process lifetime
         env:
-          NET: \${{ runner.temp }}/sobya-18-multinode
+          NET: ${{ runner.temp }}/sobya-18-multinode
         shell: bash
         run: |
           set -euo pipefail
@@ -124,12 +124,12 @@ jobs:
 
           AMOUNT=1000000000000000
           FEE=20000000000000
-          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "\${AMOUNT}asobya" \
+          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}asobya" \
             --chain-id sobya-feature-multinode-1 \
             --node tcp://127.0.0.1:26657 \
             --home "$NET/validator0" \
             --keyring-backend test \
-            --fees "\${FEE}asobya" \
+            --fees "${FEE}asobya" \
             --gas 200000 \
             --broadcast-mode sync \
             --yes \
@@ -169,7 +169,7 @@ jobs:
         with:
           name: sobya-18-decimal-multinode-failure
           path: |
-            \${{ runner.temp }}/validator0.log
-            \${{ runner.temp }}/validator1.log
+            ${{ runner.temp }}/validator0.log
+            ${{ runner.temp }}/validator1.log
           if-no-files-found: ignore
           retention-days: 7
