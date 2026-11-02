@@ -30,12 +30,30 @@ The Ignite development configuration contains test balances, scaled to preserve 
 
 These are development-only test values. They are not an approved public launch allocation, treasury allocation, or final genesis distribution.
 
+## Agreed economic decisions not yet implemented
+
+- Founder allocation: 40% of the maximum supply (400 million SOBY), with the
+  full founder allocation available at network launch.
+- Transaction-fee distribution target: 50% treasury, 30% validators, and 20%
+  community.
+- Validator allocation is intended to vest gradually and remain conditional on
+  actual validator participation; a validator that stops participating must
+  not continue earning future unvested rewards.
+
+These are design decisions, not active on-chain rules yet. The current source
+does not implement the custom 50/30/20 fee routing or participation-based
+validator rewards. Treasury, liquidity, development, emergency, and community
+wallets and the remaining genesis allocations still need their final amounts,
+addresses, and release rules.
+
 ## Rules not yet finalized
 
-No production values have been approved in source for:
+No production values have been finalized in source for:
 
-- transaction fee schedule or fee split;
-- validator commission and any validator reward policy;
+- transaction fee amount, gas pricing, and exact implementation of the agreed
+  fee split;
+- validator commission, reward eligibility, participation measurement, and
+  slashing/claim logic;
 - staking minimums, unbonding period, and validator eligibility;
 - treasury, community pool, ecosystem, team, or public distribution;
 - governance voting thresholds and upgrade authority;
