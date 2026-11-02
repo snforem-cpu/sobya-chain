@@ -28,7 +28,7 @@ jobs:
           go-version: '1.26.7'
           cache: true
 
-      - name: Resolve and compile Cosmos EVM v0.6.0 with SOBYA's SDK baseline
+      - name: Resolve and compile Cosmos EVM v0.6.0 with SOBYA's SDK baseline and Go 1.26-compatible Sonic
         shell: bash
         run: |
           set -euo pipefail
@@ -46,7 +46,10 @@ jobs:
             github.com/cosmos/ibc-go/v10 v10.4.0
           )
 
-          replace github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
+          replace (
+            github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
+            github.com/bytedance/sonic => github.com/bytedance/sonic v1.15.5
+          )
           EOF
           go mod download
           go list -m all > module-graph.txt
