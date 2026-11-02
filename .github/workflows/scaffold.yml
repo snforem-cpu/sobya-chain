@@ -5,13 +5,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   create-chain:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Refuse to write to main
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "This workflow must only run on a development branch."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -37,9 +44,9 @@ jobs:
 
       - name: Generate SOBYA chain
         run: |
-          ignite scaffold chain sobya \
-            --address-prefix sobya \
-            --no-module \
+          ignite scaffold chain sobya \\
+            --address-prefix sobya \\
+            --no-module \\
             --skip-git
 
       - name: Verify generated source
@@ -54,6 +61,20 @@ jobs:
         run: |
           go mod tidy
           go build ./...
+
+      - name: Persist generated source on this development branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sobya/
+          if git diff --cached --quiet; then
+            echo "Generated source is unchanged; no commit is needed."
+          else
+            git commit -m "Generate SOBYA chain source"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
 
       - name: Upload SOBYA source
         uses: actions/upload-artifact@v4
