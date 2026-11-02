@@ -34,6 +34,9 @@ func TestValidateNativeSupply(t *testing.T) {
 }
 
 func TestNativeDenominationConstants(t *testing.T) {
+	if sdk.DefaultBondDenom != BaseDenom {
+		t.Fatalf("default bond denom = %s, want %s", sdk.DefaultBondDenom, BaseDenom)
+	}
 	if BaseDenom != "usobya" {
 		t.Fatalf("unexpected base denom: %s", BaseDenom)
 	}
