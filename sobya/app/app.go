@@ -1,8 +1,6 @@
 package app
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -10,7 +8,6 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
-	sdkmath "cosmossdk.io/math"
 	circuitkeeper "cosmossdk.io/x/circuit/keeper"
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
 
@@ -63,7 +60,7 @@ const (
 )
 
 // DefaultNodeHome default home directories for the application daemon
-var DefaultNodeHome
+var DefaultNodeHome string
 
 var (
 	_ runtime.AppI            = (*App)(nil)
