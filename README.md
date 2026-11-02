@@ -1,3 +1,5 @@
+![SOBYA official logo](assets/logo/sobya-coin-128.png)
+
 # SOBYA Chain
 
 Independent blockchain project for SOBYA (SOBY).
