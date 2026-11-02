@@ -1,0 +1,185 @@
+name: SOBYA 18-Decimal Multi-Node Localnet
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - '.github/workflows/feature-multinode-smoke.yml'
+      - 'sobya/cmd/sobyad/cmd/testnet_multi_node.go'
+      - 'sobya/app/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-18-decimal-multinode-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  two-validator-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Test and build node
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Generate two independent validator homes
+        env:
+          NET: ${{ runner.temp }}/sobya-18-multinode
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad multi-node \
+            --v 2 \
+            --output-dir "$NET" \
+            --chain-id sobya-feature-multinode-1 \
+            --validators-stake-amount 100000000000000000000,100000000000000000000 \
+            --list-ports 26657,26654 \
+            --starting-ip-address 127.0.0.1 \
+            --keyring-backend test \
+            --minimum-gas-prices 0asobya
+          test -s "$NET/validator0/config/genesis.json"
+          test -s "$NET/validator1/config/genesis.json"
+          cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
+          test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-feature-multinode-1"
+
+      - name: Start both nodes and verify P2P and consensus
+        env:
+          NET: ${{ runner.temp }}/sobya-18-multinode
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad start --home "$NET/validator0" > "$RUNNER_TEMP/validator0.log" 2>&1 &
+          PID0=$!
+          ./sobyad start --home "$NET/validator1" > "$RUNNER_TEMP/validator1.log" 2>&1 &
+          PID1=$!
+          cleanup() {
+            kill "$PID0" "$PID1" 2>/dev/null || true
+            wait "$PID0" "$PID1" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY0=0
+          READY1=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"; then READY0=1; fi
+            if curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"; then READY1=1; fi
+            if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ]; then break; fi
+            if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
+              cat "$RUNNER_TEMP/validator0.log"
+              cat "$RUNNER_TEMP/validator1.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$READY0" -eq 1
+          test "$READY1" -eq 1
+
+          for attempt in $(seq 1 120); do
+            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"
+            curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"
+            H0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status0.json")"
+            H1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status1.json")"
+            if [ "$H0" -ge 2 ] && [ "$H1" -ge 2 ] && [ "$H0" = "$H1" ]; then break; fi
+            sleep 2
+          done
+          test "$H0" -ge 2
+          test "$H1" -ge 2
+          PEERS0="$(curl -fsS http://127.0.0.1:26657/net_info | jq '.result.n_peers | tonumber')"
+          PEERS1="$(curl -fsS http://127.0.0.1:26654/net_info | jq '.result.n_peers | tonumber')"
+          test "$PEERS0" -ge 1
+          test "$PEERS1" -ge 1
+
+          ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
+          test "$(jq '.validators | length' "$RUNNER_TEMP/validators.json")" -ge 2
+
+      - name: Transfer native SOBY between independent validator keyrings
+        env:
+          NET: ${{ runner.temp }}/sobya-18-multinode
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
+          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
+          FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
+          FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
+          TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
+          test -n "$FROM_NAME"
+          test -n "$FROM_ADDR"
+          test -n "$TO_ADDR"
+          test "$FROM_ADDR" != "$TO_ADDR"
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
+
+          AMOUNT=1000000000000000
+          FEE=20000000000000
+          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}asobya" \
+            --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" \
+            --keyring-backend test \
+            --fees "${FEE}asobya" \
+            --gas 200000 \
+            --broadcast-mode sync \
+            --yes \
+            --output json > "$RUNNER_TEMP/transfer.json"
+          TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
+          test "$TRANSFER_CODE" = "0"
+
+          CONFIRMED=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+            if python3 - "$RUNNER_TEMP/before-from.json" "$RUNNER_TEMP/before-to.json" "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$AMOUNT" "$FEE" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
+          amount, fee = map(int, sys.argv[5:7])
+          ok = after_from == before_from - amount - fee and after_to == before_to + amount
+          if ok:
+              print("PASS: exact integer balance deltas verified for 18-decimal SOBYA.")
+          sys.exit(0 if ok else 1)
+          PY
+            then
+              CONFIRMED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$CONFIRMED" -eq 1
+          echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-18-decimal-multinode-failure
+          path: |
+            ${{ runner.temp }}/validator0.log
+            ${{ runner.temp }}/validator1.log
+          if-no-files-found: ignore
+          retention-days: 7
