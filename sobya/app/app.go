@@ -149,6 +149,12 @@ func New(
 				// This needs to be removed after IBC supports App Wiring.
 				app.GetIBCKeeper,
 
+				// SOBYA has a fixed native supply. Replace the SDK mint function
+				// with a no-op so parameter changes cannot re-enable token issuance.
+				mintkeeper.MintFn(func(_ sdk.Context, _ *mintkeeper.Keeper) error {
+					return nil
+				}),
+
 				// here alternative options can be supplied to the DI container.
 				// those options can be used f.e to override the default behavior of some modules.
 				// for instance supplying a custom address codec for not using bech32 addresses.
