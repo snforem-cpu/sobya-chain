@@ -106,9 +106,10 @@ var (
 						upgradetypes.ModuleName,
 						authtypes.ModuleName,
 					},
-					// Inflation is intentionally disabled for SOBYA. The mint module remains
-					// available for state compatibility, but its BeginBlocker is not scheduled.
+					// The mint module remains in the blocker order because the module manager
+					// requires a complete order. Its genesis inflation values are forced to zero.
 					BeginBlockers: []string{
+						minttypes.ModuleName,
 						distrtypes.ModuleName,
 						slashingtypes.ModuleName,
 						evidencetypes.ModuleName,
