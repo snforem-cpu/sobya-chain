@@ -4,7 +4,7 @@ The official SOBYA coin mark is the user-provided crystal-and-gold-orbit artwork
 
 ## Files
 
-- `sobya-coin-128.png`: optimized 128×128 RGBA PNG for wallet/token metadata and compact UI use.
+- `sobya-coin-128.png`: optimized 128×128 PNG for wallet/token metadata and compact UI use.
 
 The artwork is intentionally preserved with its dark navy background and original composition. The repository asset is a compact raster derivative; the original high-resolution upload remains the design master and should be used when generating larger website or explorer artwork.
 
