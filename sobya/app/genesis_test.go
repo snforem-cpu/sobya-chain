@@ -15,17 +15,17 @@ import (
 func TestValidateNativeSupply(t *testing.T) {
 	tests := []struct {
 		name    string
-		supply  int64
+		supply  sdkmath.Int
 		wantErr bool
 	}{
-		{name: "zero supply", supply: 0},
-		{name: "below maximum", supply: MaxSupply - 1},
+		{name: "zero supply", supply: sdkmath.NewInt(0)},
+		{name: "below maximum", supply: MaxSupply.Sub(sdkmath.NewInt(1))},
 		{name: "exact maximum", supply: MaxSupply},
-		{name: "above maximum", supply: MaxSupply + 1, wantErr: true},
+		{name: "above maximum", supply: MaxSupply.Add(sdkmath.NewInt(1)), wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateNativeSupply(sdkmath.NewInt(tt.supply))
+			err := validateNativeSupply(tt.supply)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("validateNativeSupply() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -37,13 +37,13 @@ func TestNativeDenominationConstants(t *testing.T) {
 	if sdk.DefaultBondDenom != BaseDenom {
 		t.Fatalf("default bond denom = %s, want %s", sdk.DefaultBondDenom, BaseDenom)
 	}
-	if BaseDenom != "usobya" {
+	if BaseDenom != "asobya" {
 		t.Fatalf("unexpected base denom: %s", BaseDenom)
 	}
 	if DisplayDenom != "SOBY" {
 		t.Fatalf("unexpected display denom: %s", DisplayDenom)
 	}
-	if DisplayExponent != 6 {
+	if DisplayExponent != 18 {
 		t.Fatalf("unexpected display exponent: %d", DisplayExponent)
 	}
 	if MaxSupply != 1_000_000_000_000_000 {
@@ -117,7 +117,7 @@ func TestPrepareGenesisStateRejectsSupplyAboveCap(t *testing.T) {
 	bankGenesis := banktypes.DefaultGenesisState()
 	bankGenesis.Balances = []banktypes.Balance{{
 		Address: "sobya1genesisallocationtest",
-		Coins:   sdk.NewCoins(sdk.NewCoin(BaseDenom, sdkmath.NewInt(MaxSupply+1))),
+		Coins:   sdk.NewCoins(sdk.NewCoin(BaseDenom, MaxSupply.Add(sdkmath.NewInt(1)))),
 	}}
 	mintGenesis := minttypes.DefaultGenesisState()
 
