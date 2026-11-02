@@ -2,6 +2,11 @@ name: SOBYA Blockchain Scaffold
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - '.github/workflows/scaffold.yml'
 
 permissions:
   contents: write
