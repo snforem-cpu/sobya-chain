@@ -6,6 +6,10 @@ The approved SOBYA mark is stored at [assets/logo/sobya-coin-128.png](../assets/
 
 ## Metadata policy
 
+- Display symbol: `SOBY`.
+- Native base denomination: `asobya`.
+- Native precision: 18 decimals (`1 SOBY = 10^18 asobya`).
+
 Keep the token's display name, ticker, base denomination, decimal precision, chain ID, RPC endpoints and logo URI in one canonical network metadata set. Do not publish guessed chain IDs, RPC endpoints, explorer URLs or token contract addresses.
 
 ## Wallet compatibility
