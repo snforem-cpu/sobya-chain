@@ -26,8 +26,6 @@ const (
 // MaxSupply is the hard maximum native supply in base units (1 billion SOBY).
 var MaxSupply = sdkmath.NewIntWithDecimal(1_000_000_000, 18)
 
-const (
-)
 
 // validateNativeSupply rejects genesis states that exceed the agreed SOBYA cap.
 func validateNativeSupply(supply sdkmath.Int) error {
@@ -35,7 +33,7 @@ func validateNativeSupply(supply sdkmath.Int) error {
 		return fmt.Errorf("native SOBYA supply cannot be negative")
 	}
 	if supply.GT(MaxSupply) {
-		return fmt.Errorf("native SOBYA supply %s exceeds maximum %d %s", supply, MaxSupply.String(), BaseDenom)
+		return fmt.Errorf("native SOBYA supply %s exceeds maximum %s %s", supply, MaxSupply.String(), BaseDenom)
 	}
 	return nil
 }
