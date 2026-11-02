@@ -2,6 +2,17 @@
 
 # SOBYA Chain
 
+## Native token (development parameters)
+
+- Display symbol: `SOBY`.
+- Base denomination: `asobya`.
+- Precision: 18 decimal places.
+- Maximum native supply: 1,000,000,000 SOBY, enforced using arbitrary-precision integers.
+- Official logo: `assets/logo/sobya-coin-128.png`.
+
+The 18-decimal denomination is prepared for EVM compatibility. Cosmos EVM is not yet integrated into the SOBYA application; see [the integration plan](docs/COSMOS_EVM_INTEGRATION.md) and [token rules](sobya/TOKENOMICS.md).
+
+
 Independent blockchain project for SOBYA (SOBY).
 
 ## Development status
