@@ -16,13 +16,17 @@ type GenesisState map[string]json.RawMessage
 
 const (
 	// BaseDenom is the smallest unit of the native SOBYA token.
-	BaseDenom = "usobya"
+	BaseDenom = "asobya"
 	// DisplayDenom is the user-facing token denomination.
 	DisplayDenom = "SOBY"
-	// DisplayExponent defines 1 SOBY = 10^6 usobya.
-	DisplayExponent uint32 = 6
-	// MaxSupply is the hard maximum native supply in base units (1 billion SOBY).
-	MaxSupply int64 = 1_000_000_000_000_000
+	// DisplayExponent defines 1 SOBY = 10^18 asobya.
+	DisplayExponent uint32 = 18
+)
+
+// MaxSupply is the hard maximum native supply in base units (1 billion SOBY).
+var MaxSupply = sdkmath.NewIntWithDecimal(1_000_000_000, 18)
+
+const (
 )
 
 // validateNativeSupply rejects genesis states that exceed the agreed SOBYA cap.
@@ -30,17 +34,17 @@ func validateNativeSupply(supply sdkmath.Int) error {
 	if supply.IsNegative() {
 		return fmt.Errorf("native SOBYA supply cannot be negative")
 	}
-	if supply.GT(sdkmath.NewInt(MaxSupply)) {
-		return fmt.Errorf("native SOBYA supply %s exceeds maximum %d %s", supply, MaxSupply, BaseDenom)
+	if supply.GT(MaxSupply) {
+		return fmt.Errorf("native SOBYA supply %s exceeds maximum %d %s", supply, MaxSupply.String(), BaseDenom)
 	}
 	return nil
 }
 
 func nativeDenomMetadata() banktypes.Metadata {
 	return banktypes.Metadata{
-		Description: "SOBYA native token; 1 SOBY = 1,000,000 usobya.",
+		Description: "SOBYA native token; 1 SOBY = 1,000,000,000,000,000,000 asobya.",
 		DenomUnits: []*banktypes.DenomUnit{
-			{Denom: BaseDenom, Exponent: 0, Aliases: []string{"microSOBY"}},
+			{Denom: BaseDenom, Exponent: 0, Aliases: []string{"attoSOBY"}},
 			{Denom: DisplayDenom, Exponent: DisplayExponent},
 		},
 		Base:    BaseDenom,
