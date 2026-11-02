@@ -30,7 +30,7 @@ import (
 	"sobya/app"
 )
 
-const valVotingPower int64 = 900000000000000000000000000
+var valVotingPower = math.NewIntWithDecimal(900_000_000, 18)
 
 var flagAccountsToFund = "accounts-to-fund"
 
@@ -94,7 +94,7 @@ func initAppForTestnet(app *app.App, args valArgs) *app.App {
 		ConsensusPubkey: pubkeyAny,
 		Jailed:          false,
 		Status:          stakingtypes.Bonded,
-		Tokens:          math.NewInt(valVotingPower),
+		Tokens:          valVotingPower,
 		DelegatorShares: math.LegacyMustNewDecFromStr("10000000"),
 		Description: stakingtypes.Description{
 			Moniker: "Testnet Validator",
@@ -179,7 +179,7 @@ func initAppForTestnet(app *app.App, args valArgs) *app.App {
 	bondDenom, err := app.StakingKeeper.BondDenom(ctx)
 	handleErr(err)
 
-	defaultCoins := sdk.NewCoins(sdk.NewInt64Coin(bondDenom, 1000000000000000000000))
+	defaultCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, math.NewIntWithDecimal(1000, 18)))
 
 	// Fund local accounts
 	for _, accountStr := range args.accountsToFund {
