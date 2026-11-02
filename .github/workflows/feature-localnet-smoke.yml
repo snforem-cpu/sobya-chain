@@ -1,0 +1,127 @@
+name: SOBYA 18-Decimal Localnet Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/feature-localnet-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-18-decimal-localnet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  localnet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Verify dependencies, run tests, and build node
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Initialize 18-decimal SOBYA local validator
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-18-localnet
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad init "SOBYA 18 Decimal CI Validator" --chain-id sobya-feature-local-1 --home "$SOBYA_HOME"
+          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
+          VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator-key.json")"
+          test -n "$VALIDATOR_ADDRESS"
+          ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis gentx validator 1000000000000000000000asobya --chain-id sobya-feature-local-1 --keyring-backend test --home "$SOBYA_HOME"
+          ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
+          sed -i 's/^minimum-gas-prices = ""/minimum-gas-prices = "0asobya"/' "$SOBYA_HOME/config/app.toml"
+          grep -n 'minimum-gas-prices = "0asobya"' "$SOBYA_HOME/config/app.toml"
+
+      - name: Start node and verify block production, denomination, and supply cap
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-18-localnet
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad start --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-18-node.log" 2>&1 &
+          NODE_PID=$!
+          cleanup() {
+            kill "$NODE_PID" 2>/dev/null || true
+            wait "$NODE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"; then READY=1; break; fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-18-node.log"; exit 1; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          HEIGHT=0
+          for attempt in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"
+            HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status.json")"
+            if [ "$HEIGHT" -ge 1 ]; then break; fi
+            sleep 2
+          done
+          test "$HEIGHT" -ge 1
+
+          ./sobyad query bank denom-metadata asobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/denom.json"
+          jq -e '.metadata.base == "asobya" and .metadata.display == "SOBY" and .metadata.denom_units[1].exponent == 18' "$RUNNER_TEMP/denom.json" >/dev/null
+
+          ./sobyad query bank total-supply-of asobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/supply.json"
+          python3 - "$RUNNER_TEMP/supply.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              data = json.load(f)
+          amount = int(data["amount"]["amount"])
+          cap = 10**27
+          assert data["amount"]["denom"] == "asobya", data
+          assert 0 <= amount <= cap, (amount, cap)
+          print(f"PASS: native supply {amount} asobya is within the 10^27 cap.")
+          PY
+
+          ./sobyad query mint params --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/mint-params.json"
+          jq -e '.params.mint_denom == "asobya" and .params.inflation_rate_change == "0.000000000000000000" and .params.inflation_max == "0.000000000000000000" and .params.inflation_min == "0.000000000000000000"' "$RUNNER_TEMP/mint-params.json" >/dev/null
+
+          ./sobyad query mint inflation --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/inflation.json"
+          jq -e '.inflation == "0.000000000000000000"' "$RUNNER_TEMP/inflation.json" >/dev/null
+
+          ./sobyad query mint annual-provisions --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/annual-provisions.json"
+          jq -e '.annual_provisions == "0.000000000000000000"' "$RUNNER_TEMP/annual-provisions.json" >/dev/null
+
+          echo "PASS: chain=sobya-feature-local-1 height=$HEIGHT precision=18 denom=asobya inflation=0."
+          cat "$RUNNER_TEMP/denom.json"
+          cat "$RUNNER_TEMP/supply.json"
+
+      - name: Upload node log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-18-decimal-localnet-failure
+          path: ${{ runner.temp }}/sobya-18-node.log
+          if-no-files-found: ignore
+          retention-days: 7
