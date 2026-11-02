@@ -1,20 +1,59 @@
-
-name: SOBYA Build Check
+name: SOBYA Source Validation
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - maintenance/verify-build
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
 
 jobs:
-  inspect:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
+      - name: Refuse unexpected branches
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "maintenance/verify-build" ]; then
+            echo "Validation is restricted to maintenance/verify-build."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
 
-      - name: Show project files
+      - name: Check whether source exists
+        id: source
+        shell: bash
         run: |
-          echo "SOBYA Chain repository"
-          find . -maxdepth 3 -type f -not -path './.git/*' | sort
+          if [ -f sobya/go.mod ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SOBYA starter source has not been generated yet. Run the SOBYA Blockchain Scaffold workflow."
+          fi
+
+      - name: Set up Go
+        if: steps.source.outputs.present == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache: false
+
+      - name: Test and build SOBYA source
+        if: steps.source.outputs.present == 'true'
+        working-directory: sobya
+        shell: bash
+        run: |
+          go version
+          go test ./...
+          go build ./...
