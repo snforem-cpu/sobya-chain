@@ -1,6 +1,8 @@
 package app
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -8,6 +10,7 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
+	sdkmath "cosmossdk.io/math"
 	circuitkeeper "cosmossdk.io/x/circuit/keeper"
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
 
@@ -23,6 +26,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
@@ -36,6 +40,7 @@ import (
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
@@ -58,7 +63,7 @@ const (
 )
 
 // DefaultNodeHome default home directories for the application daemon
-var DefaultNodeHome string
+var DefaultNodeHome
 
 var (
 	_ runtime.AppI            = (*App)(nil)
@@ -212,6 +217,15 @@ func New(
 		if err := app.UpgradeKeeper.SetModuleVersionMap(ctx, app.ModuleManager.GetVersionMap()); err != nil {
 			return nil, err
 		}
+
+		// Normalize and validate the native SOBYA denomination before any module
+		// initializes its genesis state. This also enforces the native supply cap.
+		normalizedGenesis, err := prepareGenesisState(app.appCodec, req.AppStateBytes)
+		if err != nil {
+			return nil, err
+		}
+		req.AppStateBytes = normalizedGenesis
+
 		return app.App.InitChainer(ctx, req)
 	})
 
@@ -283,7 +297,6 @@ func GetMaccPerms() map[string][]string {
 	for _, perms := range moduleAccPerms {
 		dup[perms.GetAccount()] = perms.GetPermissions()
 	}
-
 	return dup
 }
 

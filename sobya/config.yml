@@ -1,27 +1,24 @@
 version: 1
 validation: sovereign
-default_denom: stake
-accounts: 
+default_denom: usobya
+accounts:
 - name: alice
   coins:
-  - 20000token
-  - 200000000stake
+  - 20000000000usobya
 - name: bob
   coins:
-  - 10000token
-  - 100000000stake
+  - 10000000000usobya
 client:
   openapi:
     path: docs/static/openapi.json
 faucet:
   name: bob
   coins:
-  - 5token
-  - 100000stake
+  - 5000000usobya
 validators:
 - name: alice
-  bonded: 100000000stake
+  bonded: 100000000usobya
 - name: validator1
-  bonded: 200000000stake
+  bonded: 200000000usobya
 - name: validator2
-  bonded: 100000000stake
+  bonded: 100000000usobya

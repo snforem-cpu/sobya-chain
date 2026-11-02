@@ -1,49 +1,29 @@
-# sobya
-**sobya** is a blockchain built using Cosmos SDK and Tendermint and created with [Ignite CLI](https://ignite.com/cli).
+# SOBYA blockchain (development)
 
-## Get started
+SOBYA is a Cosmos SDK application using CometBFT. The repository currently contains a development scaffold, not a launched public network.
 
-```
+## Native token
+
+- Display: `SOBY`
+- Base denomination: `usobya`
+- Precision: 6 decimals (`1 SOBY = 1,000,000 usobya`)
+- Maximum native supply: `1,000,000,000 SOBY`
+
+The application validates the native genesis allocation against this cap. Automatic mint inflation is disabled: mint parameters are set to zero at genesis and the mint BeginBlocker is not scheduled. See [TOKENOMICS.md](TOKENOMICS.md) for the current rules and decisions still pending.
+
+## Development
+
+Run locally with Ignite:
+
+```sh
 ignite chain serve
 ```
 
-`serve` command installs dependencies, builds, initializes, and starts your blockchain in development.
+The values in `config.yml` are development-only test allocations. They are not a public launch distribution or final genesis file.
 
-### Configure
+## Safety and status
 
-Your blockchain in development can be configured with `config.yml`. To learn more, see the [Ignite CLI docs](https://docs.ignite.com).
-
-### Web Frontend
-
-Additionally, Ignite CLI offers a frontend scaffolding feature (based on Vue) to help you quickly build a web frontend for your blockchain:
-
-Use: `ignite scaffold vue`
-This command can be run within your scaffolded blockchain project.
-
-
-For more information see the [monorepo for Ignite front-end development](https://github.com/ignite/web).
-
-## Release
-To release a new version of your blockchain, create and push a new tag with `v` prefix. A new draft release with the configured targets will be created.
-
-```
-git tag v0.1
-git push origin v0.1
-```
-
-After a draft release is created, make your final changes from the release page and publish it.
-
-### Install
-To install the latest version of your blockchain node's binary, execute the following command on your machine:
-
-```
-curl https://get.ignite.com/username/sobya@latest! | sudo bash
-```
-`username/sobya` should match the `username` and `repo_name` of the Github repository to which the source code was pushed. Learn more about [the install process](https://github.com/ignite/installer).
-
-## Learn more
-
-- [Ignite CLI](https://ignite.com/cli)
-- [Tutorials](https://docs.ignite.com/guide)
-- [Ignite CLI docs](https://docs.ignite.com)
-- [Cosmos SDK docs](https://docs.cosmos.network)
+- This repository branch is for development and verification.
+- A successful local build does not prove public-network connectivity, validator independence, or production readiness.
+- Do not commit private validator keys, node keys, wallet seed phrases, or other secrets.
+- Do not use real funds on this development chain.
