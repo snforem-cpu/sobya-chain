@@ -50,10 +50,58 @@ jobs:
           go mod download
           go list -m all > module-graph.txt
           grep -E '^(github.com/cosmos/evm |github.com/cosmos/cosmos-sdk |github.com/cometbft/cometbft |github.com/cosmos/ibc-go/v10 |github.com/cosmos/go-ethereum )' module-graph.txt
-          go test -mod=mod -run '^$' github.com/cosmos/evm/evmd
           go test -mod=mod -run '^$' github.com/cosmos/evm/x/vm/...
           go test -mod=mod -run '^$' github.com/cosmos/evm/x/erc20/...
-          go test -mod=mod -run '^$' github.com/cosmos/evm/x/feemarket/...
+          go test -mod=mod -run '^
+      - name: Upload resolved module graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cosmos-evm-v060-module-graph
+          path: evm-compat/module-graph.txt
+          if-no-files-found: warn
+          retention-days: 14
+ github.com/cosmos/evm/x/feemarket/...
+          go test -mod=mod -run '^
+      - name: Upload resolved module graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cosmos-evm-v060-module-graph
+          path: evm-compat/module-graph.txt
+          if-no-files-found: warn
+          retention-days: 14
+ github.com/cosmos/evm/ante/...
+          go test -mod=mod -run '^
+      - name: Upload resolved module graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cosmos-evm-v060-module-graph
+          path: evm-compat/module-graph.txt
+          if-no-files-found: warn
+          retention-days: 14
+ github.com/cosmos/evm/server/...
+          go test -mod=mod -run '^
+      - name: Upload resolved module graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cosmos-evm-v060-module-graph
+          path: evm-compat/module-graph.txt
+          if-no-files-found: warn
+          retention-days: 14
+ github.com/cosmos/evm/precompiles/...
+          go test -mod=mod -run '^
+      - name: Upload resolved module graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cosmos-evm-v060-module-graph
+          path: evm-compat/module-graph.txt
+          if-no-files-found: warn
+          retention-days: 14
+ github.com/cosmos/evm/mempool/...
 
       - name: Upload resolved module graph
         if: always()
