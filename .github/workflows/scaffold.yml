@@ -83,19 +83,6 @@ jobs:
           go test ./...
           go build ./...
 
-      - name: Persist verified source on the development branch
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add sobya/
-          if git diff --cached --quiet; then
-            echo "Verified source is unchanged; no commit is needed."
-          else
-            git commit -m "Generate and verify SOBYA starter source"
-            git push origin "HEAD:maintenance/verify-build"
-          fi
-
       - name: Upload verified SOBYA source
         uses: actions/upload-artifact@v4
         with:
@@ -103,3 +90,23 @@ jobs:
           path: sobya/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Persist verified source on the development branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="maintenance/verify-build"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sobya/
+          if git diff --cached --quiet; then
+            echo "Verified source is unchanged; no commit is needed."
+            exit 0
+          fi
+          git commit -m "Generate and verify SOBYA starter source"
+          # The branch may have advanced while this workflow was building.
+          # Rebase the generated-source commit onto the latest remote head
+          # instead of attempting a stale non-fast-forward push.
+          git fetch origin "$branch"
+          git rebase "origin/$branch"
+          git push origin "HEAD:refs/heads/$branch"
