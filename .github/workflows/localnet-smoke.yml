@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - maintenance/verify-build
+    paths:
+      - "sobya/**"
+      - ".github/workflows/localnet-smoke.yml"
 
 permissions:
   contents: read
@@ -19,23 +22,26 @@ jobs:
         with:
           ref: maintenance/verify-build
 
-      - name: Extract verified SOBYA source
+      - name: Verify SOBYA source and denomination
         run: |
-          mkdir -p project
-          unzip -q 26031 -d project
-          test -f project/go.mod
-          grep -n 'DefaultBondDenom = "usobya"' project/app/config.go
-          grep -n 'default_denom: usobya' project/config.yml
+          test -f sobya/go.mod
+          grep -n 'BaseDenom = "usobya"' sobya/app/genesis.go
+          grep -n 'DisplayDenom = "SOBY"' sobya/app/genesis.go
+          grep -n 'default_denom: usobya' sobya/config.yml
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: project/go.mod
+          go-version-file: sobya/go.mod
           cache: true
-          cache-dependency-path: project/go.sum
+          cache-dependency-path: sobya/go.sum
+
+      - name: Run SOBYA application tests
+        working-directory: sobya
+        run: go test -mod=readonly ./...
 
       - name: Build SOBYA node
-        working-directory: project
+        working-directory: sobya
         run: go build -mod=readonly -o ../sobyad ./cmd/sobyad
 
       - name: Initialize a fresh one-validator SOBYA network
@@ -56,7 +62,7 @@ jobs:
           grep -n 'minimum-gas-prices = "0usobya"' "$SOBYA_HOME/config/app.toml"
           echo "Fresh genesis created with validator $VALIDATOR_ADDRESS"
 
-      - name: Start node and verify RPC, block production, and SOBYA balance
+      - name: Start node and verify fixed-supply rules, RPC, and block production
         env:
           SOBYA_HOME: ${{ runner.temp }}/sobya-localnet
         run: |
@@ -87,11 +93,21 @@ jobs:
             sleep 2
           done
           test "$HEIGHT" -ge 1
+
           ./sobyad query bank balances "$VALIDATOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/balances.json"
           jq -e '.balances[] | select(.denom == "usobya" and (.amount | tonumber) > 0)' "$RUNNER_TEMP/balances.json" >/dev/null
-          echo "PASS: chain ID=$NETWORK, block height=$HEIGHT, validator has a positive usobya balance."
+
+          ./sobyad query mint params --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/mint-params.json"
+          jq -e '.params.mint_denom == "usobya" and .params.inflation_rate_change == "0.000000000000000000" and .params.inflation_max == "0.000000000000000000" and .params.inflation_min == "0.000000000000000000"' "$RUNNER_TEMP/mint-params.json" >/dev/null
+
+          ./sobyad query bank denom-metadata usobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/denom-metadata.json"
+          jq -e '.metadata.base == "usobya" and .metadata.display == "SOBY" and .metadata.denom_units[1].exponent == 6' "$RUNNER_TEMP/denom-metadata.json" >/dev/null
+
+          echo "PASS: chain ID=$NETWORK, block height=$HEIGHT, SOBY metadata is canonical, and inflation is zero."
           cat "$RUNNER_TEMP/status.json"
           cat "$RUNNER_TEMP/balances.json"
+          cat "$RUNNER_TEMP/mint-params.json"
+          cat "$RUNNER_TEMP/denom-metadata.json"
 
       - name: Upload node log on failure
         if: failure()
