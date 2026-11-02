@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sobya-18-decimal-multinode-${{ github.ref }}
+  group: sobya-18-decimal-multinode-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout exact feature commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: \${{ github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -43,9 +43,9 @@ jobs:
           go test -mod=readonly ./...
           go build -mod=readonly -o ../sobyad ./cmd/sobyad
 
-      - name: Generate two independent validator homes
+      - name: Generate, run, and test two validators in one process lifetime
         env:
-          NET: ${{ runner.temp }}/sobya-18-multinode
+          NET: \${{ runner.temp }}/sobya-18-multinode
         shell: bash
         run: |
           set -euo pipefail
@@ -63,12 +63,6 @@ jobs:
           cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
           test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-feature-multinode-1"
 
-      - name: Start both nodes and verify P2P and consensus
-        env:
-          NET: ${{ runner.temp }}/sobya-18-multinode
-        shell: bash
-        run: |
-          set -euo pipefail
           ./sobyad start --home "$NET/validator0" > "$RUNNER_TEMP/validator0.log" 2>&1 &
           PID0=$!
           ./sobyad start --home "$NET/validator1" > "$RUNNER_TEMP/validator1.log" 2>&1 &
@@ -95,6 +89,8 @@ jobs:
           test "$READY0" -eq 1
           test "$READY1" -eq 1
 
+          H0=0
+          H1=0
           for attempt in $(seq 1 120); do
             curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"
             curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"
@@ -112,60 +108,60 @@ jobs:
 
           ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
           test "$(jq '.validators | length' "$RUNNER_TEMP/validators.json")" -ge 2
-                    set -euo pipefail
-                    ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
-                    ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
-                    FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
-                    FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
-                    TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
-                    test -n "$FROM_NAME"
-                    test -n "$FROM_ADDR"
-                    test -n "$TO_ADDR"
-                    test "$FROM_ADDR" != "$TO_ADDR"
-          
-                    ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-from.json"
-                    ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
-          
-                    AMOUNT=1000000000000000
-                    FEE=20000000000000
-                    ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}asobya" \
-                      --chain-id sobya-feature-multinode-1 \
-                      --node tcp://127.0.0.1:26657 \
-                      --home "$NET/validator0" \
-                      --keyring-backend test \
-                      --fees "${FEE}asobya" \
-                      --gas 200000 \
-                      --broadcast-mode sync \
-                      --yes \
-                      --output json > "$RUNNER_TEMP/transfer.json"
-                    TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
-                    test "$TRANSFER_CODE" = "0"
-          
-                    CONFIRMED=0
-                    for attempt in $(seq 1 60); do
-                      ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
-                      ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
-                      if python3 - "$RUNNER_TEMP/before-from.json" "$RUNNER_TEMP/before-to.json" "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$AMOUNT" "$FEE" <<'PY'
-                    import json, sys
-                    def balance(path):
-                        with open(path, encoding="utf-8") as f:
-                            data = json.load(f)
-                        return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
-                    before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
-                    amount, fee = map(int, sys.argv[5:7])
-                    ok = after_from == before_from - amount - fee and after_to == before_to + amount
-                    if ok:
-                        print("PASS: exact integer balance deltas verified for 18-decimal SOBYA.")
-                    sys.exit(0 if ok else 1)
-                    PY
-                      then
-                        CONFIRMED=1
-                        break
-                      fi
-                      sleep 2
-                    done
-                    test "$CONFIRMED" -eq 1
-                    echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
+
+          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
+          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
+          FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
+          FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
+          TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
+          test -n "$FROM_NAME"
+          test -n "$FROM_ADDR"
+          test -n "$TO_ADDR"
+          test "$FROM_ADDR" != "$TO_ADDR"
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
+
+          AMOUNT=1000000000000000
+          FEE=20000000000000
+          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "\${AMOUNT}asobya" \
+            --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" \
+            --keyring-backend test \
+            --fees "\${FEE}asobya" \
+            --gas 200000 \
+            --broadcast-mode sync \
+            --yes \
+            --output json > "$RUNNER_TEMP/transfer.json"
+          TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
+          test "$TRANSFER_CODE" = "0"
+
+          CONFIRMED=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+            if python3 - "$RUNNER_TEMP/before-from.json" "$RUNNER_TEMP/before-to.json" "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$AMOUNT" "$FEE" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
+          amount, fee = map(int, sys.argv[5:7])
+          ok = after_from == before_from - amount - fee and after_to == before_to + amount
+          if ok:
+              print("PASS: exact integer balance deltas verified for 18-decimal SOBYA.")
+          sys.exit(0 if ok else 1)
+          PY
+            then
+              CONFIRMED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$CONFIRMED" -eq 1
+          echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
 
       - name: Upload diagnostics on failure
         if: failure()
@@ -173,7 +169,7 @@ jobs:
         with:
           name: sobya-18-decimal-multinode-failure
           path: |
-            ${{ runner.temp }}/validator0.log
-            ${{ runner.temp }}/validator1.log
+            \${{ runner.temp }}/validator0.log
+            \${{ runner.temp }}/validator1.log
           if-no-files-found: ignore
           retention-days: 7
