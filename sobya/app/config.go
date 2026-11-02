@@ -1,11 +1,16 @@
 package app
 
-import sdk "github.com/cosmos/cosmos-sdk/types"
+import (
+	sdkmath "cosmossdk.io/math"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
 
 func init() {
 	// Set bond denom
 
-	sdk.DefaultBondDenom = "usobya"
+	sdk.DefaultBondDenom = "asobya"
+	// Use atto-scale staking power to match the 18-decimal native SOBYA token.
+	sdk.DefaultPowerReduction = sdkmath.NewIntWithDecimal(1, 18)
 
 	// Set address prefixes
 	accountPubKeyPrefix := AccountAddressPrefix + "pub"
