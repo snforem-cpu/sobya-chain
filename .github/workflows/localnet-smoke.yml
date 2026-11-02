@@ -101,13 +101,13 @@ jobs:
           jq -e '.params.mint_denom == "usobya" and .params.inflation_rate_change == "0.000000000000000000" and .params.inflation_max == "0.000000000000000000" and .params.inflation_min == "0.000000000000000000"' "$RUNNER_TEMP/mint-params.json" >/dev/null
 
           ./sobyad query mint inflation --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/mint-inflation.json"
-          jq -e '.inflation == "0.000000000000000000"' "$RUNNER_TEMP/mint-inflation.json" >/dev/null
+          jq -e '.inflation == "0.000000000000000000"' "$RUNNER_TEMP/mint-inflation.json" >/dev/null && echo "PASS: mint inflation is zero."
 
           ./sobyad query mint annual-provisions --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/annual-provisions.json"
-          jq -e '.annual_provisions == "0.000000000000000000"' "$RUNNER_TEMP/annual-provisions.json" >/dev/null
+          jq -e '.annual_provisions == "0.000000000000000000"' "$RUNNER_TEMP/annual-provisions.json" >/dev/null && echo "PASS: annual provisions are zero."
 
           ./sobyad query bank total-supply-of usobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/native-supply.json"
-          jq -e '.denom == "usobya" and ((.amount | tonumber) <= 1000000000000000)' "$RUNNER_TEMP/native-supply.json" >/dev/null
+          jq -e '.amount.denom == "usobya" and ((.amount.amount | tonumber) <= 1000000000000000)' "$RUNNER_TEMP/native-supply.json" >/dev/null && echo "PASS: native supply is below the 1 billion SOBY cap."
 
           ./sobyad query bank denom-metadata usobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/denom-metadata.json"
           jq -e '.metadata.base == "usobya" and .metadata.display == "SOBY" and .metadata.denom_units[1].exponent == 6' "$RUNNER_TEMP/denom-metadata.json" >/dev/null
