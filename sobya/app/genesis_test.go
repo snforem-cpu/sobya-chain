@@ -46,8 +46,8 @@ func TestNativeDenominationConstants(t *testing.T) {
 	if DisplayExponent != 18 {
 		t.Fatalf("unexpected display exponent: %d", DisplayExponent)
 	}
-	if MaxSupply != 1_000_000_000_000_000 {
-		t.Fatalf("unexpected maximum supply: %d", MaxSupply)
+	if !MaxSupply.Equal(sdkmath.NewIntWithDecimal(1_000_000_000, 18)) {
+		t.Fatalf("unexpected maximum supply: %s", MaxSupply)
 	}
 }
 
