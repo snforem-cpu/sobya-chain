@@ -12,7 +12,7 @@
 - Maximum: `1,000,000,000 SOBY`.
 - In base units: `1,000,000,000,000,000 usobya`.
 - Genesis initialization rejects an allocation above this maximum.
-- The mint module is retained for Cosmos SDK compatibility, but its inflation parameters are normalized to zero and its BeginBlocker is not scheduled. This prevents automatic inflation/reward minting in the current application.
+- The mint module remains in the required block lifecycle order, but genesis initialization sets its denomination to `usobya` and forces inflation minimum, maximum, rate change, current inflation, and annual provisions to zero. The current application therefore issues no automatic native-token inflation. Any future change to minting must be reviewed against the supply cap.
 
 The cap applies to the native `usobya` denomination. IBC voucher denominations are separate assets and are not native SOBY issuance.
 
