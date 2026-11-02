@@ -9,7 +9,7 @@ SOBYA is a Cosmos SDK application using CometBFT. The repository currently conta
 - Precision: 6 decimals (`1 SOBY = 1,000,000 usobya`)
 - Maximum native supply: `1,000,000,000 SOBY`
 
-The application validates the native genesis allocation against this cap. Automatic mint inflation is disabled: mint parameters are set to zero at genesis and the mint BeginBlocker is not scheduled. See [TOKENOMICS.md](TOKENOMICS.md) for the current rules and decisions still pending.
+The application validates the native genesis allocation against this cap. Automatic mint inflation is disabled: the mint module stays in the required block order, but its genesis parameters and current inflation are forced to zero. See [TOKENOMICS.md](TOKENOMICS.md) for the current rules and decisions still pending.
 
 ## Development
 
