@@ -16,6 +16,11 @@ validates that the archive can be extracted, and runs Go dependency checks,
 tests, and builds against the tracked `sobya/` application. It does not commit
 or push changes to any branch.
 
+Additional feature-branch workflows exercise the 18-decimal localnet and
+two-validator transfer path, and separately compile the candidate Cosmos EVM
+v0.6.0 modules against SOBYA's Cosmos SDK/CometBFT dependency baseline. Passing
+the EVM dependency check does not mean the EVM application has been integrated.
+
 ## What GitHub can do
 
 GitHub Actions can build the SOBYA node, run automated tests, create disposable
