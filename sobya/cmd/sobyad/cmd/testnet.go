@@ -30,7 +30,7 @@ import (
 	"sobya/app"
 )
 
-const valVotingPower int64 = 900000000000000
+const valVotingPower int64 = 900000000000000000000000000
 
 var flagAccountsToFund = "accounts-to-fund"
 
@@ -179,7 +179,7 @@ func initAppForTestnet(app *app.App, args valArgs) *app.App {
 	bondDenom, err := app.StakingKeeper.BondDenom(ctx)
 	handleErr(err)
 
-	defaultCoins := sdk.NewCoins(sdk.NewInt64Coin(bondDenom, 1000000000))
+	defaultCoins := sdk.NewCoins(sdk.NewInt64Coin(bondDenom, 1000000000000000000000))
 
 	// Fund local accounts
 	for _, accountStr := range args.accountsToFund {
