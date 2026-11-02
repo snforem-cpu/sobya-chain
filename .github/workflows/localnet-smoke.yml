@@ -100,7 +100,7 @@ jobs:
           ./sobyad query mint params --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/mint-params.json"
           jq -e '.params.mint_denom == "usobya" and .params.inflation_rate_change == "0.000000000000000000" and .params.inflation_max == "0.000000000000000000" and .params.inflation_min == "0.000000000000000000"' "$RUNNER_TEMP/mint-params.json" >/dev/null
 
-          ./sobyad query bank denom-metadata usobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/denom-metadata.json"
+          ./sobyad query bank denom-metadata --denom usobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/denom-metadata.json"
           jq -e '.metadata.base == "usobya" and .metadata.display == "SOBY" and .metadata.denom_units[1].exponent == 6' "$RUNNER_TEMP/denom-metadata.json" >/dev/null
 
           echo "PASS: chain ID=$NETWORK, block height=$HEIGHT, SOBY metadata is canonical, and inflation is zero."
