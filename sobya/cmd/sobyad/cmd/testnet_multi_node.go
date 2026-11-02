@@ -77,7 +77,7 @@ or a similar setup where each node has a manually configurable IP address.
 Note, strict routability for addresses is turned off in the config file.
 
 Example:
-	sobyad multi-node --v 4 --output-dir ./.testnets --validators-stake-amount 1000000,200000,300000,400000 --list-ports 47222,50434,52851,44210
+	sobyad multi-node --v 4 --output-dir ./.testnets --validators-stake-amount 1000000000000000000,2000000000000000000,3000000000000000000,4000000000000000000 --list-ports 47222,50434,52851,44210
 	`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			clientCtx, err := client.GetClientQueryContext(cmd)
@@ -135,7 +135,7 @@ Example:
 	addTestnetFlagsToCmd(cmd)
 	cmd.Flags().String(flagPorts, "", "Ports of nodes (default 26657,26654,26651,26648.. )")
 	cmd.Flags().String(flagNodeDirPrefix, "validator", "Prefix the directory name for each node with (node results in node0, node1, ...)")
-	cmd.Flags().String(flagValidatorsStakeAmount, "100000000,100000000,100000000,100000000", "Amount of stake for each validator")
+	cmd.Flags().String(flagValidatorsStakeAmount, "100000000000000000000,100000000000000000000,100000000000000000000,100000000000000000000", "Amount of stake for each validator")
 	cmd.Flags().String(flagStartingIPAddress, "localhost", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
 	cmd.Flags().String(flags.FlagKeyringBackend, "test", "Select keyring's backend (os|file|test)")
 
@@ -146,7 +146,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 	cmd.Flags().Int(flagNumValidators, 4, "Number of validators to initialize the testnet with")
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
-	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.0001%s", sdk.DefaultBondDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001usobya)")
+	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("100000000%s", sdk.DefaultBondDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,1000000000asobya)")
 	cmd.Flags().String(flags.FlagKeyType, string(hd.Secp256k1Type), "Key signing algorithm to generate keys for")
 
 	// support old flags name for backwards compatibility
@@ -177,7 +177,7 @@ func initTestnetFiles(
 	appConfig := srvconfig.DefaultConfig()
 	appConfig.MinGasPrices = args.minGasPrices
 	appConfig.API.Enable = false
-	appConfig.BaseConfig.MinGasPrices = "0.0001" + sdk.DefaultBondDenom
+	appConfig.BaseConfig.MinGasPrices = "100000000" + sdk.DefaultBondDenom
 	appConfig.Telemetry.EnableHostnameLabel = false
 	appConfig.Telemetry.Enabled = false
 	appConfig.Telemetry.PrometheusRetentionTime = 0
