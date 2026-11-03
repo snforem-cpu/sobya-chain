@@ -71,20 +71,15 @@ jobs:
           cache: true
           cache-dependency-path: sobya/go.sum
 
-      - name: Resolve and persist the complete working-source module checksums
-        if: startsWith(github.ref, 'refs/heads/feature/')
+      - name: Resolve working-source dependencies in the runner
         working-directory: sobya
         shell: bash
         run: |
           set -euo pipefail
+          # Populate the runner module cache and generate any missing go.sum
+          # entries locally. Never push from CI: validation must be read-only
+          # with respect to the feature branch.
           go mod download all
-          if ! git diff --quiet -- go.sum; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add go.sum
-            git commit -m "build: record complete SOBYA module checksums"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
 
       - name: Verify, test, and build working source
         working-directory: sobya
@@ -119,7 +114,7 @@ jobs:
             echo "Commit: ${GITHUB_SHA}"
             echo "Branch: ${GITHUB_REF_NAME}"
             echo "The workflow validates both the tracked source directory and the archived build input."
-            echo "No workflow step writes commits or pushes to any branch."
+            echo "Validation resolves dependencies locally and never pushes commits."
           } >> reports/source-audit.txt
 
       - name: Upload audit and binaries
