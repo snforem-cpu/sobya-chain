@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"errors"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"cosmossdk.io/log"
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -239,7 +239,7 @@ func (app *App) SetClientCtx(clientCtx client.Context) {
 }
 
 // RegisterPendingTxListener registers listeners used by the Ethereum JSON-RPC pending stream.
-func (app *App) RegisterPendingTxListener(listener func(ethcommon.Hash)) {
+func (app *App) RegisterPendingTxListener(listener func(common.Hash)) {
 	app.pendingTxListeners = append(app.pendingTxListeners, listener)
 }
 
