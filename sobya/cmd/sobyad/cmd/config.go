@@ -21,8 +21,12 @@ func initCometBFTConfig() *cmtcfg.Config {
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
 	// The following code snippet is just for reference.
+	type EVMAppConfig struct {
+		EVMChainID uint64 `mapstructure:"evm-chain-id"`
+	}
 	type CustomAppConfig struct {
 		serverconfig.Config `mapstructure:",squash"`
+		EVM               EVMAppConfig `mapstructure:"evm"`
 	}
 
 	// Optionally allow the chain developer to overwrite the SDK's default
@@ -44,9 +48,17 @@ func initAppConfig() (string, interface{}) {
 
 	customAppConfig := CustomAppConfig{
 		Config: *srvCfg,
+		EVM: EVMAppConfig{EVMChainID: 777777},
 	}
 
-	customAppTemplate := serverconfig.DefaultConfigTemplate
+	// The EVM chain ID is independent from the CometBFT chain ID. This
+	// development default must be replaced with a network-specific value
+	// before publishing a production genesis.
+	customAppTemplate := serverconfig.DefaultConfigTemplate + `
+[evm]
+# EIP-155 chain ID; choose a unique value for the SOBYA network.
+evm-chain-id = 777777
+`
 	// Edit the default template file
 	//
 	// customAppTemplate := serverconfig.DefaultConfigTemplate + `
