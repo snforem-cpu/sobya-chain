@@ -111,11 +111,14 @@ jobs:
           READY=0
           for attempt in $(seq 1 90); do
             if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-evm-rpc.log"; exit 1; fi
-            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:8545 >/dev/null 2>&1; then READY=1; break; fi
+            if rpc web3_clientVersion '[]' "$RUNNER_TEMP/readiness.json"; then
+              READY=1
+              break
+            fi
             sleep 2
           done
           if [ "$READY" -ne 1 ]; then
-            echo "EVM JSON-RPC did not bind to 127.0.0.1:8545"
+            echo "EVM JSON-RPC did not answer web3_clientVersion on 127.0.0.1:8545"
             cat "$RUNNER_TEMP/sobya-evm-rpc.log"
             exit 1
           fi
@@ -158,8 +161,8 @@ jobs:
           print(f"PASS: web3_clientVersion={read('client-version.json')}")
           PY
 
-      - name: Upload EVM node log on failure
-        if: failure()
+      - name: Upload EVM node log for diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sobya-evm-rpc-failure
