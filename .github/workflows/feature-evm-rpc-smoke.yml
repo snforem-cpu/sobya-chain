@@ -126,11 +126,21 @@ jobs:
 
           BLOCK_READY=0
           for attempt in $(seq 1 90); do
-            rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-ready.json"
-            BLOCK_HEX="$(jq -r '.result' "$RUNNER_TEMP/block-ready.json")"
-            if [ "$(python3 -c 'import sys; print(int(sys.argv[1], 16))' "$BLOCK_HEX")" -ge 1 ]; then
-              BLOCK_READY=1
-              break
+            # The HTTP listener can answer web3_clientVersion a moment before
+            # the EVM backend is ready for block queries. Treat transient RPC
+            # errors as not-ready and keep polling instead of exiting under
+            # bash's errexit mode.
+            if rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-ready.json"; then
+              BLOCK_HEX="$(jq -r '.result' "$RUNNER_TEMP/block-ready.json")"
+              if [ "$(python3 -c 'import sys; print(int(sys.argv[1], 16))' "$BLOCK_HEX")" -ge 1 ]; then
+                BLOCK_READY=1
+                break
+              fi
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then
+              echo "SOBYA node exited while waiting for the first EVM block"
+              cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+              exit 1
             fi
             sleep 2
           done
