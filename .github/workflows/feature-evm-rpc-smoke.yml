@@ -137,6 +137,368 @@ jobs:
           PY
           grep -A8 '^\[json-rpc\]' "$SOBYA_HOME/config/app.toml"
 
+      - name: Pin the EVM broadcaster to the local CometBFT RPC
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLIENT_TOML="$SOBYA_HOME/config/client.toml"
+          test -f "$CLIENT_TOML"
+          python3 - "$CLIENT_TOML" <<'PY'
+          import pathlib, re, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          if not re.search(r'(?m)^node\\s*=', text):
+              raise SystemExit("client.toml is missing the node endpoint")
+          text = re.sub(r'(?m)^node\\s*=.*        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad start --chain-id sobya-evm-rpc-ci-1 --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-evm-rpc.log" 2>&1 &
+          NODE_PID=$!
+          cleanup() {
+            kill "$NODE_PID" 2>/dev/null || true
+            for attempt in $(seq 1 10); do
+              if ! kill -0 "$NODE_PID" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            if kill -0 "$NODE_PID" 2>/dev/null; then
+              kill -KILL "$NODE_PID" 2>/dev/null || true
+            fi
+            wait "$NODE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          rpc() {
+            local method="$1" params="$2" output="$3"
+            curl --connect-timeout 2 --max-time 10 -fsS \
+              -H 'Content-Type: application/json' \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":$params}" \
+              http://127.0.0.1:8545 > "$output"
+            jq -e '.error == null and .result != null' "$output" >/dev/null
+          }
+
+          READY=0
+          for attempt in $(seq 1 90); do
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-evm-rpc.log"; exit 1; fi
+            if rpc web3_clientVersion '[]' "$RUNNER_TEMP/readiness.json"; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$READY" -ne 1 ]; then
+            echo "EVM JSON-RPC did not answer web3_clientVersion on 127.0.0.1:8545"
+            cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+            exit 1
+          fi
+
+          BLOCK_READY=0
+          for attempt in $(seq 1 90); do
+            # The HTTP listener can answer web3_clientVersion a moment before
+            # the EVM backend is ready for block queries. Treat transient RPC
+            # errors as not-ready and keep polling instead of exiting under
+            # bash's errexit mode.
+            if rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-ready.json"; then
+              BLOCK_HEX="$(jq -r '.result' "$RUNNER_TEMP/block-ready.json")"
+              if [ "$(python3 -c 'import sys; print(int(sys.argv[1], 16))' "$BLOCK_HEX")" -ge 1 ]; then
+                BLOCK_READY=1
+                break
+              fi
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then
+              echo "SOBYA node exited while waiting for the first EVM block"
+              cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$BLOCK_READY" -ne 1 ]; then
+            echo "EVM RPC started but no block was produced"
+            cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+            exit 1
+          fi
+
+          rpc eth_chainId '[]' "$RUNNER_TEMP/chain-id.json"
+          rpc net_version '[]' "$RUNNER_TEMP/net-version.json"
+          rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-number.json"
+          rpc web3_clientVersion '[]' "$RUNNER_TEMP/client-version.json"
+          rpc eth_getBlockByNumber '["latest",false]' "$RUNNER_TEMP/latest-block.json"
+
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          read = lambda name: json.loads((p / name).read_text())["result"]
+          chain_id = int(read("chain-id.json"), 16)
+          network = int(read("net-version.json"))
+          height = int(read("block-number.json"), 16)
+          latest = read("latest-block.json")
+          assert chain_id == 777777, f"unexpected EVM chain ID: {chain_id}"
+          assert network == 777777, f"unexpected net_version: {network}"
+          assert height >= 1, f"no EVM block produced: {height}"
+          assert latest and int(latest["number"], 16) == height, "latest block RPC mismatch"
+          print(f"PASS: eth_chainId={chain_id}, net_version={network}, block={height}")
+          print(f"PASS: web3_clientVersion={read('client-version.json')}")
+          PY
+
+          echo "Running signed transaction, Solidity deployment, ERC-20, and WebSocket tests"
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import solc from "solc";
+          import { ContractFactory, JsonRpcProvider, Wallet, WebSocketProvider, parseEther, parseUnits } from "ethers";
+          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
+          const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
+          assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
+          assert((await provider.getBalance(wallet.address)) > parseEther("1"), "EVM test account not funded");
+          const signed = await wallet.sendTransaction({ to: wallet.address, value: parseEther("0.01"), gasLimit: 21000n });
+          assert.equal((await signed.wait(1)).status, 1, "signed EVM transfer failed");
+          console.log("PASS signed EVM transaction:", signed.hash);
+
+          const source = "pragma solidity ^0.8.20; contract StorageBox { uint256 public value; function set(uint256 x) external { value=x; } } contract TestToken { string public name='SOBYA Test Token'; string public symbol='tSOBY'; uint8 public decimals=18; uint256 public totalSupply; mapping(address=>uint256) public balanceOf; event Transfer(address indexed from,address indexed to,uint256 value); constructor(uint256 n){totalSupply=n;balanceOf[msg.sender]=n;emit Transfer(address(0),msg.sender,n);} function transfer(address to,uint256 n) external returns(bool){require(to!=address(0)&&balanceOf[msg.sender]>=n,'balance');balanceOf[msg.sender]-=n;balanceOf[to]+=n;emit Transfer(msg.sender,to,n);return true;} }";
+          const input = { language:"Solidity", sources:{"Test.sol":{content:source}}, settings:{optimizer:{enabled:true,runs:200},outputSelection:{"*":{"*":["abi","evm.bytecode.object"]}}} };
+          const compiled = JSON.parse(solc.compile(JSON.stringify(input)));
+          const errors = (compiled.errors || []).filter(x => x.severity === "error");
+          assert.equal(errors.length, 0, errors.map(x => x.formattedMessage).join("\\n"));
+          const artifacts = compiled.contracts["Test.sol"];
+          const box = await new ContractFactory(artifacts.StorageBox.abi, "0x"+artifacts.StorageBox.evm.bytecode.object, wallet).deploy();
+          await box.waitForDeployment();
+          assert.equal((await (await box.set(20261103n)).wait(1)).status, 1);
+          assert.equal(await box.value(), 20261103n);
+          console.log("PASS contract deployment and read/write:", await box.getAddress());
+
+          const token = await new ContractFactory(artifacts.TestToken.abi, "0x"+artifacts.TestToken.evm.bytecode.object, wallet).deploy(parseUnits("1000000",18));
+          await token.waitForDeployment();
+          assert.equal(await token.name(), "SOBYA Test Token");
+          assert.equal(await token.symbol(), "tSOBY");
+          assert.equal(await token.decimals(), 18n);
+          assert.equal(await token.totalSupply(), parseUnits("1000000",18));
+          const amount = parseUnits("125.5",18), recipient = "0x000000000000000000000000000000000000dEaD";
+          assert.equal((await (await token.transfer(recipient,amount)).wait(1)).status,1);
+          assert.equal(await token.balanceOf(recipient),amount);
+          console.log("PASS ERC-20 deployment, metadata, supply and transfer:", await token.getAddress());
+
+          const ws = new WebSocketProvider("ws://127.0.0.1:8546",777777);
+          try {
+            await ws.getNetwork();
+            const block = await new Promise((resolve,reject) => {
+              const timer=setTimeout(()=>reject(new Error("WebSocket new block subscription timed out")),30000);
+              ws.once("block",n=>{clearTimeout(timer);resolve(n);});
+            });
+            assert(block>0);
+            console.log("PASS WebSocket new block subscription:",block);
+          } finally {
+            await ws.destroy();
+            await provider.destroy();
+          }
+          JS
+
+      - name: Persist reconciled Go module graph on the feature branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- sobya/go.mod sobya/go.sum; then
+            git add sobya/go.mod sobya/go.sum
+            git commit -m "build: persist reconciled Go module graph"
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "Committed Go module graph is already tidy."
+          fi
+
+      - name: Upload EVM node log for diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-evm-rpc-failure
+          path: ${{ runner.temp }}/sobya-evm-rpc.log
+          if-no-files-found: ignore
+          retention-days: 7
+, 'node = "tcp://127.0.0.1:26657"', text, count=1)
+          path.write_text(text)
+          if not re.search(r'(?m)^node\\s*=\\s*"tcp://127\\.0\\.0\\.1:26657"        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad start --chain-id sobya-evm-rpc-ci-1 --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-evm-rpc.log" 2>&1 &
+          NODE_PID=$!
+          cleanup() {
+            kill "$NODE_PID" 2>/dev/null || true
+            for attempt in $(seq 1 10); do
+              if ! kill -0 "$NODE_PID" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            if kill -0 "$NODE_PID" 2>/dev/null; then
+              kill -KILL "$NODE_PID" 2>/dev/null || true
+            fi
+            wait "$NODE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          rpc() {
+            local method="$1" params="$2" output="$3"
+            curl --connect-timeout 2 --max-time 10 -fsS \
+              -H 'Content-Type: application/json' \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":$params}" \
+              http://127.0.0.1:8545 > "$output"
+            jq -e '.error == null and .result != null' "$output" >/dev/null
+          }
+
+          READY=0
+          for attempt in $(seq 1 90); do
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-evm-rpc.log"; exit 1; fi
+            if rpc web3_clientVersion '[]' "$RUNNER_TEMP/readiness.json"; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$READY" -ne 1 ]; then
+            echo "EVM JSON-RPC did not answer web3_clientVersion on 127.0.0.1:8545"
+            cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+            exit 1
+          fi
+
+          BLOCK_READY=0
+          for attempt in $(seq 1 90); do
+            # The HTTP listener can answer web3_clientVersion a moment before
+            # the EVM backend is ready for block queries. Treat transient RPC
+            # errors as not-ready and keep polling instead of exiting under
+            # bash's errexit mode.
+            if rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-ready.json"; then
+              BLOCK_HEX="$(jq -r '.result' "$RUNNER_TEMP/block-ready.json")"
+              if [ "$(python3 -c 'import sys; print(int(sys.argv[1], 16))' "$BLOCK_HEX")" -ge 1 ]; then
+                BLOCK_READY=1
+                break
+              fi
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then
+              echo "SOBYA node exited while waiting for the first EVM block"
+              cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$BLOCK_READY" -ne 1 ]; then
+            echo "EVM RPC started but no block was produced"
+            cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+            exit 1
+          fi
+
+          rpc eth_chainId '[]' "$RUNNER_TEMP/chain-id.json"
+          rpc net_version '[]' "$RUNNER_TEMP/net-version.json"
+          rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-number.json"
+          rpc web3_clientVersion '[]' "$RUNNER_TEMP/client-version.json"
+          rpc eth_getBlockByNumber '["latest",false]' "$RUNNER_TEMP/latest-block.json"
+
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          read = lambda name: json.loads((p / name).read_text())["result"]
+          chain_id = int(read("chain-id.json"), 16)
+          network = int(read("net-version.json"))
+          height = int(read("block-number.json"), 16)
+          latest = read("latest-block.json")
+          assert chain_id == 777777, f"unexpected EVM chain ID: {chain_id}"
+          assert network == 777777, f"unexpected net_version: {network}"
+          assert height >= 1, f"no EVM block produced: {height}"
+          assert latest and int(latest["number"], 16) == height, "latest block RPC mismatch"
+          print(f"PASS: eth_chainId={chain_id}, net_version={network}, block={height}")
+          print(f"PASS: web3_clientVersion={read('client-version.json')}")
+          PY
+
+          echo "Running signed transaction, Solidity deployment, ERC-20, and WebSocket tests"
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import solc from "solc";
+          import { ContractFactory, JsonRpcProvider, Wallet, WebSocketProvider, parseEther, parseUnits } from "ethers";
+          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
+          const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
+          assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
+          assert((await provider.getBalance(wallet.address)) > parseEther("1"), "EVM test account not funded");
+          const signed = await wallet.sendTransaction({ to: wallet.address, value: parseEther("0.01"), gasLimit: 21000n });
+          assert.equal((await signed.wait(1)).status, 1, "signed EVM transfer failed");
+          console.log("PASS signed EVM transaction:", signed.hash);
+
+          const source = "pragma solidity ^0.8.20; contract StorageBox { uint256 public value; function set(uint256 x) external { value=x; } } contract TestToken { string public name='SOBYA Test Token'; string public symbol='tSOBY'; uint8 public decimals=18; uint256 public totalSupply; mapping(address=>uint256) public balanceOf; event Transfer(address indexed from,address indexed to,uint256 value); constructor(uint256 n){totalSupply=n;balanceOf[msg.sender]=n;emit Transfer(address(0),msg.sender,n);} function transfer(address to,uint256 n) external returns(bool){require(to!=address(0)&&balanceOf[msg.sender]>=n,'balance');balanceOf[msg.sender]-=n;balanceOf[to]+=n;emit Transfer(msg.sender,to,n);return true;} }";
+          const input = { language:"Solidity", sources:{"Test.sol":{content:source}}, settings:{optimizer:{enabled:true,runs:200},outputSelection:{"*":{"*":["abi","evm.bytecode.object"]}}} };
+          const compiled = JSON.parse(solc.compile(JSON.stringify(input)));
+          const errors = (compiled.errors || []).filter(x => x.severity === "error");
+          assert.equal(errors.length, 0, errors.map(x => x.formattedMessage).join("\\n"));
+          const artifacts = compiled.contracts["Test.sol"];
+          const box = await new ContractFactory(artifacts.StorageBox.abi, "0x"+artifacts.StorageBox.evm.bytecode.object, wallet).deploy();
+          await box.waitForDeployment();
+          assert.equal((await (await box.set(20261103n)).wait(1)).status, 1);
+          assert.equal(await box.value(), 20261103n);
+          console.log("PASS contract deployment and read/write:", await box.getAddress());
+
+          const token = await new ContractFactory(artifacts.TestToken.abi, "0x"+artifacts.TestToken.evm.bytecode.object, wallet).deploy(parseUnits("1000000",18));
+          await token.waitForDeployment();
+          assert.equal(await token.name(), "SOBYA Test Token");
+          assert.equal(await token.symbol(), "tSOBY");
+          assert.equal(await token.decimals(), 18n);
+          assert.equal(await token.totalSupply(), parseUnits("1000000",18));
+          const amount = parseUnits("125.5",18), recipient = "0x000000000000000000000000000000000000dEaD";
+          assert.equal((await (await token.transfer(recipient,amount)).wait(1)).status,1);
+          assert.equal(await token.balanceOf(recipient),amount);
+          console.log("PASS ERC-20 deployment, metadata, supply and transfer:", await token.getAddress());
+
+          const ws = new WebSocketProvider("ws://127.0.0.1:8546",777777);
+          try {
+            await ws.getNetwork();
+            const block = await new Promise((resolve,reject) => {
+              const timer=setTimeout(()=>reject(new Error("WebSocket new block subscription timed out")),30000);
+              ws.once("block",n=>{clearTimeout(timer);resolve(n);});
+            });
+            assert(block>0);
+            console.log("PASS WebSocket new block subscription:",block);
+          } finally {
+            await ws.destroy();
+            await provider.destroy();
+          }
+          JS
+
+      - name: Persist reconciled Go module graph on the feature branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- sobya/go.mod sobya/go.sum; then
+            git add sobya/go.mod sobya/go.sum
+            git commit -m "build: persist reconciled Go module graph"
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "Committed Go module graph is already tidy."
+          fi
+
+      - name: Upload EVM node log for diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-evm-rpc-failure
+          path: ${{ runner.temp }}/sobya-evm-rpc.log
+          if-no-files-found: ignore
+          retention-days: 7
+, text):
+              raise SystemExit("failed to pin client.toml node endpoint")
+          print("Pinned Cosmos client broadcaster to tcp://127.0.0.1:26657")
+          PY
+          grep -n '^node[[:space:]]*=' "$CLIENT_TOML"
+
       - name: Start node and verify Ethereum JSON-RPC
         env:
           SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
