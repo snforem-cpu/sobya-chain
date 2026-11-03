@@ -287,7 +287,11 @@ func broadcastEVMTransactions(clientCtx client.Context, txConfig client.TxConfig
 		if err != nil {
 			return fmt.Errorf("encode Ethereum transaction: %w", err)
 		}
-		res, err := clientCtx.BroadcastTxSync(txBytes)
+		// The Ethereum transaction is already validated and resident in the local EVM
+		// pool. Broadcast asynchronously to CometBFT: synchronous CheckTx re-enters
+		// this same application's CheckTx/mempool path and can stall the EVM RPC
+		// request while the in-process node is processing the transaction.
+		res, err := clientCtx.BroadcastTxAsync(txBytes)
 		if err != nil {
 			return fmt.Errorf("broadcast Ethereum transaction %s: %w", ethTx.Hash().Hex(), err)
 		}
