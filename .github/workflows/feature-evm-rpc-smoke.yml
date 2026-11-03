@@ -101,6 +101,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Set up Node.js EVM test dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install ethers and Solidity compiler for functional EVM checks
+        run: npm install --no-save ethers@6.15.0 solc@0.8.30 bech32@2.0.0
+
       - name: Initialize chain and enable EVM JSON-RPC
         env:
           SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
@@ -112,7 +120,19 @@ jobs:
           ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
           VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator-key.json")"
           test -n "$VALIDATOR_ADDRESS"
+          node --input-type=module <<'JS' > "$RUNNER_TEMP/evm-test-account.json"
+          import { Wallet } from "ethers";
+          import { createHash } from "node:crypto";
+          import { bech32 } from "bech32";
+          const wallet = Wallet.createRandom();
+          const pub = Buffer.from(wallet.signingKey.compressedPublicKey.slice(2), "hex");
+          const hash160 = createHash("ripemd160").update(createHash("sha256").update(pub).digest()).digest();
+          console.log(JSON.stringify({ privateKey: wallet.privateKey, address: bech32.encode("sobya", bech32.toWords(hash160)) }));
+          JS
+          EVM_ACCOUNT="$(jq -r '.address' "$RUNNER_TEMP/evm-test-account.json")"
+          jq -r '.privateKey' "$RUNNER_TEMP/evm-test-account.json" | sed 's/^/EVM_TEST_PRIVATE_KEY=/' >> "$GITHUB_ENV"
           ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis add-genesis-account "$EVM_ACCOUNT" 10000000000000000000000000asobya --home "$SOBYA_HOME"
           ./sobyad genesis gentx validator 1000000000000000000000asobya --chain-id sobya-evm-rpc-ci-1 --keyring-backend test --home "$SOBYA_HOME"
           ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
           python3 - "$SOBYA_HOME/config/app.toml" <<'PY'
@@ -228,6 +248,57 @@ jobs:
           print(f"PASS: eth_chainId={chain_id}, net_version={network}, block={height}")
           print(f"PASS: web3_clientVersion={read('client-version.json')}")
           PY
+
+          echo "Running signed transaction, Solidity deployment, ERC-20, and WebSocket tests"
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import solc from "solc";
+          import { ContractFactory, JsonRpcProvider, Wallet, WebSocketProvider, parseEther, parseUnits } from "ethers";
+          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
+          const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
+          assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
+          assert((await provider.getBalance(wallet.address)) > parseEther("1"), "EVM test account not funded");
+          const signed = await wallet.sendTransaction({ to: wallet.address, value: parseEther("0.01"), gasLimit: 21000n });
+          assert.equal((await signed.wait(1)).status, 1, "signed EVM transfer failed");
+          console.log("PASS signed EVM transaction:", signed.hash);
+
+          const source = "pragma solidity ^0.8.20; contract StorageBox { uint256 public value; function set(uint256 x) external { value=x; } } contract TestToken { string public name='SOBYA Test Token'; string public symbol='tSOBY'; uint8 public decimals=18; uint256 public totalSupply; mapping(address=>uint256) public balanceOf; event Transfer(address indexed from,address indexed to,uint256 value); constructor(uint256 n){totalSupply=n;balanceOf[msg.sender]=n;emit Transfer(address(0),msg.sender,n);} function transfer(address to,uint256 n) external returns(bool){require(to!=address(0)&&balanceOf[msg.sender]>=n,'balance');balanceOf[msg.sender]-=n;balanceOf[to]+=n;emit Transfer(msg.sender,to,n);return true;} }";
+          const input = { language:"Solidity", sources:{"Test.sol":{content:source}}, settings:{optimizer:{enabled:true,runs:200},outputSelection:{"*":{"*":["abi","evm.bytecode.object"]}}} };
+          const compiled = JSON.parse(solc.compile(JSON.stringify(input)));
+          const errors = (compiled.errors || []).filter(x => x.severity === "error");
+          assert.equal(errors.length, 0, errors.map(x => x.formattedMessage).join("\\n"));
+          const artifacts = compiled.contracts["Test.sol"];
+          const box = await new ContractFactory(artifacts.StorageBox.abi, "0x"+artifacts.StorageBox.evm.bytecode.object, wallet).deploy();
+          await box.waitForDeployment();
+          assert.equal((await (await box.set(20261103n)).wait(1)).status, 1);
+          assert.equal(await box.value(), 20261103n);
+          console.log("PASS contract deployment and read/write:", await box.getAddress());
+
+          const token = await new ContractFactory(artifacts.TestToken.abi, "0x"+artifacts.TestToken.evm.bytecode.object, wallet).deploy(parseUnits("1000000",18));
+          await token.waitForDeployment();
+          assert.equal(await token.name(), "SOBYA Test Token");
+          assert.equal(await token.symbol(), "tSOBY");
+          assert.equal(await token.decimals(), 18n);
+          assert.equal(await token.totalSupply(), parseUnits("1000000",18));
+          const amount = parseUnits("125.5",18), recipient = "0x000000000000000000000000000000000000dEaD";
+          assert.equal((await (await token.transfer(recipient,amount)).wait(1)).status,1);
+          assert.equal(await token.balanceOf(recipient),amount);
+          console.log("PASS ERC-20 deployment, metadata, supply and transfer:", await token.getAddress());
+
+          const ws = new WebSocketProvider("ws://127.0.0.1:8546",777777);
+          try {
+            await ws.getNetwork();
+            const block = await new Promise((resolve,reject) => {
+              const timer=setTimeout(()=>reject(new Error("WebSocket new block subscription timed out")),30000);
+              ws.once("block",n=>{clearTimeout(timer);resolve(n);});
+            });
+            assert(block>0);
+            console.log("PASS WebSocket new block subscription:",block);
+          } finally {
+            await ws.destroy();
+            await provider.destroy();
+          }
+          JS
 
       - name: Upload EVM node log for diagnostics
         if: always()
