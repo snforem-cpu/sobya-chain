@@ -13,7 +13,6 @@ import (
 	evmconfig "github.com/cosmos/evm/config"
 	evmmempool "github.com/cosmos/evm/mempool"
 
-	"github.com/ethereum/go-ethereum/common"
 	evmante "github.com/cosmos/evm/ante"
 	antetypes "github.com/cosmos/evm/ante/types"
 	"strconv"
