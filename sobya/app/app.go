@@ -4,6 +4,7 @@ import (
 	"io"
 
 	clienthelpers "cosmossdk.io/client/v2/helpers"
+	"cosmossdk.io/core/address"
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
@@ -27,7 +28,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
-	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
+	erc20keeper evmaddress "github.com/cosmos/evm/encoding/address"
+	"github.com/cosmos/evm/x/erc20/keeper"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
@@ -137,7 +139,7 @@ func AppConfig() depinject.Config {
 		// annotation, so it must be registered through this supported DI hook.
 		// MsgConvertERC20 is intentionally omitted: its protobuf descriptor
 		// already declares its signer and a second extractor would be duplicate.
-		depinject.Provide(ProvideEVMCustomGetSigner),
+		depinject.Provide(ProvideEVMCustomGetSigner, ProvideEVMAddressCodecFactories),
 	)
 }
 
@@ -213,6 +215,12 @@ func New(
 
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
+
+	// runtime.AppBuilder creates BaseApp with a nil transaction decoder. Install
+	// the app-wired TxConfig explicitly so Ethereum MsgEthereumTx envelopes are
+	// decoded and encoded by the same registry used by the EVM ante handler.
+	app.SetTxDecoder(app.txConfig.TxDecoder())
+	app.SetTxEncoder(app.txConfig.TxEncoder())
 
 	// register legacy modules
 	if err := app.registerIBCModules(appOpts); err != nil {
@@ -338,6 +346,22 @@ func BlockedAddresses() map[string]bool {
 	}
 
 	return result
+}
+
+// ProvideEVMAddressCodecFactories makes the SDK signing context use Ethereum-compatible
+// hex/bech32 codecs for account, validator, and consensus addresses.
+func ProvideEVMAddressCodecFactories() (
+	func() address.Codec,
+	func() runtime.ValidatorAddressCodec,
+	func() runtime.ConsensusAddressCodec,
+) {
+	return func() address.Codec {
+		return evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32AccountAddrPrefix())
+	}, func() runtime.ValidatorAddressCodec {
+		return evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32ValidatorAddrPrefix())
+	}, func() runtime.ConsensusAddressCodec {
+		return evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32ConsensusAddrPrefix())
+	}
 }
 
 // ProvideEVMCustomGetSigner registers the Ethereum transaction signer
