@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	storetypes "cosmossdk.io/store/types"
-	"github.com/cosmos/cosmos-sdk/runtime"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
