@@ -1,67 +1,75 @@
-# SOBYA (SOBY) token rules — EVM compatibility development
+# SOBYA (SOBY) tokenomics and launch rules
 
 ## Native denomination and precision
 
 - Native base denomination: `asobya`.
 - Display denomination: `SOBY`.
-- Precision: 18 decimal places.
+- Precision: **18 decimal places**.
 - Conversion: `1 SOBY = 1,000,000,000,000,000,000 asobya`.
-- Staking power reduction is set to `10^18` base units per SOBY.
-
-The 18-decimal choice is intended to align the native gas asset with Ethereum/EVM wallet conventions. It does not, by itself, mean Cosmos EVM has been integrated or that EVM wallets can connect yet.
+- Staking power reduction: `10^18` base units per SOBY.
+- The native token logo is included in the repository at `assets/logo/sobya-coin-128.png`.
 
 ## Maximum native supply
 
-- Maximum: `1,000,000,000 SOBY`.
+- Maximum: **1,000,000,000 SOBY**.
 - In base units: `1,000,000,000,000,000,000,000,000,000 asobya` (`10^27`).
 - The application represents this cap with the Cosmos SDK arbitrary-precision integer type, not `int64`.
 - Genesis initialization rejects a native allocation above this maximum.
 - Automatic inflation is disabled in the current application. The mint module remains in the required block lifecycle order, but genesis initialization forces inflation parameters, current inflation, and annual provisions to zero.
+- The cap applies to native `asobya`. IBC voucher denominations are separate assets and are not native SOBY issuance.
 
-The cap applies to native `asobya`. IBC voucher denominations are separate assets and are not native SOBY issuance.
+## Agreed initial supply allocation
 
-## Development allocations (not a launch distribution)
+The agreed distribution of the full 1 billion SOBY maximum supply is:
 
-The Ignite development configuration contains test balances, scaled to preserve their previous SOBY-denominated values:
+| Allocation | Share | Amount |
+|---|---:|---:|
+| Founder | 40% | 400,000,000 SOBY |
+| Community | 20% | 200,000,000 SOBY |
+| Validators | 15% | 150,000,000 SOBY |
+| Development | 10% | 100,000,000 SOBY |
+| Liquidity | 10% | 100,000,000 SOBY |
+| Treasury | 3% | 30,000,000 SOBY |
+| Emergency reserve | 2% | 20,000,000 SOBY |
+| **Total** | **100%** | **1,000,000,000 SOBY** |
 
-- Alice: `20,000 SOBY`.
-- Bob: `10,000 SOBY`.
-- Validator test bonds: `100`, `200`, and `100 SOBY`.
+The founder allocation is available at network launch. The validator allocation is intended to vest/release gradually and remain conditional on actual validator participation; a validator that stops participating must not continue earning future unvested rewards.
 
-These are development-only test values. They are not an approved public launch allocation, treasury allocation, or final genesis distribution.
+The founder is responsible for the treasury, liquidity, emergency-reserve, and development wallets. These allocations are distinct from the founder's personal 40% allocation. The actual launch wallet addresses, genesis account entries, and any detailed release schedules must be populated in the production genesis package; they must not be replaced with guessed addresses or invented vesting terms.
 
-## Agreed economic decisions not yet implemented
+## Agreed transaction-fee distribution
 
-- Founder allocation: 40% of the maximum supply (400 million SOBY), with the
-  full founder allocation available at network launch.
-- Transaction-fee distribution target: 50% treasury, 30% validators, and 20%
-  community.
-- Validator allocation is intended to vest gradually and remain conditional on
-  actual validator participation; a validator that stops participating must
-  not continue earning future unvested rewards.
+The target routing of network transaction fees is:
 
-These are design decisions, not active on-chain rules yet. The current source
-does not implement the custom 50/30/20 fee routing or participation-based
-validator rewards. Treasury, liquidity, development, emergency, and community
-wallets and the remaining genesis allocations still need their final amounts,
-addresses, and release rules.
+- **50%** to the founder-controlled treasury wallet.
+- **30%** to eligible validators.
+- **20%** to the community allocation/pool.
 
-## Rules not yet finalized
+This split is an approved design requirement. It is **not yet implemented as custom on-chain fee-routing logic** in the current source. The implementation must account for actual collected fees, deterministic accounting, validator eligibility/participation, and transparent community accounting; do not treat the standard Cosmos distribution module as proof that this exact split is active.
 
-No production values have been finalized in source for:
+## Development allocations and test data
 
-- transaction fee amount, gas pricing, and exact implementation of the agreed
-  fee split;
-- validator commission, reward eligibility, participation measurement, and
-  slashing/claim logic;
-- staking minimums, unbonding period, and validator eligibility;
-- treasury, community pool, ecosystem, team, or public distribution;
-- governance voting thresholds and upgrade authority;
-- public Cosmos chain ID, EVM chain ID, genesis time, validator set, or launch date;
-- public RPC, REST, gRPC, Ethereum JSON-RPC, P2P and explorer endpoints.
+The Ignite development configuration contains test balances and validator bonds. These are disposable development values, not the agreed production launch allocation. A production genesis must use the allocation table above and must validate that the total native supply equals no more than the 1 billion SOBY cap, with no accidental duplicate allocations.
 
 ## EVM integration status
 
-Cosmos EVM `v0.6.0` is the candidate compatibility baseline because its Cosmos SDK and CometBFT versions match this source tree. The EVM application is not yet integrated into SOBYA. Integration still requires wiring EVM, ERC-20, fee-market, ante handling, JSON-RPC, precompiles, module lifecycle, and a single canonical representation of the native asset. Dependency compatibility alone is not an integration.
+The working branch contains partial Cosmos EVM `v0.6.0` integration: EVM, ERC-20 and fee-market keepers/modules, EVM-aware ante handling, unified EVM/Cosmos mempool and proposal handlers, and EVM server command/configuration paths. The development EVM chain ID currently defaults to `777777`; it is a **development value only**, not an approved production network identifier.
 
-Do not treat the development genesis or test validator balances as production parameters. Do not use this network for real funds until EVM integration (if adopted), fixed-supply invariants, launch configuration, security review, independent multi-node testing, and public-network operations are complete.
+The integration is not yet considered complete or production-ready. Required verification and remaining work include:
+- starting the node with Ethereum JSON-RPC and WebSocket endpoints enabled;
+- validating `eth_chainId`, block queries, balances, signed EIP-155 transactions, transaction receipts, and Solidity contract deployment/calls/state/logs;
+- verifying ERC-20 conversion and native-asset mapping end to end;
+- reviewing and wiring required precompiles and IBC/EVM interactions;
+- implementing and testing the agreed 50/30/20 fee routing;
+- implementing and testing validator reward release based on participation;
+- testing genesis allocation, wallet control, and fixed-supply invariants.
+
+## Launch and operational policy
+
+- No presale.
+- No promises of exchange listing.
+- The project is to be fully prepared and tested before seeking independent validators through X (formerly Twitter) and Telegram.
+- GitHub Actions runners are temporary CI environments; they are not permanent validators or production hosting.
+- A public network requires independent validator operators, persistent node infrastructure, public RPC/REST/gRPC/EVM JSON-RPC endpoints, monitoring, backups, an upgrade process, and a security review.
+
+Do not use this network for real funds until the production genesis, independent multi-node operation, EVM behavior, tokenomics enforcement, and security/operational readiness have all been verified.
