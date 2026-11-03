@@ -59,7 +59,7 @@ The integration is not yet considered complete or production-ready. Required ver
 - starting the node with Ethereum JSON-RPC and WebSocket endpoints enabled;
 - validating `eth_chainId`, block queries, balances, signed EIP-155 transactions, transaction receipts, and Solidity contract deployment/calls/state/logs;
 - verifying ERC-20 conversion and native-asset mapping end to end;
-- reviewing and wiring required precompiles and IBC/EVM interactions;
+- testing the wired Cosmos EVM static precompiles, ERC-20 IBC middleware, and IBC contract callbacks;
 - implementing and testing the agreed 50/30/20 fee routing;
 - implementing and testing validator reward release based on participation;
 - testing genesis allocation, wallet control, and fixed-supply invariants.

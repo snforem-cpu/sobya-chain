@@ -120,6 +120,22 @@ jobs:
             exit 1
           fi
 
+          BLOCK_READY=0
+          for attempt in $(seq 1 90); do
+            rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-ready.json"
+            BLOCK_HEX="$(jq -r '.result' "$RUNNER_TEMP/block-ready.json")"
+            if [ "$(python3 -c 'import sys; print(int(sys.argv[1], 16))' "$BLOCK_HEX")" -ge 1 ]; then
+              BLOCK_READY=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$BLOCK_READY" -ne 1 ]; then
+            echo "EVM RPC started but no block was produced"
+            cat "$RUNNER_TEMP/sobya-evm-rpc.log"
+            exit 1
+          fi
+
           rpc eth_chainId '[]' "$RUNNER_TEMP/chain-id.json"
           rpc net_version '[]' "$RUNNER_TEMP/net-version.json"
           rpc eth_blockNumber '[]' "$RUNNER_TEMP/block-number.json"

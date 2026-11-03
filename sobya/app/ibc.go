@@ -17,6 +17,10 @@ import (
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
 	icahosttypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/types"
 	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
+	erc20ibc "github.com/cosmos/evm/x/erc20"
+	erc20v2 "github.com/cosmos/evm/x/erc20/v2"
+	ibccallbackskeeper "github.com/cosmos/evm/x/ibc/callbacks/keeper"
+	ibccallbacks "github.com/cosmos/ibc-go/v10/modules/apps/callbacks"
 	ibctransfer "github.com/cosmos/ibc-go/v10/modules/apps/transfer"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
@@ -141,6 +145,32 @@ func (app *App) registerIBCModules(appOpts servertypes.AppOptions) error {
 	}
 
 	return nil
+}
+
+
+ // configureEVMIBC wraps IBC transfer with Cosmos EVM's ERC-20 conversion
+ // middleware and contract callback support. It is called after Erc20Keeper
+ // initialization and before the application is loaded.
+func (app *App) configureEVMIBC() {
+	transferStack := porttypes.IBCModule(ibctransfer.NewIBCModule(app.TransferKeeper))
+	transferStack = erc20ibc.NewIBCMiddleware(app.Erc20Keeper, transferStack)
+
+	callbackKeeper := ibccallbackskeeper.NewKeeper(app.AuthKeeper, app.EVMKeeper, app.Erc20Keeper)
+	callbacksMiddleware := ibccallbacks.NewIBCMiddleware(callbackKeeper, uint64(1_000_000))
+	callbacksMiddleware.SetICS4Wrapper(app.IBCKeeper.ChannelKeeper)
+	callbacksMiddleware.SetUnderlyingApplication(transferStack)
+	transferStack = callbacksMiddleware
+
+	ibcRouter := porttypes.NewRouter().
+		AddRoute(ibctransfertypes.ModuleName, transferStack).
+		AddRoute(icacontrollertypes.SubModuleName, icacontroller.NewIBCMiddleware(app.ICAControllerKeeper)).
+		AddRoute(icahosttypes.SubModuleName, icahost.NewIBCModule(app.ICAHostKeeper))
+	app.IBCKeeper.SetRouter(ibcRouter)
+
+	transferStackV2 := ibctransferv2.NewIBCModule(app.TransferKeeper)
+	transferStackV2 = erc20v2.NewIBCMiddleware(transferStackV2, app.Erc20Keeper)
+	ibcRouterV2 := ibcapi.NewRouter().AddRoute(ibctransfertypes.PortID, transferStackV2)
+	app.IBCKeeper.SetRouterV2(ibcRouterV2)
 }
 
 // RegisterIBC Since the IBC modules don't support dependency injection,

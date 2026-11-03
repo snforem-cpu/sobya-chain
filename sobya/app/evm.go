@@ -144,6 +144,9 @@ func (app *App) registerEVMModules(appOpts servertypes.AppOptions) error {
 		&app.TransferKeeper,
 	)
 
+	// Rebuild IBC transfer routes with EVM-aware ERC-20 and callback middleware.
+	app.configureEVMIBC()
+
 	if err := app.RegisterModules(
 		vm.NewAppModule(
 			app.EVMKeeper,

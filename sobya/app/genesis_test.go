@@ -10,6 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 func TestValidateNativeSupply(t *testing.T) {
@@ -143,4 +144,19 @@ func TestPrepareGenesisStateRejectsSupplyAboveCap(t *testing.T) {
 	if _, err := prepareGenesisState(cdc, raw); err == nil {
 		t.Fatal("expected genesis above the native supply cap to be rejected")
 	}
+}
+
+func TestMintModuleHasNoMintAuthority(t *testing.T) {
+	for _, permission := range moduleAccPerms {
+		if permission.Account != minttypes.ModuleName {
+			continue
+		}
+		for _, capability := range permission.Permissions {
+			if capability == authtypes.Minter {
+				t.Fatal("mint module account must not retain the Minter permission")
+			}
+		}
+		return
+	}
+	t.Fatal("mint module account permission entry is missing")
 }
