@@ -36,10 +36,37 @@ jobs:
       - name: Build SOBYA node
         working-directory: sobya
         shell: bash
+        env:
+          # Keep checksum verification enabled. Use independent module
+          # mirrors as fallbacks; the Go checksum database still authenticates
+          # downloaded module content.
+          GOPROXY: https://proxy.golang.org|https://goproxy.io|direct
+          GOSUMDB: sum.golang.org
         run: |
           set -euo pipefail
-          go mod tidy
-          go mod download all
+
+          retry() {
+            local max_attempts=5
+            local attempt=1
+            local delay=5
+            until "$@"; do
+              local status=$?
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                echo "Command failed after $attempt attempts: $*" >&2
+                return "$status"
+              fi
+              echo "Transient dependency/network failure (attempt $attempt/$max_attempts); retrying in ${delay}s: $*" >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          # Do not run 'go mod tidy' in CI: it mutates the dependency graph
+          # during the build and is not required to test the committed module.
+          # Retry transient proxy/checksum-database failures without disabling
+          # sum.golang.org verification.
+          retry go mod download all
           go mod verify
           go test -mod=readonly ./...
           go build -mod=readonly -o ../sobyad ./cmd/sobyad
