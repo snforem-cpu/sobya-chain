@@ -4,7 +4,11 @@ go 1.26.7
 
 replace (
 	// support for go 1.26 (remove when cosmossdk.io/log is updated)
-	github.com/bytedance/sonic => github.com/bytedance/sonic v1.15.0
+	github.com/bytedance/sonic => github.com/bytedance/sonic v1.15.5
+	// Keep Sonic's loader aligned with the Go 1.26-compatible Sonic release.
+	github.com/bytedance/sonic/loader => github.com/bytedance/sonic/loader v0.5.3
+	// Cosmos EVM's maintained Ethereum fork is required by Cosmos EVM v0.6.0.
+	github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
 	// fix upstream GHSA-h395-qcrw-5vmq vulnerability.
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	// replace broken goleveldb
@@ -30,6 +34,7 @@ require (
 	github.com/cometbft/cometbft v0.38.21
 	github.com/cosmos/cosmos-db v1.1.3
 	github.com/cosmos/cosmos-sdk v0.53.6
+	github.com/cosmos/evm v0.6.0
 	github.com/cosmos/ibc-go/v10 v10.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/spf13/cast v1.10.0
