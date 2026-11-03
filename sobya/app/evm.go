@@ -261,6 +261,16 @@ func (app *App) SetClientCtx(clientCtx client.Context) {
 	app.clientCtx = clientCtx
 }
 
+// RegisterTxService is called by the Cosmos EVM server after it replaces the
+// startup RPC client with CometBFT's in-process local client. Keep the EVM
+// mempool broadcaster on that same client; retaining the pre-start client can
+// send a transaction back through the node's external RPC listener and stall
+// while CheckTx re-enters the application.
+func (app *App) RegisterTxService(clientCtx client.Context) {
+	app.SetClientCtx(clientCtx)
+	app.App.RegisterTxService(clientCtx)
+}
+
 // RegisterPendingTxListener registers listeners used by the Ethereum JSON-RPC pending stream.
 func (app *App) RegisterPendingTxListener(listener func(common.Hash)) {
 	app.pendingTxListeners = append(app.pendingTxListeners, listener)
