@@ -351,9 +351,12 @@ func NewEVMInterfaceRegistry() codectypes.InterfaceRegistry {
 		SigningOptions: signing.Options{
 			AddressCodec:          evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32AccountAddrPrefix()),
 			ValidatorAddressCodec: evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32ValidatorAddrPrefix()),
+			// MsgConvertERC20 already declares cosmos.msg.v1.signer in its
+			// proto descriptor, so registering a second custom extractor for it
+			// causes a duplicate-signer panic in SDK v0.53.6. Only EthereumTx
+			// needs the custom extractor because it has no proto signer option.
 			CustomGetSigners: map[protoreflect.FullName]signing.GetSignersFunc{
-				evmtypes.MsgEthereumTxCustomGetSigner.MsgType:     evmtypes.MsgEthereumTxCustomGetSigner.Fn,
-				erc20types.MsgConvertERC20CustomGetSigner.MsgType: erc20types.MsgConvertERC20CustomGetSigner.Fn,
+				evmtypes.MsgEthereumTxCustomGetSigner.MsgType: evmtypes.MsgEthereumTxCustomGetSigner.Fn,
 			},
 		},
 	})
