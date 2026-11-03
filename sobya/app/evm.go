@@ -2,6 +2,10 @@ package app
 
 import (
 	"fmt"
+
+	"github.com/ethereum/go-ethereum/common"
+	evmante "github.com/cosmos/evm/ante"
+	antetypes "github.com/cosmos/evm/ante/types"
 	"strconv"
 
 	storetypes "cosmossdk.io/store/types"
@@ -130,6 +134,28 @@ func (app *App) registerEVMModules(appOpts servertypes.AppOptions) error {
 	); err != nil {
 		return fmt.Errorf("register Cosmos EVM modules: %w", err)
 	}
+
+	// Route both Ethereum and Cosmos SDK transactions through Cosmos EVM\x27s
+	// transaction-aware ante handler. This is essential: keeper/module wiring
+	// alone does not make signed Ethereum transactions executable.
+	anteOptions := evmante.HandlerOptions{
+		Cdc:                    app.appCodec,
+		AccountKeeper:          app.AuthKeeper,
+		BankKeeper:             app.BankKeeper,
+		IBCKeeper:              app.IBCKeeper,
+		FeeMarketKeeper:        app.FeeMarketKeeper,
+		EvmKeeper:              app.EVMKeeper,
+		FeegrantKeeper:         app.FeeGrantKeeper,
+		ExtensionOptionChecker: antetypes.HasDynamicFeeExtensionOption,
+		SignModeHandler:        app.txConfig.SignModeHandler(),
+		SigGasConsumer:         evmante.SigVerificationGasConsumer,
+		DynamicFeeChecker:      true,
+		PendingTxListener:      func(_ common.Hash) {},
+	}
+	if err := anteOptions.Validate(); err != nil {
+		return fmt.Errorf("validate Cosmos EVM ante handler options: %w", err)
+	}
+	app.SetAnteHandler(evmante.NewAnteHandler(anteOptions))
 
 	return nil
 }
