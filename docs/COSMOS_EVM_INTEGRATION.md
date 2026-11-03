@@ -93,3 +93,6 @@ Do not mark Cosmos EVM integration complete until:
 - Cosmos and EVM transfers preserve one native supply and expected balances;
 - two independent nodes synchronize and process both transaction formats;
 - security, fee policy, validator economics, and production genesis are reviewed.
+
+
+Dependency-check note: the compatibility workflow pins Sonic v1.15.5 together with its matching `github.com/bytedance/sonic/loader` v0.5.3 module. This is a compile-time compatibility probe only; it does not constitute application-level EVM integration.
