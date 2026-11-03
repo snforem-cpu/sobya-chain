@@ -76,6 +76,14 @@ jobs:
           mkdir -p "$RUNNER_TEMP/sobya-module-audit"
           cp go.mod go.sum "$RUNNER_TEMP/sobya-module-audit/"
 
+      - name: Upload reconciled Go module files for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-go-module-audit
+          path: ${{ runner.temp }}/sobya-module-audit/
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Initialize chain and enable EVM JSON-RPC
         env:
           SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
