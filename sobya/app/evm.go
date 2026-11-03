@@ -14,6 +14,7 @@ import (
 	evmmempool "github.com/cosmos/evm/mempool"
 
 	evmante "github.com/cosmos/evm/ante"
+	precompiletypes "github.com/cosmos/evm/precompiles/types"
 	antetypes "github.com/cosmos/evm/ante/types"
 	"strconv"
 
@@ -118,7 +119,19 @@ func (app *App) registerEVMModules(appOpts servertypes.AppOptions) error {
 		ExtendedDenom: BaseDenom,
 		DisplayDenom:  DisplayDenom,
 		Decimals:      DisplayExponent,
-	})
+	}).WithStaticPrecompiles(
+		precompiletypes.DefaultStaticPrecompiles(
+			*app.StakingKeeper,
+			app.DistrKeeper,
+			app.BankKeeper,
+			&app.Erc20Keeper,
+			&app.TransferKeeper,
+			app.IBCKeeper.ChannelKeeper,
+			*app.GovKeeper,
+			app.SlashingKeeper,
+			app.appCodec,
+		),
+	)
 
 	app.Erc20Keeper = erc20keeper.NewKeeper(
 		erc20StoreKey,
