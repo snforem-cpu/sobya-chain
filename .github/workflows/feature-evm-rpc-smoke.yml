@@ -10,7 +10,7 @@ on:
       - '.github/workflows/feature-evm-rpc-smoke.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: sobya-evm-rpc-${{ github.ref }}
@@ -75,6 +75,23 @@ jobs:
           # committed dependency graph was incomplete.
           mkdir -p "$RUNNER_TEMP/sobya-module-audit"
           cp go.mod go.sum "$RUNNER_TEMP/sobya-module-audit/"
+
+      - name: Persist reconciled Go module graph on the feature branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- sobya/go.mod sobya/go.sum; then
+            git add sobya/go.mod sobya/go.sum
+            git commit -m "build: persist reconciled Go module graph"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "Committed Go module graph is already tidy."
+          fi
 
       - name: Upload reconciled Go module files for review
         uses: actions/upload-artifact@v4
