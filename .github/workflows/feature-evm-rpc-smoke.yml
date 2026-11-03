@@ -122,12 +122,10 @@ jobs:
           test -n "$VALIDATOR_ADDRESS"
           node --input-type=module <<'JS' > "$RUNNER_TEMP/evm-test-account.json"
           import { Wallet } from "ethers";
-          import { createHash } from "node:crypto";
           import { bech32 } from "bech32";
           const wallet = Wallet.createRandom();
-          const pub = Buffer.from(wallet.signingKey.compressedPublicKey.slice(2), "hex");
-          const hash160 = createHash("ripemd160").update(createHash("sha256").update(pub).digest()).digest();
-          console.log(JSON.stringify({ privateKey: wallet.privateKey, address: bech32.encode("sobya", bech32.toWords(hash160)) }));
+          const evmAddressBytes = Buffer.from(wallet.address.slice(2), "hex");
+          console.log(JSON.stringify({ privateKey: wallet.privateKey, address: bech32.encode("sobya", bech32.toWords(evmAddressBytes)) }));
           JS
           EVM_ACCOUNT="$(jq -r '.address' "$RUNNER_TEMP/evm-test-account.json")"
           jq -r '.privateKey' "$RUNNER_TEMP/evm-test-account.json" | sed 's/^/EVM_TEST_PRIVATE_KEY=/' >> "$GITHUB_ENV"
