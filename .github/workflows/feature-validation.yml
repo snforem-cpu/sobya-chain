@@ -76,9 +76,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Populate the runner module cache and generate any missing go.sum
-          # entries locally. Never push from CI: validation must be read-only
-          # with respect to the feature branch.
+          # Normalize the module graph and checksums locally. The resulting
+          go.mod/go.sum are uploaded as an artifact for review and a separate
+          commit; CI never pushes to the feature branch.
+          go mod tidy
           go mod download all
 
       - name: Verify, test, and build working source
@@ -125,5 +126,7 @@ jobs:
           path: |
             reports/
             dist/
+            sobya/go.mod
+            sobya/go.sum
           if-no-files-found: warn
           retention-days: 14
