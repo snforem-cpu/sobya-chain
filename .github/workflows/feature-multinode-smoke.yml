@@ -75,41 +75,93 @@ jobs:
           }
           trap cleanup EXIT
 
+          set -x
+          dump_node_logs() {
+            echo "===== validator0.log ====="
+            cat "$RUNNER_TEMP/validator0.log" || true
+            echo "===== validator1.log ====="
+            cat "$RUNNER_TEMP/validator1.log" || true
+          }
+          rpc_get() {
+            local url="$1" output="$2"
+            for attempt in $(seq 1 30); do
+              if curl --connect-timeout 2 --max-time 5 -fsS "$url" -o "$output" &&
+                 jq -e '.result' "$output" >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "RPC endpoint did not become healthy: $url"
+            return 1
+          }
+
+          echo "CHECKPOINT: waiting for both CometBFT RPC endpoints"
           READY0=0
           READY1=0
           for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"; then READY0=1; fi
-            if curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"; then READY1=1; fi
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json" &&
+               jq -e '.result.node_info.network' "$RUNNER_TEMP/status0.json" >/dev/null 2>&1; then READY0=1; fi
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json" &&
+               jq -e '.result.node_info.network' "$RUNNER_TEMP/status1.json" >/dev/null 2>&1; then READY1=1; fi
             if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ]; then break; fi
             if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
-              cat "$RUNNER_TEMP/validator0.log"
-              cat "$RUNNER_TEMP/validator1.log"
+              echo "A validator process exited before both RPC endpoints became ready"
+              dump_node_logs
               exit 1
             fi
             sleep 2
           done
-          test "$READY0" -eq 1
-          test "$READY1" -eq 1
+          if [ "$READY0" -ne 1 ] || [ "$READY1" -ne 1 ]; then
+            echo "RPC readiness timeout: validator0=$READY0 validator1=$READY1"
+            dump_node_logs
+            exit 1
+          fi
 
+          echo "CHECKPOINT: waiting for both validators to commit the same height"
           H0=0
           H1=0
           for attempt in $(seq 1 120); do
-            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"
-            curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"
-            H0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status0.json")"
-            H1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status1.json")"
-            if [ "$H0" -ge 2 ] && [ "$H1" -ge 2 ] && [ "$H0" = "$H1" ]; then break; fi
+            if ! curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json" ||
+               ! curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"; then
+              sleep 2
+              continue
+            fi
+            H0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status0.json" 2>/dev/null || echo 0)"
+            H1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status1.json" 2>/dev/null || echo 0)"
+            if [[ "$H0" =~ ^[0-9]+$ && "$H1" =~ ^[0-9]+$ ]] &&
+               [ "$H0" -ge 2 ] && [ "$H1" -ge 2 ] && [ "$H0" = "$H1" ]; then break; fi
             sleep 2
           done
-          test "$H0" -ge 2
-          test "$H1" -ge 2
-          PEERS0="$(curl -fsS http://127.0.0.1:26657/net_info | jq '.result.n_peers | tonumber')"
-          PEERS1="$(curl -fsS http://127.0.0.1:26654/net_info | jq '.result.n_peers | tonumber')"
-          test "$PEERS0" -ge 1
-          test "$PEERS1" -ge 1
+          if ! [[ "$H0" =~ ^[0-9]+$ ]] || ! [[ "$H1" =~ ^[0-9]+$ ]] ||
+             [ "$H0" -lt 2 ] || [ "$H1" -lt 2 ] || [ "$H0" != "$H1" ]; then
+            echo "Validators did not reach a common height >= 2 (validator0=$H0 validator1=$H1)"
+            dump_node_logs
+            exit 1
+          fi
 
-          ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
-          test "$(jq '.validators | length' "$RUNNER_TEMP/validators.json")" -ge 2
+          echo "CHECKPOINT: checking peer connectivity"
+          rpc_get http://127.0.0.1:26657/net_info "$RUNNER_TEMP/net0.json"
+          rpc_get http://127.0.0.1:26654/net_info "$RUNNER_TEMP/net1.json"
+          PEERS0="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net0.json")"
+          PEERS1="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net1.json")"
+          if [ "$PEERS0" -lt 1 ] || [ "$PEERS1" -lt 1 ]; then
+            echo "P2P peer check failed: validator0=$PEERS0 validator1=$PEERS1"
+            dump_node_logs
+            exit 1
+          fi
+
+          echo "CHECKPOINT: querying validator set"
+          if ! ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"; then
+            echo "Validator-set query failed"
+            dump_node_logs
+            exit 1
+          fi
+          VALIDATOR_COUNT="$(jq '.validators | length' "$RUNNER_TEMP/validators.json")"
+          if [ "$VALIDATOR_COUNT" -lt 2 ]; then
+            echo "Expected at least 2 validators, received $VALIDATOR_COUNT"
+            cat "$RUNNER_TEMP/validators.json"
+            exit 1
+          fi
 
           ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
           ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
