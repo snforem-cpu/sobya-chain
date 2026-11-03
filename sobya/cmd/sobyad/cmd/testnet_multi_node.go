@@ -177,7 +177,7 @@ func initTestnetFiles(
 	appConfig := srvconfig.DefaultConfig()
 	appConfig.MinGasPrices = args.minGasPrices
 	appConfig.API.Enable = false
-	appConfig.BaseConfig.MinGasPrices = "100000000" + sdk.DefaultBondDenom
+	appConfig.BaseConfig.MinGasPrices = args.minGasPrices
 	appConfig.Telemetry.EnableHostnameLabel = false
 	appConfig.Telemetry.Enabled = false
 	appConfig.Telemetry.PrometheusRetentionTime = 0
