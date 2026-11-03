@@ -1,98 +1,75 @@
-# SOBYA Cosmos EVM Integration Plan
+# SOBYA Cosmos EVM Integration
 
-Status: design and compatibility assessment only. Cosmos EVM is not yet wired
-into the SOBYA application, and no EVM JSON-RPC endpoint is available.
+Status: **partially wired; EVM runtime acceptance tests are not yet passing because the EVM RPC/mempool server path is not integrated.** Do not treat this branch as a public EVM network or claim wallet compatibility yet.
 
-## Candidate dependency baseline
+## Confirmed on the current feature branch
 
-The candidate is `github.com/cosmos/evm v0.6.0`.
+The feature branch pins github.com/cosmos/evm v0.6.0 and has passed compile/build validation with the current Cosmos SDK / CometBFT dependency set.
 
-The release's root module declares:
+The SOBYA application currently contains:
 
-- Cosmos SDK `v0.53.6` — exact match with SOBYA.
-- CometBFT `v0.38.21` — exact match with SOBYA.
-- IBC-Go `v10.3.1-0.20250909102629-ed3b125c7b6f` — SOBYA currently uses
-  `v10.4.0`; Go module version selection and the EVM package build must be
-  verified before adoption.
-- Go-Ethereum `v1.15.11` with the Cosmos-maintained replacement
-  `github.com/cosmos/go-ethereum v1.16.2-cosmos-1`.
+- EVM, FeeMarket, and ERC-20 store keys and keepers in app/evm.go.
+- Manual registration of the EVM, FeeMarket, and ERC-20 application modules.
+- EVM ante-handler installation through evmante.NewAnteHandler.
+- Runtime module lifecycle entries for EVM, FeeMarket, and ERC-20 in app/app_config.go.
+- A development EVM chain ID default of 777777; this is not a production network ID.
+- Native coin metadata configured as SOBY / asobya with 18 decimals.
 
-The module versions appear compatible at the SDK and CometBFT layers, but this
-is not proof that the full SOBYA app can import and initialize the EVM stack.
-The EVM package graph, IBC integration, Go-Ethereum replacement, and app wiring
-must be tested in CI before the dependency is added to the production app.
+The 3 November 2026 GitHub Actions runs on commit 5734ecfc92987e5bc866a4a97ab4067de06bada5 passed:
+- Feature source validation, tests, and binary builds.
+- 18-decimal native localnet initialization and block production.
+- Two-validator P2P synchronization, validator-set query, and a signed native SOBYA bank transfer with exact integer balance-delta verification.
 
-## Required application integration
+These tests prove Cosmos-native chain functionality only. They do not prove Ethereum transaction execution, EVM JSON-RPC, contract deployment, or wallet connectivity.
 
-A complete integration must implement and test all of the following together:
+## Remaining EVM runtime work
 
-1. EVM encoding, Ethereum-compatible account/address handling, and EVM chain ID.
-2. EVM keeper, fee-market keeper, ERC-20 keeper, store keys, and required module
-   accounts and permissions.
-3. EVM ante handling and transaction decoding/encoding so Cosmos and Ethereum
-   transactions are both accepted safely.
-4. EVM module lifecycle and genesis initialization in the correct order.
-5. Ethereum JSON-RPC, WebSocket configuration, API allow-list, and operational
-   security limits.
-6. Required EVM precompiles and the intended IBC transfer/callback integration.
-7. A single canonical native SOBY supply across Cosmos bank and EVM/ERC-20
-   interfaces. Tests must prove that conversions and transfers cannot create a
-   second independently spendable supply.
-8. Fixed-supply enforcement across Cosmos minting, EVM mint paths, genesis,
-   governance parameter changes, and upgrades.
-9. End-to-end tests for Cosmos sends, EVM native transfers, contract deployment,
-   ERC-20 representation, fee charging, staking, and IBC behavior.
+1. **Ethereum-compatible encoding and transaction configuration**
+   - Review the account, validator, and consensus address codecs.
+   - Register Ethereum transaction decoding/signing correctly without duplicate protobuf signer extractors.
+   - Verify the native SOBYA denomination maps to the EVM gas coin without a second supply.
 
-## Current SOBYA architecture consideration
+2. **EVM mempool and proposal path**
+   - Integrate the Cosmos EVM experimental mempool and its CheckTx / PrepareProposal handlers.
+   - Wire pending-transaction notifications and CometBFT event-bus lifecycle.
+   - Verify Cosmos SDK transactions continue to work through the same mempool.
 
-SOBYA currently uses Cosmos SDK App Wiring/depinject in `app/app.go` and
-`app/app_config.go`. The Cosmos EVM reference application in v0.6.0 uses a
-substantial manually wired BaseApp application. Integration therefore requires
-an explicit architecture decision: adapt the EVM keepers and modules to the
-existing SOBYA app wiring, or deliberately port the reference application's
-application construction and then re-apply SOBYA's custom denomination,
-fixed-supply, genesis, IBC, and governance rules. Merely adding the EVM module
-to `go.mod` would not enable EVM support.
+3. **Node server and RPC**
+   - Use the Cosmos EVM server startup path rather than the standard SDK-only start command.
+   - Add explicit JSON-RPC and WebSocket configuration, API namespace allow-list, timeouts, gas caps, and safe CORS defaults.
+   - Verify eth_chainId, net_version, eth_blockNumber, eth_getBalance, and WebSocket subscriptions on a running local node.
 
-## Token precision and staking
+4. **EVM execution tests**
+   - Submit an EIP-155 signed native-value Ethereum transaction through JSON-RPC.
+   - Verify sender/recipient balances and nonce changes.
+   - Deploy a small Solidity contract, call it, and verify stored state and emitted logs.
+   - Test ERC-20 representation/conversion against the one canonical native supply.
+   - Test fee-market charging and ensure no mint path can exceed the 1-billion-SOBY cap.
 
-The feature branch now uses 18 decimal places and an arbitrary-precision
-1-billion-SOBY cap. The native base denomination is `asobya`, and the staking
-power reduction is `10^18`. This matches the standard EVM gas-token precision.
-The app still needs an integration-level test proving the same denomination
-and amount semantics are used by the EVM keeper and Ethereum JSON-RPC.
+5. **Precompiles and IBC**
+   - Review and add only the required Cosmos EVM static precompiles.
+   - Integrate and test ERC-20/IBC transfer middleware and callbacks only after the keeper/address-codec wiring is validated.
 
-## IDs and wallet metadata
+6. **Production readiness**
+   - Select and collision-check a permanent EVM chain ID before public genesis.
+   - Finalize fee policy, including the agreed 50/30/20 fee allocation through explicit custom distribution logic.
+   - Review validator economics, genesis allocation, upgrade safety, RPC exposure, monitoring, backups, and permanent validator hosting.
 
-The Cosmos chain ID and EVM chain ID are different values. Neither production
-ID is assigned in this document. The EVM chain ID must be checked for collision
-and chosen before the first public testnet genesis is created; after launch it
-must not be casually changed.
+## Token rules that must remain invariant
 
-Wallet compatibility targets are:
+- Native token: SOBY; base denomination: asobya.
+- Precision: 18 decimal places.
+- Maximum supply: 1,000,000,000 SOBY = 10^27 asobya, enforced with arbitrary-precision integers.
+- Founder allocation: 40% (400 million SOBY), as previously agreed.
+- Network fee allocation: 50% treasury, 30% validators, 20% community. This is separate from initial token allocation and is not yet implemented.
+- Do not invent allocations for the remaining initial supply. Do not add a presale or imply exchange listings.
 
-- EVM JSON-RPC wallets such as MetaMask and Rabby, after a stable public RPC
-  and correct EVM chain ID are available.
-- Cosmos wallets such as Keplr, after the Cosmos chain metadata, REST/gRPC/RPC
-  endpoints, address derivation, and chain registry submission are prepared.
-- Trust Wallet and Phantom only after their current network/token listing
-  requirements are satisfied.
+## Wallet and network claims
 
-No wallet can be promised universal support. A repository logo file alone does
-not cause a wallet to display the network or token.
+MetaMask/Rabby compatibility can only be claimed after a persistent public EVM JSON-RPC endpoint, the chosen EVM chain ID, and signed transaction tests are available. Cosmos wallet support requires working Cosmos RPC/gRPC/REST and published chain metadata. Trust Wallet and Phantom must not be claimed compatible without their own network/token requirements and tests.
 
-## Acceptance gates
+A GitHub Actions runner is temporary infrastructure. A successful two-validator CI test is not a continuously available public network.
 
-Do not mark Cosmos EVM integration complete until:
+## Dependency note
 
-- the EVM compatibility workflow passes using the pinned candidate version;
-- SOBYA's application builds and all unit/integration tests pass;
-- a local network starts with both Cosmos and Ethereum JSON-RPC enabled;
-- an EVM wallet can query chain ID and native balance and submit a signed
-  transaction;
-- Cosmos and EVM transfers preserve one native supply and expected balances;
-- two independent nodes synchronize and process both transaction formats;
-- security, fee policy, validator economics, and production genesis are reviewed.
-
-
-Dependency-check note: the compatibility workflow pins Sonic v1.15.5 together with its matching `github.com/bytedance/sonic/loader` v0.5.3 module. This is a compile-time compatibility probe only; it does not constitute application-level EVM integration.
+The compatibility workflow pins Sonic v1.15.5 together with its matching github.com/bytedance/sonic/loader v0.5.3 module. Dependency compatibility and compilation do not establish EVM runtime functionality.
