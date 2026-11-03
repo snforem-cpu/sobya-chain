@@ -139,9 +139,12 @@ func (app *App) configureEVMIBC() {
 	transferStack = erc20ibc.NewIBCMiddleware(app.Erc20Keeper, transferStack)
 
 	callbackKeeper := ibccallbackskeeper.NewKeeper(app.AuthKeeper, app.EVMKeeper, app.Erc20Keeper)
-	callbacksMiddleware := ibccallbacks.NewIBCMiddleware(callbackKeeper, uint64(1_000_000))
-	callbacksMiddleware.SetICS4Wrapper(app.IBCKeeper.ChannelKeeper)
-	callbacksMiddleware.SetUnderlyingApplication(transferStack)
+	callbacksMiddleware := ibccallbacks.NewIBCMiddleware(
+		transferStack,
+		app.IBCKeeper.ChannelKeeper,
+		callbackKeeper,
+		uint64(1_000_000),
+	)
 	transferStack = callbacksMiddleware
 
 	ibcRouter := porttypes.NewRouter().
@@ -150,7 +153,7 @@ func (app *App) configureEVMIBC() {
 		AddRoute(icahosttypes.SubModuleName, icahost.NewIBCModule(app.ICAHostKeeper))
 	app.IBCKeeper.SetRouter(ibcRouter)
 
-	transferStackV2 := ibctransferv2.NewIBCModule(app.TransferKeeper)
+	var transferStackV2 ibcapi.IBCModule = ibctransferv2.NewIBCModule(app.TransferKeeper)
 	transferStackV2 = erc20v2.NewIBCMiddleware(transferStackV2, app.Erc20Keeper)
 	ibcRouterV2 := ibcapi.NewRouter().AddRoute(ibctransfertypes.PortID, transferStackV2)
 	app.IBCKeeper.SetRouterV2(ibcRouterV2)
