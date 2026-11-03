@@ -52,11 +52,9 @@ jobs:
           set -euo pipefail
           ./sobyad init "SOBYA 18 Decimal CI Validator" --chain-id sobya-feature-local-1 --home "$SOBYA_HOME"
           # Keep CometBFT node configuration aligned with the genesis chain ID.
-          python3 - "$SOBYA_HOME/config/config.toml" "sobya-feature-local-1" <<'PY'
-          import pathlib, re, sys
-          path = pathlib.Path(sys.argv[1])
-          text = path.read_text()
-          updated, count = re.subn(r'(?m)^chain_id\s*=\s*".*"          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
+          sed -i 's/^chain_id = ""/chain_id = "sobya-feature-local-1"/' "$SOBYA_HOME/config/config.toml"
+          grep -n '^chain_id = ' "$SOBYA_HOME/config/config.toml"
+          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
           VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator-key.json")"
           test -n "$VALIDATOR_ADDRESS"
           ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000000000000000asobya --home "$SOBYA_HOME"
