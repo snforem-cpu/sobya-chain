@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: sobya-evm-rpc-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   evm-rpc:
