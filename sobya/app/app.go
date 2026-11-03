@@ -199,6 +199,9 @@ func New(
 	if err := app.registerIBCModules(appOpts); err != nil {
 		panic(err)
 	}
+	if err := app.registerEVMModules(appOpts); err != nil {
+		panic(err)
+	}
 
 	/****  Module Options ****/
 
