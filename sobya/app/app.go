@@ -30,7 +30,10 @@ import (
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
+	evmaddress "github.com/cosmos/evm/encoding/address"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/cosmos/gogoproto/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -130,11 +133,13 @@ func AppConfig() depinject.Config {
 			map[string]module.AppModuleBasic{
 				genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
 			},
+			// Use Cosmos EVM's canonical signing registry. The SDK runtime's
+			// ProvideInterfaceRegistry calls DefineCustomGetSigners, which rejects
+			// MsgConvertERC20 because its proto also declares a signer annotation.
+			// Cosmos EVM v0.6.0 builds the registry with CustomGetSigners in
+			// signing.Options, which correctly supports both custom extractors.
+			NewEVMInterfaceRegistry(),
 		),
-		// CustomGetSigner is a many-per-container dependency in the SDK.
-		// Return both EVM signer providers from one provider function so depinject
-		// registers two members of that collection instead of a conflicting slice.
-		depinject.Provide(ProvideEVMCustomSigners),
 	)
 }
 
@@ -336,8 +341,24 @@ func BlockedAddresses() map[string]bool {
 	return result
 }
 
-// ProvideEVMCustomSigners registers the canonical signer extractors required by
-// Cosmos EVM messages that do not carry the standard cosmos.msg.v1.signer option.
-func ProvideEVMCustomSigners() (signing.CustomGetSigner, signing.CustomGetSigner) {
-	return evmtypes.MsgEthereumTxCustomGetSigner, erc20types.MsgConvertERC20CustomGetSigner
+// NewEVMInterfaceRegistry mirrors Cosmos EVM v0.6.0's encoding setup.
+// Its SigningOptions map is important: it supports the ERC20 conversion
+// custom signer together with the proto signer annotation without passing
+// through the SDK runtime's stricter DefineCustomGetSigners helper.
+func NewEVMInterfaceRegistry() codectypes.InterfaceRegistry {
+	registry, err := codectypes.NewInterfaceRegistryWithOptions(codectypes.InterfaceRegistryOptions{
+		ProtoFiles: proto.HybridResolver,
+		SigningOptions: signing.Options{
+			AddressCodec:          evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32AccountAddrPrefix()),
+			ValidatorAddressCodec: evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32ValidatorAddrPrefix()),
+			CustomGetSigners: map[protoreflect.FullName]signing.GetSignersFunc{
+				evmtypes.MsgEthereumTxCustomGetSigner.MsgType:     evmtypes.MsgEthereumTxCustomGetSigner.Fn,
+				erc20types.MsgConvertERC20CustomGetSigner.MsgType: erc20types.MsgConvertERC20CustomGetSigner.Fn,
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return registry
 }
