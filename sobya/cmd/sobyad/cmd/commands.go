@@ -62,6 +62,10 @@ func initRootCmd(
 
 // addModuleInitFlags adds more flags to the start command.
 func addModuleInitFlags(startCmd *cobra.Command) {
+	// Cosmos EVM's default start command does not expose the SDK chain-id flag.
+	// newEVMApp reads this value through appOpts and passes it to BaseApp so
+	// CometBFT's InitChain chain ID matches genesis.json.
+	startCmd.Flags().String(flags.FlagChainID, "", "The network chain ID (defaults to the chain ID in genesis.json)")
 }
 
 func queryCommand() *cobra.Command {
