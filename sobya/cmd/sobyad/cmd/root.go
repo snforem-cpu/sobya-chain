@@ -84,7 +84,6 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	initRootCmd(rootCmd, clientCtx.TxConfig, moduleBasicManager)
-	addEVMServerCommands(rootCmd)
 
 	if err := autoCliOpts.EnhanceRootCommand(rootCmd); err != nil {
 		panic(err)
