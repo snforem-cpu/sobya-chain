@@ -429,6 +429,9 @@ func collectGenFiles(
 		nodeConfig.Moniker = nodeDirName
 
 		nodeConfig.SetRoot(nodeDir)
+		// Each local validator is a separate process, so its optional CometBFT
+		// pprof listener must not contend for the default 6060 port.
+		nodeConfig.RPC.PprofListenAddress = "127.0.0.1:" + strconv.Itoa(6060+i)
 
 		nodeID, valPubKey := nodeIDs[i], valPubKeys[i]
 		initCfg := genutiltypes.NewInitConfig(chainID, gentxsDir, nodeID, valPubKey)
