@@ -65,9 +65,9 @@ jobs:
           cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
           test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-feature-multinode-1"
 
-          ./sobyad start --home "$NET/validator0" > "$RUNNER_TEMP/validator0.log" 2>&1 &
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator0" > "$RUNNER_TEMP/validator0.log" 2>&1 &
           PID0=$!
-          ./sobyad start --home "$NET/validator1" > "$RUNNER_TEMP/validator1.log" 2>&1 &
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator1" > "$RUNNER_TEMP/validator1.log" 2>&1 &
           PID1=$!
           cleanup() {
             for pid in "$PID0" "$PID1"; do
