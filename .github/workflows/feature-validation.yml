@@ -77,8 +77,8 @@ jobs:
         run: |
           set -euo pipefail
           # Normalize the module graph and checksums locally. The resulting
-          go.mod/go.sum are uploaded as an artifact for review and a separate
-          commit; CI never pushes to the feature branch.
+          # go.mod/go.sum are uploaded as an artifact for review and a separate
+          # commit; CI never pushes to the feature branch.
           go mod tidy
           go mod download all
 
