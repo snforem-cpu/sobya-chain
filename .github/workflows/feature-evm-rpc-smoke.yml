@@ -293,6 +293,8 @@ jobs:
           if ! git diff --quiet -- sobya/go.mod sobya/go.sum; then
             git add sobya/go.mod sobya/go.sum
             git commit -m "build: persist reconciled Go module graph"
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
             git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"
           else
             echo "Committed Go module graph is already tidy."
