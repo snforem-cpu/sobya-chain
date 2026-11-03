@@ -137,6 +137,7 @@ jobs:
           PY
           grep -A8 '^\[json-rpc\]' "$SOBYA_HOME/config/app.toml"
 
+      # Ensure the EVM mempool broadcaster targets this node's actual RPC listener.
       - name: Pin the EVM broadcaster to the local CometBFT RPC
         env:
           SOBYA_HOME: ${{ runner.temp }}/sobya-evm-rpc
