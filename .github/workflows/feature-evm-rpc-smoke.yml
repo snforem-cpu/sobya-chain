@@ -62,14 +62,19 @@ jobs:
             done
           }
 
-          # Do not run 'go mod tidy' in CI: it mutates the dependency graph
-          # during the build and is not required to test the committed module.
-          # Retry transient proxy/checksum-database failures without disabling
-          # sum.golang.org verification.
-          retry go mod download all
+          # Reconcile the module graph before readonly tests/build. The prior
+          # CI run proved downloads and checksums succeed, but Go reported that
+          # go.mod needs updates before tests can run.
+          # Keep checksum verification enabled and retry transient network errors.
+          retry go mod tidy
           go mod verify
           go test -mod=readonly ./...
           go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+          # Preserve the exact module files produced by tidy for review if the
+          # committed dependency graph was incomplete.
+          mkdir -p "$RUNNER_TEMP/sobya-module-audit"
+          cp go.mod go.sum "$RUNNER_TEMP/sobya-module-audit/"
 
       - name: Initialize chain and enable EVM JSON-RPC
         env:
