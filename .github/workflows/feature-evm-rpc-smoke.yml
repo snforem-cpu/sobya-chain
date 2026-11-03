@@ -111,7 +111,9 @@ jobs:
           console.log(JSON.stringify({ privateKey: wallet.privateKey, address: bech32.encode("sobya", bech32.toWords(evmAddressBytes)) }));
           JS
           EVM_ACCOUNT="$(jq -r '.address' "$RUNNER_TEMP/evm-test-account.json")"
-          jq -r '.privateKey' "$RUNNER_TEMP/evm-test-account.json" | sed 's/^/EVM_TEST_PRIVATE_KEY=/' >> "$GITHUB_ENV"
+          EVM_TEST_PRIVATE_KEY="$(jq -r '.privateKey' "$RUNNER_TEMP/evm-test-account.json")"
+          echo "::add-mask::$EVM_TEST_PRIVATE_KEY"
+          echo "EVM_TEST_PRIVATE_KEY=$EVM_TEST_PRIVATE_KEY" >> "$GITHUB_ENV"
           ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000000000000000asobya --home "$SOBYA_HOME"
           ./sobyad genesis add-genesis-account "$EVM_ACCOUNT" 10000000000000000000000000asobya --home "$SOBYA_HOME"
           ./sobyad genesis gentx validator 1000000000000000000000asobya --chain-id sobya-evm-rpc-ci-1 --keyring-backend test --home "$SOBYA_HOME"
