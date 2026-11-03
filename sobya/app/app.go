@@ -26,8 +26,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -127,6 +129,11 @@ func AppConfig() depinject.Config {
 			map[string]module.AppModuleBasic{
 				genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
 			},
+			// Cosmos EVM messages do not declare the standard cosmos.msg.v1.signer
+			// annotation. Register their canonical signer extractors with the SDK
+			// signing context before depinject validates the global proto registry.
+			evmtypes.MsgEthereumTxCustomGetSigner,
+			erc20types.MsgConvertERC20CustomGetSigner,
 		),
 	)
 }
