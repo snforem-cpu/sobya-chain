@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
+	"cosmossdk.io/x/tx/signing"
 	storetypes "cosmossdk.io/store/types"
 	circuitkeeper "cosmossdk.io/x/circuit/keeper"
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
@@ -132,8 +133,10 @@ func AppConfig() depinject.Config {
 			// Cosmos EVM messages do not declare the standard cosmos.msg.v1.signer
 			// annotation. Register their canonical signer extractors with the SDK
 			// signing context before depinject validates the global proto registry.
-			evmtypes.MsgEthereumTxCustomGetSigner,
-			erc20types.MsgConvertERC20CustomGetSigner,
+			[]signing.CustomGetSigner{
+				evmtypes.MsgEthereumTxCustomGetSigner,
+				erc20types.MsgConvertERC20CustomGetSigner,
+			},
 		),
 	)
 }
