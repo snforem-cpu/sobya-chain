@@ -134,7 +134,7 @@ func AppConfig() depinject.Config {
 		// CustomGetSigner is a many-per-container dependency in the SDK.
 		// Return both EVM signer providers from one provider function so depinject
 		// registers two members of that collection instead of a conflicting slice.
-		depinject.Provide(provideEVMCustomSigners),
+		depinject.Provide(ProvideEVMCustomSigners),
 	)
 }
 
@@ -336,8 +336,8 @@ func BlockedAddresses() map[string]bool {
 	return result
 }
 
-// provideEVMCustomSigners registers the canonical signer extractors required by
+// ProvideEVMCustomSigners registers the canonical signer extractors required by
 // Cosmos EVM messages that do not carry the standard cosmos.msg.v1.signer option.
-func provideEVMCustomSigners() (signing.CustomGetSigner, signing.CustomGetSigner) {
+func ProvideEVMCustomSigners() (signing.CustomGetSigner, signing.CustomGetSigner) {
 	return evmtypes.MsgEthereumTxCustomGetSigner, erc20types.MsgConvertERC20CustomGetSigner
 }
