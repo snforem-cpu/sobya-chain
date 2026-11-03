@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: sobya-evm-rpc-${{ github.ref }}
+  group: sobya-evm-rpc-${{ github.ref }}-broadcaster-fix
   cancel-in-progress: false
 
 jobs:
