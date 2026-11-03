@@ -177,8 +177,11 @@ jobs:
           ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
 
           AMOUNT=1000000000000000
-          FEE=20000000000000
-          ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}asobya" \
+          # Use a fee comfortably above the local minimum-gas-price threshold.
+          # This is a disposable CI chain; the larger fee avoids equality/rounding
+          # ambiguity while remaining only 0.001 SOBYA.
+          FEE=1000000000000000
+          if ! ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}asobya" \
             --chain-id sobya-feature-multinode-1 \
             --node tcp://127.0.0.1:26657 \
             --home "$NET/validator0" \
@@ -187,9 +190,22 @@ jobs:
             --gas 200000 \
             --broadcast-mode sync \
             --yes \
-            --output json > "$RUNNER_TEMP/transfer.json"
+            --output json > "$RUNNER_TEMP/transfer.json" 2> "$RUNNER_TEMP/transfer.stderr"; then
+            echo "Transaction CLI failed before returning a response"
+            cat "$RUNNER_TEMP/transfer.stderr" || true
+            dump_node_logs
+            exit 1
+          fi
           TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
-          test "$TRANSFER_CODE" = "0"
+          if [ "$TRANSFER_CODE" != "0" ]; then
+            echo "Native SOBYA transfer rejected: code=$TRANSFER_CODE"
+            jq '{codespace,code,raw_log,txhash,gas_wanted,gas_used,tx_response}' "$RUNNER_TEMP/transfer.json" || cat "$RUNNER_TEMP/transfer.json"
+            echo "===== transfer.stderr ====="
+            cat "$RUNNER_TEMP/transfer.stderr" || true
+            dump_node_logs
+            exit 1
+          fi
+          echo "PASS: native SOBYA transfer accepted by CheckTx."
 
           CONFIRMED=0
           for attempt in $(seq 1 60); do
@@ -225,5 +241,11 @@ jobs:
           path: |
             ${{ runner.temp }}/validator0.log
             ${{ runner.temp }}/validator1.log
+            ${{ runner.temp }}/transfer.json
+            ${{ runner.temp }}/transfer.stderr
+            ${{ runner.temp }}/before-from.json
+            ${{ runner.temp }}/before-to.json
+            ${{ runner.temp }}/after-from.json
+            ${{ runner.temp }}/after-to.json
           if-no-files-found: ignore
           retention-days: 7
