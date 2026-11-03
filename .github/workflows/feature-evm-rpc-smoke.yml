@@ -51,9 +51,6 @@ jobs:
         run: |
           set -euo pipefail
           ./sobyad init "SOBYA EVM RPC CI" --chain-id sobya-evm-rpc-ci-1 --home "$SOBYA_HOME"
-          # Keep CometBFT node configuration aligned with the genesis chain ID.
-          sed -i -E 's/^chain_id = .*/chain_id = "sobya-evm-rpc-ci-1"/' "$SOBYA_HOME/config/config.toml"
-          grep -Fx 'chain_id = "sobya-evm-rpc-ci-1"' "$SOBYA_HOME/config/config.toml"
           jq -e --arg expected "sobya-evm-rpc-ci-1" '.chain_id == $expected' "$SOBYA_HOME/config/genesis.json" >/dev/null
           ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
           VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator-key.json")"
