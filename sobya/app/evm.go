@@ -2,6 +2,16 @@ package app
 
 import (
 	"fmt"
+	"errors"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"cosmossdk.io/log"
+	"github.com/cosmos/cosmos-sdk/baseapp"
+	"github.com/cosmos/cosmos-sdk/client"
+	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
+	evmconfig "github.com/cosmos/evm/config"
+	evmmempool "github.com/cosmos/evm/mempool"
 
 	"github.com/ethereum/go-ethereum/common"
 	evmante "github.com/cosmos/evm/ante"
@@ -150,12 +160,125 @@ func (app *App) registerEVMModules(appOpts servertypes.AppOptions) error {
 		SignModeHandler:        app.txConfig.SignModeHandler(),
 		SigGasConsumer:         evmante.SigVerificationGasConsumer,
 		DynamicFeeChecker:      true,
-		PendingTxListener:      func(_ common.Hash) {},
+		PendingTxListener:      app.onPendingTx,
 	}
 	if err := anteOptions.Validate(); err != nil {
 		return fmt.Errorf("validate Cosmos EVM ante handler options: %w", err)
 	}
 	app.SetAnteHandler(evmante.NewAnteHandler(anteOptions))
 
+	if err := app.configureEVMMempool(appOpts, app.Logger()); err != nil {
+		return fmt.Errorf("configure Cosmos EVM mempool: %w", err)
+	}
+
+	return nil
+}
+
+
+// configureEVMMempool installs the unified Ethereum/Cosmos transaction pool,
+// CheckTx validation, and proposal handlers before BaseApp is loaded/sealed.
+func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.Logger) error {
+	if evmtypes.GetChainConfig() == nil {
+		return fmt.Errorf("Cosmos EVM chain configuration is not initialized")
+	}
+
+	cosmosPoolMaxTx := evmconfig.GetCosmosPoolMaxTx(appOpts, logger)
+	if cosmosPoolMaxTx < 0 {
+		return fmt.Errorf("Cosmos EVM mempool is disabled; JSON-RPC requires the EVM mempool")
+	}
+
+	mempoolConfig := &evmmempool.EVMMempoolConfig{
+		AnteHandler:      app.BaseApp.AnteHandler(),
+		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
+		BlockGasLimit:    evmconfig.GetBlockGasLimit(appOpts, logger),
+		MinTip:           evmconfig.GetMinTip(appOpts, logger),
+		BroadCastTxFn: func(txs []*ethtypes.Transaction) error {
+			return broadcastEVMTransactions(app.clientCtx, app.txConfig, txs)
+		},
+	}
+
+	pool := evmmempool.NewExperimentalEVMMempool(
+		app.CreateQueryContext,
+		logger,
+		app.EVMKeeper,
+		app.FeeMarketKeeper,
+		app.txConfig,
+		app.clientCtx,
+		mempoolConfig,
+		cosmosPoolMaxTx,
+	)
+	app.EVMMempool = pool
+	app.SetMempool(pool)
+	app.SetCheckTxHandler(evmmempool.NewCheckTxHandler(pool))
+
+	proposalHandler := baseapp.NewDefaultProposalHandler(pool, app)
+	proposalHandler.SetSignerExtractionAdapter(
+		evmmempool.NewEthSignerExtractionAdapter(
+			sdkmempool.NewDefaultSignerExtractionAdapter(),
+		),
+	)
+	app.SetPrepareProposal(proposalHandler.PrepareProposalHandler())
+	app.SetProcessProposal(proposalHandler.ProcessProposalHandler())
+
+	return nil
+}
+
+// GetMempool exposes the unified EVM/Cosmos mempool to the Cosmos EVM server.
+func (app *App) GetMempool() sdkmempool.ExtMempool {
+	return app.EVMMempool
+}
+
+// GetAnteHandler exposes the active transaction ante handler to the EVM mempool.
+func (app *App) GetAnteHandler() sdk.AnteHandler {
+	return app.BaseApp.AnteHandler()
+}
+
+// SetClientCtx provides the RPC client context used by the EVM mempool broadcaster.
+func (app *App) SetClientCtx(clientCtx client.Context) {
+	app.clientCtx = clientCtx
+}
+
+// RegisterPendingTxListener registers listeners used by the Ethereum JSON-RPC pending stream.
+func (app *App) RegisterPendingTxListener(listener func(ethcommon.Hash)) {
+	app.pendingTxListeners = append(app.pendingTxListeners, listener)
+}
+
+func (app *App) onPendingTx(hash common.Hash) {
+	for _, listener := range app.pendingTxListeners {
+		listener(hash)
+	}
+}
+
+// Close shuts down the EVM transaction pool before closing BaseApp.
+func (app *App) Close() error {
+	var poolErr error
+	if app.EVMMempool != nil {
+		poolErr = app.EVMMempool.Close()
+	}
+	return errors.Join(poolErr, app.App.Close())
+}
+
+// broadcastEVMTransactions wraps signed Ethereum transactions as MsgEthereumTx
+// and broadcasts them through the client context supplied by the EVM server.
+func broadcastEVMTransactions(clientCtx client.Context, txConfig client.TxConfig, ethTxs []*ethtypes.Transaction) error {
+	for _, ethTx := range ethTxs {
+		msg := &evmtypes.MsgEthereumTx{}
+		msg.FromEthereumTx(ethTx)
+		txBuilder := txConfig.NewTxBuilder()
+		if err := txBuilder.SetMsgs(msg); err != nil {
+			return fmt.Errorf("set Ethereum message: %w", err)
+		}
+		txBytes, err := txConfig.TxEncoder()(txBuilder.GetTx())
+		if err != nil {
+			return fmt.Errorf("encode Ethereum transaction: %w", err)
+		}
+		res, err := clientCtx.BroadcastTxSync(txBytes)
+		if err != nil {
+			return fmt.Errorf("broadcast Ethereum transaction %s: %w", ethTx.Hash().Hex(), err)
+		}
+		if res.Code != 0 {
+			return fmt.Errorf("Ethereum transaction %s rejected: code=%d log=%s", ethTx.Hash().Hex(), res.Code, res.RawLog)
+		}
+	}
 	return nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 	"github.com/spf13/cobra"
 
 	"sobya/app"
@@ -83,6 +84,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	initRootCmd(rootCmd, clientCtx.TxConfig, moduleBasicManager)
+	addEVMServerCommands(rootCmd)
 
 	if err := autoCliOpts.EnhanceRootCommand(rootCmd); err != nil {
 		panic(err)
@@ -117,7 +119,7 @@ func ProvideClientContext(
 	if err != nil {
 		panic(err)
 	}
-	clientCtx = clientCtx.WithTxConfig(txConfig)
+	clientCtx = clientCtx.WithTxConfig(txConfig).WithKeyringOptions(evmhd.EthSecp256k1Option()).WithLedgerHasProtobuf(true)
 
 	return clientCtx
 }

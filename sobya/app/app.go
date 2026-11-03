@@ -15,6 +15,8 @@ import (
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
 
 	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/ethereum/go-ethereum/common"
+	evmmempool "github.com/cosmos/evm/mempool"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -98,6 +100,11 @@ type App struct {
 	ConsensusParamsKeeper consensuskeeper.Keeper
 	CircuitBreakerKeeper  circuitkeeper.Keeper
 	ParamsKeeper          paramskeeper.Keeper
+
+	// Cosmos EVM server state.
+	clientCtx          client.Context
+	EVMMempool         *evmmempool.ExperimentalEVMMempool
+	pendingTxListeners []func(common.Hash)
 
 	// Cosmos EVM keepers. SOBYA uses its native 18-decimal asobya bank coin.
 	FeeMarketKeeper feemarketkeeper.Keeper

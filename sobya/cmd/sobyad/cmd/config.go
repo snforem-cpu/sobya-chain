@@ -3,6 +3,7 @@ package cmd
 import (
 	cmtcfg "github.com/cometbft/cometbft/config"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
+	evmserverconfig "github.com/cosmos/evm/server/config"
 )
 
 // initCometBFTConfig helps to override default CometBFT Config values.
@@ -20,54 +21,27 @@ func initCometBFTConfig() *cmtcfg.Config {
 // initAppConfig helps to override default appConfig template and configs.
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
-	// The following code snippet is just for reference.
-	type EVMAppConfig struct {
-		EVMChainID uint64 `mapstructure:"evm-chain-id"`
-	}
 	type CustomAppConfig struct {
 		serverconfig.Config `mapstructure:",squash"`
-		EVM               EVMAppConfig `mapstructure:"evm"`
+		EVM     evmserverconfig.EVMConfig     `mapstructure:"evm"`
+		JSONRPC evmserverconfig.JSONRPCConfig `mapstructure:"json-rpc"`
+		TLS     evmserverconfig.TLSConfig     `mapstructure:"tls"`
 	}
 
-	// Optionally allow the chain developer to overwrite the SDK's default
-	// server config.
 	srvCfg := serverconfig.DefaultConfig()
-	// The SDK's default minimum gas price is set to "" (empty value) inside
-	// app.toml. If left empty by validators, the node will halt on startup.
-	// However, the chain developer can set a default app.toml value for their
-	// validators here.
-	//
-	// In summary:
-	// - if you leave srvCfg.MinGasPrices = "", all validators MUST tweak their
-	//   own app.toml config,
-	// - if you set srvCfg.MinGasPrices non-empty, validators CAN tweak their
-	//   own app.toml to override, or use this default value.
-	//
-	// In tests, we set the min gas prices to 0.
-	// srvCfg.MinGasPrices = "0asobya"
+	evmCfg := evmserverconfig.DefaultEVMConfig()
+	evmCfg.EVMChainID = 777777
 
 	customAppConfig := CustomAppConfig{
-		Config: *srvCfg,
-		EVM: EVMAppConfig{EVMChainID: 777777},
+		Config:  *srvCfg,
+		EVM:     *evmCfg,
+		JSONRPC: *evmserverconfig.DefaultJSONRPCConfig(),
+		TLS:     *evmserverconfig.DefaultTLSConfig(),
 	}
 
-	// The EVM chain ID is independent from the CometBFT chain ID. This
-	// development default must be replaced with a network-specific value
-	// before publishing a production genesis.
-	customAppTemplate := serverconfig.DefaultConfigTemplate + `
-[evm]
-# EIP-155 chain ID; choose a unique value for the SOBYA network.
-evm-chain-id = 777777
-`
-	// Edit the default template file
-	//
-	// customAppTemplate := serverconfig.DefaultConfigTemplate + `
-	// [wasm]
-	// # This is the maximum sdk gas (wasm and storage) that we allow for any x/wasm "smart" queries
-	// query_gas_limit = 300000
-	// # This is the number of wasm vm instances we keep cached in memory for speed-up
-	// # Warning: this is currently unstable and may lead to crashes, best to keep for 0 unless testing locally
-	// lru_size = 0`
+	// Preserve Cosmos SDK settings while adding the complete EVM server
+	// configuration, including JSON-RPC and WebSocket defaults.
+	customAppTemplate := serverconfig.DefaultConfigTemplate + evmserverconfig.DefaultEVMConfigTemplate
 
 	return customAppTemplate, customAppConfig
 }
