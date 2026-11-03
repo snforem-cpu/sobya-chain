@@ -3,6 +3,10 @@ package app
 import (
 	"time"
 
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
 	appv1alpha1 "cosmossdk.io/api/cosmos/app/v1alpha1"
 	authmodulev1 "cosmossdk.io/api/cosmos/auth/module/v1"
@@ -81,6 +85,7 @@ var (
 		{Account: nft.ModuleName},
 		{Account: ibctransfertypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
 		{Account: icatypes.ModuleName},
+		{Account: evmtypes.ModuleName},
 	}
 
 	// blocked account addresses
@@ -91,6 +96,8 @@ var (
 		stakingtypes.BondedPoolName,
 		stakingtypes.NotBondedPoolName,
 		nft.ModuleName,
+		evmtypes.ModuleName,
+		erc20types.ModuleName,
 		// We allow the following module accounts to receive funds:
 		// govtypes.ModuleName
 	}
@@ -105,6 +112,7 @@ var (
 					PreBlockers: []string{
 						upgradetypes.ModuleName,
 						authtypes.ModuleName,
+						evmtypes.ModuleName,
 					},
 					// The mint module remains in the blocker order because the module manager
 					// requires a complete order. Its genesis inflation values are forced to zero.
@@ -117,12 +125,18 @@ var (
 						authz.ModuleName,
 						epochstypes.ModuleName,
 						ibcexported.ModuleName,
+						erc20types.ModuleName,
+						feemarkettypes.ModuleName,
+						evmtypes.ModuleName,
 					},
 					EndBlockers: []string{
 						govtypes.ModuleName,
 						stakingtypes.ModuleName,
 						feegrant.ModuleName,
 						group.ModuleName,
+						evmtypes.ModuleName,
+						erc20types.ModuleName,
+						feemarkettypes.ModuleName,
 					},
 					OverrideStoreKeys: []*runtimev1alpha1.StoreKeyConfig{
 						{ModuleName: authtypes.ModuleName, KvStoreKey: "acc"},
@@ -149,6 +163,9 @@ var (
 						ibcexported.ModuleName,
 						ibctransfertypes.ModuleName,
 						icatypes.ModuleName,
+						evmtypes.ModuleName,
+						feemarkettypes.ModuleName,
+						erc20types.ModuleName,
 					},
 				}),
 			},
