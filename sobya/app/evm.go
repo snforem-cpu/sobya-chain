@@ -17,6 +17,7 @@ import (
 	precompiletypes "github.com/cosmos/evm/precompiles/types"
 	antetypes "github.com/cosmos/evm/ante/types"
 	"strconv"
+	"time"
 
 	storetypes "cosmossdk.io/store/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -208,7 +209,14 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 		BlockGasLimit:    evmconfig.GetBlockGasLimit(appOpts, logger),
 		MinTip:           evmconfig.GetMinTip(appOpts, logger),
 		BroadCastTxFn: func(txs []*ethtypes.Transaction) error {
-			return broadcastEVMTransactions(app.clientCtx, app.txConfig, txs)
+			logger.Info("SOBYA EVM broadcaster callback entered", "count", len(txs))
+			err := broadcastEVMTransactions(app.clientCtx, app.txConfig, txs, logger)
+			if err != nil {
+				logger.Error("SOBYA EVM broadcaster callback failed", "err", err)
+				return err
+			}
+			logger.Info("SOBYA EVM broadcaster callback returned successfully", "count", len(txs))
+			return nil
 		},
 	}
 
@@ -275,8 +283,10 @@ func (app *App) Close() error {
 
 // broadcastEVMTransactions wraps signed Ethereum transactions as MsgEthereumTx
 // and broadcasts them through the client context supplied by the EVM server.
-func broadcastEVMTransactions(clientCtx client.Context, txConfig client.TxConfig, ethTxs []*ethtypes.Transaction) error {
+func broadcastEVMTransactions(clientCtx client.Context, txConfig client.TxConfig, ethTxs []*ethtypes.Transaction, logger log.Logger) error {
 	for _, ethTx := range ethTxs {
+		started := time.Now()
+		logger.Info("SOBYA EVM Comet broadcast starting", "hash", ethTx.Hash().Hex(), "method", "BroadcastTxAsync")
 		msg := &evmtypes.MsgEthereumTx{}
 		msg.FromEthereumTx(ethTx)
 		txBuilder := txConfig.NewTxBuilder()
@@ -293,8 +303,10 @@ func broadcastEVMTransactions(clientCtx client.Context, txConfig client.TxConfig
 		// request while the in-process node is processing the transaction.
 		res, err := clientCtx.BroadcastTxAsync(txBytes)
 		if err != nil {
+			logger.Error("SOBYA EVM Comet broadcast transport error", "hash", ethTx.Hash().Hex(), "elapsed", time.Since(started), "err", err)
 			return fmt.Errorf("broadcast Ethereum transaction %s: %w", ethTx.Hash().Hex(), err)
 		}
+		logger.Info("SOBYA EVM Comet broadcast response", "hash", ethTx.Hash().Hex(), "code", res.Code, "elapsed", time.Since(started), "log", res.RawLog)
 		if res.Code != 0 {
 			return fmt.Errorf("Ethereum transaction %s rejected: code=%d log=%s", ethTx.Hash().Hex(), res.Code, res.RawLog)
 		}
