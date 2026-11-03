@@ -8,6 +8,7 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 	"cosmossdk.io/x/tx/signing"
+	feegrantkeeper "cosmossdk.io/x/feegrant/keeper"
 	storetypes "cosmossdk.io/store/types"
 	circuitkeeper "cosmossdk.io/x/circuit/keeper"
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
@@ -26,6 +27,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+	evmante "github.com/cosmos/evm/ante"
+	antetypes "github.com/cosmos/evm/ante/types"
+	"github.com/ethereum/go-ethereum/common"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
@@ -98,6 +102,7 @@ type App struct {
 
 	// Cosmos EVM keepers. SOBYA uses its native 18-decimal asobya bank coin.
 	FeeMarketKeeper feemarketkeeper.Keeper
+	FeeGrantKeeper feegrantkeeper.Keeper
 	EVMKeeper       *evmkeeper.Keeper
 	Erc20Keeper     erc20keeper.Keeper
 
@@ -200,6 +205,7 @@ func New(
 		&app.ConsensusParamsKeeper,
 		&app.CircuitBreakerKeeper,
 		&app.ParamsKeeper,
+		&app.FeeGrantKeeper,
 	); err != nil {
 		panic(err)
 	}
