@@ -67,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./sobyad start --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-18-node.log" 2>&1 &
+          ./sobyad start --chain-id sobya-feature-local-1 --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-18-node.log" 2>&1 &
           NODE_PID=$!
           cleanup() {
             kill "$NODE_PID" 2>/dev/null || true
