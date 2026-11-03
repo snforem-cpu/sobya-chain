@@ -70,8 +70,19 @@ jobs:
           ./sobyad start --home "$NET/validator1" > "$RUNNER_TEMP/validator1.log" 2>&1 &
           PID1=$!
           cleanup() {
-            kill "$PID0" "$PID1" 2>/dev/null || true
-            wait "$PID0" "$PID1" 2>/dev/null || true
+            for pid in "$PID0" "$PID1"; do
+              kill "$pid" 2>/dev/null || true
+            done
+            for pid in "$PID0" "$PID1"; do
+              for attempt in $(seq 1 10); do
+                if ! kill -0 "$pid" 2>/dev/null; then break; fi
+                sleep 1
+              done
+              if kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$pid" 2>/dev/null || true
+              fi
+              wait "$pid" 2>/dev/null || true
+            done
           }
           trap cleanup EXIT
 
