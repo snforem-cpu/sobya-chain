@@ -20,28 +20,31 @@ func initCometBFTConfig() *cmtcfg.Config {
 
 // initAppConfig helps to override default appConfig template and configs.
 // return "", nil if no custom configuration is required for the application.
-func initAppConfig() (string, interface{}) {
-	type CustomAppConfig struct {
-		serverconfig.Config `mapstructure:",squash"`
-		EVM     evmserverconfig.EVMConfig     `mapstructure:"evm"`
-		JSONRPC evmserverconfig.JSONRPCConfig `mapstructure:"json-rpc"`
-		TLS     evmserverconfig.TLSConfig     `mapstructure:"tls"`
-	}
-
+// defaultAppConfig returns the combined Cosmos SDK and Cosmos EVM app.toml
+// configuration used by both normal node startup and generated testnets.
+func defaultAppConfig() *evmserverconfig.Config {
 	srvCfg := serverconfig.DefaultConfig()
+	// Cosmos SDK defaults its application mempool to disabled (-1). Cosmos EVM
+	// requires the unified EVM/Cosmos mempool for CheckTx and proposal handling.
+	// Keep a bounded queue instead of silently starting with EVM disabled.
+	srvCfg.Mempool.MaxTxs = 5000
+
 	evmCfg := evmserverconfig.DefaultEVMConfig()
+	// Development-only EVM chain ID. A production ID must be explicitly selected
+	// before generating a public genesis.
 	evmCfg.EVMChainID = 777777
 
-	customAppConfig := CustomAppConfig{
+	return &evmserverconfig.Config{
 		Config:  *srvCfg,
 		EVM:     *evmCfg,
 		JSONRPC: *evmserverconfig.DefaultJSONRPCConfig(),
 		TLS:     *evmserverconfig.DefaultTLSConfig(),
 	}
+}
 
+func initAppConfig() (string, interface{}) {
 	// Preserve Cosmos SDK settings while adding the complete EVM server
 	// configuration, including JSON-RPC and WebSocket defaults.
 	customAppTemplate := serverconfig.DefaultConfigTemplate + evmserverconfig.DefaultEVMConfigTemplate
-
-	return customAppTemplate, customAppConfig
+	return customAppTemplate, defaultAppConfig()
 }
