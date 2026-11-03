@@ -19,6 +19,7 @@ import (
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	"github.com/cosmos/evm/x/vm"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
+	evmwrappers "github.com/cosmos/evm/x/vm/wrappers"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 )
@@ -93,7 +94,7 @@ func (app *App) registerEVMModules(appOpts servertypes.AppOptions) error {
 		storeKeys,
 		govAuthority,
 		app.AuthKeeper,
-		app.BankKeeper,
+		evmwrappers.NewBankWrapper(app.BankKeeper),
 		app.StakingKeeper,
 		app.FeeMarketKeeper,
 		&app.ConsensusParamsKeeper,
