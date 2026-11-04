@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"errors"
+	abci "github.com/cometbft/cometbft/abci/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -232,7 +233,14 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	)
 	app.EVMMempool = pool
 	app.SetMempool(pool)
-	app.SetCheckTxHandler(evmmempool.NewCheckTxHandler(pool))
+	checkTxHandler := evmmempool.NewCheckTxHandler(pool)
+	app.SetCheckTxHandler(func(runTx sdk.RunTx, request *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
+		started := time.Now()
+		logger.Info("SOBYA Comet CheckTx entered", "tx_bytes", len(request.Tx))
+		response, err := checkTxHandler(runTx, request)
+		logger.Info("SOBYA Comet CheckTx completed", "elapsed", time.Since(started), "err", err)
+		return response, err
+	})
 
 	proposalHandler := baseapp.NewDefaultProposalHandler(pool, app)
 	proposalHandler.SetSignerExtractionAdapter(
@@ -261,11 +269,6 @@ func (app *App) SetClientCtx(clientCtx client.Context) {
 	app.clientCtx = clientCtx
 }
 
-// RegisterTxService is called by the Cosmos EVM server after it replaces the
-// startup RPC client with CometBFT's in-process local client. Keep the EVM
-// mempool broadcaster on that same client; retaining the pre-start client can
-// send a transaction back through the node's external RPC listener and stall
-// while CheckTx re-enters the application.
 // RegisterTxService registers the SDK transaction query service on the local gRPC router.
 // Do not replace app.clientCtx here: Cosmos EVM's server sets that context before
 // starting CometBFT so the EVM mempool broadcasts through the configured RPC client.
