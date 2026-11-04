@@ -248,9 +248,15 @@ done
 
 # Verify the matured period was settled exactly once: block 1 has one release
 # event; the following block has none.
-for height in 1 2; do
+for height in 1 2 3 4 5 6; do
   curl --connect-timeout 2 --max-time 5 -fsS "$RPC0/block_results?height=$height" > "$NET/block-results-$height.json"
 done
+# The four signed withdrawals must each be included in a committed block
+# and have successful DeliverTx results, not merely successful CheckTx.
+for height in 3 4 5 6; do
+  jq -e '(.result.txs_results // []) as $txs | ($txs | length) == 1 and $txs[0].code == 0' "$NET/block-results-$height.json" >/dev/null
+done
+echo "PASS: all four commission/delegator withdrawal transactions were committed successfully."
 EVENTS1="$(jq '[.result.finalize_block_events[]? | select(.type == "sobya_validator_reserve_release")] | length' "$NET/block-results-1.json")"
 EVENTS2="$(jq '[.result.finalize_block_events[]? | select(.type == "sobya_validator_reserve_release")] | length' "$NET/block-results-2.json")"
 test "$EVENTS1" -eq 1
