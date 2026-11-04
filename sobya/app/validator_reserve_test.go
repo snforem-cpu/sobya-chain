@@ -109,6 +109,32 @@ func TestValidatorReserveScheduleMatchesLifetimeCap(t *testing.T) {
 	}
 }
 
+func TestValidatorReserveAccruedBudgetCarriesUnpaidTranches(t *testing.T) {
+	tranche := new(big.Int).Set(validatorReserveMonthlyTranche)
+	twoTranches := new(big.Int).Mul(new(big.Int).Set(tranche), big.NewInt(2))
+	cases := []struct {
+		name      string
+		period    int
+		totalPaid *big.Int
+		want      *big.Int
+	}{
+		{name: "first period", period: 0, totalPaid: big.NewInt(0), want: tranche},
+		{name: "one unpaid period rolls into second", period: 1, totalPaid: big.NewInt(0), want: twoTranches},
+		{name: "fully paid first period leaves one tranche", period: 1, totalPaid: tranche, want: tranche},
+		{name: "all 48 periods remain available", period: 47, totalPaid: big.NewInt(0), want: new(big.Int).Set(validatorReserveMaximum)},
+		{name: "lifetime cap already paid", period: 47, totalPaid: new(big.Int).Set(validatorReserveMaximum), want: big.NewInt(0)},
+		{name: "negative period", period: -1, totalPaid: big.NewInt(0), want: big.NewInt(0)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validatorReserveAccruedBudget(tc.period, tc.totalPaid)
+			if got.Cmp(tc.want) != 0 {
+				t.Fatalf("accrued budget = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
 	newContext := func() (*baseapp.BaseApp, sdk.Context, *storetypes.KVStoreKey) {
 		db := dbm.NewMemDB()
