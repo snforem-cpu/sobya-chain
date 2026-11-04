@@ -226,9 +226,12 @@ func New(
 	// decoded by eth_getTransactionReceipt / transaction lookup RPC methods.
 	evmtypes.RegisterInterfaces(app.interfaceRegistry)
 
-	// add to default baseapp options
-	// enable optimistic execution
-	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
+	// Keep canonical FinalizeBlock execution synchronous. Optimistic execution
+	// produced state-hash mismatches against CometBFT's requested block execution
+	// in the multi-validator EVM localnet (BaseApp logged "OE aborted due to
+	// hash mismatch" at matching heights). Do not enable SetOptimisticExecution
+	// until the EVM/application execution path has a deterministic OE regression
+	// test proving speculative and canonical app hashes are identical.
 
 	// Build the application and mount the persistent validator-reserve store before loading state.
 	app.validatorReserveStoreKey = storetypes.NewKVStoreKey(validatorReserveStoreKeyName)
