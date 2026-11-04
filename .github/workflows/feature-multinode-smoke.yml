@@ -497,11 +497,50 @@ jobs:
           done
           test "$READY_UNJAIL" -eq 1
 
+          # sync mode only proves CheckTx acceptance. It does not prove that
+          # the transaction was included in a committed block. Capture its hash,
+          # wait for query-tx inclusion, and assert the DeliverTx execution code.
           ./sobyad tx slashing unjail --from "$KEY1" --chain-id sobya-feature-multinode-1 \
             --node tcp://127.0.0.1:26657 --home "$NET/validator1" \
             --keyring-backend test --fees 1000000000000000asobya --gas 300000 \
             --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/unjail-tx.json"
-          test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/unjail-tx.json")" = "0"
+          cat "$RUNNER_TEMP/unjail-tx.json"
+          UNJAIL_CHECK_CODE="$(jq -r '.code // .tx_response.code // empty' "$RUNNER_TEMP/unjail-tx.json")"
+          if [ "$UNJAIL_CHECK_CODE" != "0" ]; then
+            echo "Unjail transaction failed CheckTx: code=$UNJAIL_CHECK_CODE"
+            exit 1
+          fi
+          UNJAIL_HASH="$(jq -r '.txhash // .tx_response.txhash // empty' "$RUNNER_TEMP/unjail-tx.json")"
+          if [ -z "$UNJAIL_HASH" ]; then
+            echo "Unjail response did not contain a transaction hash."
+            exit 1
+          fi
+
+          UNJAIL_COMMITTED=0
+          for attempt in $(seq 1 90); do
+            if ./sobyad query tx "$UNJAIL_HASH" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/unjail-committed-tx.json" 2> "$RUNNER_TEMP/unjail-query-tx.stderr"; then
+              UNJAIL_COMMITTED=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$UNJAIL_COMMITTED" -ne 1 ]; then
+            echo "Unjail passed CheckTx but was never found in a committed block."
+            cat "$RUNNER_TEMP/unjail-query-tx.stderr" || true
+            cat "$RUNNER_TEMP/unjail-tx.json"
+            ./sobyad query slashing signing-info "$(./sobyad keys show "$KEY1" --bech cons --keyring-backend test --home "$NET/validator1" -a)" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
+            cat "$RUNNER_TEMP/validator0.log" || true
+            cat "$RUNNER_TEMP/validator1-unjail.log" || true
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/unjail-committed-tx.json"
+          UNJAIL_EXEC_CODE="$(jq -r '.code // .tx_response.code // empty' "$RUNNER_TEMP/unjail-committed-tx.json")"
+          if [ "$UNJAIL_EXEC_CODE" != "0" ]; then
+            echo "Unjail was committed but execution failed: code=$UNJAIL_EXEC_CODE"
+            jq '{height,txhash,codespace,code,raw_log,tx_response}' "$RUNNER_TEMP/unjail-committed-tx.json"
+            exit 1
+          fi
+          echo "PASS: MsgUnjail was included in a committed block and executed successfully."
 
           REJOINED=0
           for attempt in $(seq 1 90); do
@@ -513,8 +552,10 @@ jobs:
             sleep 2
           done
           if [ "$REJOINED" -ne 1 ]; then
-            echo "MsgUnjail was accepted but validator did not leave jailed state."
+            echo "MsgUnjail executed, but validator still reports jailed state."
             cat "$RUNNER_TEMP/unjail-validator.json"
+            CONS_ADDR="$(./sobyad keys show "$KEY1" --bech cons --keyring-backend test --home "$NET/validator1" -a)"
+            ./sobyad query slashing signing-info "$CONS_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
             cat "$RUNNER_TEMP/validator1-unjail.log" || true
             exit 1
           fi
@@ -534,5 +575,12 @@ jobs:
             ${{ runner.temp }}/before-to.json
             ${{ runner.temp }}/after-from.json
             ${{ runner.temp }}/after-to.json
+            ${{ runner.temp }}/jailed-validator.json
+            ${{ runner.temp }}/unjail-tx.json
+            ${{ runner.temp }}/unjail-committed-tx.json
+            ${{ runner.temp }}/unjail-query-tx.stderr
+            ${{ runner.temp }}/unjail-validator.json
+            ${{ runner.temp }}/validator1-unjail.log
+            ${{ runner.temp }}/validator0-restart.log
           if-no-files-found: ignore
           retention-days: 7
