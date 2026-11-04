@@ -45,10 +45,6 @@ type validatorReserveStats struct {
 	PowerSum string `json:"bonded_voting_power_sum"`
 }
 
-type validatorReservePayout struct {
-	Operator sdk.ValAddress
-	Amount   *big.Int
-}
 
 func validatorReservePeriodBoundary(start time.Time, index int) time.Time {
 	start = start.UTC()
@@ -130,7 +126,7 @@ func validatorReserveConsensusKey(consAddr []byte) []byte {
 	return append(append([]byte{}, validatorReserveConsensusIndexPrefix...), consAddr...)
 }
 
-func (app *App) loadValidatorReserveMeta(store sdk.KVStore) (validatorReserveMeta, error) {
+func (app *App) loadValidatorReserveMeta(store storetypes.KVStore) (validatorReserveMeta, error) {
 	raw := store.Get(validatorReserveMetaKey)
 	if raw == nil {
 		return validatorReserveMeta{}, nil
@@ -142,7 +138,7 @@ func (app *App) loadValidatorReserveMeta(store sdk.KVStore) (validatorReserveMet
 	return meta, nil
 }
 
-func saveValidatorReserveMeta(store sdk.KVStore, meta validatorReserveMeta) error {
+func saveValidatorReserveMeta(store storetypes.KVStore, meta validatorReserveMeta) error {
 	raw, err := json.Marshal(meta)
 	if err != nil {
 		return fmt.Errorf("encode validator reserve metadata: %w", err)
@@ -151,7 +147,7 @@ func saveValidatorReserveMeta(store sdk.KVStore, meta validatorReserveMeta) erro
 	return nil
 }
 
-func loadValidatorReserveStats(store sdk.KVStore, key []byte) (validatorReserveStats, error) {
+func loadValidatorReserveStats(store storetypes.KVStore, key []byte) (validatorReserveStats, error) {
 	raw := store.Get(key)
 	if raw == nil {
 		return validatorReserveStats{PowerSum: "0"}, nil
@@ -166,7 +162,7 @@ func loadValidatorReserveStats(store sdk.KVStore, key []byte) (validatorReserveS
 	return stats, nil
 }
 
-func saveValidatorReserveStats(store sdk.KVStore, key []byte, stats validatorReserveStats) error {
+func saveValidatorReserveStats(store storetypes.KVStore, key []byte, stats validatorReserveStats) error {
 	raw, err := json.Marshal(stats)
 	if err != nil {
 		return fmt.Errorf("encode validator reserve period statistics: %w", err)
@@ -177,7 +173,7 @@ func saveValidatorReserveStats(store sdk.KVStore, key []byte, stats validatorRes
 
 // Keep historical consensus-key mappings so key rotation cannot erase votes
 // already cast by the same operator during an open accounting period.
-func (app *App) updateValidatorReserveConsensusIndex(ctx sdk.Context, store sdk.KVStore) error {
+func (app *App) updateValidatorReserveConsensusIndex(ctx sdk.Context, store storetypes.KVStore) error {
 	validators, err := app.StakingKeeper.GetAllValidators(ctx)
 	if err != nil {
 		return fmt.Errorf("list validators for reserve accounting: %w", err)
@@ -199,7 +195,7 @@ func (app *App) updateValidatorReserveConsensusIndex(ctx sdk.Context, store sdk.
 	return nil
 }
 
-func (app *App) recordValidatorReserveCommit(ctx sdk.Context, store sdk.KVStore, period int, votes []abci.VoteInfo) error {
+func (app *App) recordValidatorReserveCommit(ctx sdk.Context, store storetypes.KVStore, period int, votes []abci.VoteInfo) error {
 	if period < 0 || period >= validatorReservePeriods {
 		return nil
 	}
@@ -250,7 +246,7 @@ func (app *App) validatorReserveBalance(ctx sdk.Context) *big.Int {
 // Each completed period can release at most one monthly tranche. Rewards are
 // sent into x/distribution before BeginBlocker, then split by validator
 // commission and delegator stake using the standard Cosmos distribution code.
-func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store sdk.KVStore, period int, meta *validatorReserveMeta) error {
+func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KVStore, period int, meta *validatorReserveMeta) error {
 	prefix := validatorReservePeriodStatsPrefix(period)
 	iterator := storetypes.KVStorePrefixIterator(store, prefix)
 	statsByOperator := make(map[string]validatorReserveStats)
