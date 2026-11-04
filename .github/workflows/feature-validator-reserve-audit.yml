@@ -62,6 +62,7 @@ jobs:
 
       - name: Publish exact-commit audit status
         if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           JOB_STATUS: ${{ job.status }}
