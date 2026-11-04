@@ -563,6 +563,15 @@ jobs:
           fi
           echo "PASS: signed MsgUnjail restored validator1 from jailed state."
 
+          # Guard against reintroducing BaseApp optimistic-execution hash
+          # mismatches. These indicate speculative execution disagreed with
+          # canonical FinalizeBlock execution and must fail this integration run.
+          if grep -nE 'OE aborted due to hash mismatch' "$RUNNER_TEMP"/validator*.log; then
+            echo "Optimistic execution hash mismatch detected in validator logs."
+            exit 1
+          fi
+          echo "PASS: no optimistic-execution hash mismatch in either validator log."
+
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
