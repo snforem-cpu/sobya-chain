@@ -9,6 +9,7 @@ on:
       - '.github/workflows/feature-multinode-smoke.yml'
       - 'sobya/cmd/sobyad/cmd/testnet_multi_node.go'
       - 'sobya/app/**'
+      - 'sobya/TOKENOMICS.md'
 
 permissions:
   contents: read
