@@ -217,6 +217,12 @@ func New(
 		panic(err)
 	}
 
+	// Cosmos EVM modules are registered manually after runtime app wiring.
+	// Register their protobuf interfaces on the same registry used by appCodec
+	// and txConfig, otherwise committed MsgEthereumTx envelopes cannot be
+	// decoded by eth_getTransactionReceipt / transaction lookup RPC methods.
+	evmtypes.RegisterInterfaces(app.interfaceRegistry)
+
 	// add to default baseapp options
 	// enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
