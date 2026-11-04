@@ -9,6 +9,7 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 // GenesisState of the blockchain is represented here as a map of raw json
@@ -54,7 +55,8 @@ func nativeDenomMetadata() banktypes.Metadata {
 }
 
 // prepareGenesisState canonicalizes native token metadata, disables inflation,
-// and rejects a genesis allocation above the fixed maximum supply.
+// enables the supported Cosmos EVM static precompiles by default, and rejects
+// a genesis allocation above the fixed maximum supply.
 func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 	appState := make(map[string]json.RawMessage)
 	if err := json.Unmarshal(raw, &appState); err != nil {
@@ -136,6 +138,29 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("encode zero-tax distribution genesis: %w", err)
 	}
 	appState[distrtypes.ModuleName] = distrBytes
+
+	// The EVM keeper registers the precompile implementations, but Cosmos EVM
+	// executes only addresses enabled in evm.Params.ActiveStaticPrecompiles.
+	// The upstream module default leaves this list empty, which silently disables
+	// SOBYA's bank/staking/distribution/IBC/etc. precompiles on a fresh chain.
+	// Enable the complete v0.6.0 set when the genesis has not selected any.
+	if evmRaw, exists := appState[evmtypes.ModuleName]; exists {
+		var evmGenesis evmtypes.GenesisState
+		if err := cdc.UnmarshalJSON(evmRaw, &evmGenesis); err != nil {
+			return nil, fmt.Errorf("decode EVM genesis: %w", err)
+		}
+		if len(evmGenesis.Params.ActiveStaticPrecompiles) == 0 {
+			evmGenesis.Params.ActiveStaticPrecompiles = append(
+				[]string(nil),
+				evmtypes.AvailableStaticPrecompiles...,
+			)
+		}
+		evmBytes, err := cdc.MarshalJSON(&evmGenesis)
+		if err != nil {
+			return nil, fmt.Errorf("encode EVM genesis with active static precompiles: %w", err)
+		}
+		appState[evmtypes.ModuleName] = evmBytes
+	}
 
 	normalized, err := json.Marshal(appState)
 	if err != nil {
