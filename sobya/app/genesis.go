@@ -8,6 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 )
 
 // GenesisState of the blockchain is represented here as a map of raw json
@@ -116,6 +117,25 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("encode fixed-supply mint genesis: %w", err)
 	}
 	appState[minttypes.ModuleName] = mintBytes
+
+	// The fee router leaves exactly 30% in fee_collector for x/distribution.
+	// Disable the SDK's default 2% community tax so validators receive that full
+	// 30% when bonded voting power exists; otherwise the SDK routes it to its
+	// community pool through its standard zero-power fallback.
+	distrRaw, ok := appState[distrtypes.ModuleName]
+	if !ok {
+		return nil, fmt.Errorf("application genesis is missing %q state", distrtypes.ModuleName)
+	}
+	var distrGenesis distrtypes.GenesisState
+	if err := cdc.UnmarshalJSON(distrRaw, &distrGenesis); err != nil {
+		return nil, fmt.Errorf("decode distribution genesis: %w", err)
+	}
+	distrGenesis.Params.CommunityTax = sdkmath.LegacyZeroDec()
+	distrBytes, err := cdc.MarshalJSON(&distrGenesis)
+	if err != nil {
+		return nil, fmt.Errorf("encode zero-tax distribution genesis: %w", err)
+	}
+	appState[distrtypes.ModuleName] = distrBytes
 
 	normalized, err := json.Marshal(appState)
 	if err != nil {
