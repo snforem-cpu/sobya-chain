@@ -337,7 +337,6 @@ jobs:
           # Exercise the actual x/slashing downtime path: stop validator1 long
           # enough to cross the shortened test-only signing window, confirm it
           # is jailed, restart it, submit MsgUnjail, and verify it rejoins.
-          KEY1="$(jq -r '.[0].name' "$NET/validator1/keys/keyring-test"* 2>/dev/null || true)"
           KEY1="$(./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json | jq -r '.[0].name')"
           VAL1="$(./sobyad keys show "$KEY1" --bech val --keyring-backend test --home "$NET/validator1" -a)"
           test -n "$VAL1"
@@ -359,7 +358,8 @@ jobs:
           done
           if [ "$JAIL_CONFIRMED" -ne 1 ]; then
             echo "Validator was not jailed after downtime window; inspect slashing params and signing-info."
-            ./sobyad query slashing signing-info "$("$NET/validator1/config/priv_validator_key.json" python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["address"])')" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
+            CONS_ADDR="$(./sobyad keys show "$KEY1" --bech valcons --keyring-backend test --home "$NET/validator1" -a)"
+            ./sobyad query slashing signing-info "$CONS_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
             exit 1
           fi
           echo "PASS: x/slashing jailed validator1 after the configured downtime window."
