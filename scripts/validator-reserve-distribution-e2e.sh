@@ -139,23 +139,35 @@ cleanup() {
 trap cleanup EXIT
 
 rpc_ready() {
-  local url="$1"
+  local url="$1" body=""
   for _ in $(seq 1 90); do
-    if curl --connect-timeout 2 --max-time 5 -fsS "$url/status" | jq -e '.result.sync_info.latest_block_height' >/dev/null; then return 0; fi
+    if body="$(curl --connect-timeout 2 --max-time 5 -fsS "$url/status" 2>/dev/null)" &&
+       jq -e '.result.sync_info.latest_block_height != null' <<<"$body" >/dev/null 2>&1; then
+      return 0
+    fi
     sleep 2
   done
   return 1
 }
-rpc_ready "$RPC0" || { cat "$NET/validator0.log"; exit 1; }
-rpc_ready "$RPC1" || { cat "$NET/validator1.log"; exit 1; }
+rpc_ready "$RPC0" || { echo "validator0 RPC did not become ready"; cat "$NET/validator0.log"; exit 1; }
+rpc_ready "$RPC1" || { echo "validator1 RPC did not become ready"; cat "$NET/validator1.log"; exit 1; }
+echo "PASS: both CometBFT RPC endpoints are ready."
 
 HEIGHT=0
 for _ in $(seq 1 90); do
-  HEIGHT="$(curl -fsS "$RPC0/status" | jq -r '.result.sync_info.latest_block_height')"
-  if [ "$HEIGHT" -ge 2 ]; then break; fi
+  if STATUS_JSON="$(curl --connect-timeout 2 --max-time 5 -fsS "$RPC0/status" 2>/dev/null)"; then
+    HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' <<<"$STATUS_JSON")"
+    if [[ "$HEIGHT" =~ ^[0-9]+$ ]] && [ "$HEIGHT" -ge 2 ]; then break; fi
+  fi
   sleep 2
 done
-test "$HEIGHT" -ge 2
+if ! [[ "$HEIGHT" =~ ^[0-9]+$ ]] || [ "$HEIGHT" -lt 2 ]; then
+  echo "Two-validator network did not reach height 2 (height=$HEIGHT)"
+  cat "$NET/validator0.log"
+  cat "$NET/validator1.log"
+  exit 1
+fi
+echo "PASS: both validators have committed at least two blocks."
 
 KEYS0="$NET/keys0.json"
 KEYS1="$NET/keys1.json"
