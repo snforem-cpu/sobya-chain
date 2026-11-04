@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   group: sobya-validator-reserve-distribution-e2e-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   distribution-e2e:
