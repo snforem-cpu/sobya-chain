@@ -1,0 +1,32 @@
+name: SOBYA Runner Provisioning Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - '.github/workflows/runner-diagnostic.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-runner-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm hosted runner allocation and shell execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUNNER_DIAGNOSTIC_STARTED"
+          echo "commit=${GITHUB_SHA}"
+          echo "runner=${RUNNER_NAME:-unknown}"
+          echo "os=${RUNNER_OS:-unknown}"
+          uname -a
+          echo "RUNNER_DIAGNOSTIC_PASSED"
