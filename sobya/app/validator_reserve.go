@@ -340,7 +340,7 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 		amount := payouts[operatorHex]
 		operator := []byte(operatorHex)
 		validator, err := app.StakingKeeper.GetValidator(ctx, sdk.ValAddress(operator))
-		if err != nil || !validator.IsBonded() || validator.Jailed {
+		if err != nil {
 			continue
 		}
 		coins := sdk.NewCoins(sdk.NewCoin(BaseDenom, sdkmath.NewIntFromBigInt(amount)))
