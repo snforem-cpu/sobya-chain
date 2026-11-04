@@ -12,6 +12,7 @@ import (
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 func TestValidateNativeSupply(t *testing.T) {
@@ -62,6 +63,7 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	mintGenesis := minttypes.DefaultGenesisState()
 	distrGenesis := distrtypes.DefaultGenesisState()
 	distrGenesis.Params.CommunityTax = sdkmath.LegacyNewDecWithPrec(2, 2)
+	evmGenesis := evmtypes.DefaultGenesisState()
 
 	bankBytes, err := cdc.MarshalJSON(bankGenesis)
 	if err != nil {
@@ -75,10 +77,15 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal distribution genesis: %v", err)
 	}
+	evmBytes, err := cdc.MarshalJSON(evmGenesis)
+	if err != nil {
+		t.Fatalf("marshal EVM genesis: %v", err)
+	}
 	raw, err := json.Marshal(map[string]json.RawMessage{
 		banktypes.ModuleName: bankBytes,
 		minttypes.ModuleName: mintBytes,
 		distrtypes.ModuleName: distrBytes,
+		evmtypes.ModuleName: evmBytes,
 	})
 	if err != nil {
 		t.Fatalf("marshal app genesis: %v", err)
@@ -129,6 +136,19 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	}
 	if !gotDistr.Params.CommunityTax.IsZero() {
 		t.Fatalf("distribution community tax = %s, want 0 for exact validator fee routing", gotDistr.Params.CommunityTax)
+	}
+
+	var gotEVM evmtypes.GenesisState
+	if err := cdc.UnmarshalJSON(appState[evmtypes.ModuleName], &gotEVM); err != nil {
+		t.Fatalf("unmarshal normalized EVM genesis: %v", err)
+	}
+	if len(gotEVM.Params.ActiveStaticPrecompiles) != len(evmtypes.AvailableStaticPrecompiles) {
+		t.Fatalf("active EVM precompile count = %d, want %d", len(gotEVM.Params.ActiveStaticPrecompiles), len(evmtypes.AvailableStaticPrecompiles))
+	}
+	for i, want := range evmtypes.AvailableStaticPrecompiles {
+		if got := gotEVM.Params.ActiveStaticPrecompiles[i]; got != want {
+			t.Fatalf("active EVM precompile[%d] = %s, want %s", i, got, want)
+		}
 	}
 }
 
