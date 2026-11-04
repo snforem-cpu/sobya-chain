@@ -248,7 +248,7 @@ jobs:
           node --input-type=module <<'JS'
           import assert from "node:assert/strict";
           import solc from "solc";
-          import { ContractFactory, JsonRpcProvider, Wallet, WebSocketProvider, parseEther, parseUnits } from "ethers";
+          import { Contract, ContractFactory, JsonRpcProvider, Wallet, WebSocketProvider, parseEther, parseUnits } from "ethers";
           const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
           const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
           assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
@@ -257,7 +257,7 @@ jobs:
           assert.equal((await signed.wait(1)).status, 1, "signed EVM transfer failed");
           console.log("PASS signed EVM transaction:", signed.hash);
 
-          const source = "pragma solidity ^0.8.20; contract StorageBox { uint256 public value; function set(uint256 x) external { value=x; } } contract TestToken { string public name='SOBYA Test Token'; string public symbol='tSOBY'; uint8 public decimals=18; uint256 public totalSupply; mapping(address=>uint256) public balanceOf; event Transfer(address indexed from,address indexed to,uint256 value); constructor(uint256 n){totalSupply=n;balanceOf[msg.sender]=n;emit Transfer(address(0),msg.sender,n);} function transfer(address to,uint256 n) external returns(bool){require(to!=address(0)&&balanceOf[msg.sender]>=n,'balance');balanceOf[msg.sender]-=n;balanceOf[to]+=n;emit Transfer(msg.sender,to,n);return true;} }";
+          const source = "pragma solidity ^0.8.20; contract StorageBox { uint256 public value; event ValueChanged(uint256 value); function set(uint256 x) external { value=x; emit ValueChanged(x); } } contract TestToken { string public name='SOBYA Test Token'; string public symbol='tSOBY'; uint8 public decimals=18; uint256 public totalSupply; mapping(address=>uint256) public balanceOf; event Transfer(address indexed from,address indexed to,uint256 value); constructor(uint256 n){totalSupply=n;balanceOf[msg.sender]=n;emit Transfer(address(0),msg.sender,n);} function transfer(address to,uint256 n) external returns(bool){require(to!=address(0)&&balanceOf[msg.sender]>=n,'balance');balanceOf[msg.sender]-=n;balanceOf[to]+=n;emit Transfer(msg.sender,to,n);return true;} }";
           const input = { language:"Solidity", sources:{"Test.sol":{content:source}}, settings:{optimizer:{enabled:true,runs:200},outputSelection:{"*":{"*":["abi","evm.bytecode.object"]}}} };
           const compiled = JSON.parse(solc.compile(JSON.stringify(input)));
           const errors = (compiled.errors || []).filter(x => x.severity === "error");
