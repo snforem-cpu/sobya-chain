@@ -545,7 +545,9 @@ jobs:
           REJOINED=0
           for attempt in $(seq 1 90); do
             ./sobyad query staking validator "$VAL1" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/unjail-validator.json"
-            if jq -e '.validator.jailed == false' "$RUNNER_TEMP/unjail-validator.json" >/dev/null; then
+            # The staking query omits "jailed" when it is false on this SDK version.
+            # Treat an omitted field as false, and require the validator to be bonded.
+            if jq -e '((.validator.jailed // false) == false) and (.validator.status == "BOND_STATUS_BONDED")' "$RUNNER_TEMP/unjail-validator.json" >/dev/null; then
               REJOINED=1
               break
             fi
