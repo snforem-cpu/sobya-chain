@@ -59,6 +59,27 @@ func validatorReservePeriodBoundary(start time.Time, index int) time.Time {
 	return time.Date(month.Year(), month.Month(), day, start.Hour(), start.Minute(), start.Second(), start.Nanosecond(), time.UTC)
 }
 
+// validatorReserveAccruedBudget returns the cumulative reserve allocation
+// earned through a completed period, less amounts already paid. This carries
+// forward every unpaid tranche instead of silently losing it at period close.
+func validatorReserveAccruedBudget(period int, totalPaid *big.Int) *big.Int {
+	if period < 0 {
+		return new(big.Int)
+	}
+	if period >= validatorReservePeriods {
+		period = validatorReservePeriods - 1
+	}
+	scheduled := new(big.Int).Mul(new(big.Int).Set(validatorReserveMonthlyTranche), big.NewInt(int64(period+1)))
+	paid := new(big.Int)
+	if totalPaid != nil && totalPaid.Sign() > 0 {
+		paid.Set(totalPaid)
+	}
+	if paid.Cmp(scheduled) >= 0 {
+		return new(big.Int)
+	}
+	return scheduled.Sub(scheduled, paid)
+}
+
 // validatorReservePeriodIndex uses monthly anniversaries in UTC. If the start
 // day does not exist in a target month, that month's final day is used.
 func validatorReservePeriodIndex(start, at time.Time) int {
@@ -296,7 +317,7 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 	if remainingCap.Sign() < 0 {
 		return fmt.Errorf("validator reserve lifetime cap exceeded: paid %s, cap %s", totalPaid, validatorReserveMaximum)
 	}
-	budget := new(big.Int).Set(validatorReserveMonthlyTranche)
+	budget := validatorReserveAccruedBudget(period, totalPaid)
 	if budget.Cmp(remainingCap) > 0 {
 		budget.Set(remainingCap)
 	}
@@ -319,7 +340,7 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 		amount := payouts[operatorHex]
 		operator := []byte(operatorHex)
 		validator, err := app.StakingKeeper.GetValidator(ctx, sdk.ValAddress(operator))
-		if err != nil {
+		if err != nil || !validator.IsBonded() || validator.Jailed {
 			continue
 		}
 		coins := sdk.NewCoins(sdk.NewCoin(BaseDenom, sdkmath.NewIntFromBigInt(amount)))
