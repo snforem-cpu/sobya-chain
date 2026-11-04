@@ -47,9 +47,17 @@ The target routing of network transaction fees is:
 - **30%** to eligible validators.
 - **20%** to the community allocation/pool.
 
-A deterministic fee-split calculation helper now exists in `app/fee_split.go`, with unit tests for exact ratios, multi-denomination fees, rounding, and conservation of the original amount. Integer rounding dust is assigned to the treasury share.
+The fee split is connected to the block lifecycle on this development branch:
 
-**Important implementation status:** the helper is a tested calculation primitive only. It is not yet connected to the live fee-collection/block lifecycle, and no funds are routed by it yet. Runtime routing still must be implemented and tested against the actual Cosmos SDK/Cosmos EVM fee collection path. The implementation must account for all collected fee denominations, deterministic accounting, validator eligibility/participation, and transparent community accounting. Do not treat the standard Cosmos distribution module or the helper alone as proof that this exact split is active.
+- A deterministic pre-block hook runs the configured module pre-blockers, then reads the actual `fee_collector` balance before the distribution module begins.
+- **70% combined (50% treasury + 20% community)** is transferred to the shared management wallet `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`. Because both allocations use the same address, the chain emits the combined transfer; the founder must keep the treasury and community ledgers separate off-chain.
+- **30%** remains in `fee_collector` for the standard distribution module, preserving validator commission/delegator reward accounting.
+- Genesis normalization sets the distribution community tax to **0%**, preventing the SDK's default 2% tax from reducing the intended validator share.
+- Rounding remainder is assigned to treasury; the split is denomination-aware and conserves every collected coin. A transfer failure aborts block finalization rather than silently dropping funds.
+
+If the distribution module sees no bonded voting power for a block, the Cosmos SDK's standard zero-power fallback sends the remaining validator-designated amount to its protocol community pool. This is not an individual validator payment and must be considered when planning validator onboarding.
+
+The code and unit tests establish the routing logic on this development branch; CI and local multi-node/EVM runs must pass on the resulting commit before this behavior is treated as verified. This does not mean the production genesis, validator reserve vesting, or mainnet launch is complete.
 
 ## Development allocations and test data
 
