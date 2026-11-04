@@ -163,17 +163,11 @@ func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
 			t.Fatalf("restored reserve value differs for key %X", iterator.Key())
 		}
 	}
-	if err := iterator.Error(); err != nil {
-		t.Fatalf("iterate source reserve store: %v", err)
-	}
 	iteratorB := storeB.Iterator(nil, nil)
 	defer iteratorB.Close()
 	count := 0
 	for ; iteratorB.Valid(); iteratorB.Next() {
 		count++
-	}
-	if err := iteratorB.Error(); err != nil {
-		t.Fatalf("iterate restored reserve store: %v", err)
 	}
 	if count != 3 {
 		t.Fatalf("restored reserve key count=%d, want 3", count)

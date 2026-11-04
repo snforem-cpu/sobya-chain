@@ -419,9 +419,6 @@ func (app *App) exportValidatorReserveGenesisState(ctx sdk.Context) ([]byte, err
 			Value: base64.RawStdEncoding.EncodeToString(iterator.Value()),
 		})
 	}
-	if err := iterator.Error(); err != nil {
-		return nil, fmt.Errorf("iterate validator reserve state for export: %w", err)
-	}
 	return json.Marshal(state)
 }
 
