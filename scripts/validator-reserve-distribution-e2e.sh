@@ -182,7 +182,31 @@ VAL1="$("$BIN" keys show "$KEY1" --bech val --keyring-backend test --home "$NET/
 
 query_positive_asobya() {
   local file="$1"
-  jq -e '[.. | objects | select(.denom? == "asobya") | (.amount | tonumber)] | add // 0 | . > 0' "$file" >/dev/null
+  python3 - "$file" <<'PY'
+import decimal, json, sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+def has_positive_asobya(value):
+    if isinstance(value, dict):
+        if value.get("denom") == "asobya":
+            try:
+                if decimal.Decimal(str(value.get("amount", "0"))) > 0:
+                    return True
+            except decimal.InvalidOperation:
+                pass
+        return any(has_positive_asobya(v) for v in value.values())
+    if isinstance(value, list):
+        return any(has_positive_asobya(v) for v in value)
+    if isinstance(value, str) and value.endswith("asobya"):
+        try:
+            return decimal.Decimal(value[:-6]) > 0
+        except decimal.InvalidOperation:
+            return False
+    return False
+
+if not has_positive_asobya(data):
+    raise SystemExit("no positive asobya reward coin found in query response")
+PY
 }
 for val in "$VAL0" "$VAL1"; do
   "$BIN" query distribution commission "$val" --node "$RPC0" --home "$NET/validator0" --output json > "$NET/commission-$val.json"
