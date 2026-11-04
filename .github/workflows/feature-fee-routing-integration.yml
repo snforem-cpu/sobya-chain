@@ -210,7 +210,16 @@ jobs:
           wait_height "$((TX_HEIGHT + 1))" >/dev/null
           WALLET_AFTER="$(bank_balance)"
           REWARDS_AFTER="$(validator_outstanding)"
+          VALIDATORS_JSON="$(./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
+          echo "$VALIDATORS_JSON" > "$RUNNER_TEMP/staking-validators.json"
+          COMMUNITY_POOL_JSON="$(./sobyad query distribution community-pool --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
+          echo "$COMMUNITY_POOL_JSON" > "$RUNNER_TEMP/community-pool.json"
+          VALIDATOR_JSON="$(./sobyad query staking validator "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
+          echo "$VALIDATOR_JSON" > "$RUNNER_TEMP/validator.json"
           echo "Cosmos fee-routing snapshot: tx=$COSMOS_HASH height=$TX_HEIGHT wallet_before=$WALLET_BEFORE wallet_after=$WALLET_AFTER rewards_before=$REWARDS_BEFORE rewards_after=$REWARDS_AFTER"
+          echo "Validator staking state: $(echo "$VALIDATOR_JSON" | jq -c '{operator_address,status,tokens,jailed}')"
+          echo "Distribution community pool: $(echo "$COMMUNITY_POOL_JSON" | jq -c .)"
+          echo "Active validators: $(echo "$VALIDATORS_JSON" | jq -c '[.validators[]? | {operator_address,status,tokens,jailed}]')"
           python3 - "$WALLET_BEFORE" "$WALLET_AFTER" "$REWARDS_BEFORE" "$REWARDS_AFTER" <<'PY'
           import sys
           from decimal import Decimal
@@ -276,5 +285,8 @@ jobs:
             ${{ runner.temp }}/sobya-fee-routing.log
             ${{ runner.temp }}/cosmos-tx.json
             ${{ runner.temp }}/evm-tx.json
+            ${{ runner.temp }}/staking-validators.json
+            ${{ runner.temp }}/community-pool.json
+            ${{ runner.temp }}/validator.json
           if-no-files-found: ignore
           retention-days: 14
