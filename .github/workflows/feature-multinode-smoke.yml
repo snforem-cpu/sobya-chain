@@ -270,6 +270,32 @@ jobs:
           fi
           echo "PASS: native SOBYA transfer accepted by CheckTx."
 
+          CONFIRMED=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+            if python3 - "$RUNNER_TEMP/before-from.json" "$RUNNER_TEMP/before-to.json" "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$AMOUNT" "$FEE" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
+          amount, fee = map(int, sys.argv[5:7])
+          ok = after_from == before_from - amount - fee and after_to == before_to + amount
+          if ok:
+              print("PASS: exact integer balance deltas verified for 18-decimal SOBYA.")
+          sys.exit(0 if ok else 1)
+          PY
+            then
+              CONFIRMED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$CONFIRMED" -eq 1
+          echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
+
           # Stake from a separate account, generate fees, and verify that this
           # non-validator delegator receives a positive distribution reward.
           BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
@@ -344,31 +370,6 @@ jobs:
           fi
           echo "PASS: independent non-validator delegator received positive asobya staking rewards."
 
-          CONFIRMED=0
-          for attempt in $(seq 1 60); do
-            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
-            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
-            if python3 - "$RUNNER_TEMP/before-from.json" "$RUNNER_TEMP/before-to.json" "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$AMOUNT" "$FEE" <<'PY'
-          import json, sys
-          def balance(path):
-              with open(path, encoding="utf-8") as f:
-                  data = json.load(f)
-              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
-          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
-          amount, fee = map(int, sys.argv[5:7])
-          ok = after_from == before_from - amount - fee and after_to == before_to + amount
-          if ok:
-              print("PASS: exact integer balance deltas verified for 18-decimal SOBYA.")
-          sys.exit(0 if ok else 1)
-          PY
-            then
-              CONFIRMED=1
-              break
-            fi
-            sleep 2
-          done
-          test "$CONFIRMED" -eq 1
-          echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
 
           # Restart both validators using the same persistent homes. The
           # restarted nodes must recover committed state, reconnect over P2P,
