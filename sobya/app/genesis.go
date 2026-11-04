@@ -158,26 +158,27 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 
 	// The EVM keeper registers the precompile implementations, but Cosmos EVM
 	// executes only addresses enabled in evm.Params.ActiveStaticPrecompiles.
-	// The upstream module default leaves this list empty, which silently disables
-	// SOBYA's bank/staking/distribution/IBC/etc. precompiles on a fresh chain.
-	// Enable only the precompile implementations registered by v0.6.0 when the genesis has not selected any.
-	if evmRaw, exists := appState[evmtypes.ModuleName]; exists {
-		var evmGenesis evmtypes.GenesisState
-		if err := cdc.UnmarshalJSON(evmRaw, &evmGenesis); err != nil {
-			return nil, fmt.Errorf("decode EVM genesis: %w", err)
-		}
-		if len(evmGenesis.Params.ActiveStaticPrecompiles) == 0 {
-			evmGenesis.Params.ActiveStaticPrecompiles = append(
-				[]string(nil),
-				defaultActiveEVMStaticPrecompiles()...,
-			)
-		}
-		evmBytes, err := cdc.MarshalJSON(&evmGenesis)
-		if err != nil {
-			return nil, fmt.Errorf("encode EVM genesis with active static precompiles: %w", err)
-		}
-		appState[evmtypes.ModuleName] = evmBytes
+	// A missing EVM genesis section must fail closed rather than silently launch
+	// a chain where the registered Cosmos precompiles cannot execute.
+	evmRaw, ok := appState[evmtypes.ModuleName]
+	if !ok {
+		return nil, fmt.Errorf("application genesis is missing %q state", evmtypes.ModuleName)
 	}
+	var evmGenesis evmtypes.GenesisState
+	if err := cdc.UnmarshalJSON(evmRaw, &evmGenesis); err != nil {
+		return nil, fmt.Errorf("decode EVM genesis: %w", err)
+	}
+	if len(evmGenesis.Params.ActiveStaticPrecompiles) == 0 {
+		evmGenesis.Params.ActiveStaticPrecompiles = append(
+			[]string(nil),
+			defaultActiveEVMStaticPrecompiles()...,
+		)
+	}
+	evmBytes, err := cdc.MarshalJSON(&evmGenesis)
+	if err != nil {
+		return nil, fmt.Errorf("encode EVM genesis with active static precompiles: %w", err)
+	}
+	appState[evmtypes.ModuleName] = evmBytes
 
 	normalized, err := json.Marshal(appState)
 	if err != nil {
