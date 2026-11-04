@@ -185,7 +185,7 @@ jobs:
           WALLET_BEFORE="$(bank_balance)"
           REWARDS_BEFORE="$(validator_outstanding)"
           HEIGHT_BEFORE="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
-          COSMOS_RESULT="$(./sobyad tx bank send validator "$RECEIVER_ADDRESS" 1asobya --chain-id sobya-fee-routing-ci-1 --fees 1000000000000000asobya --gas 200000 --keyring-backend test --home "$SOBYA_HOME" --node tcp://127.0.0.1:26657 --broadcast-mode block --yes --output json)"
+          COSMOS_RESULT="$(./sobyad tx bank send validator "$RECEIVER_ADDRESS" 1asobya --chain-id sobya-fee-routing-ci-1 --fees 1000000000000000asobya --gas 200000 --keyring-backend test --home "$SOBYA_HOME" --node tcp://127.0.0.1:26657 --broadcast-mode sync --yes --output json)"
           echo "$COSMOS_RESULT" > "$RUNNER_TEMP/cosmos-tx.json"
           COSMOS_CODE="$(echo "$COSMOS_RESULT" | jq -r '.code // .tx_response.code // 0')"
           test "$COSMOS_CODE" = "0"
