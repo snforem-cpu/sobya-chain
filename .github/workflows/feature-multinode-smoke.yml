@@ -62,16 +62,32 @@ jobs:
             --minimum-gas-prices 0asobya
           test -s "$NET/validator0/config/genesis.json"
           test -s "$NET/validator1/config/genesis.json"
+          # Create a separate delegator account before genesis is finalized.
+          ./sobyad keys add independent-delegator --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/independent-delegator.json"
+          DELEGATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/independent-delegator.json")"
+          test -n "$DELEGATOR_ADDRESS"
           # Shorten only the disposable CI chain's downtime window so
           # jail/unjail behavior can be verified in a bounded integration run.
-          python3 - "$NET/validator0/config/genesis.json" <<'PY'
-          import json, pathlib, sys
+          DELEGATOR_ADDRESS="$DELEGATOR_ADDRESS" python3 - "$NET/validator0/config/genesis.json" <<'PY'
+          import json, os, pathlib, sys
           path = pathlib.Path(sys.argv[1])
           genesis = json.loads(path.read_text())
           params = genesis["app_state"]["slashing"]["params"]
           params["signed_blocks_window"] = "10"
           params["min_signed_per_window"] = "0.500000000000000000"
           params["downtime_jail_duration"] = "1s"
+          bank = genesis["app_state"]["bank"]
+          balances = bank.setdefault("balances", [])
+          address = os.environ["DELEGATOR_ADDRESS"]
+          if any(item["address"] == address for item in balances):
+              raise SystemExit("independent delegator already exists")
+          balances.append({"address": address, "coins": [{"denom": "asobya", "amount": str(1000 * 10**18)}]})
+          balances.sort(key=lambda item: item["address"])
+          supply = {}
+          for balance in balances:
+              for coin in balance.get("coins", []):
+                  supply[coin["denom"]] = supply.get(coin["denom"], 0) + int(coin["amount"])
+          bank["supply"] = [{"denom": denom, "amount": str(supply[denom])} for denom in sorted(supply)]
           path.write_text(json.dumps(genesis, indent=2) + "\\n")
           PY
           cp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
@@ -190,6 +206,11 @@ jobs:
           ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
           ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
           FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
+          DELEGATOR_NAME="independent-delegator"
+          DELEGATOR_ADDR="$(jq -r '.address' "$RUNNER_TEMP/independent-delegator.json")"
+          VAL0="$(./sobyad keys show "$FROM_NAME" --bech val --keyring-backend test --home "$NET/validator0" -a)"
+          test -n "$VAL0"
+          test "$DELEGATOR_ADDR" != "$FROM_ADDR"
           FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
           TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
           test -n "$FROM_NAME"
@@ -230,6 +251,64 @@ jobs:
             exit 1
           fi
           echo "PASS: native SOBYA transfer accepted by CheckTx."
+
+          # Stake from a separate account, generate fees, and verify that this
+          # non-validator delegator receives a positive distribution reward.
+          BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          ./sobyad tx staking delegate "$VAL0" 100000000000000000000asobya \
+            --from "$DELEGATOR_NAME" --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 --home "$NET/validator0" \
+            --keyring-backend test --fees 1000000000000000asobya --gas 300000 \
+            --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/independent-delegation.json"
+          test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/independent-delegation.json")" = "0"
+          for attempt in $(seq 1 60); do
+            HEIGHT_NOW="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            [ "$HEIGHT_NOW" -gt "$BEFORE_HEIGHT" ] && break
+            sleep 1
+          done
+          ./sobyad query staking delegations "$DELEGATOR_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/independent-delegations.json"
+          jq -e --arg val "$VAL0" '.delegation_responses[] | select(.delegation.validator_address == $val)' "$RUNNER_TEMP/independent-delegations.json" >/dev/null
+
+          BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          ./sobyad tx bank send "$DELEGATOR_NAME" "$TO_ADDR" 1000000000000000000asobya \
+            --chain-id sobya-feature-multinode-1 --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" --keyring-backend test \
+            --fees 1000000000000000asobya --gas 200000 --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/delegator-fee-transfer.json"
+          test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/delegator-fee-transfer.json")" = "0"
+          for attempt in $(seq 1 60); do
+            HEIGHT_NOW="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            [ "$HEIGHT_NOW" -gt "$BEFORE_HEIGHT" ] && break
+            sleep 1
+          done
+
+          INDEPENDENT_REWARD=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query distribution rewards "$DELEGATOR_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/independent-delegator-rewards.json"
+            if python3 - "$RUNNER_TEMP/independent-delegator-rewards.json" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          def positive(value):
+              if isinstance(value, dict):
+                  if value.get("denom") == "asobya" and int(value.get("amount", "0")) > 0:
+                      return True
+                  return any(positive(v) for v in value.values())
+              if isinstance(value, list):
+                  return any(positive(v) for v in value)
+              return False
+          sys.exit(0 if positive(data) else 1)
+          PY
+            then
+              INDEPENDENT_REWARD=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$INDEPENDENT_REWARD" -ne 1 ]; then
+            echo "Independent delegator received no positive asobya rewards after fee-generating transactions."
+            cat "$RUNNER_TEMP/independent-delegator-rewards.json"
+            exit 1
+          fi
+          echo "PASS: independent non-validator delegator received positive asobya staking rewards."
 
           CONFIRMED=0
           for attempt in $(seq 1 60); do
