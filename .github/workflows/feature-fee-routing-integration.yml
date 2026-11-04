@@ -222,7 +222,7 @@ jobs:
           if [ -n "$FEE_COLLECTOR_ADDRESS" ]; then
             ./sobyad query bank balances "$FEE_COLLECTOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/fee-collector-balances.json"
           fi
-          ./sobyad query distribution rewards "$VALIDATOR_ADDRESS" "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/delegator-rewards.json"
+          ./sobyad query distribution rewards "$VALIDATOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/delegator-rewards.json"
           ./sobyad query distribution commission "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-commission.json"
           curl -fsS "http://127.0.0.1:26657/block_results?height=$((TX_HEIGHT + 1))" > "$RUNNER_TEMP/routed-block-results.json"
           echo "Cosmos fee-routing snapshot: tx=$COSMOS_HASH height=$TX_HEIGHT wallet_before=$WALLET_BEFORE wallet_after=$WALLET_AFTER rewards_before=$REWARDS_BEFORE rewards_after=$REWARDS_AFTER"
