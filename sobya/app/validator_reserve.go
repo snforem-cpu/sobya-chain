@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
@@ -288,7 +289,15 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 	payouts := calculateValidatorReservePayouts(budget, statsByOperator)
 	paidThisPeriod := new(big.Int)
 	recipientCount := 0
-	for operatorHex, amount := range payouts {
+	// Consensus-critical bank and distribution writes must use a stable order;
+	// Go map iteration order is intentionally randomized.
+	operators := make([]string, 0, len(payouts))
+	for operator := range payouts {
+		operators = append(operators, operator)
+	}
+	sort.Strings(operators)
+	for _, operatorHex := range operators {
+		amount := payouts[operatorHex]
 		operator := []byte(operatorHex)
 		validator, err := app.StakingKeeper.GetValidator(ctx, sdk.ValAddress(operator))
 		if err != nil {
