@@ -194,13 +194,32 @@ query_positive_asobya "$NET/delegator-rewards-0.json"
 query_positive_asobya "$NET/delegator-rewards-1.json"
 echo "PASS: reserve payout created real validator commission and self-delegator rewards for both validators."
 
+wait_for_next_block() {
+  local node="$1" before="$2" current="0" body=""
+  for _ in $(seq 1 60); do
+    if body="$(curl --connect-timeout 2 --max-time 5 -fsS "$node/status" 2>/dev/null)"; then
+      current="$(jq -r '.result.sync_info.latest_block_height // "0"' <<<"$body")"
+      if [[ "$current" =~ ^[0-9]+$ ]] && [ "$current" -gt "$before" ]; then return 0; fi
+    fi
+    sleep 1
+  done
+  echo "transaction was not included in a new block after height $before"
+  return 1
+}
+
 # Withdraw both commission and delegator rewards through signed transactions.
+# Wait for each sync-broadcast transaction to commit before using the next
+# account sequence from the same validator key.
 for idx in 0 1; do
   if [ "$idx" -eq 0 ]; then KEY="$KEY0"; VAL="$VAL0"; HOME="$NET/validator0"; NODE="$RPC0"; else KEY="$KEY1"; VAL="$VAL1"; HOME="$NET/validator1"; NODE="$RPC1"; fi
+  BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS "$NODE/status" | jq -r '.result.sync_info.latest_block_height')"
   "$BIN" tx distribution withdraw-rewards "$VAL" --commission --from "$KEY" --chain-id "$CHAIN_ID" --node "$NODE" --home "$HOME" --keyring-backend test --fees 1000000000000000asobya --gas 300000 --broadcast-mode sync --yes --output json > "$NET/commission-withdraw-$idx.json"
   test "$(jq -r '.code // .tx_response.code // 0' "$NET/commission-withdraw-$idx.json")" = "0"
+  wait_for_next_block "$NODE" "$BEFORE_HEIGHT"
+  BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS "$NODE/status" | jq -r '.result.sync_info.latest_block_height')"
   "$BIN" tx distribution withdraw-rewards "$VAL" --from "$KEY" --chain-id "$CHAIN_ID" --node "$NODE" --home "$HOME" --keyring-backend test --fees 1000000000000000asobya --gas 300000 --broadcast-mode sync --yes --output json > "$NET/delegator-withdraw-$idx.json"
   test "$(jq -r '.code // .tx_response.code // 0' "$NET/delegator-withdraw-$idx.json")" = "0"
+  wait_for_next_block "$NODE" "$BEFORE_HEIGHT"
 done
 
 # Verify the matured period was settled exactly once: block 1 has one release
