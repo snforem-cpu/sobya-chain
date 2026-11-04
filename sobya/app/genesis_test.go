@@ -176,3 +176,14 @@ func TestMintModuleHasNoMintAuthority(t *testing.T) {
 	}
 	t.Fatal("mint module account permission entry is missing")
 }
+
+func TestNativeSupplyCapEndBlockInvariant(t *testing.T) {
+	if err := validateNativeSupplyAtEndBlock(MaxSupply, 123); err != nil {
+		t.Fatalf("exact native supply cap should pass at end of block: %v", err)
+	}
+
+	overCap := MaxSupply.Add(sdkmath.NewInt(1))
+	if err := validateNativeSupplyAtEndBlock(overCap, 124); err == nil {
+		t.Fatal("end-block native supply invariant must reject supply above the cap")
+	}
+}
