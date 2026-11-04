@@ -62,6 +62,19 @@ jobs:
             --minimum-gas-prices 0asobya
           test -s "$NET/validator0/config/genesis.json"
           test -s "$NET/validator1/config/genesis.json"
+          # Shorten only the disposable CI chain's downtime window so
+          # jail/unjail behavior can be verified in a bounded integration run.
+          python3 - "$NET/validator0/config/genesis.json" <<'PY'
+          import json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          genesis = json.loads(path.read_text())
+          params = genesis["app_state"]["slashing"]["params"]
+          params["signed_blocks_window"] = "10"
+          params["min_signed_per_window"] = "0.500000000000000000"
+          params["downtime_jail_duration"] = "1s"
+          path.write_text(json.dumps(genesis, indent=2) + "\\n")
+          PY
+          cp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
           cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
           test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-feature-multinode-1"
 
@@ -320,6 +333,72 @@ jobs:
           print("PASS: committed native SOBYA balances persisted across both validator restarts.")
           PY
           echo "PASS: both validators restarted from persistent homes, reconnected to peers, resumed block production at common height=$RESTART_HEIGHT0, and preserved account state."
+
+          # Exercise the actual x/slashing downtime path: stop validator1 long
+          # enough to cross the shortened test-only signing window, confirm it
+          # is jailed, restart it, submit MsgUnjail, and verify it rejoins.
+          KEY1="$(jq -r '.[0].name' "$NET/validator1/keys/keyring-test"* 2>/dev/null || true)"
+          KEY1="$(./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json | jq -r '.[0].name')"
+          VAL1="$(./sobyad keys show "$KEY1" --bech val --keyring-backend test --home "$NET/validator1" -a)"
+          test -n "$VAL1"
+          BEFORE_DOWNTIME="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          kill "$PID1" 2>/dev/null || true
+          wait "$PID1" 2>/dev/null || true
+
+          JAIL_CONFIRMED=0
+          for attempt in $(seq 1 120); do
+            CURRENT_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            if [ "$CURRENT_HEIGHT" -ge "$((BEFORE_DOWNTIME + 18))" ]; then
+              ./sobyad query staking validator "$VAL1" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/jailed-validator.json"
+              if jq -e '.validator.jailed == true' "$RUNNER_TEMP/jailed-validator.json" >/dev/null; then
+                JAIL_CONFIRMED=1
+                break
+              fi
+            fi
+            sleep 1
+          done
+          if [ "$JAIL_CONFIRMED" -ne 1 ]; then
+            echo "Validator was not jailed after downtime window; inspect slashing params and signing-info."
+            ./sobyad query slashing signing-info "$("$NET/validator1/config/priv_validator_key.json" python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["address"])')" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
+            exit 1
+          fi
+          echo "PASS: x/slashing jailed validator1 after the configured downtime window."
+
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator1" > "$RUNNER_TEMP/validator1-unjail.log" 2>&1 &
+          PID1=$!
+          READY_UNJAIL=0
+          for attempt in $(seq 1 60); do
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/validator1-unjail-status.json" &&
+               jq -e '.result.node_info.network == "sobya-feature-multinode-1"' "$RUNNER_TEMP/validator1-unjail-status.json" >/dev/null 2>&1; then
+              READY_UNJAIL=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY_UNJAIL" -eq 1
+
+          ./sobyad tx slashing unjail --from "$KEY1" --chain-id sobya-feature-multinode-1 \\
+            --node tcp://127.0.0.1:26657 --home "$NET/validator1" \\
+            --keyring-backend test --fees 1000000000000000asobya --gas 300000 \\
+            --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/unjail-tx.json"
+          test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/unjail-tx.json")" = "0"
+
+          REJOINED=0
+          for attempt in $(seq 1 90); do
+            ./sobyad query staking validator "$VAL1" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/unjail-validator.json"
+            if jq -e '.validator.jailed == false' "$RUNNER_TEMP/unjail-validator.json" >/dev/null; then
+              REJOINED=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$REJOINED" -ne 1 ]; then
+            echo "MsgUnjail was accepted but validator did not leave jailed state."
+            cat "$RUNNER_TEMP/unjail-validator.json"
+            cat "$RUNNER_TEMP/validator1-unjail.log" || true
+            exit 1
+          fi
+          echo "PASS: signed MsgUnjail restored validator1 from jailed state."
 
       - name: Upload diagnostics on failure
         if: failure()
