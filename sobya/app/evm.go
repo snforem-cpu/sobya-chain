@@ -266,8 +266,12 @@ func (app *App) SetClientCtx(clientCtx client.Context) {
 // mempool broadcaster on that same client; retaining the pre-start client can
 // send a transaction back through the node's external RPC listener and stall
 // while CheckTx re-enters the application.
+// RegisterTxService registers the SDK transaction query service on the local gRPC router.
+// Do not replace app.clientCtx here: Cosmos EVM's server sets that context before
+// starting CometBFT so the EVM mempool broadcasts through the configured RPC client.
+// The client passed here wraps local.New(bftNode); using it for mempool broadcasts
+// re-enters CometBFT's in-process CheckTx path from the EVM txpool callback and can deadlock.
 func (app *App) RegisterTxService(clientCtx client.Context) {
-	app.SetClientCtx(clientCtx)
 	app.App.RegisterTxService(clientCtx)
 }
 
