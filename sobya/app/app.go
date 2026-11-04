@@ -284,9 +284,20 @@ func New(
 		if err != nil {
 			return nil, err
 		}
+		var normalizedState map[string]json.RawMessage
+		if err := json.Unmarshal(normalizedGenesis, &normalizedState); err != nil {
+			return nil, fmt.Errorf("decode normalized application genesis: %w", err)
+		}
 		req.AppStateBytes = normalizedGenesis
 
-		return app.App.InitChainer(ctx, req)
+		response, err := app.App.InitChainer(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		if err := app.initValidatorReserveGenesis(ctx, normalizedState[validatorReserveGenesisKey]); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 
 	if err := app.Load(loadLatest); err != nil {

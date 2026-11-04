@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -376,5 +377,124 @@ func (app *App) processValidatorReserve(ctx sdk.Context, req *abci.RequestFinali
 	if err := app.updateValidatorReserveConsensusIndex(ctx, store); err != nil { return err }
 	meta.LastBlockTime = now.Format(time.RFC3339Nano)
 	meta.LastHeight = req.Height
+	return saveValidatorReserveMeta(store, meta)
+}
+
+const validatorReserveGenesisKey = "sobya_validator_reserve"
+
+type validatorReserveGenesisEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type validatorReserveGenesisState struct {
+	Version uint32 `json:"version"`
+	Entries []validatorReserveGenesisEntry `json:"entries"`
+}
+
+// exportValidatorReserveGenesisState makes the app-owned store participate in
+// normal genesis export/import instead of silently losing accrued reserve data.
+func (app *App) exportValidatorReserveGenesisState(ctx sdk.Context) ([]byte, error) {
+	store := ctx.KVStore(app.validatorReserveStoreKey)
+	iterator := store.Iterator(nil, nil)
+	defer iterator.Close()
+
+	state := validatorReserveGenesisState{Version: 1, Entries: make([]validatorReserveGenesisEntry, 0)}
+	for ; iterator.Valid(); iterator.Next() {
+		state.Entries = append(state.Entries, validatorReserveGenesisEntry{
+			Key:   base64.RawStdEncoding.EncodeToString(iterator.Key()),
+			Value: base64.RawStdEncoding.EncodeToString(iterator.Value()),
+		})
+	}
+	if err := iterator.Error(); err != nil {
+		return nil, fmt.Errorf("iterate validator reserve state for export: %w", err)
+	}
+	return json.Marshal(state)
+}
+
+// initValidatorReserveGenesis validates and restores the app-owned reserve
+// store from the explicit genesis extension emitted by ExportAppStateAndValidators.
+func (app *App) initValidatorReserveGenesis(ctx sdk.Context, raw json.RawMessage) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var state validatorReserveGenesisState
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return fmt.Errorf("decode validator reserve genesis state: %w", err)
+	}
+	if state.Version != 1 {
+		return fmt.Errorf("unsupported validator reserve genesis version %d", state.Version)
+	}
+
+	store := ctx.KVStore(app.validatorReserveStoreKey)
+	seen := make(map[string]struct{}, len(state.Entries))
+	hasMeta := false
+	for _, entry := range state.Entries {
+		key, err := base64.RawStdEncoding.DecodeString(entry.Key)
+		if err != nil {
+			return fmt.Errorf("decode validator reserve genesis key: %w", err)
+		}
+		value, err := base64.RawStdEncoding.DecodeString(entry.Value)
+		if err != nil {
+			return fmt.Errorf("decode validator reserve genesis value: %w", err)
+		}
+		if _, exists := seen[string(key)]; exists {
+			return fmt.Errorf("duplicate validator reserve genesis key %X", key)
+		}
+		seen[string(key)] = struct{}{}
+
+		switch {
+		case len(key) == 1 && key[0] == validatorReserveMetaKey[0]:
+			var meta validatorReserveMeta
+			if err := json.Unmarshal(value, &meta); err != nil {
+				return fmt.Errorf("decode validator reserve genesis metadata: %w", err)
+			}
+			if _, err := time.Parse(time.RFC3339Nano, meta.StartTime); err != nil {
+				return fmt.Errorf("invalid validator reserve genesis start time: %w", err)
+			}
+			if _, err := time.Parse(time.RFC3339Nano, meta.LastBlockTime); err != nil {
+				return fmt.Errorf("invalid validator reserve genesis last block time: %w", err)
+			}
+			totalPaid, ok := new(big.Int).SetString(meta.TotalPaid, 10)
+			if !ok || totalPaid.Sign() < 0 || totalPaid.Cmp(validatorReserveMaximum) > 0 || meta.LastHeight < 0 {
+				return fmt.Errorf("invalid validator reserve genesis accounting metadata")
+			}
+			hasMeta = true
+		case len(key) == 1+20 && key[0] == validatorReserveConsensusIndexPrefix[0]:
+			// Consensus address -> validator operator address index.
+		case len(key) == 1+8+20 && key[0] == validatorReservePeriodPrefix[0]:
+			period := binary.BigEndian.Uint64(key[1:9])
+			if period >= validatorReservePeriods {
+				return fmt.Errorf("validator reserve genesis contains out-of-range period %d", period)
+			}
+			var stats validatorReserveStats
+			if err := json.Unmarshal(value, &stats); err != nil {
+				return fmt.Errorf("decode validator reserve genesis period stats: %w", err)
+			}
+			power, ok := new(big.Int).SetString(stats.PowerSum, 10)
+			if !ok || power.Sign() <= 0 || stats.Expected == 0 || stats.Signed > stats.Expected {
+				return fmt.Errorf("invalid validator reserve genesis period statistics")
+			}
+		default:
+			return fmt.Errorf("unknown validator reserve genesis key %X", key)
+		}
+		store.Set(key, value)
+	}
+	if len(state.Entries) > 0 && !hasMeta {
+		return fmt.Errorf("validator reserve genesis entries are missing metadata")
+	}
+	return nil
+}
+
+func (app *App) resetValidatorReserveHeightForZeroHeightExport(ctx sdk.Context) error {
+	store := ctx.KVStore(app.validatorReserveStoreKey)
+	meta, err := app.loadValidatorReserveMeta(store)
+	if err != nil {
+		return err
+	}
+	if meta.StartTime == "" {
+		return nil
+	}
+	meta.LastHeight = 0
 	return saveValidatorReserveMeta(store, meta)
 }

@@ -33,6 +33,11 @@ func (app *App) ExportAppStateAndValidators(forZeroHeight bool, jailAllowedAddrs
 	if err != nil {
 		return servertypes.ExportedApp{}, err
 	}
+	reserveState, err := app.exportValidatorReserveGenesisState(ctx)
+	if err != nil {
+		return servertypes.ExportedApp{}, err
+	}
+	genState[validatorReserveGenesisKey] = reserveState
 
 	appState, err := json.MarshalIndent(genState, "", "  ")
 	if err != nil {
@@ -250,6 +255,9 @@ func (app *App) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []str
 			return false
 		},
 	); err != nil {
+		panic(err)
+	}
+	if err := app.resetValidatorReserveHeightForZeroHeightExport(ctx); err != nil {
 		panic(err)
 	}
 

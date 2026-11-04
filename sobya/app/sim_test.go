@@ -234,6 +234,8 @@ func TestAppImportExport(t *testing.T) {
 		}
 	}
 	require.NoError(t, err)
+	err = newApp.initValidatorReserveGenesis(ctxB, genesisState[validatorReserveGenesisKey])
+	require.NoError(t, err)
 	err = newApp.StoreConsensusParams(ctxB, exported.ConsensusParams)
 	require.NoError(t, err)
 	fmt.Printf("comparing stores...\n")
