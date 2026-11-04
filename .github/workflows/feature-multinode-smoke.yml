@@ -55,7 +55,7 @@ jobs:
             --v 2 \
             --output-dir "$NET" \
             --chain-id sobya-feature-multinode-1 \
-            --validators-stake-amount 100000000000000000000,100000000000000000000 \
+            --validators-stake-amount 300000000000000000000,100000000000000000000 \
             --list-ports 26657,26654 \
             --starting-ip-address 127.0.0.1 \
             --keyring-backend test \
@@ -452,9 +452,11 @@ jobs:
           PY
           echo "PASS: both validators restarted from persistent homes, reconnected to peers, resumed block production at common height=$RESTART_HEIGHT0, and preserved account state."
 
-          # Exercise the actual x/slashing downtime path: stop validator1 long
-          # enough to cross the shortened test-only signing window, confirm it
-          # is jailed, restart it, submit MsgUnjail, and verify it rejoins.
+          # Exercise the actual x/slashing downtime path. Validator0 has 75% of
+          # total voting power (300/400), so it can keep committing blocks while
+          # validator1 (25%) is offline. Equal 50/50 power would halt consensus.
+          # Stop validator1 beyond the shortened signing window, verify jail,
+          # restart it, submit MsgUnjail, and verify it rejoins.
           KEY1="$(./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json | jq -r '.[0].name')"
           VAL1="$(./sobyad keys show "$KEY1" --bech val --keyring-backend test --home "$NET/validator1" -a)"
           test -n "$VAL1"
@@ -476,7 +478,7 @@ jobs:
           done
           if [ "$JAIL_CONFIRMED" -ne 1 ]; then
             echo "Validator was not jailed after downtime window; inspect slashing params and signing-info."
-            CONS_ADDR="$(./sobyad keys show "$KEY1" --bech valcons --keyring-backend test --home "$NET/validator1" -a)"
+            CONS_ADDR="$(./sobyad keys show "$KEY1" --bech cons --keyring-backend test --home "$NET/validator1" -a)"
             ./sobyad query slashing signing-info "$CONS_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
             exit 1
           fi
