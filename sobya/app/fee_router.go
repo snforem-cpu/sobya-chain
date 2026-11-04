@@ -65,6 +65,10 @@ func (app *App) installFeeRouter() error {
 			sdk.NewAttribute("validator_amount", validatorAmount.String()),
 		))
 
+		if err := app.processValidatorReserve(ctx, req); err != nil {
+			return nil, fmt.Errorf("process SOBYA validator reserve: %w", err)
+		}
+
 		return response, nil
 	})
 

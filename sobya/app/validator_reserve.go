@@ -320,75 +320,47 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 	return nil
 }
 
-// installValidatorReserve records actual CometBFT commit votes. It assigns
-// each commit to the previous block's timestamp and settles completed periods
-// before x/distribution's BeginBlocker executes.
+// installValidatorReserve validates the dedicated persistent store.
 func (app *App) installValidatorReserve() error {
 	if app.validatorReserveStoreKey == nil {
 		return fmt.Errorf("validator reserve store key was not initialized")
 	}
-	app.SetPreBlocker(func(ctx sdk.Context, req *abci.RequestFinalizeBlock) (*sdk.ResponsePreBlock, error) {
-		response, err := app.App.PreBlocker(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-		store := ctx.KVStore(app.validatorReserveStoreKey)
-		meta, err := app.loadValidatorReserveMeta(store)
-		if err != nil {
-			return nil, err
-		}
-		now := ctx.BlockTime().UTC()
-		if meta.StartTime == "" {
-			meta.StartTime = now.Format(time.RFC3339Nano)
-			meta.LastBlockTime = now.Format(time.RFC3339Nano)
-			meta.LastHeight = req.Height
-			meta.TotalPaid = "0"
-			if err := app.updateValidatorReserveConsensusIndex(ctx, store); err != nil {
-				return nil, err
-			}
-			if err := saveValidatorReserveMeta(store, meta); err != nil {
-				return nil, err
-			}
-			return response, nil
-		}
-		if req.Height == meta.LastHeight {
-			return response, nil
-		}
-		if req.Height != meta.LastHeight+1 {
-			return nil, fmt.Errorf("validator reserve expected height %d after %d, got %d", meta.LastHeight+1, meta.LastHeight, req.Height)
-		}
-		start, err := time.Parse(time.RFC3339Nano, meta.StartTime)
-		if err != nil {
-			return nil, fmt.Errorf("parse validator reserve start time: %w", err)
-		}
-		lastTime, err := time.Parse(time.RFC3339Nano, meta.LastBlockTime)
-		if err != nil {
-			return nil, fmt.Errorf("parse validator reserve previous block time: %w", err)
-		}
-		if now.Before(lastTime) {
-			return nil, fmt.Errorf("validator reserve block time moved backwards: %s before %s", now, lastTime)
-		}
-		previousPeriod := validatorReservePeriodIndex(start, lastTime)
-		if err := app.recordValidatorReserveCommit(ctx, store, previousPeriod, req.DecidedLastCommit.Votes); err != nil {
-			return nil, err
-		}
-		currentPeriod := validatorReservePeriodIndex(start, now)
-		for period := previousPeriod; period < currentPeriod && period < validatorReservePeriods; period++ {
-			if period >= 0 {
-				if err := app.closeValidatorReservePeriod(ctx, store, period, &meta); err != nil {
-					return nil, err
-				}
-			}
-		}
-		if err := app.updateValidatorReserveConsensusIndex(ctx, store); err != nil {
-			return nil, err
-		}
+	return nil
+}
+
+// processValidatorReserve settles completed periods from actual CometBFT votes.
+func (app *App) processValidatorReserve(ctx sdk.Context, req *abci.RequestFinalizeBlock) error {
+	store := ctx.KVStore(app.validatorReserveStoreKey)
+	meta, err := app.loadValidatorReserveMeta(store)
+	if err != nil { return err }
+	now := ctx.BlockTime().UTC()
+	if meta.StartTime == "" {
+		meta.StartTime = now.Format(time.RFC3339Nano)
 		meta.LastBlockTime = now.Format(time.RFC3339Nano)
 		meta.LastHeight = req.Height
-		if err := saveValidatorReserveMeta(store, meta); err != nil {
-			return nil, err
+		meta.TotalPaid = "0"
+		if err := app.updateValidatorReserveConsensusIndex(ctx, store); err != nil { return err }
+		return saveValidatorReserveMeta(store, meta)
+	}
+	if req.Height == meta.LastHeight { return nil }
+	if req.Height != meta.LastHeight+1 {
+		return fmt.Errorf("validator reserve expected height %d after %d, got %d", meta.LastHeight+1, meta.LastHeight, req.Height)
+	}
+	start, err := time.Parse(time.RFC3339Nano, meta.StartTime)
+	if err != nil { return fmt.Errorf("parse validator reserve start time: %w", err) }
+	lastTime, err := time.Parse(time.RFC3339Nano, meta.LastBlockTime)
+	if err != nil { return fmt.Errorf("parse validator reserve previous block time: %w", err) }
+	if now.Before(lastTime) { return fmt.Errorf("validator reserve block time moved backwards: %s before %s", now, lastTime) }
+	previousPeriod := validatorReservePeriodIndex(start, lastTime)
+	if err := app.recordValidatorReserveCommit(ctx, store, previousPeriod, req.DecidedLastCommit.Votes); err != nil { return err }
+	currentPeriod := validatorReservePeriodIndex(start, now)
+	for period := previousPeriod; period < currentPeriod && period < validatorReservePeriods; period++ {
+		if period >= 0 {
+			if err := app.closeValidatorReservePeriod(ctx, store, period, &meta); err != nil { return err }
 		}
-		return response, nil
-	})
-	return nil
+	}
+	if err := app.updateValidatorReserveConsensusIndex(ctx, store); err != nil { return err }
+	meta.LastBlockTime = now.Format(time.RFC3339Nano)
+	meta.LastHeight = req.Height
+	return saveValidatorReserveMeta(store, meta)
 }
