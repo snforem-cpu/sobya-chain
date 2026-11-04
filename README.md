@@ -43,3 +43,7 @@ The current EVM chain ID `777777` is a development/CI value, not an approved pub
 - Never commit private validator keys, node keys, mnemonics, or wallet secrets.
 - GitHub Actions runners are temporary CI machines, not persistent blockchain infrastructure.
 - No mainnet launch, token sale, or exchange-listing claim is authorized by the current development status.
+
+## Independent validator onboarding
+
+The operator recruitment pack is available at [docs/VALIDATOR_RECRUITMENT.md](docs/VALIDATOR_RECRUITMENT.md). It explains the independent-host model, operator safety rules, required launch bundle, readiness sequence, application template, and a draft recruitment notice. It is preparation material only; it does not mean a public testnet is live.
