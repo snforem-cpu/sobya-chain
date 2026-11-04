@@ -96,8 +96,8 @@ for balance in balances:
 bank["supply"] = [{"denom": d, "amount": str(supply[d])} for d in sorted(supply)]
 
 genesis_time = datetime.datetime.fromisoformat(genesis["genesis_time"].replace("Z", "+00:00"))
-start = genesis_time - datetime.timedelta(days=90)
-last = start + datetime.timedelta(days=30)
+start = genesis_time - datetime.timedelta(days=60)
+last = start
 def stamp(value):
     return value.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
@@ -110,7 +110,7 @@ entries = [
     }, separators=(",", ":")).encode())}
 ]
 for operator in operator_bytes:
-    key = b"\x02" + struct.pack(">Q", 1) + operator
+    key = b"\x02" + struct.pack(">Q", 0) + operator
     value = json.dumps({
         "expected_blocks": 100,
         "signed_blocks": 100,
