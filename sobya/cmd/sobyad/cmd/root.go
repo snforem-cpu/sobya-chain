@@ -16,6 +16,7 @@ import (
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
 	evmhd "github.com/cosmos/evm/crypto/hd"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/spf13/cobra"
 
 	"sobya/app"
@@ -100,6 +101,12 @@ func ProvideClientContext(
 	txConfigOpts tx.ConfigOptions,
 	legacyAmino *codec.LegacyAmino,
 ) client.Context {
+	// The CLI/server client context is built by a separate depinject pass from
+	// the running App. Register Cosmos EVM protobuf messages on this registry
+	// before constructing its TxConfig; the EVM JSON-RPC transaction decoder
+	// uses this client TxConfig when querying committed Ethereum transactions.
+	evmtypes.RegisterInterfaces(interfaceRegistry)
+
 	clientCtx := client.Context{}.
 		WithCodec(appCodec).
 		WithInterfaceRegistry(interfaceRegistry).
