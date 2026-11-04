@@ -76,11 +76,25 @@ jobs:
           params["signed_blocks_window"] = "10"
           params["min_signed_per_window"] = "0.500000000000000000"
           params["downtime_jail_duration"] = "1s"
+          # A bank balance alone does not create an auth account. Register the
+          # key as a BaseAccount in auth genesis as well as funding it in bank.
+          auth = genesis["app_state"]["auth"]
+          accounts = auth.setdefault("accounts", [])
+          address = os.environ["DELEGATOR_ADDRESS"]
+          if any(item.get("address") == address for item in accounts):
+              raise SystemExit("independent delegator auth account already exists")
+          accounts.append({
+              "@type": "/cosmos.auth.v1beta1.BaseAccount",
+              "address": address,
+              "pub_key": None,
+              "account_number": "0",
+              "sequence": "0",
+          })
+          accounts.sort(key=lambda item: item.get("address", ""))
           bank = genesis["app_state"]["bank"]
           balances = bank.setdefault("balances", [])
-          address = os.environ["DELEGATOR_ADDRESS"]
           if any(item["address"] == address for item in balances):
-              raise SystemExit("independent delegator already exists")
+              raise SystemExit("independent delegator bank balance already exists")
           balances.append({"address": address, "coins": [{"denom": "asobya", "amount": str(1000 * 10**18)}]})
           balances.sort(key=lambda item: item["address"])
           supply = {}
