@@ -260,6 +260,9 @@ func New(
 	if err := app.installValidatorReserve(); err != nil {
 		panic(err)
 	}
+	if err := app.installNativeSupplyCap(); err != nil {
+		panic(err)
+	}
 
 	/****  Module Options ****/
 
