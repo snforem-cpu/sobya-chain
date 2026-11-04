@@ -33,7 +33,7 @@ The agreed distribution of the full 1 billion SOBY maximum supply is:
 | Emergency reserve | 2% | 20,000,000 SOBY |
 | **Total** | **100%** | **1,000,000,000 SOBY** |
 
-The founder allocation is available at network launch. The validator allocation is intended to vest/release gradually over four years in 48 monthly periods, subject to actual validator participation. The nominal monthly release ceiling is 3,125,000 SOBY. A validator that stops participating must not continue earning future unvested rewards. The exact eligibility, distribution, and slashing interaction must be implemented and tested before launch; this schedule is a design requirement, not an active on-chain mechanism yet.
+The founder allocation is available at network launch. The validator allocation is held in the protocol-controlled validator_reserve module account and is released over 48 monthly-anniversary periods in UTC, anchored to the first finalized block. Each period has a maximum tranche of 3,125,000 SOBY. The application records actual CometBFT commit votes for each validator, counts every validator listed in the prior commit as an expected block, and requires at least 95% signed commits for that period. A validator's share is weighted by its accumulated consensus voting power across the period, not merely its power at the final block. Ineligible validators receive nothing; their shares and integer-rounding dust remain in the reserve. Each payout is routed through the Cosmos distribution module, so validator commission and delegator portions follow standard distribution rules. The application enforces a lifetime release ceiling of 150,000,000 SOBY and never mints reserve rewards. Production genesis must fund the reserve account with the 150,000,000 SOBY validator allocation; an empty or underfunded reserve cannot pay the scheduled tranche.
 
 The founder is responsible for the treasury, liquidity, emergency-reserve, and development wallets. These allocations are distinct from the founder's personal 40% allocation. The founder's public EVM address and the shared management address for the other five allocations have been supplied by the founder, but are not yet encoded into production genesis. The shared address is an administrative choice; accounting must continue to track each allocation separately. No production genesis should be generated until the addresses have been converted/validated against SOBYA's account codec and the allocation entries have been reviewed.
 
@@ -85,3 +85,16 @@ The integration is not yet considered complete or production-ready. Required ver
 - A public network requires independent validator operators, persistent node infrastructure, public RPC/REST/gRPC/EVM JSON-RPC endpoints, monitoring, backups, an upgrade process, and a security review.
 
 Do not use this network for real funds until the production genesis, independent multi-node operation, EVM behavior, tokenomics enforcement, and security/operational readiness have all been verified.
+
+
+## Validator reserve on-chain accounting
+
+The feature branch adds a dedicated persistent multistore key (sobya_validator_reserve) and a blocked module account (validator_reserve). Commit accounting is performed in the pre-block lifecycle using the actual DecidedLastCommit.Votes supplied by CometBFT. The previous block's timestamp assigns its commit to the correct monthly period. Repeated execution of an already-recorded height is ignored, while unexpected height gaps or backwards block time fail closed.
+
+The monthly share denominator includes the accumulated voting power of all validators expected during that period. Eligibility is applied independently at 95% or higher. An ineligible validator's pro-rata share is not redistributed to other validators. Unused funds remain in the reserve account; each future period remains capped at 3,125,000 SOBY. The 150,000,000 SOBY lifetime cap is tracked in persistent state in addition to the actual reserve account balance.
+
+Production genesis must place 150,000,000 SOBY (150000000000000000000000000 asobya) in the validator_reserve module account as part of the already-agreed 1 billion SOBY allocation. Do not create new supply to fund it. The module account is blocked from ordinary bank sends and has no mint permission. If it is not funded, the release mechanism remains dormant rather than minting or borrowing funds.
+
+Reserve payouts enter x/distribution and are allocated to each eligible validator's distribution record. The normal commission split applies, so operator commission and delegator rewards follow standard Cosmos distribution behavior. A validator that exits after earning a period's entitlement can still receive that completed period's accrued reward if its staking record remains available; a removed validator's unpaid share stays in reserve.
+
+This code is on the feature branch and still requires successful repository CI and integration verification before it is considered Testnet-ready. It does not itself constitute a production genesis ceremony or public network launch.

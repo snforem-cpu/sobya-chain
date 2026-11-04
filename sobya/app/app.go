@@ -94,6 +94,7 @@ type App struct {
 	SlashingKeeper        slashingkeeper.Keeper
 	MintKeeper            mintkeeper.Keeper
 	DistrKeeper           distrkeeper.Keeper
+	validatorReserveStoreKey *storetypes.KVStoreKey
 	GovKeeper             *govkeeper.Keeper
 	UpgradeKeeper         *upgradekeeper.Keeper
 	AuthzKeeper           authzkeeper.Keeper
@@ -227,8 +228,12 @@ func New(
 	// enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
 
-	// build app
+	// Build the application and mount the persistent validator-reserve store before loading state.
+	app.validatorReserveStoreKey = storetypes.NewKVStoreKey(validatorReserveStoreKeyName)
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
+	app.MountKVStores(map[string]*storetypes.KVStoreKey{
+		validatorReserveStoreKeyName: app.validatorReserveStoreKey,
+	})
 
 	// runtime.AppBuilder creates BaseApp with a nil transaction decoder. Install
 	// the app-wired TxConfig explicitly so Ethereum MsgEthereumTx envelopes are
@@ -248,6 +253,9 @@ func New(
 	// The wrapper runs the configured module pre-blockers, then moves the
 	// treasury/community shares before x/distribution consumes fee_collector.
 	if err := app.installFeeRouter(); err != nil {
+		panic(err)
+	}
+	if err := app.installValidatorReserve(); err != nil {
 		panic(err)
 	}
 

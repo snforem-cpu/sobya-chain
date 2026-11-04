@@ -77,6 +77,7 @@ import (
 var (
 	moduleAccPerms = []*authmodulev1.ModuleAccountPermission{
 		{Account: authtypes.FeeCollectorName},
+		{Account: validatorReserveModuleName},
 		{Account: distrtypes.ModuleName},
 		{Account: minttypes.ModuleName}, // Native SOBYA mint authority is intentionally absent.
 		{Account: stakingtypes.BondedPoolName, Permissions: []string{authtypes.Burner, stakingtypes.ModuleName}},
@@ -92,6 +93,7 @@ var (
 	// blocked account addresses
 	blockAccAddrs = []string{
 		authtypes.FeeCollectorName,
+		validatorReserveModuleName,
 		distrtypes.ModuleName,
 		minttypes.ModuleName,
 		stakingtypes.BondedPoolName,
