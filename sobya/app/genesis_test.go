@@ -10,6 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
@@ -59,6 +60,8 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	bankGenesis := banktypes.DefaultGenesisState()
 	mintGenesis := minttypes.DefaultGenesisState()
+	distrGenesis := distrtypes.DefaultGenesisState()
+	distrGenesis.Params.CommunityTax = sdkmath.LegacyNewDecWithPrec(2, 2)
 
 	bankBytes, err := cdc.MarshalJSON(bankGenesis)
 	if err != nil {
@@ -68,9 +71,14 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal mint genesis: %v", err)
 	}
+	distrBytes, err := cdc.MarshalJSON(distrGenesis)
+	if err != nil {
+		t.Fatalf("marshal distribution genesis: %v", err)
+	}
 	raw, err := json.Marshal(map[string]json.RawMessage{
 		banktypes.ModuleName: bankBytes,
 		minttypes.ModuleName: mintBytes,
+		distrtypes.ModuleName: distrBytes,
 	})
 	if err != nil {
 		t.Fatalf("marshal app genesis: %v", err)
@@ -113,6 +121,14 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	}
 	if !gotMint.Minter.Inflation.IsZero() || !gotMint.Minter.AnnualProvisions.IsZero() {
 		t.Fatal("mint state still contains inflation or annual provisions")
+	}
+
+	var gotDistr distrtypes.GenesisState
+	if err := cdc.UnmarshalJSON(appState[distrtypes.ModuleName], &gotDistr); err != nil {
+		t.Fatalf("unmarshal normalized distribution genesis: %v", err)
+	}
+	if !gotDistr.Params.CommunityTax.IsZero() {
+		t.Fatalf("distribution community tax = %s, want 0 for exact validator fee routing", gotDistr.Params.CommunityTax)
 	}
 }
 
