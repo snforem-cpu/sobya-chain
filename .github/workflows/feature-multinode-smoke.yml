@@ -244,6 +244,83 @@ jobs:
           test "$CONFIRMED" -eq 1
           echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
 
+          # Restart both validators using the same persistent homes. The
+          # restarted nodes must recover committed state, reconnect over P2P,
+          # and continue producing blocks beyond the pre-shutdown height.
+          PRE_RESTART_HEIGHT="$H0"
+          kill "$PID0" "$PID1" 2>/dev/null || true
+          wait "$PID0" 2>/dev/null || true
+          wait "$PID1" 2>/dev/null || true
+
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator0" > "$RUNNER_TEMP/validator0-restart.log" 2>&1 &
+          PID0=$!
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator1" > "$RUNNER_TEMP/validator1-restart.log" 2>&1 &
+          PID1=$!
+
+          RESTART_HEIGHT0=0
+          RESTART_HEIGHT1=0
+          for attempt in $(seq 1 120); do
+            READY0=0
+            READY1=0
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/restart-status0.json" &&
+               jq -e '.result.node_info.network == "sobya-feature-multinode-1"' "$RUNNER_TEMP/restart-status0.json" >/dev/null 2>&1; then
+              READY0=1
+              RESTART_HEIGHT0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/restart-status0.json")"
+            fi
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/restart-status1.json" &&
+               jq -e '.result.node_info.network == "sobya-feature-multinode-1"' "$RUNNER_TEMP/restart-status1.json" >/dev/null 2>&1; then
+              READY1=1
+              RESTART_HEIGHT1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/restart-status1.json")"
+            fi
+            if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ] &&
+               [[ "$RESTART_HEIGHT0" =~ ^[0-9]+$ ]] && [[ "$RESTART_HEIGHT1" =~ ^[0-9]+$ ]] &&
+               [ "$RESTART_HEIGHT0" -gt "$PRE_RESTART_HEIGHT" ] &&
+               [ "$RESTART_HEIGHT1" -gt "$PRE_RESTART_HEIGHT" ] &&
+               [ "$RESTART_HEIGHT0" = "$RESTART_HEIGHT1" ]; then
+              break
+            fi
+            if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
+              echo "A validator exited during persistent-state restart verification"
+              cat "$RUNNER_TEMP/validator0-restart.log" || true
+              cat "$RUNNER_TEMP/validator1-restart.log" || true
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$RESTART_HEIGHT0" -le "$PRE_RESTART_HEIGHT" ] ||
+             [ "$RESTART_HEIGHT1" -le "$PRE_RESTART_HEIGHT" ] ||
+             [ "$RESTART_HEIGHT0" != "$RESTART_HEIGHT1" ]; then
+            echo "Persistent restart failed: prior=$PRE_RESTART_HEIGHT validator0=$RESTART_HEIGHT0 validator1=$RESTART_HEIGHT1"
+            cat "$RUNNER_TEMP/validator0-restart.log" || true
+            cat "$RUNNER_TEMP/validator1-restart.log" || true
+            exit 1
+          fi
+
+          rpc_get http://127.0.0.1:26657/net_info "$RUNNER_TEMP/restart-net0.json"
+          rpc_get http://127.0.0.1:26654/net_info "$RUNNER_TEMP/restart-net1.json"
+          RESTART_PEERS0="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/restart-net0.json")"
+          RESTART_PEERS1="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/restart-net1.json")"
+          if [ "$RESTART_PEERS0" -lt 1 ] || [ "$RESTART_PEERS1" -lt 1 ]; then
+            echo "P2P did not recover after restart: validator0=$RESTART_PEERS0 validator1=$RESTART_PEERS1"
+            exit 1
+          fi
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/restart-after-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/restart-after-to.json"
+          python3 - "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$RUNNER_TEMP/restart-after-from.json" "$RUNNER_TEMP/restart-after-to.json" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
+          assert (after_from, after_to) == (before_from, before_to), (
+              f"balances changed across restart: before={(before_from, before_to)} after={(after_from, after_to)}"
+          )
+          print("PASS: committed native SOBYA balances persisted across both validator restarts.")
+          PY
+          echo "PASS: both validators restarted from persistent homes, reconnected to peers, resumed block production at common height=$RESTART_HEIGHT0, and preserved account state."
+
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
