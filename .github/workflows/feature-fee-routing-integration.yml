@@ -152,7 +152,10 @@ jobs:
               python3 -c 'import json,sys; d=json.load(sys.stdin); print(sum(int(c["amount"]) for c in d.get("balances",[]) if c.get("denom")=="asobya"))'
           }
           validator_outstanding() {
-            ./sobyad query distribution validator-outstanding-rewards "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json |
+            local raw
+            raw="$(./sobyad query distribution validator-outstanding-rewards "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
+            printf '%s' "$raw" > "$RUNNER_TEMP/validator-outstanding.json"
+            printf '%s' "$raw" |
               python3 -c 'import json,sys; from decimal import Decimal; d=json.load(sys.stdin); found=[]; walk=lambda x: (found.append(Decimal(x["amount"])) if isinstance(x,dict) and x.get("denom")=="asobya" and "amount" in x else None, [walk(v) for v in x.values()] if isinstance(x,dict) else [walk(v) for v in x] if isinstance(x,list) else None); walk(d); print(sum(found,Decimal(0)))'
           }
           assert_deltas() {
@@ -302,5 +305,6 @@ jobs:
             ${{ runner.temp }}/delegator-rewards.json
             ${{ runner.temp }}/validator-commission.json
             ${{ runner.temp }}/routed-block-results.json
+            ${{ runner.temp }}/validator-outstanding.json
           if-no-files-found: ignore
           retention-days: 14
