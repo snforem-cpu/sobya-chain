@@ -19,6 +19,7 @@ import (
 	antetypes "github.com/cosmos/evm/ante/types"
 	"strconv"
 	"time"
+	"sync"
 
 	storetypes "cosmossdk.io/store/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -209,15 +210,11 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
 		BlockGasLimit:    evmconfig.GetBlockGasLimit(appOpts, logger),
 		MinTip:           evmconfig.GetMinTip(appOpts, logger),
+		// The txpool callback runs inside the reorg triggered by CheckTx. Do not
+		// call CometBFT from this callback: that would re-enter CheckTx before the
+		// current request has returned. Queue the batch for the worker below.
 		BroadCastTxFn: func(txs []*ethtypes.Transaction) error {
-			logger.Info("SOBYA EVM broadcaster callback entered", "count", len(txs))
-			err := broadcastEVMTransactions(app.clientCtx, app.txConfig, txs, logger)
-			if err != nil {
-				logger.Error("SOBYA EVM broadcaster callback failed", "err", err)
-				return err
-			}
-			logger.Info("SOBYA EVM broadcaster callback returned successfully", "count", len(txs))
-			return nil
+			return app.enqueueEVMBroadcast(txs, logger)
 		},
 	}
 
@@ -234,12 +231,16 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	app.EVMMempool = pool
 	app.SetMempool(pool)
 	checkTxHandler := evmmempool.NewCheckTxHandler(pool)
+	app.startEVMBroadcastWorker(logger)
 	app.SetCheckTxHandler(func(runTx sdk.RunTx, request *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
 		started := time.Now()
+		app.beginEVMCheckTx()
 		logger.Info("SOBYA Comet CheckTx entered", "tx_bytes", len(request.Tx))
-		response, err := checkTxHandler(runTx, request)
-		logger.Info("SOBYA Comet CheckTx completed", "elapsed", time.Since(started), "err", err)
-		return response, err
+		defer func() {
+			app.endEVMCheckTx()
+			logger.Info("SOBYA Comet CheckTx completed", "elapsed", time.Since(started))
+		}()
+		return checkTxHandler(runTx, request)
 	})
 
 	proposalHandler := baseapp.NewDefaultProposalHandler(pool, app)
@@ -291,11 +292,116 @@ func (app *App) onPendingTx(hash common.Hash) {
 
 // Close shuts down the EVM transaction pool before closing BaseApp.
 func (app *App) Close() error {
+	app.stopEVMBroadcastWorker()
 	var poolErr error
 	if app.EVMMempool != nil {
 		poolErr = app.EVMMempool.Close()
 	}
 	return errors.Join(poolErr, app.App.Close())
+}
+
+// evmBroadcastState defers CometBFT rebroadcasts until the current CheckTx
+// request has returned. The upstream EVM txpool invokes BroadcastTxFn from its
+// reorg goroutine and waits for it; calling CometBFT there can recursively enter
+// CheckTx while the original request is still holding the mempool path.
+type evmBroadcastState struct {
+	mu       sync.Mutex
+	cond     *sync.Cond
+	active   int
+	queue    chan []*ethtypes.Transaction
+	stop     chan struct{}
+	stopOnce sync.Once
+	wg       sync.WaitGroup
+}
+
+func (app *App) startEVMBroadcastWorker(logger log.Logger) {
+	state := &evmBroadcastState{
+		queue: make(chan []*ethtypes.Transaction, 256),
+		stop:  make(chan struct{}),
+	}
+	state.cond = sync.NewCond(&state.mu)
+	app.evmBroadcast = state
+	state.wg.Add(1)
+	go func() {
+		defer state.wg.Done()
+		for {
+			select {
+			case <-state.stop:
+				return
+			case txs := <-state.queue:
+				state.mu.Lock()
+				for state.active > 0 {
+					state.cond.Wait()
+				}
+				state.mu.Unlock()
+				select {
+				case <-state.stop:
+					return
+				default:
+				}
+				if err := broadcastEVMTransactions(app.clientCtx, app.txConfig, txs, logger); err != nil {
+					logger.Error("SOBYA deferred EVM broadcast failed", "count", len(txs), "err", err)
+				} else {
+					logger.Info("SOBYA deferred EVM broadcast completed", "count", len(txs))
+				}
+			}
+		}
+	}()
+}
+
+func (app *App) beginEVMCheckTx() {
+	if app.evmBroadcast == nil {
+		return
+	}
+	app.evmBroadcast.mu.Lock()
+	app.evmBroadcast.active++
+	app.evmBroadcast.mu.Unlock()
+}
+
+func (app *App) endEVMCheckTx() {
+	if app.evmBroadcast == nil {
+		return
+	}
+	app.evmBroadcast.mu.Lock()
+	app.evmBroadcast.active--
+	if app.evmBroadcast.active == 0 {
+		app.evmBroadcast.cond.Broadcast()
+	}
+	app.evmBroadcast.mu.Unlock()
+}
+
+func (app *App) enqueueEVMBroadcast(txs []*ethtypes.Transaction, logger log.Logger) error {
+	if len(txs) == 0 {
+		return nil
+	}
+	state := app.evmBroadcast
+	if state == nil {
+		return fmt.Errorf("EVM broadcast worker is not initialized")
+	}
+	batch := append([]*ethtypes.Transaction(nil), txs...)
+	select {
+	case <-state.stop:
+		return fmt.Errorf("EVM broadcast worker is stopping")
+	case state.queue <- batch:
+		logger.Info("SOBYA EVM broadcast queued", "count", len(batch))
+		return nil
+	default:
+		return fmt.Errorf("EVM broadcast queue is full")
+	}
+}
+
+func (app *App) stopEVMBroadcastWorker() {
+	state := app.evmBroadcast
+	if state == nil {
+		return
+	}
+	state.stopOnce.Do(func() {
+		close(state.stop)
+		state.mu.Lock()
+		state.cond.Broadcast()
+		state.mu.Unlock()
+	})
+	state.wg.Wait()
 }
 
 // broadcastEVMTransactions wraps signed Ethereum transactions as MsgEthereumTx
