@@ -114,15 +114,30 @@ jobs:
           trap cleanup EXIT
 
           wait_height() {
-            local target="$1" height=0
-            for attempt in $(seq 1 90); do
-              height="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height // "0"')"
-              if [ "$height" -ge "$target" ]; then echo "$height"; return 0; fi
-              if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-fee-routing.log"; return 1; fi
+            local target="$1" height=0 status_json=""
+            for attempt in $(seq 1 120); do
+              # RPC may not be listening immediately after the process is spawned.
+              # Do not let curl's expected connection-refused during startup trip set -e.
+              if status_json="$(curl --silent --show-error --fail --max-time 2 http://127.0.0.1:26657/status 2>/dev/null)"; then
+                height="$(printf '%s' "$status_json" | jq -r '.result.sync_info.latest_block_height // "0"')"
+                if [ "$height" -ge "$target" ]; then
+                  echo "$height"
+                  return 0
+                fi
+              else
+                if ! kill -0 "$NODE_PID" 2>/dev/null; then
+                  echo "SOBYA node process exited before RPC became ready (target height $target)." >&2
+                  cat "$RUNNER_TEMP/sobya-fee-routing.log" >&2 || true
+                  return 1
+                fi
+              fi
               sleep 2
             done
-            echo "Timed out waiting for height $target (last=$height)" >&2
-            cat "$RUNNER_TEMP/sobya-fee-routing.log"
+            echo "Timed out waiting for RPC/height $target (last height=$height)." >&2
+            echo "Node process status:" >&2
+            ps -p "$NODE_PID" -o pid=,stat=,etime=,cmd= >&2 || true
+            echo "SOBYA node log:" >&2
+            cat "$RUNNER_TEMP/sobya-fee-routing.log" >&2 || true
             return 1
           }
 
