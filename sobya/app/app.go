@@ -105,6 +105,7 @@ type App struct {
 	clientCtx          client.Context
 	EVMMempool         *evmmempool.ExperimentalEVMMempool
 	pendingTxListeners []func(common.Hash)
+	evmBroadcast      *evmBroadcastState
 
 	// Cosmos EVM keepers. SOBYA uses its native 18-decimal asobya bank coin.
 	FeeMarketKeeper feemarketkeeper.Keeper
