@@ -33,9 +33,11 @@ The agreed distribution of the full 1 billion SOBY maximum supply is:
 | Emergency reserve | 2% | 20,000,000 SOBY |
 | **Total** | **100%** | **1,000,000,000 SOBY** |
 
-The founder allocation is available at network launch. The validator allocation is intended to vest/release gradually and remain conditional on actual validator participation; a validator that stops participating must not continue earning future unvested rewards.
+The founder allocation is available at network launch. The validator allocation is intended to vest/release gradually over four years in 48 monthly periods, subject to actual validator participation. The nominal monthly release ceiling is 3,125,000 SOBY. A validator that stops participating must not continue earning future unvested rewards. The exact eligibility, distribution, and slashing interaction must be implemented and tested before launch; this schedule is a design requirement, not an active on-chain mechanism yet.
 
-The founder is responsible for the treasury, liquidity, emergency-reserve, and development wallets. These allocations are distinct from the founder's personal 40% allocation. The actual launch wallet addresses, genesis account entries, and any detailed release schedules must be populated in the production genesis package; they must not be replaced with guessed addresses or invented vesting terms.
+The founder is responsible for the treasury, liquidity, emergency-reserve, and development wallets. These allocations are distinct from the founder's personal 40% allocation. The founder's public EVM address and the shared management address for the other five allocations have been supplied by the founder, but are not yet encoded into production genesis. The shared address is an administrative choice; accounting must continue to track each allocation separately. No production genesis should be generated until the addresses have been converted/validated against SOBYA's account codec and the allocation entries have been reviewed.
+
+The validator reserve should be held by a protocol-controlled account, not by the founder's personal wallet. Validator wallet addresses are not needed before validators join: the future on-chain registration/reward mechanism must accept eligible validator operators dynamically without a code change for each new validator.
 
 ## Agreed transaction-fee distribution
 
@@ -45,11 +47,13 @@ The target routing of network transaction fees is:
 - **30%** to eligible validators.
 - **20%** to the community allocation/pool.
 
-This split is an approved design requirement. It is **not yet implemented as custom on-chain fee-routing logic** in the current source. The implementation must account for actual collected fees, deterministic accounting, validator eligibility/participation, and transparent community accounting; do not treat the standard Cosmos distribution module as proof that this exact split is active.
+A deterministic fee-split calculation helper now exists in `app/fee_split.go`, with unit tests for exact ratios, multi-denomination fees, rounding, and conservation of the original amount. Integer rounding dust is assigned to the treasury share.
+
+**Important implementation status:** the helper is a tested calculation primitive only. It is not yet connected to the live fee-collection/block lifecycle, and no funds are routed by it yet. Runtime routing still must be implemented and tested against the actual Cosmos SDK/Cosmos EVM fee collection path. The implementation must account for all collected fee denominations, deterministic accounting, validator eligibility/participation, and transparent community accounting. Do not treat the standard Cosmos distribution module or the helper alone as proof that this exact split is active.
 
 ## Development allocations and test data
 
-The Ignite development configuration contains test balances and validator bonds. These are disposable development values, not the agreed production launch allocation. A production genesis must use the allocation table above and must validate that the total native supply equals no more than the 1 billion SOBY cap, with no accidental duplicate allocations.
+The Ignite development configuration contains test balances and validator bonds. These are disposable development values, not the agreed production launch allocation. A production genesis must use the allocation table above and must validate that the total native supply equals the 1 billion SOBY launch allocation, with no accidental duplicate allocations or unassigned remainder.
 
 ## EVM integration status
 
@@ -60,7 +64,7 @@ The integration is not yet considered complete or production-ready. Required ver
 - validating `eth_chainId`, block queries, balances, signed EIP-155 transactions, transaction receipts, and Solidity contract deployment/calls/state/logs;
 - verifying ERC-20 conversion and native-asset mapping end to end;
 - testing the wired Cosmos EVM static precompiles, ERC-20 IBC middleware, and IBC contract callbacks;
-- implementing and testing the agreed 50/30/20 fee routing;
+- implementing and testing the agreed 50/30/20 fee routing at runtime;
 - implementing and testing validator reward release based on participation;
 - testing genesis allocation, wallet control, and fixed-supply invariants.
 
