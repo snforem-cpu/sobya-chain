@@ -24,6 +24,7 @@ const (
 	validatorReservePeriods = 48
 	validatorReserveEligibilityNumerator = 95
 	validatorReserveEligibilityDenominator = 100
+	validatorReserveMaxTrackingPeriod = 1_000_000
 )
 
 var (
@@ -87,11 +88,15 @@ func validatorReservePeriodIndex(start, at time.Time) int {
 	if at.Before(start) {
 		return -1
 	}
-	index := 0
-	for index < validatorReservePeriods && !at.Before(validatorReservePeriodBoundary(start, index+1)) {
-		index++
+
+	// Continue monthly accounting beyond the 48 scheduled tranches. The
+	// accrued budget remains capped at 150M SOBY, but unpaid funds can still
+	// be earned by eligible validators in later catch-up periods.
+	months := (at.Year()-start.Year())*12 + int(at.Month()-start.Month())
+	if at.Before(validatorReservePeriodBoundary(start, months)) {
+		months--
 	}
-	return index
+	return months
 }
 
 func validatorReserveEligible(expected, signed uint64) bool {
@@ -232,7 +237,7 @@ func (app *App) updateValidatorReserveConsensusIndex(ctx sdk.Context, store stor
 }
 
 func (app *App) recordValidatorReserveCommit(ctx sdk.Context, store storetypes.KVStore, period int, votes []abci.VoteInfo) error {
-	if period < 0 || period >= validatorReservePeriods {
+	if period < 0 {
 		return nil
 	}
 	for _, vote := range votes {
@@ -404,7 +409,7 @@ func (app *App) processValidatorReserve(ctx sdk.Context, req *abci.RequestFinali
 	previousPeriod := validatorReservePeriodIndex(start, lastTime)
 	if err := app.recordValidatorReserveCommit(ctx, store, previousPeriod, req.DecidedLastCommit.Votes); err != nil { return err }
 	currentPeriod := validatorReservePeriodIndex(start, now)
-	for period := previousPeriod; period < currentPeriod && period < validatorReservePeriods; period++ {
+	for period := previousPeriod; period < currentPeriod; period++ {
 		if period >= 0 {
 			if err := app.closeValidatorReservePeriod(ctx, store, period, &meta); err != nil { return err }
 		}
@@ -499,8 +504,8 @@ func (app *App) initValidatorReserveGenesis(ctx sdk.Context, raw json.RawMessage
 			}
 		case len(key) == 1+8+20 && key[0] == validatorReservePeriodPrefix[0]:
 			period := binary.BigEndian.Uint64(key[1:9])
-			if period >= validatorReservePeriods {
-				return fmt.Errorf("validator reserve genesis contains out-of-range period %d", period)
+			if period > validatorReserveMaxTrackingPeriod {
+				return fmt.Errorf("validator reserve genesis contains out-of-range tracking period %d", period)
 			}
 			var stats validatorReserveStats
 			if err := json.Unmarshal(value, &stats); err != nil {
