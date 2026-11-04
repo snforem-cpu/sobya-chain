@@ -42,28 +42,26 @@ func (app *App) installFeeRouter() error {
 
 		feeCollector := authtypes.NewModuleAddress(authtypes.FeeCollectorName)
 		collected := app.BankKeeper.GetAllBalances(ctx, feeCollector)
-		if len(collected) == 0 {
-			return response, nil
-		}
-
-		sharedAmount, validatorAmount := splitCollectedFeesForRouting(collected)
-		if len(sharedAmount) > 0 {
-			if err := app.BankKeeper.SendCoinsFromModuleToAccount(
-				ctx,
-				authtypes.FeeCollectorName,
-				recipient,
-				sharedAmount,
-			); err != nil {
-				return nil, fmt.Errorf("route SOBYA treasury/community fees to shared wallet: %w", err)
+		if len(collected) > 0 {
+			sharedAmount, validatorAmount := splitCollectedFeesForRouting(collected)
+			if len(sharedAmount) > 0 {
+				if err := app.BankKeeper.SendCoinsFromModuleToAccount(
+					ctx,
+					authtypes.FeeCollectorName,
+					recipient,
+					sharedAmount,
+				); err != nil {
+					return nil, fmt.Errorf("route SOBYA treasury/community fees to shared wallet: %w", err)
+				}
 			}
-		}
 
-		ctx.EventManager().EmitEvent(sdk.NewEvent(
-			"sobya_fee_split",
-			sdk.NewAttribute("shared_wallet", sharedFeeWallet),
-			sdk.NewAttribute("shared_wallet_amount", sharedAmount.String()),
-			sdk.NewAttribute("validator_amount", validatorAmount.String()),
-		))
+			ctx.EventManager().EmitEvent(sdk.NewEvent(
+				"sobya_fee_split",
+				sdk.NewAttribute("shared_wallet", sharedFeeWallet),
+				sdk.NewAttribute("shared_wallet_amount", sharedAmount.String()),
+				sdk.NewAttribute("validator_amount", validatorAmount.String()),
+			))
+		}
 
 		if err := app.processValidatorReserve(ctx, req); err != nil {
 			return nil, fmt.Errorf("process SOBYA validator reserve: %w", err)
