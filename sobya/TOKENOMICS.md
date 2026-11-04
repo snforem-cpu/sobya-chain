@@ -67,14 +67,25 @@ The Ignite development configuration contains test balances and validator bonds.
 
 The working branch contains partial Cosmos EVM `v0.6.0` integration: EVM, ERC-20 and fee-market keepers/modules, EVM-aware ante handling, unified EVM/Cosmos mempool and proposal handlers, and EVM server command/configuration paths. The development EVM chain ID currently defaults to `777777`; it is a **development value only**, not an approved production network identifier.
 
-The integration is not yet considered complete or production-ready. Required verification and remaining work include:
-- starting the node with Ethereum JSON-RPC and WebSocket endpoints enabled;
-- validating `eth_chainId`, block queries, balances, signed EIP-155 transactions, transaction receipts, and Solidity contract deployment/calls/state/logs;
-- verifying ERC-20 conversion and native-asset mapping end to end;
-- testing the wired Cosmos EVM static precompiles, ERC-20 IBC middleware, and IBC contract callbacks;
-- implementing and testing the agreed 50/30/20 fee routing at runtime;
-- implementing and testing validator reward release based on participation;
-- testing genesis allocation, wallet control, and fixed-supply invariants.
+The integration is not yet considered complete or production-ready. ## Verification status (2026-11-04)
+
+Previously successful GitHub Actions runs on commit `17337dfe901c70cde0e0da7bb67d1fc67e4fa794`:
+
+- EVM JSON-RPC smoke test `41866665016`: node startup, `eth_chainId`, `net_version`, block query, funded native account balance, signed EIP-155 transaction, Solidity contract deployment and state read/write, ERC-20 deployment/metadata/supply/transfer, and WebSocket new-block subscription.
+- Transaction fee-routing integration `41866665090`: Cosmos and EVM transaction fees were checked against committed receipts; 70% reached the configured shared wallet, 30% reached validator outstanding rewards, and no duplicate routing occurred across the following empty blocks.
+- Validator reserve unit audit `41866665119`: focused reserve tests, full Go tests, and node build passed.
+
+These are historical successes on the stated commit, not fresh test results for the current branch head.
+
+## Remaining phase-one verification
+
+- **Static precompiles:** fresh genesis now enables the eight static precompile implementations actually registered by Cosmos EVM v0.6.0 when no explicit selection is supplied, while preserving an operator-provided selection. Unit tests and a bank-precompile/native-balance RPC assertion have been added; they still require a successful CI run on the current code.
+- **IBC/ERC-20 bridge:** the v1 ERC-20 transfer middleware, v2 ERC-20 middleware, and EVM IBC callback middleware are wired in the application. End-to-end packet tests are still needed for token conversion in both directions and callback success/failure behavior across two chains.
+- **Native supply:** genesis and end-block cap checks exist. A runtime test must still exercise the 1-billion-SOBY cap through EVM value transfers and the bank/EVM mint-burn reconciliation path.
+- **Validator reserve:** the earlier two-validator E2E test used validator self-delegations. Separate third-party delegator rewards, slashing/jailing/unbonding/rejoin, and process restart/restore still need integration coverage.
+- **Genesis/token control:** production allocation totals, reserve funding, wallet ownership/control, and address conversions must be validated against the final agreed genesis before launch.
+
+The latest precompile and smoke-test changes are not considered verified until the corresponding current-head GitHub Actions jobs execute successfully.
 
 ## Launch and operational policy
 
