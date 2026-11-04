@@ -95,8 +95,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: project/go.mod
-          cache: true
-          cache-dependency-path: project/go.sum
+          # The working-source setup-go step already populated the shared
+          # module cache. Avoid restoring a second overlapping cache archive
+          # into the same GOMODCACHE (tar reports "File exists").
+          cache: false
 
       - name: Verify, test, and build archived source
         working-directory: project
