@@ -84,14 +84,14 @@ jobs:
           import pathlib, re, sys
           path = pathlib.Path(sys.argv[1])
           text = path.read_text()
-          match = re.search(r"(?ms)^\\[json-rpc\\]\\s*\\n.*?(?=^\\[|\\Z)", text)
+          match = re.search(r"(?ms)^\[json-rpc\]\s*\n.*?(?=^\[|\Z)", text)
           if not match:
               raise SystemExit("Missing [json-rpc] section")
           section = match.group(0)
-          section = re.sub(r"(?m)^enable\\s*=.*$", "enable = true", section)
-          section = re.sub(r"(?m)^address\\s*=.*$", 'address = "127.0.0.1:8545"', section)
+          section = re.sub(r"(?m)^enable\s*=.*$", "enable = true", section)
+          section = re.sub(r"(?m)^address\s*=.*$", 'address = "127.0.0.1:8545"', section)
           text = text[:match.start()] + section + text[match.end():]
-          text = re.sub(r'(?m)^minimum-gas-prices\\s*=.*$', 'minimum-gas-prices = "0asobya"', text, count=1)
+          text = re.sub(r'(?m)^minimum-gas-prices\s*=.*$', 'minimum-gas-prices = "0asobya"', text, count=1)
           path.write_text(text)
           PY
           sed -i 's#^node[[:space:]]*=.*#node = "tcp://127.0.0.1:26657"#' "$SOBYA_HOME/config/client.toml"
