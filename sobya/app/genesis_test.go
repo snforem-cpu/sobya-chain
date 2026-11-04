@@ -142,10 +142,20 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	if err := cdc.UnmarshalJSON(appState[evmtypes.ModuleName], &gotEVM); err != nil {
 		t.Fatalf("unmarshal normalized EVM genesis: %v", err)
 	}
-	if len(gotEVM.Params.ActiveStaticPrecompiles) != len(evmtypes.AvailableStaticPrecompiles) {
-		t.Fatalf("active EVM precompile count = %d, want %d", len(gotEVM.Params.ActiveStaticPrecompiles), len(evmtypes.AvailableStaticPrecompiles))
+	wantPrecompiles := []string{
+		evmtypes.P256PrecompileAddress,
+		evmtypes.Bech32PrecompileAddress,
+		evmtypes.StakingPrecompileAddress,
+		evmtypes.DistributionPrecompileAddress,
+		evmtypes.ICS20PrecompileAddress,
+		evmtypes.BankPrecompileAddress,
+		evmtypes.GovPrecompileAddress,
+		evmtypes.SlashingPrecompileAddress,
 	}
-	for i, want := range evmtypes.AvailableStaticPrecompiles {
+	if len(gotEVM.Params.ActiveStaticPrecompiles) != len(wantPrecompiles) {
+		t.Fatalf("active EVM precompile count = %d, want %d", len(gotEVM.Params.ActiveStaticPrecompiles), len(wantPrecompiles))
+	}
+	for i, want := range wantPrecompiles {
 		if got := gotEVM.Params.ActiveStaticPrecompiles[i]; got != want {
 			t.Fatalf("active EVM precompile[%d] = %s, want %s", i, got, want)
 		}
