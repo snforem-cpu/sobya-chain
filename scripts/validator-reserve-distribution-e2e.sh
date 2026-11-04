@@ -31,7 +31,7 @@ source = pathlib.Path(sys.argv[1])
 genesis = json.loads(source.read_text(encoding="utf-8"))
 app = genesis["app_state"]
 bank = app["bank"]
-staking = app["staking"]
+genutil = app["genutil"]
 reserve_address = "sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr"
 reserve_amount = 150_000_000 * 10**18
 
@@ -54,18 +54,24 @@ def bech32_decode(value: str) -> bytes:
         raise ValueError("invalid bech32 padding")
     return bytes(out)
 
-validators = staking.get("validators", [])
-if len(validators) < 2:
-    raise SystemExit(f"expected two genesis validators, found {len(validators)}")
-
+# multi-node stores validator creation transactions in genutil genesis;
+# staking.validators is populated when the node executes InitGenesis.
+gentxs = genutil.get("gen_txs", [])
 operator_bytes = []
-for validator in validators[:2]:
-    operator_bytes.append(bech32_decode(validator["operator_address"]))
-    commission = validator.setdefault("commission", {})
-    rates = commission.setdefault("commission_rates", {})
-    rates["rate"] = "0.100000000000000000"
-    rates["max_rate"] = "1.000000000000000000"
-    rates["max_change_rate"] = "0.100000000000000000"
+validator_messages = []
+for tx in gentxs:
+    for message in tx.get("body", {}).get("messages", []):
+        if message.get("@type") == "/cosmos.staking.v1beta1.MsgCreateValidator":
+            validator_messages.append(message)
+if len(validator_messages) < 2:
+    raise SystemExit(f"expected two validator gentxs, found {len(validator_messages)}")
+
+for message in validator_messages[:2]:
+    operator_bytes.append(bech32_decode(message["validator_address"]))
+    commission = message.setdefault("commission", {})
+    commission["rate"] = "0.100000000000000000"
+    commission["max_rate"] = "1.000000000000000000"
+    commission["max_change_rate"] = "0.100000000000000000"
 
 # Fund the dedicated reserve module account and recompute bank supply exactly.
 balances = bank.setdefault("balances", [])
