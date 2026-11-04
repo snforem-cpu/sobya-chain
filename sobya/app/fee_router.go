@@ -42,12 +42,12 @@ func (app *App) installFeeRouter() error {
 
 		feeCollector := authtypes.NewModuleAddress(authtypes.FeeCollectorName)
 		collected := app.BankKeeper.GetAllBalances(ctx, feeCollector)
-		if collected.IsZero() {
+		if len(collected) == 0 {
 			return response, nil
 		}
 
 		sharedAmount, validatorAmount := splitCollectedFeesForRouting(collected)
-		if !sharedAmount.IsZero() {
+		if len(sharedAmount) > 0 {
 			if err := app.BankKeeper.SendCoinsFromModuleToAccount(
 				ctx,
 				authtypes.FeeCollectorName,
