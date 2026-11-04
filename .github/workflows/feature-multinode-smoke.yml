@@ -370,6 +370,10 @@ jobs:
           fi
           echo "PASS: independent non-validator delegator received positive asobya staking rewards."
 
+          # Capture balances only after every pre-restart transaction has committed.
+          # The independent delegator fee-transfer above also changes TO_ADDR.
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
 
           # Restart both validators using the same persistent homes. The
           # restarted nodes must recover committed state, reconnect over P2P,
