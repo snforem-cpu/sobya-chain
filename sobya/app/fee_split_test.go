@@ -57,3 +57,22 @@ func assertFeeConservation(t *testing.T, fees, treasury, validators, community s
 		t.Fatalf("fee split does not conserve funds: input=%s output=%s", fees, total)
 	}
 }
+
+func TestSplitCollectedFeesForRouting(t *testing.T) {
+	fees := sdk.NewCoins(
+		sdk.NewCoin(BaseDenom, sdkmath.NewInt(100)),
+		sdk.NewCoin("uatom", sdkmath.NewInt(7)),
+	)
+
+	sharedWallet, validators := splitCollectedFeesForRouting(fees)
+
+	assertFeeAmount(t, sharedWallet, BaseDenom, 70)
+	assertFeeAmount(t, validators, BaseDenom, 30)
+	// For 7 units, treasury receives the 4-unit remainder and community
+	// receives 1; both go to the shared wallet, while validators retain 2.
+	assertFeeAmount(t, sharedWallet, "uatom", 5)
+	assertFeeAmount(t, validators, "uatom", 2)
+	if !sharedWallet.Add(validators...).IsEqual(fees) {
+		t.Fatalf("routed fee amounts do not conserve collected fees: shared=%s validators=%s input=%s", sharedWallet, validators, fees)
+	}
+}
