@@ -79,13 +79,15 @@ These are historical successes on the stated commit, not fresh test results for 
 
 ## Remaining phase-one verification
 
-- **Static precompiles:** fresh genesis now enables the eight static precompile implementations actually registered by Cosmos EVM v0.6.0 when no explicit selection is supplied, while preserving an operator-provided selection. Unit tests and a bank-precompile/native-balance RPC assertion have been added; they still require a successful CI run on the current code.
+- **Static precompiles:** fresh genesis now requires an EVM module genesis section (fails closed if absent) and enables the eight static precompile implementations actually registered by Cosmos EVM v0.6.0 when no explicit selection is supplied, while preserving an operator-provided selection. Unit tests cover defaults, explicit selection, and missing EVM genesis. The EVM smoke test also calls the bank precompile to verify native SOBYA balance mapping, and checks transaction receipts and contract event logs. These new checks are not yet verified by a completed runner execution.
 - **IBC/ERC-20 bridge:** the v1 ERC-20 transfer middleware, v2 ERC-20 middleware, and EVM IBC callback middleware are wired in the application. End-to-end packet tests are still needed for token conversion in both directions and callback success/failure behavior across two chains.
 - **Native supply:** genesis and end-block cap checks exist. A runtime test must still exercise the 1-billion-SOBY cap through EVM value transfers and the bank/EVM mint-burn reconciliation path.
 - **Validator reserve:** the earlier two-validator E2E test used validator self-delegations. Separate third-party delegator rewards, slashing/jailing/unbonding/rejoin, and process restart/restore still need integration coverage.
 - **Genesis/token control:** production allocation totals, reserve funding, wallet ownership/control, and address conversions must be validated against the final agreed genesis before launch.
 
-The latest precompile and smoke-test changes are not considered verified until the corresponding current-head GitHub Actions jobs execute successfully.
+Current-head CI attempt on `439239a764c0f54a7478763b6e7189e5cd670f22` (4 Nov 2026): feature validation run `41885940750`, EVM smoke `41885940789`, fee routing `41885940791`, and reserve audit `41885940757` all failed before any job step was reported. GitHub returned empty step lists and no downloadable job logs; rerunning the failed jobs (attempt 2) produced the same pre-step failures. This is an Actions runner/execution availability problem, not evidence that the Go or EVM tests themselves passed or failed. A successful current-head execution is still required.
+
+The latest source commit after those runs is newer than the tested commit, so no current-head CI success is claimed.
 
 ## Launch and operational policy
 
