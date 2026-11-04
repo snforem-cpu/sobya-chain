@@ -253,7 +253,8 @@ jobs:
           const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
           assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
           assert((await provider.getBalance(wallet.address)) > parseEther("1"), "EVM test account not funded");
-          const signed = await wallet.sendTransaction({ to: wallet.address, value: parseEther("0.01"), gasLimit: 21000n });
+          const nativeRecipient = "0x000000000000000000000000000000000000dEaD";
+          const signed = await wallet.sendTransaction({ to: nativeRecipient, value: parseEther("0.01"), gasLimit: 21000n });
           const signedReceipt = await signed.wait(1);
           assert.equal(signedReceipt.status, 1, "signed EVM transfer failed");
           const rpcReceipt = await provider.send("eth_getTransactionReceipt", [signed.hash]);
@@ -262,16 +263,16 @@ jobs:
           console.log("PASS signed EVM transaction and eth_getTransactionReceipt:", signed.hash);
 
           // The fresh-chain genesis must enable the bank precompile, not merely
-          // register its implementation in the EVM keeper.
+          // register its implementation in the EVM keeper. Verify a real native
+          // value transfer is reflected by the Cosmos bank balance bridge.
           const bankPrecompile = new Contract(
             "0x0000000000000000000000000000000000000804",
             ["function balances(address account) view returns (tuple(address contractAddress,uint256 amount)[] balances)"],
             provider
           );
-          const nativeBalances = await bankPrecompile.balances(wallet.address);
-          assert(nativeBalances.length > 0, "bank precompile returned no native SOBYA balances");
-          assert(nativeBalances.some(entry => entry.amount > 0n), "bank precompile did not expose the funded native balance");
-          console.log("PASS active bank static precompile and native SOBYA balance mapping");
+          const recipientBalances = await bankPrecompile.balances(nativeRecipient);
+          assert(recipientBalances.some(entry => entry.amount === parseEther("0.01")), "bank precompile did not expose the transferred native SOBYA balance");
+          console.log("PASS active bank static precompile and native SOBYA value-transfer mapping");
 
           const source = "pragma solidity ^0.8.20; contract StorageBox { uint256 public value; event ValueChanged(uint256 value); function set(uint256 x) external { value=x; emit ValueChanged(x); } } contract TestToken { string public name='SOBYA Test Token'; string public symbol='tSOBY'; uint8 public decimals=18; uint256 public totalSupply; mapping(address=>uint256) public balanceOf; event Transfer(address indexed from,address indexed to,uint256 value); constructor(uint256 n){totalSupply=n;balanceOf[msg.sender]=n;emit Transfer(address(0),msg.sender,n);} function transfer(address to,uint256 n) external returns(bool){require(to!=address(0)&&balanceOf[msg.sender]>=n,'balance');balanceOf[msg.sender]-=n;balanceOf[to]+=n;emit Transfer(msg.sender,to,n);return true;} }";
           const input = { language:"Solidity", sources:{"Test.sol":{content:source}}, settings:{optimizer:{enabled:true,runs:200},outputSelection:{"*":{"*":["abi","evm.bytecode.object"]}}} };
