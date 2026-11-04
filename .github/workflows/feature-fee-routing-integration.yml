@@ -216,6 +216,15 @@ jobs:
           echo "$COMMUNITY_POOL_JSON" > "$RUNNER_TEMP/community-pool.json"
           VALIDATOR_JSON="$(./sobyad query staking validator "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
           echo "$VALIDATOR_JSON" > "$RUNNER_TEMP/validator.json"
+          FEE_COLLECTOR_JSON="$(./sobyad query auth module-account fee_collector --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
+          echo "$FEE_COLLECTOR_JSON" > "$RUNNER_TEMP/fee-collector-account.json"
+          FEE_COLLECTOR_ADDRESS="$(echo "$FEE_COLLECTOR_JSON" | jq -r '.account.value.address // .account.base_account.address // empty')"
+          if [ -n "$FEE_COLLECTOR_ADDRESS" ]; then
+            ./sobyad query bank balances "$FEE_COLLECTOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/fee-collector-balances.json"
+          fi
+          ./sobyad query distribution rewards "$VALIDATOR_ADDRESS" "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/delegator-rewards.json"
+          ./sobyad query distribution commission "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-commission.json"
+          curl -fsS "http://127.0.0.1:26657/block_results?height=$((TX_HEIGHT + 1))" > "$RUNNER_TEMP/routed-block-results.json"
           echo "Cosmos fee-routing snapshot: tx=$COSMOS_HASH height=$TX_HEIGHT wallet_before=$WALLET_BEFORE wallet_after=$WALLET_AFTER rewards_before=$REWARDS_BEFORE rewards_after=$REWARDS_AFTER"
           echo "Validator staking state: $(echo "$VALIDATOR_JSON" | jq -c '{operator_address,status,tokens,jailed}')"
           echo "Distribution community pool: $(echo "$COMMUNITY_POOL_JSON" | jq -c .)"
@@ -288,5 +297,10 @@ jobs:
             ${{ runner.temp }}/staking-validators.json
             ${{ runner.temp }}/community-pool.json
             ${{ runner.temp }}/validator.json
+            ${{ runner.temp }}/fee-collector-account.json
+            ${{ runner.temp }}/fee-collector-balances.json
+            ${{ runner.temp }}/delegator-rewards.json
+            ${{ runner.temp }}/validator-commission.json
+            ${{ runner.temp }}/routed-block-results.json
           if-no-files-found: ignore
           retention-days: 14
