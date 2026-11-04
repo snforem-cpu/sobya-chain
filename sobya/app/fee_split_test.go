@@ -53,7 +53,7 @@ func assertFeeAmount(t *testing.T, coins sdk.Coins, denom string, expected int64
 func assertFeeConservation(t *testing.T, fees, treasury, validators, community sdk.Coins) {
 	t.Helper()
 	total := treasury.Add(validators...).Add(community...)
-	if !total.IsEqual(fees) {
+	if total.String() != fees.String() {
 		t.Fatalf("fee split does not conserve funds: input=%s output=%s", fees, total)
 	}
 }
