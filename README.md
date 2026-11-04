@@ -2,43 +2,44 @@
 
 # SOBYA Chain
 
-## Native token (development parameters)
+SOBYA is an in-development Cosmos SDK and CometBFT blockchain project with a partially integrated Cosmos EVM execution environment. The repository is private and development work is being carried out on `feature/tokenomics-fee-split`.
 
-- Display symbol: `SOBY`.
-- Base denomination: `asobya`.
-- Precision: 18 decimal places.
-- Maximum native supply: 1,000,000,000 SOBY, enforced using arbitrary-precision integers.
-- Official logo: `assets/logo/sobya-coin-128.png`.
+## Native token
 
-The 18-decimal denomination is prepared for EVM compatibility. Cosmos EVM is not yet integrated into the SOBYA application; see [the integration plan](docs/COSMOS_EVM_INTEGRATION.md) and [token rules](sobya/TOKENOMICS.md).
+- Display symbol: `SOBY`
+- Base denomination: `asobya`
+- Precision: 18 decimal places (`1 SOBY = 10^18 asobya`)
+- Intended maximum native supply: 1,000,000,000 SOBY
+- Automatic mint inflation is disabled in the current genesis normalization.
 
+See [tokenomics and launch rules](sobya/TOKENOMICS.md).
 
-Independent blockchain project for SOBYA (SOBY).
+## Verified development capabilities
 
-## Development status
+The current development branch contains:
+- Native Cosmos SDK transaction processing and 18-decimal denomination configuration.
+- Runtime transaction-fee routing: 70% combined to the configured shared management wallet and 30% left for the standard validator/delegator distribution path.
+- A local integration workflow that has exercised actual Cosmos and EVM fee-paying transactions and checked fee accounting.
+- EVM JSON-RPC, signed-transaction, and Solidity contract test workflows.
+- A two-validator localnet smoke-test workflow.
 
-This repository is being prepared on the `maintenance/verify-build` branch. The
-Ignite scaffold workflow creates a **starter Cosmos SDK application** with the
-`sobya` address prefix. A successful scaffold build is only a source-generation
-and compilation check; it does not mean that a public SOBYA network is running.
+These are development/CI checks. They do not establish a public network, independently operated validators, production genesis, or mainnet readiness. Check the workflow runs and the exact commit SHA before treating any test as current.
 
-The starter application is not yet the final SOBYA protocol. Do not use it for
-real funds, announce a public mainnet, or treat its default genesis and validator
-configuration as production settings.
+## Current launch blockers
 
-## Current next steps
+Before a public testnet can be announced, SOBYA still needs:
+1. A finalized testnet chain ID, EVM chain ID, genesis, validator onboarding and allocation procedure.
+2. A reviewed implementation for the 150 million SOBY validator reserve, including release schedule, eligibility, voting-power allocation, and unclaimed/slashed reward handling.
+3. Multi-validator fee/reward tests and tests of fixed-supply invariants across all issuance paths.
+4. A tested operator package, reproducible binaries, genesis checksum, peer discovery, public RPC policy, faucet, monitoring, backups, and recovery procedures.
+5. At least two independently operated hosts completing public P2P consensus and cross-node transactions.
+6. Security review and a coordinated testnet rehearsal.
 
-1. Generate and compile the starter source.
-2. Implement and review SOBYA's actual token, fee, validator, and network rules.
-3. Define and independently verify the genesis configuration.
-4. Test multiple independent nodes, peer discovery, consensus, and transfers.
-5. Publish reproducible node binaries and participant setup instructions.
+The current EVM chain ID `777777` is a development/CI value, not an approved public network identifier.
 
 ## Repository safety
 
-- Development changes belong on `maintenance/verify-build` until explicitly
-  approved for integration.
-- Never commit private validator keys, node keys, wallet seed phrases, or other
-  secrets.
-- GitHub Actions runners are temporary build machines, not permanent blockchain
-  validators or network hosting.
+- Do not use this development chain for real funds.
+- Never commit private validator keys, node keys, mnemonics, or wallet secrets.
+- GitHub Actions runners are temporary CI machines, not persistent blockchain infrastructure.
+- No mainnet launch, token sale, or exchange-listing claim is authorized by the current development status.
