@@ -205,11 +205,15 @@ jobs:
 
           ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
           ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
-          FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
+          # The independent delegator was added after node initialization; never
+          # assume it is ordered after the validator key in keys list output.
+          FROM_KEY="$(jq -ce '[.[] | select(.name != "independent-delegator")][0]' "$RUNNER_TEMP/keys0.json")"
+          TO_KEY="$(jq -ce '.[0]' "$RUNNER_TEMP/keys1.json")"
+          FROM_NAME="$(jq -r '.name' <<<"$FROM_KEY")"
           DELEGATOR_NAME="independent-delegator"
           DELEGATOR_ADDR="$(jq -r '.address' "$RUNNER_TEMP/independent-delegator.json")"
-          FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
-          TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
+          FROM_ADDR="$(jq -r '.address' <<<"$FROM_KEY")"
+          TO_ADDR="$(jq -r '.address' <<<"$TO_KEY")"
           VAL0="$(./sobyad keys show "$FROM_NAME" --bech val --keyring-backend test --home "$NET/validator0" -a)"
           test -n "$VAL0"
           test "$DELEGATOR_ADDR" != "$FROM_ADDR"
