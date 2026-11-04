@@ -272,7 +272,7 @@ func initTestnetFiles(
 			valPubKeys[i],
 			valTokens,
 			stakingtypes.NewDescription(nodeDirName, "", "", "", ""),
-			stakingtypes.NewCommissionRates(math.LegacyOneDec(), math.LegacyOneDec(), math.LegacyOneDec()),
+			stakingtypes.NewCommissionRates(math.LegacyNewDecWithPrec(10, 2), math.LegacyOneDec(), math.LegacyNewDecWithPrec(10, 2)),
 			math.OneInt(),
 		)
 		if err != nil {
