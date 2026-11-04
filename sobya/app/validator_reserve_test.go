@@ -90,6 +90,10 @@ func TestValidatorReserveMonthlyAnniversaryClampsEndOfMonth(t *testing.T) {
 		{time.Date(2026, time.February, 28, 12, 0, 0, 0, time.UTC), 1},
 		{time.Date(2026, time.March, 30, 12, 0, 0, 0, time.UTC), 1},
 		{time.Date(2026, time.March, 31, 12, 0, 0, 0, time.UTC), 2},
+		{time.Date(2030, time.January, 30, 12, 0, 0, 0, time.UTC), 47},
+		{time.Date(2030, time.January, 31, 12, 0, 0, 0, time.UTC), 48},
+		{time.Date(2030, time.February, 27, 12, 0, 0, 0, time.UTC), 48},
+		{time.Date(2030, time.February, 28, 12, 0, 0, 0, time.UTC), 49},
 	}
 	for _, tt := range tests {
 		if got := validatorReservePeriodIndex(start, tt.at); got != tt.want {
@@ -122,6 +126,8 @@ func TestValidatorReserveAccruedBudgetCarriesUnpaidTranches(t *testing.T) {
 		{name: "one unpaid period rolls into second", period: 1, totalPaid: big.NewInt(0), want: twoTranches},
 		{name: "fully paid first period leaves one tranche", period: 1, totalPaid: tranche, want: tranche},
 		{name: "all 48 periods remain available", period: 47, totalPaid: big.NewInt(0), want: new(big.Int).Set(validatorReserveMaximum)},
+		{name: "post-schedule catch-up keeps all unpaid tranches available", period: 48, totalPaid: big.NewInt(0), want: new(big.Int).Set(validatorReserveMaximum)},
+		{name: "post-schedule catch-up subtracts prior payments", period: 49, totalPaid: new(big.Int).Mul(new(big.Int).Set(validatorReserveMonthlyTranche), big.NewInt(10)), want: new(big.Int).Sub(new(big.Int).Set(validatorReserveMaximum), new(big.Int).Mul(new(big.Int).Set(validatorReserveMonthlyTranche), big.NewInt(10)))},
 		{name: "lifetime cap already paid", period: 47, totalPaid: new(big.Int).Set(validatorReserveMaximum), want: big.NewInt(0)},
 		{name: "negative period", period: -1, totalPaid: big.NewInt(0), want: big.NewInt(0)},
 	}
