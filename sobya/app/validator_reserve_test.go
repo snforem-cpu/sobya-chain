@@ -12,6 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	dbm "github.com/cosmos/cosmos-db"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 func TestValidatorReserveEligibilityThreshold(t *testing.T) {
@@ -194,4 +195,11 @@ func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
 
 	_ = baseA
 	_ = baseB
+}
+
+func TestValidatorReserveModuleAccountAddress(t *testing.T) {
+	const expected = "sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr"
+	if got := authtypes.NewModuleAddress(validatorReserveModuleName).String(); got != expected {
+		t.Fatalf("validator reserve module account address=%s, want %s", got, expected)
+	}
 }

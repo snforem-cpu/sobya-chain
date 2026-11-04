@@ -93,7 +93,21 @@ The feature branch adds a dedicated persistent multistore key (sobya_validator_r
 
 The monthly share denominator includes the accumulated voting power of all validators expected during that period. Eligibility is applied independently at 95% or higher. An ineligible validator's pro-rata share is not redistributed to other validators. Unused funds remain in the reserve account; each future period remains capped at 3,125,000 SOBY. The 150,000,000 SOBY lifetime cap is tracked in persistent state in addition to the actual reserve account balance.
 
-Production genesis must place 150,000,000 SOBY (150000000000000000000000000 asobya) in the validator_reserve module account as part of the already-agreed 1 billion SOBY allocation. Do not create new supply to fund it. The module account is blocked from ordinary bank sends and has no mint permission. If it is not funded, the release mechanism remains dormant rather than minting or borrowing funds.
+Production genesis must place 150,000,000 SOBY (150000000000000000000000000 asobya) in the validator_reserve module account as part of the already-agreed 1 billion SOBY allocation. Do not create new supply to fund it. The account is derived by the Cosmos SDK as `authtypes.NewModuleAddress("validator_reserve")`; with SOBYA's `sobya` prefix its address is `sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr`. Add its 150,000,000 SOBY balance to the `bank.balances` section of the production genesis, not as a user-controlled auth account:
+
+```json
+{
+  "address": "sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr",
+  "coins": [
+    {
+      "denom": "asobya",
+      "amount": "150000000000000000000000000"
+    }
+  ]
+}
+```
+
+This balance must be deducted from the already-agreed validator allocation when constructing the full 1 billion SOBY genesis; it is not an additional issuance. The module account is blocked from ordinary bank sends and has no mint permission. If it is not funded, the release mechanism remains dormant rather than minting or borrowing funds.
 
 Reserve payouts enter x/distribution and are allocated to each eligible validator's distribution record. The normal commission split applies, so operator commission and delegator rewards follow standard Cosmos distribution behavior. A validator that exits after earning a period's entitlement can still receive that completed period's accrued reward if its staking record remains available; a removed validator's unpaid share stays in reserve.
 
