@@ -98,6 +98,7 @@ jobs:
           # The working-source setup-go step already populated the shared
           # module cache. Avoid restoring a second overlapping cache archive
           # into the same GOMODCACHE (tar reports "File exists").
+          # Keep this disabled until both source trees use isolated caches.
           cache: false
 
       - name: Verify, test, and build archived source
