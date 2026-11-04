@@ -211,3 +211,47 @@ func TestNativeSupplyCapEndBlockInvariant(t *testing.T) {
 		t.Fatal("end-block native supply invariant must reject a negative supply")
 	}
 }
+
+
+func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T) {
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	bankGenesis := banktypes.DefaultGenesisState()
+	mintGenesis := minttypes.DefaultGenesisState()
+	distrGenesis := distrtypes.DefaultGenesisState()
+	evmGenesis := evmtypes.DefaultGenesisState()
+	evmGenesis.Params.ActiveStaticPrecompiles = []string{evmtypes.Bech32PrecompileAddress}
+
+	marshal := func(value interface{}) json.RawMessage {
+		t.Helper()
+		raw, err := cdc.MarshalJSON(value)
+		if err != nil {
+			t.Fatalf("marshal genesis state: %v", err)
+		}
+		return raw
+	}
+	raw, err := json.Marshal(map[string]json.RawMessage{
+		banktypes.ModuleName:  marshal(bankGenesis),
+		minttypes.ModuleName:  marshal(mintGenesis),
+		distrtypes.ModuleName: marshal(distrGenesis),
+		evmtypes.ModuleName:   marshal(evmGenesis),
+	})
+	if err != nil {
+		t.Fatalf("marshal application genesis: %v", err)
+	}
+
+	normalized, err := prepareGenesisState(cdc, raw)
+	if err != nil {
+		t.Fatalf("prepareGenesisState() error: %v", err)
+	}
+	appState := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(normalized, &appState); err != nil {
+		t.Fatalf("unmarshal normalized application genesis: %v", err)
+	}
+	var got evmtypes.GenesisState
+	if err := cdc.UnmarshalJSON(appState[evmtypes.ModuleName], &got); err != nil {
+		t.Fatalf("unmarshal normalized EVM genesis: %v", err)
+	}
+	if len(got.Params.ActiveStaticPrecompiles) != 1 || got.Params.ActiveStaticPrecompiles[0] != evmtypes.Bech32PrecompileAddress {
+		t.Fatalf("explicit EVM precompile selection changed: %v", got.Params.ActiveStaticPrecompiles)
+	}
+}
