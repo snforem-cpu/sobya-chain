@@ -107,3 +107,91 @@ func TestValidatorReserveScheduleMatchesLifetimeCap(t *testing.T) {
 		t.Fatalf("lifetime cap = %s, want %s asobya", validatorReserveMaximum, want)
 	}
 }
+
+func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
+	newContext := func() (*baseapp.BaseApp, sdk.Context, *storetypes.KVStoreKey) {
+		db := dbm.NewMemDB()
+		base := baseapp.NewBaseApp("validator-reserve-genesis-test", log.NewNopLogger(), db, func(tx []byte) (sdk.Tx, error) {
+			return nil, nil
+		})
+		key := storetypes.NewKVStoreKey(validatorReserveStoreKeyName)
+		base.MountKVStores(map[string]*storetypes.KVStoreKey{validatorReserveStoreKeyName: key})
+		if err := base.LoadLatestVersion(); err != nil {
+			t.Fatalf("load reserve test store: %v", err)
+		}
+		ctx := base.NewContextLegacy(true, cmtproto.Header{Height: 1})
+		return base, ctx, key
+	}
+
+	baseA, ctxA, keyA := newContext()
+	appA := &App{validatorReserveStoreKey: keyA}
+	start := time.Date(2026, time.January, 31, 12, 0, 0, 0, time.UTC)
+	meta := validatorReserveMeta{
+		StartTime:     start.Format(time.RFC3339Nano),
+		LastBlockTime: start.Add(24 * time.Hour).Format(time.RFC3339Nano),
+		LastHeight:    77,
+		TotalPaid:     "123456789",
+	}
+	storeA := ctxA.KVStore(keyA)
+	if err := saveValidatorReserveMeta(storeA, meta); err != nil {
+		t.Fatal(err)
+	}
+	operator := bytes.Repeat([]byte{0x11}, 20)
+	consensus := bytes.Repeat([]byte{0x22}, 20)
+	storeA.Set(validatorReserveConsensusKey(consensus), operator)
+	statsKey := append(validatorReservePeriodStatsPrefix(0), operator...)
+	if err := saveValidatorReserveStats(storeA, statsKey, validatorReserveStats{Expected: 100, Signed: 97, PowerSum: "987654321"}); err != nil {
+		t.Fatal(err)
+	}
+
+	exported, err := appA.exportValidatorReserveGenesisState(ctxA)
+	if err != nil {
+		t.Fatalf("export reserve state: %v", err)
+	}
+
+	baseB, ctxB, keyB := newContext()
+	appB := &App{validatorReserveStoreKey: keyB}
+	if err := appB.initValidatorReserveGenesis(ctxB, exported); err != nil {
+		t.Fatalf("restore reserve state: %v", err)
+	}
+	storeB := ctxB.KVStore(keyB)
+	iterator := storeA.Iterator(nil, nil)
+	defer iterator.Close()
+	for ; iterator.Valid(); iterator.Next() {
+		if got := storeB.Get(iterator.Key()); !bytes.Equal(got, iterator.Value()) {
+			t.Fatalf("restored reserve value differs for key %X", iterator.Key())
+		}
+	}
+	if err := iterator.Error(); err != nil {
+		t.Fatalf("iterate source reserve store: %v", err)
+	}
+	iteratorB := storeB.Iterator(nil, nil)
+	defer iteratorB.Close()
+	count := 0
+	for ; iteratorB.Valid(); iteratorB.Next() {
+		count++
+	}
+	if err := iteratorB.Error(); err != nil {
+		t.Fatalf("iterate restored reserve store: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("restored reserve key count=%d, want 3", count)
+	}
+
+	if err := appA.resetValidatorReserveHeightForZeroHeightExport(ctxA); err != nil {
+		t.Fatalf("reset reserve height for zero-height export: %v", err)
+	}
+	resetMeta, err := appA.loadValidatorReserveMeta(storeA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resetMeta.LastHeight != 0 {
+		t.Fatalf("zero-height reserve last height=%d, want 0", resetMeta.LastHeight)
+	}
+	if resetMeta.LastBlockTime != meta.LastBlockTime {
+		t.Fatalf("zero-height export changed accounting timestamp: got %s, want %s", resetMeta.LastBlockTime, meta.LastBlockTime)
+	}
+
+	_ = baseA
+	_ = baseB
+}
