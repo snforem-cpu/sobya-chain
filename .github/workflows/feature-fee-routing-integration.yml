@@ -1,0 +1,245 @@
+name: SOBYA Transaction Fee Routing Integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/feature-fee-routing-integration.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-fee-routing-integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fee-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Build SOBYA node
+        working-directory: sobya
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Set up Node.js and EVM test dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install EVM test dependencies
+        run: npm install --no-save ethers@6.15.0 bech32@2.0.0
+
+      - name: Initialize validator and funded EVM account
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-fee-routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad init "SOBYA fee routing integration" --chain-id sobya-fee-routing-ci-1 --home "$SOBYA_HOME"
+          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator.json"
+          ./sobyad keys add receiver --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/receiver.json"
+          VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator.json")"
+          RECEIVER_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/receiver.json")"
+          node --input-type=module <<'JS' > "$RUNNER_TEMP/evm-account.json"
+          import { Wallet } from "ethers";
+          import { bech32 } from "bech32";
+          const wallet = Wallet.createRandom();
+          const bytes = Buffer.from(wallet.address.slice(2), "hex");
+          console.log(JSON.stringify({
+            address: bech32.encode("sobya", bech32.toWords(bytes)),
+            privateKey: wallet.privateKey
+          }));
+          JS
+          EVM_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/evm-account.json")"
+          EVM_PRIVATE_KEY="$(jq -r '.privateKey' "$RUNNER_TEMP/evm-account.json")"
+          echo "::add-mask::$EVM_PRIVATE_KEY"
+          echo "EVM_TEST_PRIVATE_KEY=$EVM_PRIVATE_KEY" >> "$GITHUB_ENV"
+          ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis add-genesis-account "$RECEIVER_ADDRESS" 1000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis add-genesis-account "$EVM_ADDRESS" 10000000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis gentx validator 1000000000000000000000asobya --chain-id sobya-fee-routing-ci-1 --keyring-backend test --home "$SOBYA_HOME"
+          ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
+          python3 - "$SOBYA_HOME/config/app.toml" <<'PY'
+          import pathlib, re, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          pattern = r'(?ms)^\\[json-rpc\\]\\n.*?(?=^\\[|\\Z)'
+          match = re.search(pattern, text)
+          if not match:
+              raise SystemExit("Missing [json-rpc] section")
+          section = match.group(0)
+          section = re.sub(r'(?m)^enable\\s*=.*$', 'enable = true', section)
+          section = re.sub(r'(?m)^address\\s*=.*$', 'address = "127.0.0.1:8545"', section)
+          text = text[:match.start()] + section + text[match.end():]
+          text = re.sub(r'(?m)^minimum-gas-prices\\s*=.*$', 'minimum-gas-prices = "0asobya"', text, count=1)
+          path.write_text(text)
+          PY
+          sed -i 's#^node[[:space:]]*=.*#node = "tcp://127.0.0.1:26657"#' "$SOBYA_HOME/config/client.toml"
+          echo "VALIDATOR_ADDRESS=$VALIDATOR_ADDRESS" >> "$GITHUB_ENV"
+          echo "EVM_ADDRESS=$(jq -r '.address' "$RUNNER_TEMP/evm-account.json" | sed 's/^sobya1/0x/')" >> "$GITHUB_ENV"
+          echo "EVM_ACCOUNT_BECH32=$EVM_ADDRESS" >> "$GITHUB_ENV"
+
+      - name: Start chain and run real Cosmos and EVM fee transactions
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-fee-routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad start --chain-id sobya-fee-routing-ci-1 --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-fee-routing.log" 2>&1 &
+          NODE_PID=$!
+          cleanup() {
+            kill "$NODE_PID" 2>/dev/null || true
+            wait "$NODE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          wait_height() {
+            local target="$1" height=0
+            for attempt in $(seq 1 90); do
+              height="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height // "0"')"
+              if [ "$height" -ge "$target" ]; then echo "$height"; return 0; fi
+              if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-fee-routing.log"; return 1; fi
+              sleep 2
+            done
+            echo "Timed out waiting for height $target (last=$height)" >&2
+            cat "$RUNNER_TEMP/sobya-fee-routing.log"
+            return 1
+          }
+
+          wait_height 2 >/dev/null
+          SHARED_WALLET="0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f"
+          VALIDATOR_OPERATOR="$(./sobyad keys show validator --bech val -a --keyring-backend test --home "$SOBYA_HOME")"
+          echo "Validator operator: $VALIDATOR_OPERATOR"
+
+          bank_balance() {
+            ./sobyad query bank balances "$SHARED_WALLET" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json |
+              python3 -c 'import json,sys; d=json.load(sys.stdin); print(sum(int(c["amount"]) for c in d.get("balances",[]) if c.get("denom")=="asobya"))'
+          }
+          validator_outstanding() {
+            ./sobyad query distribution validator-outstanding-rewards "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json |
+              python3 -c 'import json,sys; from decimal import Decimal; d=json.load(sys.stdin); found=[]; walk=lambda x: (found.append(Decimal(x["amount"])) if isinstance(x,dict) and x.get("denom")=="asobya" and "amount" in x else None, [walk(v) for v in x.values()] if isinstance(x,dict) else [walk(v) for v in x] if isinstance(x,list) else None); walk(d); print(sum(found,Decimal(0)))'
+          }
+          assert_deltas() {
+            local label="$1" before_wallet="$2" before_rewards="$3" fee="$4" after_wallet after_rewards expected_validator expected_shared wallet_delta rewards_delta
+            after_wallet="$(bank_balance)"
+            after_rewards="$(validator_outstanding)"
+            expected_validator=$((fee * 30 / 100))
+            expected_shared=$((fee - expected_validator))
+            wallet_delta=$((after_wallet - before_wallet))
+            rewards_delta="$(python3 - "$after_rewards" "$before_rewards" <<'PY'
+          import sys
+          from decimal import Decimal
+          print(Decimal(sys.argv[1])-Decimal(sys.argv[2]))
+          PY
+          )"
+            python3 - "$label" "$wallet_delta" "$rewards_delta" "$expected_shared" "$expected_validator" <<'PY'
+          import sys
+          from decimal import Decimal
+          label, wd, rd, es, ev = sys.argv[1:]
+          wd, rd, es, ev = int(wd), Decimal(rd), int(es), Decimal(ev)
+          assert wd == es, f"{label}: shared-wallet delta {wd}, expected {es}"
+          assert rd == ev, f"{label}: validator outstanding-rewards delta {rd}, expected {ev}"
+          print(f"PASS {label}: shared wallet +{wd} asobya; validator rewards +{rd} asobya")
+          PY
+            echo "$after_wallet"
+            echo "$after_rewards"
+          }
+
+          # Cosmos SDK transaction: fixed, explicit fee for exact accounting.
+          WALLET_BEFORE="$(bank_balance)"
+          REWARDS_BEFORE="$(validator_outstanding)"
+          HEIGHT_BEFORE="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          COSMOS_RESULT="$(./sobyad tx bank send validator receiver 1asobya --chain-id sobya-fee-routing-ci-1 --fees 1000000000000000asobya --gas 200000 --keyring-backend test --home "$SOBYA_HOME" --node tcp://127.0.0.1:26657 --broadcast-mode block --yes --output json)"
+          echo "$COSMOS_RESULT" > "$RUNNER_TEMP/cosmos-tx.json"
+          COSMOS_CODE="$(echo "$COSMOS_RESULT" | jq -r '.code // .tx_response.code // 0')"
+          test "$COSMOS_CODE" = "0"
+          wait_height "$((HEIGHT_BEFORE + 2))" >/dev/null
+          read -r WALLET_AFTER REWARDS_AFTER < <(printf '%s %s' "$(bank_balance)" "$(validator_outstanding)")
+          python3 - "$WALLET_BEFORE" "$WALLET_AFTER" "$REWARDS_BEFORE" "$REWARDS_AFTER" <<'PY'
+          import sys
+          from decimal import Decimal
+          wb, wa, rb, ra = int(sys.argv[1]), int(sys.argv[2]), Decimal(sys.argv[3]), Decimal(sys.argv[4])
+          fee = 1_000_000_000_000_000
+          expected_validator = fee * 30 // 100
+          expected_shared = fee - expected_validator
+          assert wa-wb == expected_shared, (wa-wb, expected_shared)
+          assert ra-rb == expected_validator, (ra-rb, expected_validator)
+          print(f"PASS Cosmos fee: {fee}; shared wallet +{wa-wb}; validator rewards +{ra-rb}")
+          PY
+
+          # EVM transaction: derive the exact fee from the committed receipt.
+          WALLET_BEFORE="$(bank_balance)"
+          REWARDS_BEFORE="$(validator_outstanding)"
+          EVM_RESULT="$(node --input-type=module <<'JS'
+          import { JsonRpcProvider, Wallet } from "ethers";
+          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
+          const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
+          const tx = await wallet.sendTransaction({ to: wallet.address, value: 0n, gasLimit: 21000n });
+          const receipt = await tx.wait(1);
+          if (!receipt || receipt.status !== 1) throw new Error("EVM transaction failed");
+          const fee = receipt.gasUsed * receipt.gasPrice;
+          console.log(JSON.stringify({ hash: tx.hash, blockNumber: receipt.blockNumber, fee: fee.toString() }));
+          await provider.destroy();
+          JS
+          )"
+          echo "$EVM_RESULT" | tee "$RUNNER_TEMP/evm-tx.json"
+          EVM_BLOCK="$(echo "$EVM_RESULT" | jq -r '.blockNumber')"
+          EVM_FEE="$(echo "$EVM_RESULT" | jq -r '.fee')"
+          wait_height "$((EVM_BLOCK + 1))" >/dev/null
+          WALLET_AFTER="$(bank_balance)"
+          REWARDS_AFTER="$(validator_outstanding)"
+          python3 - "$WALLET_BEFORE" "$WALLET_AFTER" "$REWARDS_BEFORE" "$REWARDS_AFTER" "$EVM_FEE" <<'PY'
+          import sys
+          from decimal import Decimal
+          wb, wa = int(sys.argv[1]), int(sys.argv[2])
+          rb, ra = Decimal(sys.argv[3]), Decimal(sys.argv[4])
+          fee = int(sys.argv[5])
+          expected_validator = fee * 30 // 100
+          expected_shared = fee - expected_validator
+          assert wa-wb == expected_shared, (wa-wb, expected_shared, fee)
+          assert ra-rb == expected_validator, (ra-rb, expected_validator, fee)
+          print(f"PASS EVM fee: {fee}; shared wallet +{wa-wb}; validator rewards +{ra-rb}")
+          PY
+
+          # No new transactions: a further block must not route the same fees again.
+          WALLET_STABLE="$(bank_balance)"
+          REWARDS_STABLE="$(validator_outstanding)"
+          CURRENT_HEIGHT="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          wait_height "$((CURRENT_HEIGHT + 2))" >/dev/null
+          test "$(bank_balance)" = "$WALLET_STABLE"
+          test "$(validator_outstanding)" = "$REWARDS_STABLE"
+          echo "PASS no duplicate routing across two empty blocks."
+          echo "PASS Cosmos + EVM transaction fee-routing integration."
+
+      - name: Upload integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-fee-routing-integration
+          path: |
+            ${{ runner.temp }}/sobya-fee-routing.log
+            ${{ runner.temp }}/cosmos-tx.json
+            ${{ runner.temp }}/evm-tx.json
+          if-no-files-found: ignore
+          retention-days: 14
