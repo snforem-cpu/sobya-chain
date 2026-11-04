@@ -112,3 +112,16 @@ This balance must be deducted from the already-agreed validator allocation when 
 Reserve payouts enter x/distribution and are allocated to each eligible validator's distribution record. The normal commission split applies, so operator commission and delegator rewards follow standard Cosmos distribution behavior. A validator that exits after earning a period's entitlement can still receive that completed period's accrued reward if its staking record remains available; a removed validator's unpaid share stays in reserve.
 
 This code is on the feature branch and still requires successful repository CI and integration verification before it is considered Testnet-ready. It does not itself constitute a production genesis ceremony or public network launch.
+
+## Verification snapshot — 2026-11-04
+
+The reserve-distribution end-to-end workflow passed on commit `ec8206d151b3877dbced9c6df7362ffe8259f350` (GitHub Actions run `41819524001`). Its two-validator local network verified that:
+
+- both CometBFT RPC endpoints became ready and both validators committed blocks;
+- the matured reserve release created positive validator commission and self-delegator rewards for both validators;
+- all four signed commission/delegator withdrawal transactions were included in committed blocks with successful DeliverTx results; and
+- the reserve-release event occurred once, with no duplicate release in the following block.
+
+**Scope limitation:** this test uses validator self-delegations. It does not yet prove reward accrual and withdrawal for a separate third-party delegator, nor slashing/jailing/unbonding/rejoin behavior, restart/restore across a real process restart, or operation across independently hosted public nodes. The successful CI network is temporary and is not a public testnet.
+
+The public testnet remains blocked on a finalized testnet EVM chain ID, production/testnet genesis ceremony and address/allocation validation, independently operated persistent hosts and peer discovery, externally reachable hardened RPC endpoints, operator onboarding, monitoring/backups, and a security review. The development EVM chain ID `777777` must not be treated as the public testnet ID.
