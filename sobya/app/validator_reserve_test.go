@@ -177,6 +177,13 @@ func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Unpaid reserve funds must remain recoverable in catch-up periods after
+	// the original 48-month schedule has elapsed.
+	catchUpStatsKey := append(validatorReservePeriodStatsPrefix(48), operator...)
+	if err := saveValidatorReserveStats(storeA, catchUpStatsKey, validatorReserveStats{Expected: 100, Signed: 96, PowerSum: "123456789"}); err != nil {
+		t.Fatal(err)
+	}
+
 	exported, err := appA.exportValidatorReserveGenesisState(ctxA)
 	if err != nil {
 		t.Fatalf("export reserve state: %v", err)
@@ -201,8 +208,8 @@ func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
 	for ; iteratorB.Valid(); iteratorB.Next() {
 		count++
 	}
-	if count != 3 {
-		t.Fatalf("restored reserve key count=%d, want 3", count)
+	if count != 4 {
+		t.Fatalf("restored reserve key count=%d, want 4 including post-schedule catch-up stats", count)
 	}
 
 	if err := appA.resetValidatorReserveHeightForZeroHeightExport(ctxA); err != nil {
