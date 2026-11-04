@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sobya-validator-reserve-distribution-e2e-${{ github.ref }}
+  group: sobya-validator-reserve-distribution-e2e-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
