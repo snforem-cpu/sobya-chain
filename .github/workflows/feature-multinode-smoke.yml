@@ -88,7 +88,7 @@ jobs:
               for coin in balance.get("coins", []):
                   supply[coin["denom"]] = supply.get(coin["denom"], 0) + int(coin["amount"])
           bank["supply"] = [{"denom": denom, "amount": str(supply[denom])} for denom in sorted(supply)]
-          path.write_text(json.dumps(genesis, indent=2) + "\\n")
+          path.write_text(json.dumps(genesis, indent=2) + "\n")
           PY
           cp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
           cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
