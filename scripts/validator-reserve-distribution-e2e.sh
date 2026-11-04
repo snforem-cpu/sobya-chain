@@ -212,8 +212,8 @@ for val in "$VAL0" "$VAL1"; do
   "$BIN" query distribution commission "$val" --node "$RPC0" --home "$NET/validator0" --output json > "$NET/commission-$val.json"
   query_positive_asobya "$NET/commission-$val.json"
 done
-"$BIN" query distribution rewards "$ADDR0" "$VAL0" --node "$RPC0" --home "$NET/validator0" --output json > "$NET/delegator-rewards-0.json"
-"$BIN" query distribution rewards "$ADDR1" "$VAL1" --node "$RPC0" --home "$NET/validator1" --output json > "$NET/delegator-rewards-1.json"
+"$BIN" query distribution rewards "$ADDR0" --node "$RPC0" --home "$NET/validator0" --output json > "$NET/delegator-rewards-0.json"
+"$BIN" query distribution rewards "$ADDR1" --node "$RPC0" --home "$NET/validator1" --output json > "$NET/delegator-rewards-1.json"
 query_positive_asobya "$NET/delegator-rewards-0.json"
 query_positive_asobya "$NET/delegator-rewards-1.json"
 echo "PASS: reserve payout created real validator commission and self-delegator rewards for both validators."
