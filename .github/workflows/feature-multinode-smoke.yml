@@ -377,9 +377,9 @@ jobs:
           done
           test "$READY_UNJAIL" -eq 1
 
-          ./sobyad tx slashing unjail --from "$KEY1" --chain-id sobya-feature-multinode-1 \\
-            --node tcp://127.0.0.1:26657 --home "$NET/validator1" \\
-            --keyring-backend test --fees 1000000000000000asobya --gas 300000 \\
+          ./sobyad tx slashing unjail --from "$KEY1" --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 --home "$NET/validator1" \
+            --keyring-backend test --fees 1000000000000000asobya --gas 300000 \
             --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/unjail-tx.json"
           test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/unjail-tx.json")" = "0"
 
