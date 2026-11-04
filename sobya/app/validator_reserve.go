@@ -279,9 +279,10 @@ func (app *App) validatorReserveBalance(ctx sdk.Context) *big.Int {
 	return app.BankKeeper.GetAllBalances(ctx, address).AmountOf(BaseDenom).BigInt()
 }
 
-// Each completed period can release at most one monthly tranche. Rewards are
-// sent into x/distribution before BeginBlocker, then split by validator
-// commission and delegator stake using the standard Cosmos distribution code.
+// A completed period can release all scheduled-but-unpaid tranches accrued
+// through that period, bounded by the lifetime cap and reserve balance.
+// Rewards enter x/distribution before BeginBlocker, then follow standard
+// validator commission and delegator reward accounting.
 func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KVStore, period int, meta *validatorReserveMeta) error {
 	prefix := validatorReservePeriodStatsPrefix(period)
 	iterator := storetypes.KVStorePrefixIterator(store, prefix)
