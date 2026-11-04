@@ -262,6 +262,11 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 		if stats.PowerSum == "" {
 			stats.PowerSum = "0"
 		}
+		power, ok := new(big.Int).SetString(stats.PowerSum, 10)
+		if !ok || power.Sign() <= 0 || stats.Expected == 0 || stats.Signed > stats.Expected {
+			_ = iterator.Close()
+			return fmt.Errorf("invalid validator reserve statistics for operator key %X", key[len(prefix):])
+		}
 		statsByOperator[string(key[len(prefix):])] = stats
 		keys = append(keys, key)
 	}
@@ -270,7 +275,7 @@ func (app *App) closeValidatorReservePeriod(ctx sdk.Context, store storetypes.KV
 	}
 
 	totalPaid, ok := new(big.Int).SetString(meta.TotalPaid, 10)
-	if !ok {
+	if !ok || totalPaid.Sign() < 0 || totalPaid.Cmp(validatorReserveMaximum) > 0 {
 		return fmt.Errorf("invalid total-paid validator reserve value %q", meta.TotalPaid)
 	}
 	remainingCap := new(big.Int).Sub(new(big.Int).Set(validatorReserveMaximum), totalPaid)

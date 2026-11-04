@@ -88,3 +88,14 @@ func TestValidatorReserveMonthlyAnniversaryClampsEndOfMonth(t *testing.T) {
 		}
 	}
 }
+
+func TestValidatorReserveScheduleMatchesLifetimeCap(t *testing.T) {
+	totalScheduled := new(big.Int).Mul(new(big.Int).Set(validatorReserveMonthlyTranche), big.NewInt(validatorReservePeriods))
+	if totalScheduled.Cmp(validatorReserveMaximum) != 0 {
+		t.Fatalf("48 monthly tranches = %s, lifetime cap = %s", totalScheduled, validatorReserveMaximum)
+	}
+	want := new(big.Int).Mul(big.NewInt(150_000_000), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+	if validatorReserveMaximum.Cmp(want) != 0 {
+		t.Fatalf("lifetime cap = %s, want %s asobya", validatorReserveMaximum, want)
+	}
+}
