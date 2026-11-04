@@ -462,6 +462,9 @@ func (app *App) initValidatorReserveGenesis(ctx sdk.Context, raw json.RawMessage
 			hasMeta = true
 		case len(key) == 1+20 && key[0] == validatorReserveConsensusIndexPrefix[0]:
 			// Consensus address -> validator operator address index.
+			if len(value) != 20 {
+				return fmt.Errorf("invalid validator operator address in reserve genesis index")
+			}
 		case len(key) == 1+8+20 && key[0] == validatorReservePeriodPrefix[0]:
 			period := binary.BigEndian.Uint64(key[1:9])
 			if period >= validatorReservePeriods {
