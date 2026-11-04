@@ -67,11 +67,11 @@ if len(validator_messages) < 2:
     raise SystemExit(f"expected two validator gentxs, found {len(validator_messages)}")
 
 for message in validator_messages[:2]:
+    # Read the signed gentx as-is; never mutate a signed genesis transaction.
     operator_bytes.append(bech32_decode(message["validator_address"]))
-    commission = message.setdefault("commission", {})
-    commission["rate"] = "0.100000000000000000"
-    commission["max_rate"] = "1.000000000000000000"
-    commission["max_change_rate"] = "0.100000000000000000"
+    rate = message.get("commission", {}).get("rate", "0")
+    if rate != "0.100000000000000000":
+        raise SystemExit(f"multi-node default commission is {rate}, expected 10 percent")
 
 # Fund the dedicated reserve module account and recompute bank supply exactly.
 balances = bank.setdefault("balances", [])
