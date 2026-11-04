@@ -54,6 +54,23 @@ func nativeDenomMetadata() banktypes.Metadata {
 	}
 }
 
+// defaultActiveEVMStaticPrecompiles lists only the extension implementations
+// actually registered by Cosmos EVM v0.6.0's DefaultStaticPrecompiles.
+// The upstream AvailableStaticPrecompiles list also contains the legacy
+// vesting address, for which v0.6.0 does not register an implementation.
+func defaultActiveEVMStaticPrecompiles() []string {
+	return []string{
+		evmtypes.P256PrecompileAddress,
+		evmtypes.Bech32PrecompileAddress,
+		evmtypes.StakingPrecompileAddress,
+		evmtypes.DistributionPrecompileAddress,
+		evmtypes.ICS20PrecompileAddress,
+		evmtypes.BankPrecompileAddress,
+		evmtypes.GovPrecompileAddress,
+		evmtypes.SlashingPrecompileAddress,
+	}
+}
+
 // prepareGenesisState canonicalizes native token metadata, disables inflation,
 // enables the supported Cosmos EVM static precompiles by default, and rejects
 // a genesis allocation above the fixed maximum supply.
@@ -143,7 +160,7 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 	// executes only addresses enabled in evm.Params.ActiveStaticPrecompiles.
 	// The upstream module default leaves this list empty, which silently disables
 	// SOBYA's bank/staking/distribution/IBC/etc. precompiles on a fresh chain.
-	// Enable the complete v0.6.0 set when the genesis has not selected any.
+	// Enable only the precompile implementations registered by v0.6.0 when the genesis has not selected any.
 	if evmRaw, exists := appState[evmtypes.ModuleName]; exists {
 		var evmGenesis evmtypes.GenesisState
 		if err := cdc.UnmarshalJSON(evmRaw, &evmGenesis); err != nil {
@@ -152,7 +169,7 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 		if len(evmGenesis.Params.ActiveStaticPrecompiles) == 0 {
 			evmGenesis.Params.ActiveStaticPrecompiles = append(
 				[]string(nil),
-				evmtypes.AvailableStaticPrecompiles...,
+				defaultActiveEVMStaticPrecompiles()...,
 			)
 		}
 		evmBytes, err := cdc.MarshalJSON(&evmGenesis)
