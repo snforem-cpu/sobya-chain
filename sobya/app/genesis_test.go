@@ -265,3 +265,27 @@ func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T
 		t.Fatalf("explicit EVM precompile selection changed: %v", got.Params.ActiveStaticPrecompiles)
 	}
 }
+
+
+func TestPrepareGenesisStateRejectsMissingEVMGenesis(t *testing.T) {
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	marshal := func(value interface{}) json.RawMessage {
+		t.Helper()
+		raw, err := cdc.MarshalJSON(value)
+		if err != nil {
+			t.Fatalf("marshal genesis state: %v", err)
+		}
+		return raw
+	}
+	raw, err := json.Marshal(map[string]json.RawMessage{
+		banktypes.ModuleName:  marshal(banktypes.DefaultGenesisState()),
+		minttypes.ModuleName:  marshal(minttypes.DefaultGenesisState()),
+		distrtypes.ModuleName: marshal(distrtypes.DefaultGenesisState()),
+	})
+	if err != nil {
+		t.Fatalf("marshal application genesis: %v", err)
+	}
+	if _, err := prepareGenesisState(cdc, raw); err == nil {
+		t.Fatal("expected genesis without EVM module state to be rejected")
+	}
+}
