@@ -310,7 +310,7 @@ jobs:
 
           def positive(value):
               if isinstance(value, str):
-                  match = re.fullmatch(r"([0-9]+(?:\\.[0-9]+)?)([A-Za-z][A-Za-z0-9/]*)", value)
+                  match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([A-Za-z][A-Za-z0-9/]*)", value)
                   if not match or match.group(2) != "asobya":
                       return False
                   try:
