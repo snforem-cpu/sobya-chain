@@ -93,7 +93,7 @@ genesis_time = datetime.datetime.fromisoformat(genesis["genesis_time"].replace("
 start = genesis_time - datetime.timedelta(days=90)
 last = start + datetime.timedelta(days=30)
 def stamp(value):
-    return value.isoformat(timespec="nanoseconds").replace("+00:00", "Z")
+    return value.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 entries = [
     {"key": b64raw(b"\x00"), "value": b64raw(json.dumps({
