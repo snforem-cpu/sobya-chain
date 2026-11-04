@@ -156,7 +156,17 @@ jobs:
             raw="$(./sobyad query distribution validator-outstanding-rewards "$VALIDATOR_OPERATOR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json)"
             printf '%s' "$raw" > "$RUNNER_TEMP/validator-outstanding.json"
             printf '%s' "$raw" |
-              python3 -c 'import json,sys; from decimal import Decimal; d=json.load(sys.stdin); found=[]; walk=lambda x: (found.append(Decimal(x["amount"])) if isinstance(x,dict) and x.get("denom")=="asobya" and "amount" in x else None, [walk(v) for v in x.values()] if isinstance(x,dict) else [walk(v) for v in x] if isinstance(x,list) else None); walk(d); print(sum(found,Decimal(0)))'
+              python3 -c 'import json,re,sys; from decimal import Decimal; d=json.load(sys.stdin); found=[]; 
+def walk(x):
+ if isinstance(x,dict):
+  if x.get("denom")=="asobya" and "amount" in x: found.append(Decimal(str(x["amount"])))
+  for v in x.values(): walk(v)
+ elif isinstance(x,list):
+  for v in x: walk(v)
+ elif isinstance(x,str):
+  m=re.fullmatch(r"([0-9]+(?:\\.[0-9]+)?)asobya",x)
+  if m: found.append(Decimal(m.group(1)))
+walk(d); print(sum(found,Decimal(0)))'
           }
           assert_deltas() {
             local label="$1" before_wallet="$2" before_rewards="$3" fee="$4" after_wallet after_rewards expected_validator expected_shared wallet_delta rewards_delta
