@@ -72,7 +72,7 @@ func TestSplitCollectedFeesForRouting(t *testing.T) {
 	// receives 1; both go to the shared wallet, while validators retain 2.
 	assertFeeAmount(t, sharedWallet, "uatom", 5)
 	assertFeeAmount(t, validators, "uatom", 2)
-	if !sharedWallet.Add(validators...).IsEqual(fees) {
+	if sharedWallet.Add(validators...).String() != fees.String() {
 		t.Fatalf("routed fee amounts do not conserve collected fees: shared=%s validators=%s input=%s", sharedWallet, validators, fees)
 	}
 }
