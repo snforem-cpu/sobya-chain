@@ -173,9 +173,22 @@ func saveValidatorReserveStats(store storetypes.KVStore, key []byte, stats valid
 	return nil
 }
 
-// Keep historical consensus-key mappings so key rotation cannot erase votes
-// already cast by the same operator during an open accounting period.
+// Refresh the consensus-key index after the previous commit has been
+// recorded. This keeps the prior key available for one-block attribution
+// across key rotation while preventing stale mappings from growing forever.
 func (app *App) updateValidatorReserveConsensusIndex(ctx sdk.Context, store storetypes.KVStore) error {
+	iterator := storetypes.KVStorePrefixIterator(store, validatorReserveConsensusIndexPrefix)
+	keys := make([][]byte, 0)
+	for ; iterator.Valid(); iterator.Next() {
+		keys = append(keys, append([]byte{}, iterator.Key()...))
+	}
+	if err := iterator.Close(); err != nil {
+		return fmt.Errorf("close validator reserve consensus-index iterator: %w", err)
+	}
+	for _, key := range keys {
+		store.Delete(key)
+	}
+
 	validators, err := app.StakingKeeper.GetAllValidators(ctx)
 	if err != nil {
 		return fmt.Errorf("list validators for reserve accounting: %w", err)
