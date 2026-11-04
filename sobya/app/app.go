@@ -244,6 +244,13 @@ func New(
 		panic(err)
 	}
 
+	// Install deterministic fee routing before the first block is loaded.
+	// The wrapper runs the configured module pre-blockers, then moves the
+	// treasury/community shares before x/distribution consumes fee_collector.
+	if err := app.installFeeRouter(); err != nil {
+		panic(err)
+	}
+
 	/****  Module Options ****/
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
