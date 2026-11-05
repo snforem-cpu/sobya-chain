@@ -80,3 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           go test -mod=readonly ./cmd/sobyad/cmd
+          go build -mod=readonly -trimpath \
+            -ldflags "-X github.com/cosmos/cosmos-sdk/version.Name=sobya -X github.com/cosmos/cosmos-sdk/version.AppName=sobyad -X github.com/cosmos/cosmos-sdk/version.Version=ci -X github.com/cosmos/cosmos-sdk/version.Commit=${GITHUB_SHA}" \
+            -o /tmp/sobyad ./cmd/sobyad
+          /tmp/sobyad version
