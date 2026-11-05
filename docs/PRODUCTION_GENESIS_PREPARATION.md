@@ -45,6 +45,13 @@ supply ceiling.
 
 CometBFT chain ID and EVM chain ID are separate values and must not be confused.
 
+
+**Owner-provided MetaMask destinations recovered from the earlier project discussion:**
+- Founder wallet (400M SOBY): `0xd316993423Fc6268038F4EE3EA7C0C5038513C18` → SOBYA account encoding `sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq`.
+- Shared wallet for Community, Treasury, Development, Liquidity, and Emergency (450M SOBY combined): `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f` → SOBYA account encoding `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3`.
+
+The bech32 forms above are deterministic encodings of the 20-byte EVM addresses using the repository's `sobya` account prefix. The shared wallet does not merge the five tokenomics categories: the genesis allocation ledger must retain their separate amounts even though the destination address is identical. These are owner-provided public addresses; this document does not establish control of their private keys.
+
 ## Allocation ledger — addresses required
 
 All amounts below are exact base units. Blank destination fields are deliberate
@@ -52,13 +59,13 @@ blocking inputs; no placeholder or old development address may be substituted.
 
 | Allocation | SOBY | Base units (`asobya`) | Destination |
 |---|---:|---:|---|
-| Founder | 400,000,000 | 400000000000000000000000000 | **REQUIRED: owner-confirmed SOBYA account address** |
-| Community | 200,000,000 | 200000000000000000000000000 | **REQUIRED: owner-confirmed destination / sub-ledger** |
+| Founder | 400,000,000 | 400000000000000000000000000 | EVM: `0xd316993423Fc6268038F4EE3EA7C0C5038513C18`; SOBYA bech32: `sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq` |
+| Community | 200,000,000 | 200000000000000000000000000 | Shared MetaMask EVM: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`; SOBYA bech32: `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3` |
 | Validator reserve | 150,000,000 | 150000000000000000000000000 | `sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr` |
-| Development | 100,000,000 | 100000000000000000000000000 | **REQUIRED: owner-confirmed destination** |
-| Liquidity | 100,000,000 | 100000000000000000000000000 | **REQUIRED: owner-confirmed destination** |
-| Treasury | 30,000,000 | 30000000000000000000000000 | **REQUIRED: owner-confirmed destination** |
-| Emergency | 20,000,000 | 20000000000000000000000000 | **REQUIRED: owner-confirmed destination** |
+| Development | 100,000,000 | 100000000000000000000000000 | Shared MetaMask EVM: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`; SOBYA bech32: `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3` |
+| Liquidity | 100,000,000 | 100000000000000000000000000 | Shared MetaMask EVM: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`; SOBYA bech32: `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3` |
+| Treasury | 30,000,000 | 30000000000000000000000000 | Shared MetaMask EVM: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`; SOBYA bech32: `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3` |
+| Emergency | 20,000,000 | 20000000000000000000000000 | Shared MetaMask EVM: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`; SOBYA bech32: `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3` |
 | **Total** | **1,000,000,000** | **1000000000000000000000000000** | Must reconcile exactly |
 
 The shared management wallet may be used for the five owner-managed categories
