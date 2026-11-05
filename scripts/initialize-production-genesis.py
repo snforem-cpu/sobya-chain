@@ -24,6 +24,16 @@ FOUNDER_AMOUNT = 400_000_000 * 10**18
 SHARED_AMOUNT = 450_000_000 * 10**18
 RESERVE_AMOUNT = 150_000_000 * 10**18
 MAX_SUPPLY = 1_000_000_000 * 10**18
+ACTIVE_STATIC_PRECOMPILES = [
+    "0x0000000000000000000000000000000000000100",
+    "0x0000000000000000000000000000000000000400",
+    "0x0000000000000000000000000000000000000800",
+    "0x0000000000000000000000000000000000000801",
+    "0x0000000000000000000000000000000000000802",
+    "0x0000000000000000000000000000000000000804",
+    "0x0000000000000000000000000000000000000805",
+    "0x0000000000000000000000000000000000000806",
+]
 BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
 
@@ -124,6 +134,62 @@ def calculate_supply(balances: list[dict]) -> list[dict[str, str]]:
     return coins_from_map(dict(totals))
 
 
+def normalize_app_state(app_state: dict) -> None:
+    bank = app_state.get("bank")
+    mint = app_state.get("mint")
+    distribution = app_state.get("distribution")
+    evm = app_state.get("evm")
+    if not all(isinstance(item, dict) for item in (bank, mint, distribution, evm)):
+        fail("genesis must contain bank, mint, distribution, and evm module states")
+
+    metadata = {
+        "description": "SOBYA native token; 1 SOBY = 1,000,000,000,000,000,000 asobya.",
+        "denom_units": [
+            {"denom": BASE_DENOM, "exponent": 0, "aliases": ["attoSOBY"]},
+            {"denom": "SOBY", "exponent": 18},
+        ],
+        "base": BASE_DENOM,
+        "display": "SOBY",
+        "name": "SOBYA",
+        "symbol": "SOBY",
+    }
+    denom_metadata = bank.setdefault("denom_metadata", [])
+    if not isinstance(denom_metadata, list):
+        fail("bank.denom_metadata must be an array")
+    for index, item in enumerate(denom_metadata):
+        if isinstance(item, dict) and item.get("base") == BASE_DENOM:
+            denom_metadata[index] = metadata
+            break
+    else:
+        denom_metadata.append(metadata)
+
+    mint_params = mint.get("params")
+    minter = mint.get("minter")
+    if not isinstance(mint_params, dict) or not isinstance(minter, dict):
+        fail("mint genesis must contain params and minter objects")
+    mint_params["mint_denom"] = BASE_DENOM
+    for field in ("inflation_rate_change", "inflation_max", "inflation_min"):
+        mint_params[field] = "0"
+    minter["inflation"] = "0"
+    minter["annual_provisions"] = "0"
+
+    distribution_params = distribution.get("params")
+    if not isinstance(distribution_params, dict):
+        fail("distribution genesis must contain a params object")
+    distribution_params["community_tax"] = "0"
+
+    evm_params = evm.get("params")
+    if not isinstance(evm_params, dict):
+        fail("evm genesis must contain a params object")
+    evm_params["evm_denom"] = BASE_DENOM
+    extended_options = evm_params.get("extended_denom_options")
+    if not isinstance(extended_options, dict):
+        extended_options = {}
+        evm_params["extended_denom_options"] = extended_options
+    extended_options["extended_denom"] = BASE_DENOM
+    evm_params["active_static_precompiles"] = list(ACTIVE_STATIC_PRECOMPILES)
+
+
 def prepare(genesis: dict) -> dict:
     if not isinstance(genesis, dict) or not genesis.get("chain_id"):
         fail("initialized genesis must contain a non-empty chain_id")
@@ -180,6 +246,8 @@ def prepare(genesis: dict) -> dict:
     native_supply = next((int(coin["amount"]) for coin in bank["supply"] if coin["denom"] == BASE_DENOM), 0)
     if native_supply != MAX_SUPPLY:
         fail(f"native supply is {native_supply} {BASE_DENOM}; expected exactly {MAX_SUPPLY}")
+
+    normalize_app_state(app_state)
     return genesis
 
 
@@ -219,6 +287,12 @@ def self_test() -> None:
                 ],
                 "supply": [{"denom": BASE_DENOM, "amount": str(FOUNDER_AMOUNT + SHARED_AMOUNT)}],
             },
+            "mint": {
+                "params": {"mint_denom": "stake", "inflation_rate_change": "0.13", "inflation_max": "0.2", "inflation_min": "0.07"},
+                "minter": {"inflation": "0.13", "annual_provisions": "100"},
+            },
+            "distribution": {"params": {"community_tax": "0.02"}},
+            "evm": {"params": {"evm_denom": "aatom", "extended_denom_options": {"extended_denom": "aatom"}, "active_static_precompiles": []}},
         },
     }
     result = prepare(genesis)
@@ -226,13 +300,20 @@ def self_test() -> None:
     reserve = next(item for item in bank["balances"] if item["address"] == RESERVE_ADDRESS)
     assert coin_map(reserve["coins"], "reserve")[BASE_DENOM] == RESERVE_AMOUNT
     assert next(int(item["amount"]) for item in bank["supply"] if item["denom"] == BASE_DENOM) == MAX_SUPPLY
+    assert result["app_state"]["mint"]["params"]["mint_denom"] == BASE_DENOM
+    assert result["app_state"]["mint"]["minter"]["inflation"] == "0"
+    assert result["app_state"]["distribution"]["params"]["community_tax"] == "0"
+    assert result["app_state"]["evm"]["params"]["evm_denom"] == BASE_DENOM
+    assert result["app_state"]["evm"]["params"]["extended_denom_options"]["extended_denom"] == BASE_DENOM
+    assert result["app_state"]["evm"]["params"]["active_static_precompiles"] == ACTIVE_STATIC_PRECOMPILES
+    assert any(item["base"] == BASE_DENOM and item["display"] == "SOBY" for item in bank["denom_metadata"])
     try:
         prepare(result)
     except GenesisError:
         pass
     else:
         fail("self-test did not reject adding the reserve allocation twice")
-    print("PASS production allocation bootstrap: founder/shared balances, module account, 150M reserve, exact 1B native supply, duplicate protection")
+    print("PASS production genesis bootstrap: owner/reserve allocations, 1B supply, SOBY metadata, zero inflation/tax, asobya EVM denom, active precompiles, duplicate protection")
 
 
 def main() -> int:
