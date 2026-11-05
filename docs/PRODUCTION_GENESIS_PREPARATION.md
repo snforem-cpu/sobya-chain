@@ -28,19 +28,33 @@ must be funded within the 150M validator allocation, never on top of the cap.
 The application genesis normalizer disables inflation and validates the native
 supply ceiling.
 
-## Chain identifiers — not yet frozen
+## Owner-approved production network parameters
 
-- **Proposed CometBFT chain ID:** `sobya-1`. This is a proposal for the production
-  network identifier, not a value already embedded in an approved genesis.
-  It must be checked against any previously published SOBYA network and then
-  frozen before operators create gentxs.
-- **Proposed production EVM chain ID:** `357812033857` (`0x534f425941`, ASCII bytes for `SOBYA`). This is within the exact-integer range used by JavaScript and the uint64 range accepted by SOBYA's EVM configuration. The corresponding `eip155-357812033857.json` entry was not present in the ethereum-lists/chains repository when checked on 2026-11-05. Registry absence is not a reservation and cannot prove that no private chain uses it; the owner must approve the candidate and it must be rechecked before genesis is frozen. The repository's `777777` and `777778` values remain development/CI-only.
-- **Proposed minimum Cosmos gas price:** `1000000000asobya` per gas (1e-9 SOBY/gas), matching Cosmos EVM v0.6.0's default initial EVM base fee. Every validator and RPC node must use this same value; the configuration auditor enforces it. Owner approval is required before freezing the launch bundle.
-- **Genesis UTC time, release tag, validator self-bond amount, peer list, and
-  launch time:** unset until the release and validator ceremony are agreed.
+The project owner explicitly approved the following production candidates on
+2026-11-05. The final launch bundle must repeat these values and all operators
+must use them consistently.
 
-CometBFT chain ID and EVM chain ID are separate values and must not be confused. The proposed pair is CometBFT `sobya-1` and EVM `${id}`; neither becomes frozen until the owner signs off.
+- **CometBFT chain ID:** `sobya-1` (owner-approved).
+- **Production EVM chain ID:** `357812033857` (`0x534f425941`, ASCII bytes for
+  `SOBYA`; owner-approved). This value is within JavaScript's exact-integer
+  range and the uint64 range accepted by SOBYA. The corresponding entry was
+  not found at `ethereum-lists/chains/eip155/357812033857.json` when checked
+  on 2026-11-05. Registry absence is not a reservation and cannot prove that
+  no private chain uses it; recheck the public registry immediately before
+  publishing the launch bundle. The repository's `777777` and `777778`
+  values remain development/CI-only.
+- **Minimum Cosmos gas price:** `1000000000asobya` per gas
+  (1e-9 SOBY/gas; owner-approved). Every validator and RPC node must use this
+  same `minimum-gas-prices` value; the configuration auditor enforces it.
+  This local admission-price setting is distinct from the EVM fee-market
+  base fee, which is separately initialized and validated at genesis.
+- **Not yet fixed:** genesis UTC time, release tag, validator self-bond amount,
+  peer list, and coordinated launch time.
 
+CometBFT chain ID and EVM chain ID are separate identifiers. The approved
+production pair is CometBFT `sobya-1` and EVM `357812033857`. This approval
+does not itself create or authorize a production genesis, release, or network
+launch.
 
 **Owner-provided MetaMask destinations recovered from the earlier project discussion:**
 - Founder wallet (400M SOBY): `0xd316993423Fc6268038F4EE3EA7C0C5038513C18` → SOBYA account encoding `sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq`.
