@@ -117,8 +117,10 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
 
     evm = app.get("evm", {})
     actual_evm_id = evm.get("evm-chain-id")
-    if actual_evm_id != evm_chain_id or evm_chain_id <= 0 or evm_chain_id > (2**64 - 1):
+    if type(actual_evm_id) is not int or actual_evm_id != evm_chain_id:
         fail(f"[evm].evm-chain-id {actual_evm_id!r} does not match expected {evm_chain_id}")
+    if not 0 < evm_chain_id <= MAX_EVM_CHAIN_ID:
+        fail(f"EVM chain ID must be a positive uint64, got {evm_chain_id}")
     if evm_chain_id in {777777, 777778}:
         fail(f"{evm_chain_id} is reserved for SOBYA development/CI and cannot be used for a public network")
 
