@@ -312,6 +312,13 @@ func New(
 		if err != nil {
 			return nil, err
 		}
+		// The validator reserve is an app-owned module account rather than an
+		// SDK module with its own InitGenesis hook. Create it after auth and
+		// bank genesis have initialized so its pre-funded bank balance is
+		// preserved and the account receives the configured module permissions.
+		if app.AccountKeeper.GetModuleAccount(ctx, validatorReserveModuleName) == nil {
+			return nil, fmt.Errorf("failed to initialize validator reserve module account")
+		}
 		if err := app.initValidatorReserveGenesis(ctx, normalizedState[validatorReserveGenesisKey]); err != nil {
 			return nil, err
 		}
