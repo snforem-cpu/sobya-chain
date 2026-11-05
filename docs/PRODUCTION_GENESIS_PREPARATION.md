@@ -48,6 +48,8 @@ CometBFT chain ID and EVM chain ID are separate values and must not be confused.
 
 Both Bech32 strings were checksum-decoded and verified to contain exactly 20 bytes, with byte-for-byte values matching the two owner-supplied EVM hex addresses. This matches the exact Cosmos EVM v0.6.0 `NewEvmCodec` behavior used by SOBYA: it accepts EVM hex or Bech32, requires the configured `sobya` HRP for Bech32, and applies the SDK account-address length check. This verifies address format and conversion only; it does not prove control of either wallet's private key. The shared wallet does not merge the five tokenomics categories: keep their separate amounts in the off-chain allocation ledger even though the on-chain bank genesis will contain one aggregated balance for that address.
 
+The production allocation bootstrap also writes canonical `SOBY`/`asobya` bank metadata, fixes the EVM and extended EVM denoms to `asobya`, enables only the supported Cosmos EVM v0.6.0 static precompiles, sets mint inflation and annual provisions to zero, and sets distribution community tax to zero. The validator reconciliation script refuses to proceed if any of these canonical settings are missing or changed.
+
 The `validator_reserve` address is an app-owned module account configured in the application's module-account permissions. It is intentionally not fabricated as a normal entry in the initial `auth.accounts` list: SOBYA's `InitChainer` creates the module account after auth/bank genesis, while the bootstrap script funds its deterministic bank address. The production preflight exercises this exact sequence with the real binary.
 
 ## Allocation ledger — destinations recorded; final sign-off pending
