@@ -50,11 +50,10 @@ After `sobyad init` has created the empty application genesis and its module acc
 sobyad genesis add-genesis-account sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq 400000000000000000000000000asobya --home "$SOBYA_HOME"
 sobyad genesis add-genesis-account sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3 450000000000000000000000000asobya --home "$SOBYA_HOME"
 python3 scripts/initialize-production-genesis.py \
-  --genesis "$SOBYA_HOME/config/genesis.json" \
-  --output "$SOBYA_HOME/config/genesis.base.json"
+  --genesis "$SOBYA_HOME/config/genesis.json"
 ```
 
-The bootstrap script validates the two exact owner allocations and the pre-existing `validator_reserve` module account, adds 150M SOBY to that module account's bank balance without replacing its module-account permissions, recalculates bank supply, and requires exactly 1B SOBY total native supply. Use the output as the initial coordinator genesis. Its self-test runs in GitHub Actions. Do not use `add-genesis-account` to replace the reserve module account with a normal account.
+The bootstrap script validates the two exact owner allocations and the pre-existing `validator_reserve` module account, adds 150M SOBY to that module account's bank balance without replacing its module-account permissions, recalculates bank supply, and requires exactly 1B SOBY total native supply. The script updates the initialized genesis in place. Its self-test runs in GitHub Actions. Do not use `add-genesis-account` to replace the reserve module account with a normal account.
 
 ### Initial validator self-bonds — deterministic reserve accounting
 
@@ -63,9 +62,9 @@ The validator self-bonds are funded **from inside** the 150,000,000 SOBY validat
 1. Initialize the coordinator genesis with the exact release binary and add the founder, shared management wallet, and 150M reserve allocation.
 2. For each participating validator, add the operator's public account address with exactly the agreed self-bond amount using `sobyad genesis add-genesis-account <sobya-account-address> <amount>asobya`. This command creates the auth account and initial bank balance needed for the operator's gentx.
 3. Create `validators.json` as a JSON array of objects with `address` and `self_bond_asobya` (integer string) fields. Use the exact same address and amount used in `add-genesis-account`.
-4. Run `python scripts/prepare-validator-genesis.py --genesis <path-to-genesis.json> --validators validators.json --output <reconciled-genesis.json>`.
+4. Set the final `genesis_time` before reserve reconciliation, then run `python3 scripts/prepare-validator-genesis.py --genesis "$SOBYA_HOME/config/genesis.json" --validators validators.json`. The script updates the same coordinator genesis in place.
 5. The script validates each `sobya` Bech32 address/checksum, requires the matching auth and bank accounts, deducts the self-bond total from the 150M reserve module balance, recalculates all bank supply denominations, and requires native supply to remain exactly 1B SOBY. It writes the app-owned `sobya_validator_reserve` genesis extension with `total_paid_asobya` equal to the initial self-bonds, so the 150M lifetime ceiling and 48-tranche schedule account for them.
-6. Use the reconciled genesis as the coordinator genesis, then have each operator generate a gentx for exactly the funded self-bond amount. Collect and validate gentxs with the release binary. Any mismatch between the funded amount and the gentx must block the ceremony.
+6. Distribute this exact pre-gentx genesis to each operator. Each operator then generates a gentx for exactly the funded self-bond amount. Do not change `genesis_time` after the reserve metadata is generated; if it must change, restart from the base genesis and rerun the reconciliation before any gentx is signed. Collect and validate gentxs with the release binary. Any mismatch between the funded amount and the gentx must block the ceremony.
 
 The script refuses duplicate execution, unknown/duplicate validator addresses, missing auth/bank accounts, an underfunded reserve, self-bonds above the 150M lifetime cap, or a post-reconciliation native supply other than exactly 1B SOBY. Its self-test is part of GitHub Actions. Never send private keys, mnemonics, keyrings, or validator signing files to the coordinator.
 
