@@ -275,7 +275,19 @@ enable = false
 enable = false
 """
     genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {
-        "evm": {},
+        "bank": {"denom_metadata": [{
+            "base": BASE_DENOM, "display": "SOBY", "symbol": "SOBY",
+        }]},
+        "mint": {
+            "params": {"mint_denom": BASE_DENOM, "inflation_rate_change": "0", "inflation_max": "0", "inflation_min": "0"},
+            "minter": {"inflation": "0", "annual_provisions": "0"},
+        },
+        "distribution": {"params": {"community_tax": "0"}},
+        "evm": {"params": {
+            "evm_denom": BASE_DENOM,
+            "extended_denom_options": {"extended_denom": BASE_DENOM},
+            "active_static_precompiles": list(ACTIVE_STATIC_PRECOMPILES),
+        }},
         "feemarket": {"params": {"no_base_fee": False, "base_fee": "1000000000.000000000000000000", "enable_height": "0"}},
     }}
     with tempfile.TemporaryDirectory() as directory:
