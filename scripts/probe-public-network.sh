@@ -44,6 +44,10 @@ echo "Checking connected CometBFT peers..."
 net_info="$(curl --fail --silent --show-error --max-time 10 "$SOBYA_RPC_URL/net_info")"
 peer_count="$(jq -r '.result.n_peers // "0"' <<<"$net_info")"
 min_peers="${SOBYA_MIN_PEERS:-1}"
+[[ "$min_peers" =~ ^[0-9]+$ ]] && (( min_peers >= 1 )) || {
+  echo "FAIL: SOBYA_MIN_PEERS must be a positive integer" >&2
+  exit 2
+}
 [[ "$peer_count" =~ ^[0-9]+$ ]] && (( peer_count >= min_peers )) || {
   echo "FAIL: connected peer count $peer_count is below required $min_peers" >&2
   exit 1
