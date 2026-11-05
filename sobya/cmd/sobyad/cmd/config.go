@@ -11,6 +11,12 @@ import (
 func initCometBFTConfig() *cmtcfg.Config {
 	cfg := cmtcfg.DefaultConfig()
 
+	// Keep CometBFT query/admin RPC private by default. Operators expose
+	// read-only routes only through a separately hardened TLS reverse proxy.
+	cfg.RPC.ListenAddress = "tcp://127.0.0.1:26657"
+	cfg.RPC.Unsafe = false
+	cfg.P2P.ListenAddress = "tcp://0.0.0.0:26656"
+
 	// these values put a higher strain on node memory
 	// cfg.P2P.MaxNumInboundPeers = 100
 	// cfg.P2P.MaxNumOutboundPeers = 40
