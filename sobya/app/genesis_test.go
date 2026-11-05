@@ -6,6 +6,7 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/gogoproto/proto"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -231,7 +232,7 @@ func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T
 	evmGenesis := evmtypes.DefaultGenesisState()
 	evmGenesis.Params.ActiveStaticPrecompiles = []string{evmtypes.Bech32PrecompileAddress}
 
-	marshal := func(value interface{}) json.RawMessage {
+	marshal := func(value proto.Message) json.RawMessage {
 		t.Helper()
 		raw, err := cdc.MarshalJSON(value)
 		if err != nil {
