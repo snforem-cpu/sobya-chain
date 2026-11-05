@@ -182,10 +182,6 @@ func initTestnetFiles(
 	appConfig.Telemetry.Enabled = false
 	appConfig.Telemetry.PrometheusRetentionTime = 0
 
-	// Every generated CometBFT config must carry the same chain ID as the
-	// genesis document; otherwise the node rejects InitChain at startup.
-	nodeConfig.ChainID = args.chainID
-
 	var (
 		genAccounts     []authtypes.GenesisAccount
 		genBalances     []banktypes.Balance
@@ -318,6 +314,13 @@ func initTestnetFiles(
 
 	if err := initGenFiles(clientCtx, mbm, args.chainID, genAccounts, genBalances, genFiles, args.numValidators); err != nil {
 		return err
+	}
+	// Cosmos EVM reads the BaseApp chain ID from each node's client.toml.
+	for i := 0; i < args.numValidators; i++ {
+		nodeDir := filepath.Join(args.outputDir, fmt.Sprintf("%s%d", args.nodeDirPrefix, i))
+		if err := writeClientChainID(nodeDir, args.chainID); err != nil {
+			return err
+		}
 	}
 	// copy gentx file
 	for i := 0; i < args.numValidators; i++ {
