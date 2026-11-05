@@ -5,9 +5,9 @@ This process describes how to create a versioned operator binary. A source commi
 ## Release rules
 
 - Release only from a reviewed, exact source commit on the approved branch.
-- Use a version tag such as `v0.1.0-testnet.1` only after the release candidate passes the agreed tests.
+- Use a version tag such as `v0.1.0-rc.1` only after the release candidate passes the agreed tests.
 - The current root workflow builds a Linux amd64 candidate and publishes it as a GitHub prerelease with SHA-256 checksums.
-- A prerelease is not a production or mainnet approval. The release notes must identify it as testnet software.
+- A prerelease is a pre-mainnet operator candidate, not launch authorization. Release notes must state the exact source commit and that operators must wait for the signed launch bundle and genesis.
 - Never attach genesis files containing private data or any operator keys/secrets.
 
 ## Candidate validation
