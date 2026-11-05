@@ -26,3 +26,16 @@ func TestDefaultAppConfigKeepsRPCPrivateAndLocked(t *testing.T) {
 		t.Fatalf("development EVM chain ID changed unexpectedly: %d", cfg.EVM.EVMChainID)
 	}
 }
+
+func TestDefaultCometBFTConfigKeepsAdminRPCPrivate(t *testing.T) {
+	cfg := initCometBFTConfig()
+	if cfg.RPC.ListenAddress != "tcp://127.0.0.1:26657" {
+		t.Fatalf("CometBFT RPC listener = %q, want loopback", cfg.RPC.ListenAddress)
+	}
+	if cfg.RPC.Unsafe {
+		t.Fatal("CometBFT unsafe RPC must be disabled")
+	}
+	if cfg.P2P.ListenAddress != "tcp://0.0.0.0:26656" {
+		t.Fatalf("CometBFT P2P listener = %q, want public-interface listener", cfg.P2P.ListenAddress)
+	}
+}
