@@ -24,6 +24,7 @@ on:
   pull_request:
     paths:
       - 'scripts/validate-network-config.py'
+      - 'scripts/prepare-validator-genesis.py'
       - 'scripts/probe-public-network.sh'
       - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
@@ -75,6 +76,7 @@ jobs:
           set -euo pipefail
           test -s docs/STAGE_THREE_OPERATOR_KIT.md
           test -s docs/GENESIS_CEREMONY.md
+          test -s scripts/prepare-validator-genesis.py
           test -s docs/RELEASE_PROCESS.md
           test -s docs/ANNOUNCEMENTS.md
           grep -qi 'testnet tokens have no monetary value' docs/STAGE_THREE_OPERATOR_KIT.md
