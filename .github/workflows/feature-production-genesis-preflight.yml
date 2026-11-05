@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: sobya-production-genesis-preflight-${{ github.ref }}
@@ -26,6 +27,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Remove earlier diagnostic artifact containing an ephemeral CI key output
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          URL="https://api.github.com/repos/snforem-cpu/sobya-chain/actions/artifacts/13405574618"
+          STATUS="$(curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$URL")"
+          if [ "$STATUS" = "200" ]; then
+            curl -fsS -X DELETE -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$URL"
+            echo "Deleted the earlier temporary-key diagnostic artifact."
+          elif [ "$STATUS" = "404" ]; then
+            echo "Earlier diagnostic artifact is already absent."
+          else
+            echo "Unexpected artifact lookup status: $STATUS" >&2
+            exit 1
+          fi
+
       - name: Checkout exact candidate commit
         uses: actions/checkout@v4
         with:
