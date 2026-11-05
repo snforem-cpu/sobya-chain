@@ -144,9 +144,9 @@ def prepare(genesis: dict) -> dict:
     for address in (FOUNDER_ADDRESS, SHARED_ADDRESS, RESERVE_ADDRESS):
         decode_sobya_address(address)
     account_addresses = collect_addresses(accounts)
-    for address, label in ((FOUNDER_ADDRESS, "founder"), (SHARED_ADDRESS, "shared management"), (RESERVE_ADDRESS, "validator reserve module")):
+    for address, label in ((FOUNDER_ADDRESS, "founder"), (SHARED_ADDRESS, "shared management")):
         if address not in account_addresses:
-            fail(f"{label} account {address} is missing from auth.accounts; initialize the app or add the owner account first")
+            fail(f"{label} account {address} is missing from auth.accounts; run sobyad genesis add-genesis-account first")
 
     balance_by_address = {}
     for balance in balances:
@@ -211,7 +211,6 @@ def self_test() -> None:
             "auth": {"accounts": [
                 {"@type": "/cosmos.auth.v1beta1.BaseAccount", "address": FOUNDER_ADDRESS},
                 {"@type": "/cosmos.auth.v1beta1.BaseAccount", "address": SHARED_ADDRESS},
-                {"@type": "/cosmos.auth.v1beta1.ModuleAccount", "base_account": {"address": RESERVE_ADDRESS}, "name": "validator_reserve"},
             ]},
             "bank": {
                 "balances": [
