@@ -28,6 +28,16 @@ RESERVE_ADDRESS = "sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr"
 FOUNDER_ADDRESS = "sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq"
 SHARED_ADDRESS = "sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3"
 RESERVE_GENESIS_KEY = "sobya_validator_reserve"
+ACTIVE_STATIC_PRECOMPILES = [
+    "0x0000000000000000000000000000000000000100",
+    "0x0000000000000000000000000000000000000400",
+    "0x0000000000000000000000000000000000000800",
+    "0x0000000000000000000000000000000000000801",
+    "0x0000000000000000000000000000000000000802",
+    "0x0000000000000000000000000000000000000804",
+    "0x0000000000000000000000000000000000000805",
+    "0x0000000000000000000000000000000000000806",
+]
 BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
 
@@ -151,6 +161,31 @@ def recalculate_supply(balances: list[dict]) -> list[dict[str, str]]:
     return coins_from_map(dict(totals))
 
 
+def validate_canonical_app_state(app_state: dict) -> None:
+    bank = app_state.get("bank", {})
+    mint = app_state.get("mint", {})
+    distribution = app_state.get("distribution", {})
+    evm = app_state.get("evm", {})
+    metadata = bank.get("denom_metadata", [])
+    native_metadata = next((item for item in metadata if isinstance(item, dict) and item.get("base") == BASE_DENOM), None)
+    if not isinstance(native_metadata, dict) or native_metadata.get("display") != "SOBY" or native_metadata.get("symbol") != "SOBY":
+        fail("genesis must contain canonical SOBY/asobya bank denomination metadata")
+    mint_params = mint.get("params", {})
+    minter = mint.get("minter", {})
+    if mint_params.get("mint_denom") != BASE_DENOM or any(str(mint_params.get(field)) not in ("0", "0.0", "0.000000000000000000") for field in ("inflation_rate_change", "inflation_max", "inflation_min")):
+        fail("genesis mint parameters must use asobya and disable inflation")
+    if str(minter.get("inflation")) not in ("0", "0.0", "0.000000000000000000") or str(minter.get("annual_provisions")) not in ("0", "0.0", "0.000000000000000000"):
+        fail("genesis minter must have zero inflation and annual provisions")
+    if str(distribution.get("params", {}).get("community_tax")) not in ("0", "0.0", "0.000000000000000000"):
+        fail("genesis distribution community tax must be zero")
+    evm_params = evm.get("params", {})
+    extended = evm_params.get("extended_denom_options", {})
+    if evm_params.get("evm_denom") != BASE_DENOM or extended.get("extended_denom") != BASE_DENOM:
+        fail("genesis EVM and extended denoms must both be asobya")
+    if evm_params.get("active_static_precompiles") != ACTIVE_STATIC_PRECOMPILES:
+        fail("genesis active EVM static precompile list does not match the supported SOBYA v0.6.0 set")
+
+
 def prepare(genesis: dict, validators: list[dict]) -> dict:
     if not isinstance(genesis, dict) or not isinstance(genesis.get("app_state"), dict):
         fail("genesis must contain an app_state object")
@@ -161,6 +196,7 @@ def prepare(genesis: dict, validators: list[dict]) -> dict:
         fail("genesis app_state must contain bank and auth module states")
     if RESERVE_GENESIS_KEY in app_state:
         fail(f"{RESERVE_GENESIS_KEY} already exists; refusing to apply reserve reconciliation twice")
+    validate_canonical_app_state(app_state)
 
     genesis_time = utc_genesis_time(genesis.get("genesis_time"))
     balances = bank.get("balances")
@@ -306,7 +342,25 @@ def self_test() -> None:
                     {"address": validator, "coins": [{"denom": BASE_DENOM, "amount": str(100 * 10**18)}]},
                 ],
                 "supply": [{"denom": BASE_DENOM, "amount": str(initial_supply)}],
+                "denom_metadata": [{
+                    "description": "SOBYA native token; 1 SOBY = 1,000,000,000,000,000,000 asobya.",
+                    "denom_units": [
+                        {"denom": BASE_DENOM, "exponent": 0, "aliases": ["attoSOBY"]},
+                        {"denom": "SOBY", "exponent": 18},
+                    ],
+                    "base": BASE_DENOM, "display": "SOBY", "name": "SOBYA", "symbol": "SOBY",
+                }],
             },
+            "mint": {
+                "params": {"mint_denom": BASE_DENOM, "inflation_rate_change": "0", "inflation_max": "0", "inflation_min": "0"},
+                "minter": {"inflation": "0", "annual_provisions": "0"},
+            },
+            "distribution": {"params": {"community_tax": "0"}},
+            "evm": {"params": {
+                "evm_denom": BASE_DENOM,
+                "extended_denom_options": {"extended_denom": BASE_DENOM},
+                "active_static_precompiles": list(ACTIVE_STATIC_PRECOMPILES),
+            }},
         },
     }
     result = prepare(genesis, [{"address": validator, "self_bond_asobya": str(100 * 10**18)}])
