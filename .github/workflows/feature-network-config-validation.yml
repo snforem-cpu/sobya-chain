@@ -7,6 +7,7 @@ on:
       - 'release/**'
     paths:
       - 'scripts/validate-network-config.py'
+      - 'scripts/prepare-validator-genesis.py'
       - 'scripts/probe-public-network.sh'
       - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
@@ -64,6 +65,8 @@ jobs:
           set -euo pipefail
           python -m py_compile scripts/validate-network-config.py
           python scripts/validate-network-config.py --self-test
+          python -m py_compile scripts/prepare-validator-genesis.py
+          python scripts/prepare-validator-genesis.py --self-test
           bash -n scripts/probe-public-network.sh
           bash -n scripts/package-release.sh
 
