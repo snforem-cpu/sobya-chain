@@ -72,7 +72,7 @@ jobs:
           test -s docs/GENESIS_CEREMONY.md
           test -s docs/RELEASE_PROCESS.md
           test -s docs/ANNOUNCEMENTS.md
-          grep -q 'testnet tokens have no monetary value' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi 'testnet tokens have no monetary value' docs/STAGE_THREE_OPERATOR_KIT.md
           grep -q '777777' docs/GENESIS_CEREMONY.md
 
       - name: Run focused Go CLI configuration tests
