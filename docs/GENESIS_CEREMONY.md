@@ -42,6 +42,19 @@ The owner-supplied founder and shared management EVM addresses and their `sobya`
 
 The genesis native supply must reconcile exactly to the approved total and must not exceed the application cap. Inflation/mint issuance remains disabled under the agreed token rules. Any discrepancy, duplicate balance, unexpected denom, or unaccounted remainder blocks approval.
 
+### Initial validator self-bonds — deterministic reserve accounting
+
+The validator self-bonds are funded **from inside** the 150,000,000 SOBY validator allocation. They must not be added on top of the reserve or counted twice. The repository now includes `scripts/prepare-validator-genesis.py` to reconcile this safely after operators provide public account addresses and the agreed self-bond amounts:
+
+1. Initialize the coordinator genesis with the exact release binary and add the founder, shared management wallet, and 150M reserve allocation.
+2. For each participating validator, add the operator's public account address with exactly the agreed self-bond amount using `sobyad add-genesis-account <sobya-account-address> <amount>asobya`. This command creates the auth account and initial bank balance needed for the operator's gentx.
+3. Create `validators.json` as a JSON array of objects with `address` and `self_bond_asobya` (integer string) fields. Use the exact same address and amount used in `add-genesis-account`.
+4. Run `python scripts/prepare-validator-genesis.py --genesis <path-to-genesis.json> --validators validators.json --output <reconciled-genesis.json>`.
+5. The script validates each `sobya` Bech32 address/checksum, requires the matching auth and bank accounts, deducts the self-bond total from the 150M reserve module balance, recalculates all bank supply denominations, and requires native supply to remain exactly 1B SOBY. It writes the app-owned `sobya_validator_reserve` genesis extension with `total_paid_asobya` equal to the initial self-bonds, so the 150M lifetime ceiling and 48-tranche schedule account for them.
+6. Use the reconciled genesis as the coordinator genesis, then have each operator generate a gentx for exactly the funded self-bond amount. Collect and validate gentxs with the release binary. Any mismatch between the funded amount and the gentx must block the ceremony.
+
+The script refuses duplicate execution, unknown/duplicate validator addresses, missing auth/bank accounts, an underfunded reserve, self-bonds above the 150M lifetime cap, or a post-reconciliation native supply other than exactly 1B SOBY. Its self-test is part of GitHub Actions. Never send private keys, mnemonics, keyrings, or validator signing files to the coordinator.
+
 ## 4. Build and validate deterministically
 
 Using the exact release binary and documented version-specific command sequence:
