@@ -13,6 +13,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 MAX_EVM_CHAIN_ID = (1 << 64) - 1
+SOBYA_MIN_GAS_PRICES = "1000000000asobya"
+SOBYA_EVM_BASE_FEE = 1_000_000_000
 
 
 class ConfigError(Exception):
@@ -96,6 +98,19 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
         fail(f"genesis chain_id {genesis.get('chain_id')!r} does not match expected {chain_id!r}")
     if not isinstance(genesis.get("app_state"), dict) or "evm" not in genesis["app_state"]:
         fail("genesis app_state is missing the evm module")
+    feemarket = genesis["app_state"].get("feemarket")
+    if not isinstance(feemarket, dict) or not isinstance(feemarket.get("params"), dict):
+        fail("genesis app_state is missing feemarket params")
+    feemarket_params = feemarket["params"]
+    if feemarket_params.get("no_base_fee") is not False:
+        fail("feemarket.params.no_base_fee must be false")
+    try:
+        base_fee = int(str(feemarket_params.get("base_fee", "0")).split(".", 1)[0])
+        enable_height = int(feemarket_params.get("enable_height", -1))
+    except (TypeError, ValueError):
+        fail("feemarket base_fee or enable_height is invalid")
+    if base_fee != SOBYA_EVM_BASE_FEE or enable_height != 0:
+        fail(f"EVM base fee must start at {SOBYA_EVM_BASE_FEE} {BASE_DENOM}/gas and be enabled at genesis")
 
     p2p = comet.get("p2p", {})
     laddr = p2p.get("laddr", "")
@@ -123,6 +138,9 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
         fail(f"[evm].evm-chain-id {actual_evm_id!r} does not match expected {evm_chain_id}")
     if not 0 < evm_chain_id <= MAX_EVM_CHAIN_ID:
         fail(f"EVM chain ID must be a positive uint64, got {evm_chain_id}")
+    minimum_gas_prices = app.get("minimum-gas-prices", "")
+    if minimum_gas_prices != SOBYA_MIN_GAS_PRICES:
+        fail(f"minimum-gas-prices must be exactly {SOBYA_MIN_GAS_PRICES!r}, got {minimum_gas_prices!r}")
     if evm_chain_id in {777777, 777778}:
         fail(f"{evm_chain_id} is reserved for SOBYA development/CI and cannot be used for a public network")
 
@@ -162,6 +180,8 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     return [
         f"PASS chain ID: {chain_id}",
         f"PASS EVM chain ID: {evm_chain_id}",
+        f"PASS Cosmos minimum gas price: {SOBYA_MIN_GAS_PRICES}",
+        f"PASS EVM base fee: {SOBYA_EVM_BASE_FEE} {BASE_DENOM}/gas from height 0",
         f"PASS public P2P listener: {laddr}",
         f"PASS advertised P2P endpoint: {ext_host}:{ext_port}",
         f"PASS configured peers/seeds: {len(peers)} persistent, {len(seeds)} seeds",
@@ -185,7 +205,9 @@ seeds = ""
 laddr = "tcp://127.0.0.1:26657"
 unsafe = false
 """
-    app = """[evm]
+    app = """minimum-gas-prices = "1000000000asobya"
+
+[evm]
 evm-chain-id = 42424242
 
 [json-rpc]
@@ -204,7 +226,10 @@ enable = false
 [grpc]
 enable = false
 """
-    genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {"evm": {}}}
+    genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {
+        "evm": {},
+        "feemarket": {"params": {"no_base_fee": False, "base_fee": "1000000000.000000000000000000", "enable_height": "0"}},
+    }}
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         (root / "config.toml").write_text(config, encoding="utf-8")
@@ -222,6 +247,29 @@ enable = false
             pass
         else:
             fail("self-test did not reject insecure account unlocking")
+
+        bad_fee_app = app.replace('minimum-gas-prices = "1000000000asobya"', 'minimum-gas-prices = "0asobya"')
+        (root / "app.toml").write_text(bad_fee_app, encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject zero Cosmos minimum gas price")
+
+        bad_fee_genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {
+            "evm": {},
+            "feemarket": {"params": {"no_base_fee": True, "base_fee": "0", "enable_height": "0"}},
+        }}
+        (root / "app.toml").write_text(app, encoding="utf-8")
+        (root / "genesis.json").write_text(json.dumps(bad_fee_genesis), encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject disabled EVM base fee")
+        (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
 
         for reserved_id in (777777, 777778):
             reserved_app = app.replace("42424242", str(reserved_id))
@@ -247,7 +295,7 @@ enable = false
             pass
         else:
             fail("self-test did not reject an EVM chain ID outside uint64")
-    print("PASS network config validator self-test (valid config, SOBYA candidate uint64, unsafe/reserved IDs, and uint64 overflow)")
+    print("PASS network config validator self-test (valid config, gas policies, SOBYA candidate uint64, unsafe/reserved IDs, and uint64 overflow)")
 
 
 def main() -> int:
