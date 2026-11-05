@@ -107,8 +107,8 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     # The operator must verify that mapping from an independent network.
     peers = parse_peer_list(p2p.get("persistent_peers", ""), "[p2p].persistent_peers")
     seeds = parse_peer_list(p2p.get("seeds", ""), "[p2p].seeds")
-    if not peers and not seeds:
-        fail("configure at least one real persistent peer or seed; empty peer lists are not launch-ready")
+    if not peers and not seeds and role != "seed":
+        fail("configure at least one real persistent peer or seed; only the initial seed node may bootstrap without upstream peers")
 
     rpc = comet.get("rpc", {})
     is_loopback_listener(rpc.get("laddr", ""), "[rpc].laddr")
