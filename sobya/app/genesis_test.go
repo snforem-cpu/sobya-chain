@@ -270,7 +270,7 @@ func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T
 
 func TestPrepareGenesisStateRejectsMissingEVMGenesis(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
-	marshal := func(value interface{}) json.RawMessage {
+	marshal := func(value proto.Message) json.RawMessage {
 		t.Helper()
 		raw, err := cdc.MarshalJSON(value)
 		if err != nil {
