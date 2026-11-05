@@ -106,7 +106,10 @@ jobs:
 
           sed -i 's/^minimum-gas-prices = ""/minimum-gas-prices = "1000000000asobya"/' "$SOBYA_HOME/config/app.toml"
           sed -i "s/^evm-chain-id = 777777$/evm-chain-id = $EVM_CHAIN_ID/" "$SOBYA_HOME/config/app.toml"
-          grep -q '^minimum-gas-prices = "1000000000asobya"          ./sobyad genesis gentx validator "${SELF_BOND}asobya" --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
+          grep -q '^minimum-gas-prices = "1000000000asobya"$' "$SOBYA_HOME/config/app.toml"
+          grep -q "^evm-chain-id = $EVM_CHAIN_ID$" "$SOBYA_HOME/config/app.toml"
+          grep -q "^chain_id = \"$CHAIN_ID\"$" "$SOBYA_HOME/config/config.toml"
+          ./sobyad genesis gentx validator "${SELF_BOND}asobya" --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
           ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
           ./sobyad genesis validate-genesis --home "$SOBYA_HOME"
 
