@@ -10,7 +10,7 @@ We are looking for operators who control their own Linux infrastructure, can mai
 
 This is an early operator-recruitment phase—not a live network or investment offer. Testnet tokens have no monetary value. No income, reimbursement, or token price is promised.
 
-Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/blob/feature/tokenomics-fee-split/docs/STAGE_THREE_OPERATOR_KIT.md
+Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/blob/main/docs/STAGE_THREE_OPERATOR_KIT.md
 
 ## X post (Arabic)
 
@@ -20,7 +20,7 @@ Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/
 
 هذه مرحلة استقطاب وتجهيز وليست شبكة حية أو عرضاً استثمارياً. رموز الاختبار لا قيمة مالية لها، ولا توجد وعود بأرباح أو تعويضات أو سعر للعملة.
 
-دليل المشغلين: https://github.com/snforem-cpu/sobya-chain/blob/feature/tokenomics-fee-split/docs/STAGE_THREE_OPERATOR_KIT.md
+دليل المشغلين: https://github.com/snforem-cpu/sobya-chain/blob/main/docs/STAGE_THREE_OPERATOR_KIT.md
 
 ## Telegram pinned message (Arabic)
 
@@ -37,7 +37,7 @@ Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/
 
 لن يبدأ تشغيل الشبكة إلا بعد اعتماد نسخة البرنامج ومعرّفي الشبكة وملف Genesis النهائي وبصمته SHA-256 وقائمة الأقران وموعد الإطلاق. لا تستخدموا chain ID أو Genesis تجريبياً من عندكم.
 
-رموز الاختبار بلا قيمة مالية، ولا يوجد ضمان مكافآت أو تعويض تكاليف. دليل الانضمام: https://github.com/snforem-cpu/sobya-chain/blob/feature/tokenomics-fee-split/docs/STAGE_THREE_OPERATOR_KIT.md
+رموز الاختبار بلا قيمة مالية، ولا يوجد ضمان مكافآت أو تعويض تكاليف. دليل الانضمام: https://github.com/snforem-cpu/sobya-chain/blob/main/docs/STAGE_THREE_OPERATOR_KIT.md
 
 ## Operator application template
 
