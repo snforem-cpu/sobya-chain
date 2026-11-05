@@ -9,6 +9,8 @@ on:
     paths:
       - '.github/workflows/feature-multinode-smoke.yml'
       - 'sobya/cmd/sobyad/cmd/testnet_multi_node.go'
+      - 'sobya/cmd/sobyad/cmd/commands.go'
+      - 'sobya/cmd/sobyad/cmd/init_test.go'
       - 'sobya/app/**'
       - 'sobya/TOKENOMICS.md'
 
