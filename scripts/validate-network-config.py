@@ -12,6 +12,8 @@ import tomllib
 from pathlib import Path
 from urllib.parse import urlsplit
 
+MAX_EVM_CHAIN_ID = (1 << 64) - 1
+
 
 class ConfigError(Exception):
     pass
