@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cosmossdk.io/core/address"
 	"fmt"
 	"errors"
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -34,15 +35,34 @@ import (
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	"github.com/cosmos/evm/x/vm"
+	evmcli "github.com/cosmos/evm/x/vm/client/cli"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmwrappers "github.com/cosmos/evm/x/vm/wrappers"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+	"github.com/spf13/cobra"
 )
 
 // DefaultEVMChainID is a development default only. Operators must set a
 // network-specific EVM chain ID in app.toml before creating a public genesis.
 const DefaultEVMChainID uint64 = 777777
+
+// evmAppModuleBasic supplies the address codec required by the EVM CLI while
+// exposing the upstream module's genesis defaults and interface registration.
+type evmAppModuleBasic struct {
+	evm.AppModuleBasic
+	accountCodec address.Codec
+}
+
+func (b evmAppModuleBasic) GetTxCmd() *cobra.Command {
+	return evmcli.NewTxCmd(b.accountCodec)
+}
+
+func newEVMAppModuleBasic() evmAppModuleBasic {
+	return evmAppModuleBasic{
+		accountCodec: evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32AccountAddrPrefix()),
+	}
+}
 
 // registerEVMModules adds the Cosmos EVM stores, keepers, and application
 // modules to the existing runtime.App. The SDK runtime supports this hybrid
