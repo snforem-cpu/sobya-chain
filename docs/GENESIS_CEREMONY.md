@@ -9,7 +9,7 @@ The coordinator publishes a ceremony proposal and freezes:
 2. CometBFT chain ID (unique string).
 3. Proposed EVM chain ID `357812033857` (`0x534f425941`, ASCII-derived from SOBYA), subject to owner sign-off and a final registry check. Never use development/CI values `777777` or `777778`.
 4. Genesis UTC time and launch time.
-5. Minimum gas price and tested validator self-bond.
+5. Minimum Cosmos gas price `1000000000asobya` per gas (1,000,000,000 asobya/gas), matching the default EVM base fee, plus the tested validator self-bond.
 6. Supported binary platforms and SHA-256 checksums.
 7. The allocation ledger, account codec/address format, and public P2P peer list.
 
@@ -40,7 +40,7 @@ The 150M validator allocation is the total lifetime validator budget. Initial va
 
 The proposed production identifier pair is CometBFT `sobya-1` and EVM `357812033857` (`0x534f425941`). These are candidates only until the owner approves them and the final launch manifest freezes them. The EVM candidate was not listed in ethereum-lists/chains on 2026-11-05; registry absence does not reserve an ID or prove no private chain uses it. The owner-supplied founder and shared management EVM addresses and their `sobya` Bech32 encodings have been checksum-decoded and verified byte-for-byte: each Bech32 value contains exactly 20 bytes matching its corresponding EVM hex address. This matches the Cosmos EVM v0.6.0 address codec used by this application, which accepts EVM hex or `sobya` Bech32 and validates the decoded address length. This verifies address format and conversion, not private-key ownership. The owner must verify both addresses in their wallet and sign off on the destination mapping before production genesis. The shared address is one on-chain bank balance (450M SOBY) while the five allocation categories remain separate in the approved off-chain ledger. Never infer or copy an address from an old development genesis.
 
-The genesis native supply must reconcile exactly to the approved total and must not exceed the application cap. Inflation/mint issuance remains disabled under the agreed token rules. Any discrepancy, duplicate balance, unexpected denom, or unaccounted remainder blocks approval.
+The genesis native supply must reconcile exactly to the approved total and must not exceed the application cap. Inflation/mint issuance remains disabled under the agreed token rules. The Cosmos EVM v0.6.0 fee market default starts with base fee 1,000,000,000 asobya per gas, with base-fee charging enabled from height 0. The operator audit requires the same `minimum-gas-prices = "1000000000asobya"` on every node for Cosmos transactions. Any discrepancy, duplicate balance, unexpected denom, or unaccounted remainder blocks approval.
 
 ### Initial fixed allocation — prepare this before validators arrive
 
