@@ -2,8 +2,8 @@
 
 **Status: PREPARATION ONLY — not a production Genesis, not frozen, and not a launch authorization.**
 
-This document is based on the canonical `main` source tree at merge commit
-`7b7b14da898d63107e5425981389c2ba520be55b`.
+This preparation record was checked against the `main` source snapshot at commit
+`5f9bb2e27816ebcbe57b573e536c1dc3bf414b85` (the latest commit at the time of review).
 
 ## Verified protocol constants
 
@@ -50,12 +50,11 @@ CometBFT chain ID and EVM chain ID are separate values and must not be confused.
 - Founder wallet (400M SOBY): `0xd316993423Fc6268038F4EE3EA7C0C5038513C18` → SOBYA account encoding `sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq`.
 - Shared wallet for Community, Treasury, Development, Liquidity, and Emergency (450M SOBY combined): `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f` → SOBYA account encoding `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3`.
 
-The bech32 forms above are deterministic encodings of the 20-byte EVM addresses using the repository's `sobya` account prefix. The shared wallet does not merge the five tokenomics categories: the genesis allocation ledger must retain their separate amounts even though the destination address is identical. These are owner-provided public addresses; this document does not establish control of their private keys.
+The address encoding was checked against the exact Cosmos EVM v0.6.0 `NewEvmCodec` implementation used by SOBYA: it accepts a 20-byte EVM hex address, and its Bech32 decoder requires the configured `sobya` prefix and a valid SDK account-address length. The two displayed Bech32 values therefore represent the same 20-byte addresses as the supplied EVM hex values. This verifies format/conversion only; it does not prove control of either wallet's private key. The shared wallet does not merge the five tokenomics categories: keep their separate amounts in the off-chain allocation ledger even though the on-chain bank genesis will contain one aggregated balance for that address.
 
-## Allocation ledger — addresses required
+## Allocation ledger — destinations recorded; final sign-off pending
 
-All amounts below are exact base units. Blank destination fields are deliberate
-blocking inputs; no placeholder or old development address may be substituted.
+All amounts below are exact base units. Both owner-supplied destination addresses and their SOBYA Bech32 encodings are recorded and their codec format has been checked. Final production sign-off still requires the owner to verify the addresses in their own wallet and approve the exact destination-to-allocation mapping. No development/test address may be substituted.
 
 | Allocation | SOBY | Base units (`asobya`) | Destination |
 |---|---:|---:|---|
@@ -68,11 +67,7 @@ blocking inputs; no placeholder or old development address may be substituted.
 | Emergency | 20,000,000 | 20000000000000000000000000 | Shared MetaMask EVM: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`; SOBYA bech32: `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3` |
 | **Total** | **1,000,000,000** | **1000000000000000000000000000** | Must reconcile exactly |
 
-The shared management wallet may be used for the five owner-managed categories
-only if the owner explicitly confirms that exact public address and the genesis
-allocation report preserves the categories as separate accounting entries.
-The founder's EVM hex address must be converted/validated using the actual
-SOBYA account codec; do not copy a hex address into a bech32 field blindly.
+For the actual `bank.balances` section, represent the shared address as one account balance of 450,000,000 SOBY (450000000000000000000000000 `asobya`), not five duplicate address entries. Keep the five category amounts separate in the signed allocation report: Community 200M, Development 100M, Liquidity 100M, Treasury 30M, Emergency 20M. The founder address receives 400M SOBY and the validator-reserve module account receives 150M SOBY. The EVM codec accepts either the 20-byte hex address or its valid `sobya` Bech32 form; use the canonical Bech32 form in Cosmos bank genesis and verify the owner-controlled wallets before signing off.
 
 ## What can be prepared before validators
 
@@ -100,7 +95,7 @@ SOBYA account codec; do not copy a hex address into a bech32 field blindly.
 
 ## Hard launch blockers
 
-- Owner-confirmed public account destinations for the allocations above.
+- Final owner sign-off that the two supplied wallet addresses are controlled by the owner and that the allocation mapping above is correct (the address encoding itself has been checked against the application codec).
 - Confirmed production CometBFT chain ID and registry-checked EVM chain ID.
 - Tested release-specific genesis/gentx commands and release binary.
 - Validator set, signed gentxs, public P2P topology, and launch time.
