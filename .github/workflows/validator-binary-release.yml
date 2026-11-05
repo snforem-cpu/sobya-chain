@@ -57,7 +57,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: SOBYA ${{ github.ref_name }} (testnet candidate)
+          name: SOBYA ${{ github.ref_name }} (pre-mainnet candidate)
           prerelease: true
           generate_release_notes: true
           files: |
