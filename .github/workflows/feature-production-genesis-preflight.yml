@@ -141,6 +141,9 @@ jobs:
           name: sobya-production-genesis-preflight-${{ github.sha }}
           path: |
             ${{ runner.temp }}/sobya-production-genesis-preflight/config/genesis.json
+            ${{ runner.temp }}/sobya-production-genesis-preflight/config/app.toml
+            ${{ runner.temp }}/sobya-production-genesis-preflight/config/client.toml
+            ${{ runner.temp }}/sobya-production-genesis-preflight/config/config.toml
             ${{ runner.temp }}/sobya-preflight.log
           if-no-files-found: warn
           retention-days: 7
