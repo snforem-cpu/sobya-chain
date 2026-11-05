@@ -125,6 +125,23 @@ curl -fsS https://<OFFICIAL_EVM_RPC_HOST> \
 
 Also inspect `/net_info` on the local CometBFT RPC interface and verify that the expected independent peer IDs are connected. Confirm that at least two independently hosted nodes report the same CometBFT chain ID and advancing height, then complete a transaction between separately controlled accounts.
 
+### One-command external probe
+
+After publishing the real endpoints, run the probe from a separate network (for example, another operator's host). Supply only public addresses and identifiers:
+
+```bash
+export SOBYA_P2P_HOST="<PUBLIC_P2P_HOST>"
+export SOBYA_P2P_PORT="<PUBLIC_P2P_PORT>"
+export SOBYA_RPC_URL="https://<OFFICIAL_RPC_HOST>"
+export SOBYA_EVM_RPC_URL="https://<OFFICIAL_EVM_RPC_HOST>"
+export SOBYA_CHAIN_ID="<OFFICIAL_COMETBFT_CHAIN_ID>"
+export SOBYA_EVM_CHAIN_ID="<OFFICIAL_EVM_CHAIN_ID>"
+export SOBYA_MIN_PEERS=1
+bash scripts/probe-public-network.sh
+```
+
+The probe checks public TCP reachability, CometBFT chain ID and block height, connected peer count, EVM chain ID, and EVM block number. It requires `curl`, `jq`, and `nc`. It makes read-only requests and never needs a wallet key or validator secret.
+
 ## Current verified state and remaining external dependencies
 
 - [x] SOBYA CI has already exercised two local CometBFT validators and peer connectivity on one temporary runner.
