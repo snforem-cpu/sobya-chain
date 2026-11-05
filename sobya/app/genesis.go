@@ -168,6 +168,15 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 	if err := cdc.UnmarshalJSON(evmRaw, &evmGenesis); err != nil {
 		return nil, fmt.Errorf("decode EVM genesis: %w", err)
 	}
+	// Cosmos EVM defaults to the Cosmos Hub extended denom (aatom).
+	// SOBYA's canonical 18-decimal bank coin is asobya, and EVM resolves
+	// its gas coin metadata from Params.EvmDenom during InitGenesis.
+	evmGenesis.Params.EvmDenom = BaseDenom
+	if evmGenesis.Params.ExtendedDenomOptions == nil {
+		evmGenesis.Params.ExtendedDenomOptions = &evmtypes.ExtendedDenomOptions{}
+	}
+	evmGenesis.Params.ExtendedDenomOptions.ExtendedDenom = BaseDenom
+
 	if len(evmGenesis.Params.ActiveStaticPrecompiles) == 0 {
 		evmGenesis.Params.ActiveStaticPrecompiles = append(
 			[]string(nil),
