@@ -1,0 +1,100 @@
+name: SOBYA Project Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract source archive
+        run: |
+          mkdir -p project
+          unzip -q 26031 -d project
+          test -f project/go.mod
+          test -f project/cmd/sobyad/main.go
+
+      - name: Set SOBYA base denomination
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_or_accept(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count:
+                  p.write_text(text.replace(old, new))
+                  print(f"{path}: updated {count} legacy occurrence(s)")
+              elif new in text:
+                  print(f"{path}: already uses {new}; no change needed")
+              else:
+                  raise SystemExit(f"{path}: neither expected legacy value {old!r} nor target value {new!r} was found")
+
+          replace_or_accept("project/app/config.go",
+                            'sdk.DefaultBondDenom = "stake"',
+                            'sdk.DefaultBondDenom = "usobya"')
+          replace_or_accept("project/config.yml", "stake", "usobya")
+          replace_or_accept("project/cmd/sobyad/cmd/config.go", '"0stake"', '"0usobya"')
+          replace_or_accept("project/cmd/sobyad/cmd/testnet_multi_node.go", '0.001stake', '0.001usobya')
+          PY
+
+          rm -f 26031.updated
+          (cd project && zip -qr ../26031.updated .)
+          mv 26031.updated 26031
+
+      - name: Verify denomination changes in updated archive
+        run: |
+          rm -rf verify-project
+          mkdir verify-project
+          unzip -q 26031 -d verify-project
+          grep -n 'DefaultBondDenom = "usobya"' verify-project/app/config.go
+          grep -n 'default_denom: usobya' verify-project/config.yml
+          if grep -RInE 'stake([[:space:]]|$|,|")' verify-project/app verify-project/config.yml --include='*.go' --include='*.yml'; then
+            echo "Unexpected legacy stake denomination reference remains in active app/config files."
+            exit 1
+          fi
+          grep -RIn 'usobya' verify-project/app/config.go verify-project/config.yml verify-project/cmd/sobyad/cmd/config.go verify-project/cmd/sobyad/cmd/testnet_multi_node.go
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: verify-project/go.mod
+          cache: true
+          cache-dependency-path: verify-project/go.sum
+
+      - name: Verify dependencies
+        working-directory: verify-project
+        run: go mod verify
+
+      - name: Run tests
+        working-directory: verify-project
+        run: go test -mod=readonly ./...
+
+      - name: Build node binary
+        working-directory: verify-project
+        run: go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Report binary
+        run: file sobyad
+
+      - name: Commit updated source archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 26031
+          if git diff --cached --quiet; then
+            echo "Archive already contains the requested denomination."
+          else
+            git commit -m "fix: set SOBYA base denomination to usobya"
+            git push origin HEAD:maintenance/verify-build
+          fi

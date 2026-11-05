@@ -1,0 +1,67 @@
+name: SOBYA Validator Binary Prerelease
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sobya-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux-amd64:
+    name: Build Linux amd64 operator binary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache-dependency-path: sobya/go.sum
+
+      - name: Verify dependencies and test
+        working-directory: sobya
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -mod=readonly ./...
+
+      - name: Build and package
+        working-directory: sobya
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../dist
+          GOOS=linux GOARCH=amd64 go build -mod=readonly -trimpath \
+            -ldflags "-X github.com/cosmos/cosmos-sdk/version.Name=sobya -X github.com/cosmos/cosmos-sdk/version.AppName=sobyad -X github.com/cosmos/cosmos-sdk/version.Version=$RELEASE_VERSION -X github.com/cosmos/cosmos-sdk/version.Commit=$SOURCE_COMMIT" \
+            -o ../dist/sobyad ./cmd/sobyad
+          ../dist/sobyad version
+          tar -C ../dist -czf ../dist/sobyad-${RELEASE_VERSION}-linux-amd64.tar.gz sobyad
+          cd ../dist
+          sha256sum sobyad-${RELEASE_VERSION}-linux-amd64.tar.gz > SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - name: Publish GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: SOBYA ${{ github.ref_name }} (testnet candidate)
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            dist/sobyad-${{ github.ref_name }}-linux-amd64.tar.gz
+            dist/SHA256SUMS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

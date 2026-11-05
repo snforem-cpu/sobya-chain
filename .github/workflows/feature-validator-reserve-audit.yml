@@ -1,0 +1,99 @@
+name: SOBYA Validator Reserve Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'sobya/app/**'
+      - 'sobya/go.mod'
+      - 'sobya/go.sum'
+      - '.github/workflows/feature-validator-reserve-audit.yml'
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: sobya-validator-reserve-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reserve-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Verify dependencies and run focused reserve tests
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+          mkdir -p ../reports
+          go test -count=1 -mod=readonly -run 'TestValidatorReserve' -v ./app 2>&1 | tee ../reports/validator-reserve-tests.log
+
+      - name: Run full Go test suite without cache
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -mod=readonly ./...
+
+      - name: Build SOBYA node
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go build -mod=readonly -o ../reports/sobyad ./cmd/sobyad
+
+      - name: Publish exact-commit audit status
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_API_URL: https://api.github.com
+          GITHUB_SERVER_URL: https://github.com
+        shell: bash
+        run: |
+          set -euo pipefail
+          state=success
+          description="Focused reserve tests, full Go tests, and node build passed"
+          if [ "$JOB_STATUS" != "success" ]; then
+            state=failure
+            description="Reserve audit failed; inspect the GitHub Actions run logs"
+          fi
+          payload="$(jq -n --arg state "$state" --arg description "$description" --arg context "SOBYA/validator-reserve-audit" --arg target_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{state:$state,description:$description,context:$context,target_url:$target_url}')"
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -d "$payload"
+
+      - name: Upload focused test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-validator-reserve-audit-${{ github.sha }}
+          path: reports/validator-reserve-tests.log
+          if-no-files-found: warn
+          retention-days: 14

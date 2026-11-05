@@ -1,0 +1,131 @@
+name: SOBYA Localnet Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - "sobya/**"
+      - ".github/workflows/localnet-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  localnet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Verify SOBYA source and denomination
+        run: |
+          test -f sobya/go.mod
+          grep -n 'BaseDenom = "asobya"' sobya/app/genesis.go
+          grep -n 'DisplayDenom = "SOBY"' sobya/app/genesis.go
+          grep -n 'default_denom: asobya' sobya/config.yml
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Run SOBYA application tests
+        working-directory: sobya
+        run: go test -mod=readonly ./...
+
+      - name: Build SOBYA node
+        working-directory: sobya
+        run: go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Initialize a fresh one-validator SOBYA network
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-localnet
+        run: |
+          set -euo pipefail
+          ./sobyad init "SOBYA Local Validator" --chain-id sobya-local-1 --home "$SOBYA_HOME"
+          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > validator-key.json
+          VALIDATOR_ADDRESS="$(jq -r '.address' validator-key.json)"
+          test -n "$VALIDATOR_ADDRESS"
+          echo "VALIDATOR_ADDRESS=$VALIDATOR_ADDRESS" >> "$GITHUB_ENV"
+          ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" 1000000000000000000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis gentx validator 1000000000000000000000asobya --chain-id sobya-local-1 --keyring-backend test --home "$SOBYA_HOME"
+          ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
+          jq -e '.app_state.bank.balances != null' "$SOBYA_HOME/config/genesis.json" >/dev/null
+          sed -i 's/^minimum-gas-prices = ""/minimum-gas-prices = "0asobya"/' "$SOBYA_HOME/config/app.toml"
+          grep -n 'minimum-gas-prices = "0asobya"' "$SOBYA_HOME/config/app.toml"
+          echo "Fresh genesis created with validator $VALIDATOR_ADDRESS"
+
+      - name: Start node and verify fixed-supply rules, RPC, and block production
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-localnet
+        run: |
+          set -euo pipefail
+          ./sobyad start --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-node.log" 2>&1 &
+          NODE_PID=$!
+          trap 'kill "$NODE_PID" 2>/dev/null || true' EXIT
+          READY=0
+          for attempt in $(seq 1 90); do
+            if curl --silent --fail http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"; then
+              READY=1
+              break
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then
+              cat "$RUNNER_TEMP/sobya-node.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          NETWORK="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status.json")"
+          test "$NETWORK" = "sobya-local-1"
+          HEIGHT=0
+          for attempt in $(seq 1 60); do
+            curl --silent --fail http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"
+            HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status.json")"
+            if [ "$HEIGHT" -ge 1 ]; then break; fi
+            sleep 2
+          done
+          test "$HEIGHT" -ge 1
+
+          ./sobyad query bank balances "$VALIDATOR_ADDRESS" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/balances.json"
+          jq -e '.balances[] | select(.denom == "asobya" and (.amount | tonumber) > 0)' "$RUNNER_TEMP/balances.json" >/dev/null
+
+          ./sobyad query mint params --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/mint-params.json"
+          jq -e '.params.mint_denom == "asobya" and .params.inflation_rate_change == "0.000000000000000000" and .params.inflation_max == "0.000000000000000000" and .params.inflation_min == "0.000000000000000000"' "$RUNNER_TEMP/mint-params.json" >/dev/null
+
+          ./sobyad query mint inflation --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/mint-inflation.json"
+          jq -e '.inflation == "0.000000000000000000"' "$RUNNER_TEMP/mint-inflation.json" >/dev/null && echo "PASS: mint inflation is zero."
+
+          ./sobyad query mint annual-provisions --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/annual-provisions.json"
+          jq -e '.annual_provisions == "0.000000000000000000"' "$RUNNER_TEMP/annual-provisions.json" >/dev/null && echo "PASS: annual provisions are zero."
+
+          ./sobyad query bank total-supply-of asobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/native-supply.json"
+          jq -e '.amount.denom == "asobya" and ((.amount.amount | tonumber) <= 1000000000000000)' "$RUNNER_TEMP/native-supply.json" >/dev/null && echo "PASS: native supply is below the 1 billion SOBY cap."
+
+          ./sobyad query bank denom-metadata asobya --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/denom-metadata.json"
+          jq -e '.metadata.base == "asobya" and .metadata.display == "SOBY" and .metadata.denom_units[1].exponent == 18' "$RUNNER_TEMP/denom-metadata.json" >/dev/null
+
+          echo "PASS: chain ID=$NETWORK, block height=$HEIGHT, SOBY metadata is canonical, and inflation is zero."
+          cat "$RUNNER_TEMP/status.json"
+          cat "$RUNNER_TEMP/balances.json"
+          cat "$RUNNER_TEMP/mint-params.json"
+          cat "$RUNNER_TEMP/mint-inflation.json"
+          cat "$RUNNER_TEMP/annual-provisions.json"
+          cat "$RUNNER_TEMP/native-supply.json"
+          cat "$RUNNER_TEMP/denom-metadata.json"
+
+      - name: Upload node log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-localnet-failure-log
+          path: ${{ runner.temp }}/sobya-node.log
+          if-no-files-found: ignore
+          retention-days: 7

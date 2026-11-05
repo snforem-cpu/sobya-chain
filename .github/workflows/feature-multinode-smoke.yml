@@ -1,0 +1,597 @@
+name: SOBYA 18-Decimal Multi-Node Localnet
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - '.github/workflows/feature-multinode-smoke.yml'
+      - 'sobya/cmd/sobyad/cmd/testnet_multi_node.go'
+      - 'sobya/app/**'
+      - 'sobya/TOKENOMICS.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-18-decimal-multinode-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  two-validator-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Test and build node
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Generate, run, and test two validators in one process lifetime
+        env:
+          NET: ${{ runner.temp }}/sobya-18-multinode
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad multi-node \
+            --v 2 \
+            --output-dir "$NET" \
+            --chain-id sobya-feature-multinode-1 \
+            --validators-stake-amount 300000000000000000000,100000000000000000000 \
+            --list-ports 26657,26654 \
+            --starting-ip-address 127.0.0.1 \
+            --keyring-backend test \
+            --minimum-gas-prices 0asobya
+          test -s "$NET/validator0/config/genesis.json"
+          test -s "$NET/validator1/config/genesis.json"
+          # Create a separate delegator account before genesis is finalized.
+          ./sobyad keys add independent-delegator --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/independent-delegator.json"
+          DELEGATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/independent-delegator.json")"
+          test -n "$DELEGATOR_ADDRESS"
+          # Shorten only the disposable CI chain's downtime window so
+          # jail/unjail behavior can be verified in a bounded integration run.
+          DELEGATOR_ADDRESS="$DELEGATOR_ADDRESS" python3 - "$NET/validator0/config/genesis.json" <<'PY'
+          import json, os, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          genesis = json.loads(path.read_text())
+          params = genesis["app_state"]["slashing"]["params"]
+          params["signed_blocks_window"] = "10"
+          params["min_signed_per_window"] = "0.500000000000000000"
+          params["downtime_jail_duration"] = "1s"
+          # A bank balance alone does not create an auth account. Register the
+          # key as a BaseAccount in auth genesis as well as funding it in bank.
+          auth = genesis["app_state"]["auth"]
+          accounts = auth.setdefault("accounts", [])
+          address = os.environ["DELEGATOR_ADDRESS"]
+          if any(item.get("address") == address for item in accounts):
+              raise SystemExit("independent delegator auth account already exists")
+          accounts.append({
+              "@type": "/cosmos.auth.v1beta1.BaseAccount",
+              "address": address,
+              "pub_key": None,
+              "account_number": "0",
+              "sequence": "0",
+          })
+          accounts.sort(key=lambda item: item.get("address", ""))
+          bank = genesis["app_state"]["bank"]
+          balances = bank.setdefault("balances", [])
+          if any(item["address"] == address for item in balances):
+              raise SystemExit("independent delegator bank balance already exists")
+          balances.append({"address": address, "coins": [{"denom": "asobya", "amount": str(1000 * 10**18)}]})
+          balances.sort(key=lambda item: item["address"])
+          supply = {}
+          for balance in balances:
+              for coin in balance.get("coins", []):
+                  supply[coin["denom"]] = supply.get(coin["denom"], 0) + int(coin["amount"])
+          bank["supply"] = [{"denom": denom, "amount": str(supply[denom])} for denom in sorted(supply)]
+          path.write_text(json.dumps(genesis, indent=2) + "\n")
+          PY
+          cp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
+          cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
+          test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-feature-multinode-1"
+
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator0" > "$RUNNER_TEMP/validator0.log" 2>&1 &
+          PID0=$!
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator1" > "$RUNNER_TEMP/validator1.log" 2>&1 &
+          PID1=$!
+          cleanup() {
+            for pid in "$PID0" "$PID1"; do
+              kill "$pid" 2>/dev/null || true
+            done
+            for pid in "$PID0" "$PID1"; do
+              for attempt in $(seq 1 10); do
+                if ! kill -0 "$pid" 2>/dev/null; then break; fi
+                sleep 1
+              done
+              if kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$pid" 2>/dev/null || true
+              fi
+              wait "$pid" 2>/dev/null || true
+            done
+          }
+          trap cleanup EXIT
+
+          set -x
+          dump_node_logs() {
+            echo "===== validator0.log ====="
+            cat "$RUNNER_TEMP/validator0.log" || true
+            echo "===== validator1.log ====="
+            cat "$RUNNER_TEMP/validator1.log" || true
+          }
+          rpc_get() {
+            local url="$1" output="$2"
+            for attempt in $(seq 1 30); do
+              if curl --connect-timeout 2 --max-time 5 -fsS "$url" -o "$output" &&
+                 jq -e '.result' "$output" >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "RPC endpoint did not become healthy: $url"
+            return 1
+          }
+
+          echo "CHECKPOINT: waiting for both CometBFT RPC endpoints"
+          READY0=0
+          READY1=0
+          for attempt in $(seq 1 90); do
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json" &&
+               jq -e '.result.node_info.network' "$RUNNER_TEMP/status0.json" >/dev/null 2>&1; then READY0=1; fi
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json" &&
+               jq -e '.result.node_info.network' "$RUNNER_TEMP/status1.json" >/dev/null 2>&1; then READY1=1; fi
+            if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ]; then break; fi
+            if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
+              echo "A validator process exited before both RPC endpoints became ready"
+              dump_node_logs
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$READY0" -ne 1 ] || [ "$READY1" -ne 1 ]; then
+            echo "RPC readiness timeout: validator0=$READY0 validator1=$READY1"
+            dump_node_logs
+            exit 1
+          fi
+
+          echo "CHECKPOINT: waiting for both validators to commit the same height"
+          H0=0
+          H1=0
+          for attempt in $(seq 1 120); do
+            if ! curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json" ||
+               ! curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"; then
+              sleep 2
+              continue
+            fi
+            H0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status0.json" 2>/dev/null || echo 0)"
+            H1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status1.json" 2>/dev/null || echo 0)"
+            if [[ "$H0" =~ ^[0-9]+$ && "$H1" =~ ^[0-9]+$ ]] &&
+               [ "$H0" -ge 2 ] && [ "$H1" -ge 2 ] && [ "$H0" = "$H1" ]; then break; fi
+            sleep 2
+          done
+          if ! [[ "$H0" =~ ^[0-9]+$ ]] || ! [[ "$H1" =~ ^[0-9]+$ ]] ||
+             [ "$H0" -lt 2 ] || [ "$H1" -lt 2 ] || [ "$H0" != "$H1" ]; then
+            echo "Validators did not reach a common height >= 2 (validator0=$H0 validator1=$H1)"
+            dump_node_logs
+            exit 1
+          fi
+
+          echo "CHECKPOINT: checking peer connectivity"
+          rpc_get http://127.0.0.1:26657/net_info "$RUNNER_TEMP/net0.json"
+          rpc_get http://127.0.0.1:26654/net_info "$RUNNER_TEMP/net1.json"
+          PEERS0="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net0.json")"
+          PEERS1="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net1.json")"
+          if [ "$PEERS0" -lt 1 ] || [ "$PEERS1" -lt 1 ]; then
+            echo "P2P peer check failed: validator0=$PEERS0 validator1=$PEERS1"
+            dump_node_logs
+            exit 1
+          fi
+
+          echo "CHECKPOINT: querying validator set"
+          if ! ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"; then
+            echo "Validator-set query failed"
+            dump_node_logs
+            exit 1
+          fi
+          VALIDATOR_COUNT="$(jq '.validators | length' "$RUNNER_TEMP/validators.json")"
+          if [ "$VALIDATOR_COUNT" -lt 2 ]; then
+            echo "Expected at least 2 validators, received $VALIDATOR_COUNT"
+            cat "$RUNNER_TEMP/validators.json"
+            exit 1
+          fi
+
+          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
+          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
+          # The independent delegator was added after node initialization; never
+          # assume it is ordered after the validator key in keys list output.
+          FROM_KEY="$(jq -ce '[.[] | select(.name != "independent-delegator")][0]' "$RUNNER_TEMP/keys0.json")"
+          TO_KEY="$(jq -ce '.[0]' "$RUNNER_TEMP/keys1.json")"
+          FROM_NAME="$(jq -r '.name' <<<"$FROM_KEY")"
+          DELEGATOR_NAME="independent-delegator"
+          DELEGATOR_ADDR="$(jq -r '.address' "$RUNNER_TEMP/independent-delegator.json")"
+          FROM_ADDR="$(jq -r '.address' <<<"$FROM_KEY")"
+          TO_ADDR="$(jq -r '.address' <<<"$TO_KEY")"
+          VAL0="$(./sobyad keys show "$FROM_NAME" --bech val --keyring-backend test --home "$NET/validator0" -a)"
+          test -n "$VAL0"
+          test "$DELEGATOR_ADDR" != "$FROM_ADDR"
+          test -n "$FROM_NAME"
+          test -n "$FROM_ADDR"
+          test -n "$TO_ADDR"
+          test "$FROM_ADDR" != "$TO_ADDR"
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
+
+          AMOUNT=1000000000000000
+          # Use a fee comfortably above the local minimum-gas-price threshold.
+          # This is a disposable CI chain; the larger fee avoids equality/rounding
+          # ambiguity while remaining only 0.001 SOBYA.
+          FEE=1000000000000000
+          if ! ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}asobya" \
+            --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" \
+            --keyring-backend test \
+            --fees "${FEE}asobya" \
+            --gas 200000 \
+            --broadcast-mode sync \
+            --yes \
+            --output json > "$RUNNER_TEMP/transfer.json" 2> "$RUNNER_TEMP/transfer.stderr"; then
+            echo "Transaction CLI failed before returning a response"
+            cat "$RUNNER_TEMP/transfer.stderr" || true
+            dump_node_logs
+            exit 1
+          fi
+          TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
+          if [ "$TRANSFER_CODE" != "0" ]; then
+            echo "Native SOBYA transfer rejected: code=$TRANSFER_CODE"
+            jq '{codespace,code,raw_log,txhash,gas_wanted,gas_used,tx_response}' "$RUNNER_TEMP/transfer.json" || cat "$RUNNER_TEMP/transfer.json"
+            echo "===== transfer.stderr ====="
+            cat "$RUNNER_TEMP/transfer.stderr" || true
+            dump_node_logs
+            exit 1
+          fi
+          echo "PASS: native SOBYA transfer accepted by CheckTx."
+
+          CONFIRMED=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+            if python3 - "$RUNNER_TEMP/before-from.json" "$RUNNER_TEMP/before-to.json" "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$AMOUNT" "$FEE" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
+          amount, fee = map(int, sys.argv[5:7])
+          ok = after_from == before_from - amount - fee and after_to == before_to + amount
+          if ok:
+              print("PASS: exact integer balance deltas verified for 18-decimal SOBYA.")
+          sys.exit(0 if ok else 1)
+          PY
+            then
+              CONFIRMED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$CONFIRMED" -eq 1
+          echo "PASS: two nodes, P2P peers=$PEERS0/$PEERS1, synchronized heights=$H0/$H1, and a signed native SOBYA transfer."
+
+          # Stake from a separate account, generate fees, and verify that this
+          # non-validator delegator receives a positive distribution reward.
+          BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          ./sobyad tx staking delegate "$VAL0" 100000000000000000000asobya \
+            --from "$DELEGATOR_NAME" --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 --home "$NET/validator0" \
+            --keyring-backend test --fees 1000000000000000asobya --gas 300000 \
+            --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/independent-delegation.json"
+          test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/independent-delegation.json")" = "0"
+          for attempt in $(seq 1 60); do
+            HEIGHT_NOW="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            [ "$HEIGHT_NOW" -gt "$BEFORE_HEIGHT" ] && break
+            sleep 1
+          done
+          ./sobyad query staking delegations "$DELEGATOR_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/independent-delegations.json"
+          jq -e --arg val "$VAL0" '.delegation_responses[] | select(.delegation.validator_address == $val)' "$RUNNER_TEMP/independent-delegations.json" >/dev/null
+
+          BEFORE_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          ./sobyad tx bank send "$DELEGATOR_NAME" "$TO_ADDR" 1000000000000000000asobya \
+            --chain-id sobya-feature-multinode-1 --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" --keyring-backend test \
+            --fees 1000000000000000asobya --gas 200000 --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/delegator-fee-transfer.json"
+          test "$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/delegator-fee-transfer.json")" = "0"
+          for attempt in $(seq 1 60); do
+            HEIGHT_NOW="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            [ "$HEIGHT_NOW" -gt "$BEFORE_HEIGHT" ] && break
+            sleep 1
+          done
+
+          INDEPENDENT_REWARD=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query distribution rewards "$DELEGATOR_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/independent-delegator-rewards.json"
+            if python3 - "$RUNNER_TEMP/independent-delegator-rewards.json" <<'PY'
+          import json, re, sys
+          from decimal import Decimal, InvalidOperation
+
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+
+          def positive(value):
+              if isinstance(value, str):
+                  match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([A-Za-z][A-Za-z0-9/]*)", value)
+                  if not match or match.group(2) != "asobya":
+                      return False
+                  try:
+                      return Decimal(match.group(1)) > 0
+                  except InvalidOperation:
+                      return False
+              if isinstance(value, dict):
+                  if value.get("denom") == "asobya":
+                      try:
+                          if Decimal(str(value.get("amount", "0"))) > 0:
+                              return True
+                      except InvalidOperation:
+                          pass
+                  return any(positive(v) for v in value.values())
+              if isinstance(value, list):
+                  return any(positive(v) for v in value)
+              return False
+
+          sys.exit(0 if positive(data) else 1)
+          PY
+            then
+              INDEPENDENT_REWARD=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$INDEPENDENT_REWARD" -ne 1 ]; then
+            echo "Independent delegator received no positive asobya rewards after fee-generating transactions."
+            cat "$RUNNER_TEMP/independent-delegator-rewards.json"
+            exit 1
+          fi
+          echo "PASS: independent non-validator delegator received positive asobya staking rewards."
+
+          # Capture balances only after every pre-restart transaction has committed.
+          # The independent delegator fee-transfer above also changes TO_ADDR.
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+
+          # Restart both validators using the same persistent homes. The
+          # restarted nodes must recover committed state, reconnect over P2P,
+          # and continue producing blocks beyond the pre-shutdown height.
+          PRE_RESTART_HEIGHT="$H0"
+          kill "$PID0" "$PID1" 2>/dev/null || true
+          wait "$PID0" 2>/dev/null || true
+          wait "$PID1" 2>/dev/null || true
+
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator0" > "$RUNNER_TEMP/validator0-restart.log" 2>&1 &
+          PID0=$!
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator1" > "$RUNNER_TEMP/validator1-restart.log" 2>&1 &
+          PID1=$!
+
+          RESTART_HEIGHT0=0
+          RESTART_HEIGHT1=0
+          for attempt in $(seq 1 120); do
+            READY0=0
+            READY1=0
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/restart-status0.json" &&
+               jq -e '.result.node_info.network == "sobya-feature-multinode-1"' "$RUNNER_TEMP/restart-status0.json" >/dev/null 2>&1; then
+              READY0=1
+              RESTART_HEIGHT0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/restart-status0.json")"
+            fi
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/restart-status1.json" &&
+               jq -e '.result.node_info.network == "sobya-feature-multinode-1"' "$RUNNER_TEMP/restart-status1.json" >/dev/null 2>&1; then
+              READY1=1
+              RESTART_HEIGHT1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/restart-status1.json")"
+            fi
+            if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ] &&
+               [[ "$RESTART_HEIGHT0" =~ ^[0-9]+$ ]] && [[ "$RESTART_HEIGHT1" =~ ^[0-9]+$ ]] &&
+               [ "$RESTART_HEIGHT0" -gt "$PRE_RESTART_HEIGHT" ] &&
+               [ "$RESTART_HEIGHT1" -gt "$PRE_RESTART_HEIGHT" ] &&
+               [ "$RESTART_HEIGHT0" = "$RESTART_HEIGHT1" ]; then
+              break
+            fi
+            if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
+              echo "A validator exited during persistent-state restart verification"
+              cat "$RUNNER_TEMP/validator0-restart.log" || true
+              cat "$RUNNER_TEMP/validator1-restart.log" || true
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$RESTART_HEIGHT0" -le "$PRE_RESTART_HEIGHT" ] ||
+             [ "$RESTART_HEIGHT1" -le "$PRE_RESTART_HEIGHT" ] ||
+             [ "$RESTART_HEIGHT0" != "$RESTART_HEIGHT1" ]; then
+            echo "Persistent restart failed: prior=$PRE_RESTART_HEIGHT validator0=$RESTART_HEIGHT0 validator1=$RESTART_HEIGHT1"
+            cat "$RUNNER_TEMP/validator0-restart.log" || true
+            cat "$RUNNER_TEMP/validator1-restart.log" || true
+            exit 1
+          fi
+
+          rpc_get http://127.0.0.1:26657/net_info "$RUNNER_TEMP/restart-net0.json"
+          rpc_get http://127.0.0.1:26654/net_info "$RUNNER_TEMP/restart-net1.json"
+          RESTART_PEERS0="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/restart-net0.json")"
+          RESTART_PEERS1="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/restart-net1.json")"
+          if [ "$RESTART_PEERS0" -lt 1 ] || [ "$RESTART_PEERS1" -lt 1 ]; then
+            echo "P2P did not recover after restart: validator0=$RESTART_PEERS0 validator1=$RESTART_PEERS1"
+            exit 1
+          fi
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/restart-after-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/restart-after-to.json"
+          python3 - "$RUNNER_TEMP/after-from.json" "$RUNNER_TEMP/after-to.json" "$RUNNER_TEMP/restart-after-from.json" "$RUNNER_TEMP/restart-after-to.json" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          before_from, before_to, after_from, after_to = map(balance, sys.argv[1:5])
+          assert (after_from, after_to) == (before_from, before_to), (
+              f"balances changed across restart: before={(before_from, before_to)} after={(after_from, after_to)}"
+          )
+          print("PASS: committed native SOBYA balances persisted across both validator restarts.")
+          PY
+          echo "PASS: both validators restarted from persistent homes, reconnected to peers, resumed block production at common height=$RESTART_HEIGHT0, and preserved account state."
+
+          # Exercise the actual x/slashing downtime path. Validator0 has 75% of
+          # total voting power (300/400), so it can keep committing blocks while
+          # validator1 (25%) is offline. Equal 50/50 power would halt consensus.
+          # Stop validator1 beyond the shortened signing window, verify jail,
+          # restart it, submit MsgUnjail, and verify it rejoins.
+          KEY1="$(./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json | jq -r '.[0].name')"
+          VAL1="$(./sobyad keys show "$KEY1" --bech val --keyring-backend test --home "$NET/validator1" -a)"
+          test -n "$VAL1"
+          BEFORE_DOWNTIME="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          kill "$PID1" 2>/dev/null || true
+          wait "$PID1" 2>/dev/null || true
+
+          JAIL_CONFIRMED=0
+          for attempt in $(seq 1 120); do
+            CURRENT_HEIGHT="$(curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            if [ "$CURRENT_HEIGHT" -ge "$((BEFORE_DOWNTIME + 18))" ]; then
+              ./sobyad query staking validator "$VAL1" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/jailed-validator.json"
+              if jq -e '.validator.jailed == true' "$RUNNER_TEMP/jailed-validator.json" >/dev/null; then
+                JAIL_CONFIRMED=1
+                break
+              fi
+            fi
+            sleep 1
+          done
+          if [ "$JAIL_CONFIRMED" -ne 1 ]; then
+            echo "Validator was not jailed after downtime window; inspect slashing params and signing-info."
+            CONS_ADDR="$(./sobyad keys show "$KEY1" --bech cons --keyring-backend test --home "$NET/validator1" -a)"
+            ./sobyad query slashing signing-info "$CONS_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
+            exit 1
+          fi
+          echo "PASS: x/slashing jailed validator1 after the configured downtime window."
+
+          ./sobyad start --chain-id sobya-feature-multinode-1 --home "$NET/validator1" > "$RUNNER_TEMP/validator1-unjail.log" 2>&1 &
+          PID1=$!
+          READY_UNJAIL=0
+          for attempt in $(seq 1 60); do
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/validator1-unjail-status.json" &&
+               jq -e '.result.node_info.network == "sobya-feature-multinode-1"' "$RUNNER_TEMP/validator1-unjail-status.json" >/dev/null 2>&1; then
+              READY_UNJAIL=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY_UNJAIL" -eq 1
+
+          # sync mode only proves CheckTx acceptance. It does not prove that
+          # the transaction was included in a committed block. Capture its hash,
+          # wait for query-tx inclusion, and assert the DeliverTx execution code.
+          ./sobyad tx slashing unjail --from "$KEY1" --chain-id sobya-feature-multinode-1 \
+            --node tcp://127.0.0.1:26657 --home "$NET/validator1" \
+            --keyring-backend test --fees 1000000000000000asobya --gas 300000 \
+            --broadcast-mode sync --yes --output json > "$RUNNER_TEMP/unjail-tx.json"
+          cat "$RUNNER_TEMP/unjail-tx.json"
+          UNJAIL_CHECK_CODE="$(jq -r '.code // .tx_response.code // empty' "$RUNNER_TEMP/unjail-tx.json")"
+          if [ "$UNJAIL_CHECK_CODE" != "0" ]; then
+            echo "Unjail transaction failed CheckTx: code=$UNJAIL_CHECK_CODE"
+            exit 1
+          fi
+          UNJAIL_HASH="$(jq -r '.txhash // .tx_response.txhash // empty' "$RUNNER_TEMP/unjail-tx.json")"
+          if [ -z "$UNJAIL_HASH" ]; then
+            echo "Unjail response did not contain a transaction hash."
+            exit 1
+          fi
+
+          UNJAIL_COMMITTED=0
+          for attempt in $(seq 1 90); do
+            if ./sobyad query tx "$UNJAIL_HASH" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/unjail-committed-tx.json" 2> "$RUNNER_TEMP/unjail-query-tx.stderr"; then
+              UNJAIL_COMMITTED=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$UNJAIL_COMMITTED" -ne 1 ]; then
+            echo "Unjail passed CheckTx but was never found in a committed block."
+            cat "$RUNNER_TEMP/unjail-query-tx.stderr" || true
+            cat "$RUNNER_TEMP/unjail-tx.json"
+            ./sobyad query slashing signing-info "$(./sobyad keys show "$KEY1" --bech cons --keyring-backend test --home "$NET/validator1" -a)" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
+            cat "$RUNNER_TEMP/validator0.log" || true
+            cat "$RUNNER_TEMP/validator1-unjail.log" || true
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/unjail-committed-tx.json"
+          UNJAIL_EXEC_CODE="$(jq -r '.code // .tx_response.code // empty' "$RUNNER_TEMP/unjail-committed-tx.json")"
+          if [ "$UNJAIL_EXEC_CODE" != "0" ]; then
+            echo "Unjail was committed but execution failed: code=$UNJAIL_EXEC_CODE"
+            jq '{height,txhash,codespace,code,raw_log,tx_response}' "$RUNNER_TEMP/unjail-committed-tx.json"
+            exit 1
+          fi
+          echo "PASS: MsgUnjail was included in a committed block and executed successfully."
+
+          REJOINED=0
+          for attempt in $(seq 1 90); do
+            ./sobyad query staking validator "$VAL1" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/unjail-validator.json"
+            # The staking query omits "jailed" when it is false on this SDK version.
+            # Treat an omitted field as false, and require the validator to be bonded.
+            if jq -e '((.validator.jailed // false) == false) and (.validator.status == "BOND_STATUS_BONDED")' "$RUNNER_TEMP/unjail-validator.json" >/dev/null; then
+              REJOINED=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$REJOINED" -ne 1 ]; then
+            echo "MsgUnjail executed, but validator still reports jailed state."
+            cat "$RUNNER_TEMP/unjail-validator.json"
+            CONS_ADDR="$(./sobyad keys show "$KEY1" --bech cons --keyring-backend test --home "$NET/validator1" -a)"
+            ./sobyad query slashing signing-info "$CONS_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json || true
+            cat "$RUNNER_TEMP/validator1-unjail.log" || true
+            exit 1
+          fi
+          echo "PASS: signed MsgUnjail restored validator1 from jailed state."
+
+          # Guard against reintroducing BaseApp optimistic-execution hash
+          # mismatches. These indicate speculative execution disagreed with
+          # canonical FinalizeBlock execution and must fail this integration run.
+          if grep -nE 'OE aborted due to hash mismatch' "$RUNNER_TEMP"/validator*.log; then
+            echo "Optimistic execution hash mismatch detected in validator logs."
+            exit 1
+          fi
+          echo "PASS: no optimistic-execution hash mismatch in either validator log."
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-18-decimal-multinode-failure
+          path: |
+            ${{ runner.temp }}/validator0.log
+            ${{ runner.temp }}/validator1.log
+            ${{ runner.temp }}/transfer.json
+            ${{ runner.temp }}/transfer.stderr
+            ${{ runner.temp }}/before-from.json
+            ${{ runner.temp }}/before-to.json
+            ${{ runner.temp }}/after-from.json
+            ${{ runner.temp }}/after-to.json
+            ${{ runner.temp }}/jailed-validator.json
+            ${{ runner.temp }}/unjail-tx.json
+            ${{ runner.temp }}/unjail-committed-tx.json
+            ${{ runner.temp }}/unjail-query-tx.stderr
+            ${{ runner.temp }}/unjail-validator.json
+            ${{ runner.temp }}/validator1-unjail.log
+            ${{ runner.temp }}/validator0-restart.log
+          if-no-files-found: ignore
+          retention-days: 7

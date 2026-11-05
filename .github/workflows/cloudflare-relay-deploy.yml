@@ -1,0 +1,42 @@
+name: Deploy SOBYA Cloudflare Relay
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+
+      - name: Deploy Durable Objects Worker
+        working-directory: cloudflare-relay
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          wrangler deploy --config wrangler.toml
+
+      - name: Set private relay token
+        working-directory: cloudflare-relay
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SOBYA_RELAY_TOKEN: ${{ secrets.SOBYA_RELAY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SOBYA_RELAY_TOKEN"
+          printf '%s' "$SOBYA_RELAY_TOKEN" | wrangler secret put RELAY_TOKEN --config wrangler.toml

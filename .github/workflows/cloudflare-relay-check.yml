@@ -1,0 +1,46 @@
+name: SOBYA Cloudflare Relay Static Checks
+
+on:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - 'cloudflare-relay/**'
+      - '.github/workflows/cloudflare-relay-check.yml'
+      - '.github/workflows/cloudflare-relay-deploy.yml'
+  pull_request:
+    paths:
+      - 'cloudflare-relay/**'
+      - '.github/workflows/cloudflare-relay-check.yml'
+      - '.github/workflows/cloudflare-relay-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Check Worker JavaScript syntax
+        run: node --check cloudflare-relay/src/index.js
+
+      - name: Check Python bridge syntax
+        run: python3 -m py_compile cloudflare-relay/bridge/relay_client.py
+
+      - name: Validate Wrangler configuration
+        run: python3 -c "import pathlib,tomllib; tomllib.loads(pathlib.Path('cloudflare-relay/wrangler.toml').read_text())"
+
+      - name: Install pinned bridge dependency
+        run: python3 -m pip install -r cloudflare-relay/requirements.txt
+
+      - name: Validate Wrangler build without deploying
+        run: |
+          npm install --global wrangler@4
+          wrangler deploy --dry-run --config cloudflare-relay/wrangler.toml

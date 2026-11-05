@@ -1,0 +1,329 @@
+name: SOBYA GSRN Cross-Runner Network Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - '.github/workflows/gsrn-sobya-bridge.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: sobya-gsrn-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Build SOBYA and generate two independent validator homes
+        run: |
+          set -euo pipefail
+          mkdir -p project bundle
+          unzip -q 26031 -d project
+          cd project
+          go build -mod=readonly -o ../bundle/sobyad ./cmd/sobyad
+          cd ..
+          NET="$RUNNER_TEMP/sobya-gsrn-network"
+          ./bundle/sobyad multi-node \
+            --v 2 \
+            --output-dir "$NET" \
+            --chain-id sobya-gsrn-ci-1 \
+            --validators-stake-amount 100000000,100000000 \
+            --list-ports 26657,26654 \
+            --starting-ip-address 127.0.0.1 \
+            --keyring-backend test \
+            --minimum-gas-prices 0usobya
+          test -s "$NET/validator0/config/genesis.json"
+          test -s "$NET/validator1/config/genesis.json"
+          cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
+          cp -a "$NET/validator0" bundle/
+          cp -a "$NET/validator1" bundle/
+          python3 - "$NET" bundle/node-ids.txt <<'PY'
+          import base64, hashlib, json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          out = pathlib.Path(sys.argv[2])
+          ids = []
+          for n in ("validator0", "validator1"):
+              obj = json.loads((root / n / "config" / "node_key.json").read_text())
+              raw = base64.b64decode(obj["priv_key"]["value"])
+              pub = raw[-32:]
+              ids.append(hashlib.sha256(pub).digest()[:20].hex().upper())
+          assert all(len(x) == 40 for x in ids)
+          out.write_text("\n".join(ids) + "\n")
+          print("Prepared two separate validator identities and a shared SOBYA genesis.")
+          PY
+          mkdir -p bundle/relay
+          openssl rand -hex 32 > bundle/relay/secret-a
+          openssl rand -hex 32 > bundle/relay/secret-b
+          chmod 600 bundle/relay/secret-a bundle/relay/secret-b
+          tar -czf "$RUNNER_TEMP/sobya-gsrn-bundle.tar.gz" -C bundle .
+          echo "Bundle prepared; validator keys and temporary relay secrets remain in a one-day private workflow artifact."
+
+      - name: Upload temporary validator bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-gsrn-private-test-bundle
+          path: ${{ runner.temp }}/sobya-gsrn-bundle.tar.gz
+          retention-days: 1
+
+  validator-a:
+    needs: prepare-network
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download temporary validator bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: sobya-gsrn-private-test-bundle
+          path: bundle-download
+
+      - name: Extract node A and configure its reverse TCP relay
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          tar -xzf bundle-download/sobya-gsrn-bundle.tar.gz -C bundle
+          NODE_LABEL="a"
+          PEER_LABEL="b"
+          SECRET_A="$(cat bundle/relay/secret-a)"
+          SECRET_B="$(cat bundle/relay/secret-b)"
+          echo "::add-mask::$SECRET_A"
+          echo "::add-mask::$SECRET_B"
+          NODE_B_ID="$(sed -n '2p' bundle/node-ids.txt)"
+          test "${#NODE_B_ID}" -eq 40
+
+          curl -fL --retry 3 -o gs-netcat https://github.com/hackerschoice/gsocket/releases/download/v1.4.43/gs-netcat_linux-x86_64
+          chmod 700 gs-netcat
+          ./gs-netcat -s "$SECRET_A" -l -d 127.0.0.1 -p 26656 > "$RUNNER_TEMP/gsrn-listener-a.log" 2>&1 &
+          PID_LISTEN=$!
+          ./gs-netcat -s "$SECRET_B" -p 27656 > "$RUNNER_TEMP/gsrn-client-b.log" 2>&1 &
+          PID_CLIENT=$!
+
+          cleanup() {
+            kill "$PID_CLIENT" "$PID_LISTEN" "$PID_NODE" 2>/dev/null || true
+            wait "$PID_CLIENT" "$PID_LISTEN" "$PID_NODE" 2>/dev/null || true
+          }
+          PID_NODE=""
+
+          dump_diagnostics() {
+            echo "===== GSRN listener log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-listener-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== GSRN client log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-client-${PEER_LABEL}.log" 2>/dev/null || true
+            echo "===== SOBYA node log ====="
+            tail -n 200 "$RUNNER_TEMP/sobya-node-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== listening TCP sockets ====="
+            ss -lntp 2>&1 || true
+            echo "===== relevant processes ====="
+            ps -eo pid,ppid,stat,etime,args | grep -E 'gs-netcat|sobyad' | grep -v grep || true
+          }
+
+          on_exit() {
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "::group::Failure diagnostics (exit=$rc)"
+              dump_diagnostics
+              echo "::endgroup::"
+            fi
+            cleanup
+            exit "$rc"
+          }
+          trap on_exit EXIT
+
+          for attempt in $(seq 1 60); do
+            kill -0 "$PID_LISTEN"
+            kill -0 "$PID_CLIENT"
+            if ss -lnt | grep -q ':27656'; then break; fi
+            sleep 2
+          done
+          ss -lnt | grep -q ':27656'
+
+          python3 - bundle/validator0/config/config.toml "$NODE_B_ID" <<'PY'
+          import pathlib, re, sys
+          p = pathlib.Path(sys.argv[1])
+          peer = sys.argv[2] + "@127.0.0.1:27656"
+          lines = p.read_text().splitlines()
+          section = None
+          out = []
+          for line in lines:
+              m = re.match(r"^\s*\[([^]]+)\]", line)
+              if m:
+                  section = m.group(1)
+              if section == "p2p":
+                  if re.match(r"^\s*laddr\s*=", line):
+                      line = 'laddr = "tcp://0.0.0.0:26656"'
+                  elif re.match(r"^\s*persistent_peers\s*=", line):
+                      line = f'persistent_peers = "{peer}"'
+                  elif re.match(r"^\s*pex\s*=", line):
+                      line = "pex = false"
+                  elif re.match(r"^\s*addr_book_strict\s*=", line):
+                      line = "addr_book_strict = false"
+              elif section == "rpc" and re.match(r"^\s*laddr\s*=", line):
+                  line = 'laddr = "tcp://127.0.0.1:26657"'
+              out.append(line)
+          p.write_text("\n".join(out) + "\n")
+          assert 'persistent_peers = "' + peer + '"' in p.read_text()
+          PY
+
+          ./bundle/sobyad start --home bundle/validator0 > "$RUNNER_TEMP/sobya-node-a.log" 2>&1 &
+          PID_NODE=$!
+
+          READY=0
+          for attempt in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status-a.json"; then READY=1; break; fi
+            if ! kill -0 "$PID_NODE" 2>/dev/null; then exit 1; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          PEER_OK=0
+          for attempt in $(seq 1 180); do
+            curl -fsS http://127.0.0.1:26657/net_info > "$RUNNER_TEMP/net-a.json"
+            PEERS="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net-a.json")"
+            HEIGHT="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            if [ "$PEERS" -ge 1 ] && [ "$HEIGHT" -ge 5 ]; then PEER_OK=1; break; fi
+            sleep 2
+          done
+          test "$PEER_OK" -eq 1
+          echo "PASS: validator A reached validator B through GSRN; peers=$PEERS height=$HEIGHT"
+
+          ./bundle/sobyad keys list --keyring-backend test --home bundle/validator0 --output json > "$RUNNER_TEMP/keys-a.json"
+          FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys-a.json")"
+          FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys-a.json")"
+          ./bundle/sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home bundle/validator0 --output json > "$RUNNER_TEMP/balance-a.json"
+          echo "PASS: validator A RPC and wallet query are available through its local node."
+
+  validator-b:
+    needs: prepare-network
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download temporary validator bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: sobya-gsrn-private-test-bundle
+          path: bundle-download
+
+      - name: Extract node B and configure its reverse TCP relay
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          tar -xzf bundle-download/sobya-gsrn-bundle.tar.gz -C bundle
+          NODE_LABEL="b"
+          PEER_LABEL="a"
+          SECRET_A="$(cat bundle/relay/secret-a)"
+          SECRET_B="$(cat bundle/relay/secret-b)"
+          echo "::add-mask::$SECRET_A"
+          echo "::add-mask::$SECRET_B"
+          NODE_A_ID="$(sed -n '1p' bundle/node-ids.txt)"
+          test "${#NODE_A_ID}" -eq 40
+
+          curl -fL --retry 3 -o gs-netcat https://github.com/hackerschoice/gsocket/releases/download/v1.4.43/gs-netcat_linux-x86_64
+          chmod 700 gs-netcat
+          ./gs-netcat -s "$SECRET_B" -l -d 127.0.0.1 -p 26656 > "$RUNNER_TEMP/gsrn-listener-b.log" 2>&1 &
+          PID_LISTEN=$!
+          ./gs-netcat -s "$SECRET_A" -p 27656 > "$RUNNER_TEMP/gsrn-client-a.log" 2>&1 &
+          PID_CLIENT=$!
+
+          cleanup() {
+            kill "$PID_CLIENT" "$PID_LISTEN" "$PID_NODE" 2>/dev/null || true
+            wait "$PID_CLIENT" "$PID_LISTEN" "$PID_NODE" 2>/dev/null || true
+          }
+          PID_NODE=""
+
+          dump_diagnostics() {
+            echo "===== GSRN listener log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-listener-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== GSRN client log ====="
+            tail -n 100 "$RUNNER_TEMP/gsrn-client-${PEER_LABEL}.log" 2>/dev/null || true
+            echo "===== SOBYA node log ====="
+            tail -n 200 "$RUNNER_TEMP/sobya-node-${NODE_LABEL}.log" 2>/dev/null || true
+            echo "===== listening TCP sockets ====="
+            ss -lntp 2>&1 || true
+            echo "===== relevant processes ====="
+            ps -eo pid,ppid,stat,etime,args | grep -E 'gs-netcat|sobyad' | grep -v grep || true
+          }
+
+          on_exit() {
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "::group::Failure diagnostics (exit=$rc)"
+              dump_diagnostics
+              echo "::endgroup::"
+            fi
+            cleanup
+            exit "$rc"
+          }
+          trap on_exit EXIT
+
+          for attempt in $(seq 1 60); do
+            kill -0 "$PID_LISTEN"
+            kill -0 "$PID_CLIENT"
+            if ss -lnt | grep -q ':27656'; then break; fi
+            sleep 2
+          done
+          ss -lnt | grep -q ':27656'
+
+          python3 - bundle/validator1/config/config.toml "$NODE_A_ID" <<'PY'
+          import pathlib, re, sys
+          p = pathlib.Path(sys.argv[1])
+          peer = sys.argv[2] + "@127.0.0.1:27656"
+          lines = p.read_text().splitlines()
+          section = None
+          out = []
+          for line in lines:
+              m = re.match(r"^\s*\[([^]]+)\]", line)
+              if m:
+                  section = m.group(1)
+              if section == "p2p":
+                  if re.match(r"^\s*laddr\s*=", line):
+                      line = 'laddr = "tcp://0.0.0.0:26656"'
+                  elif re.match(r"^\s*persistent_peers\s*=", line):
+                      line = f'persistent_peers = "{peer}"'
+                  elif re.match(r"^\s*pex\s*=", line):
+                      line = "pex = false"
+                  elif re.match(r"^\s*addr_book_strict\s*=", line):
+                      line = "addr_book_strict = false"
+              elif section == "rpc" and re.match(r"^\s*laddr\s*=", line):
+                  line = 'laddr = "tcp://127.0.0.1:26657"'
+              out.append(line)
+          p.write_text("\n".join(out) + "\n")
+          assert 'persistent_peers = "' + peer + '"' in p.read_text()
+          PY
+
+          ./bundle/sobyad start --home bundle/validator1 > "$RUNNER_TEMP/sobya-node-b.log" 2>&1 &
+          PID_NODE=$!
+
+          READY=0
+          for attempt in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status-b.json"; then READY=1; break; fi
+            if ! kill -0 "$PID_NODE" 2>/dev/null; then exit 1; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          PEER_OK=0
+          for attempt in $(seq 1 180); do
+            curl -fsS http://127.0.0.1:26657/net_info > "$RUNNER_TEMP/net-b.json"
+            PEERS="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net-b.json")"
+            HEIGHT="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+            if [ "$PEERS" -ge 1 ] && [ "$HEIGHT" -ge 5 ]; then PEER_OK=1; break; fi
+            sleep 2
+          done
+          test "$PEER_OK" -eq 1
+          echo "PASS: validator B reached validator A through GSRN; peers=$PEERS height=$HEIGHT"
+
+          ./bundle/sobyad keys list --keyring-backend test --home bundle/validator1 --output json > "$RUNNER_TEMP/keys-b.json"
+          TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys-b.json")"
+          test -n "$TO_ADDR"
+          echo "PASS: validator B RPC and wallet query are available through its local node."

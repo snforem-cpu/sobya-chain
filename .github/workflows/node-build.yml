@@ -1,0 +1,81 @@
+name: SOBYA Node Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - '26031'
+      - '.github/workflows/node-build.yml'
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-node-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux-amd64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Extract SOBYA source archive
+        run: |
+          set -euo pipefail
+          mkdir -p project dist
+          unzip -q 26031 -d project
+          test -f project/go.mod
+          test -f project/cmd/sobyad/main.go
+          grep -q 'DefaultBondDenom = "usobya"' project/app/config.go
+          grep -q 'default_denom: usobya' project/config.yml
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: project/go.mod
+          cache: true
+          cache-dependency-path: project/go.sum
+
+      - name: Verify dependencies
+        working-directory: project
+        run: go mod verify
+
+      - name: Build Linux AMD64 node
+        working-directory: project
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -mod=readonly -trimpath -ldflags="-s -w" -o ../dist/sobyad-linux-amd64 ./cmd/sobyad
+
+      - name: Record build metadata
+        run: |
+          set -euo pipefail
+          chmod +x dist/sobyad-linux-amd64
+          ./dist/sobyad-linux-amd64 version > dist/VERSION.txt 2>&1 || true
+          {
+            echo "Repository: ${GITHUB_REPOSITORY}"
+            echo "Branch: ${GITHUB_REF_NAME}"
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Target: linux/amd64"
+            echo "Denomination: usobya"
+            sha256sum dist/sobyad-linux-amd64
+          } > dist/BUILD-METADATA.txt
+          tar -C dist -czf sobya-linux-amd64.tar.gz sobyad-linux-amd64 VERSION.txt BUILD-METADATA.txt
+
+      - name: Upload downloadable node package
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-node-linux-amd64
+          path: sobya-linux-amd64.tar.gz
+          if-no-files-found: error
+          retention-days: 30

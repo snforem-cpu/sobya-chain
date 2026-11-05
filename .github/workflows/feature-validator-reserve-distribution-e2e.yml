@@ -1,0 +1,60 @@
+name: SOBYA Validator Reserve Distribution E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'scripts/validator-reserve-distribution-e2e.sh'
+      - 'sobya/app/validator_reserve.go'
+      - 'sobya/app/fee_router.go'
+      - '.github/workflows/feature-validator-reserve-distribution-e2e.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-validator-reserve-distribution-e2e-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  distribution-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Verify dependencies
+        working-directory: sobya
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+
+      - name: Run real reserve distribution and withdrawal test
+        env:
+          NET: ${{ runner.temp }}/sobya-validator-reserve-e2e
+        run: |
+          set -euo pipefail
+          chmod +x scripts/validator-reserve-distribution-e2e.sh
+          scripts/validator-reserve-distribution-e2e.sh
+
+      - name: Upload validator reserve E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-validator-reserve-distribution-e2e-${{ github.sha }}
+          path: ${{ runner.temp }}/sobya-validator-reserve-e2e
+          if-no-files-found: warn
+          retention-days: 14

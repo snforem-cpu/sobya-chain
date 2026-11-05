@@ -1,0 +1,73 @@
+name: SOBYA Cosmos EVM Dependency Compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'sobya/go.mod'
+      - '.github/workflows/evm-compatibility.yml'
+      - 'docs/COSMOS_EVM_INTEGRATION.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-evm-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache: true
+
+      - name: Resolve and compile Cosmos EVM v0.6.0 with SOBYA's SDK baseline and Go 1.26-compatible Sonic
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir evm-compat
+          cd evm-compat
+          cat > go.mod <<'EOF'
+          module sobya-evm-compatibility-check
+
+          go 1.26.7
+
+          require (
+            github.com/cometbft/cometbft v0.38.21
+            github.com/cosmos/cosmos-sdk v0.53.6
+            github.com/cosmos/evm v0.6.0
+            github.com/cosmos/ibc-go/v10 v10.4.0
+          )
+
+          replace (
+            github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
+            github.com/bytedance/sonic => github.com/bytedance/sonic v1.15.5
+            github.com/bytedance/sonic/loader => github.com/bytedance/sonic/loader v0.5.3
+          )
+          EOF
+          go mod download
+          go list -m all > module-graph.txt
+          grep -E '^(github.com/cosmos/evm |github.com/cosmos/cosmos-sdk |github.com/cometbft/cometbft |github.com/cosmos/ibc-go/v10 |github.com/cosmos/go-ethereum )' module-graph.txt
+          go test -mod=mod -run '^$' github.com/cosmos/evm/x/vm/...
+          go test -mod=mod -run '^$' github.com/cosmos/evm/x/erc20/...
+          go test -mod=mod -run '^$' github.com/cosmos/evm/x/feemarket/...
+          go test -mod=mod -run '^$' github.com/cosmos/evm/ante/...
+          go test -mod=mod -run '^$' github.com/cosmos/evm/server/...
+          go test -mod=mod -run '^$' github.com/cosmos/evm/precompiles/...
+          go test -mod=mod -run '^$' github.com/cosmos/evm/mempool/...
+
+      - name: Upload resolved module graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cosmos-evm-v060-module-graph
+          path: evm-compat/module-graph.txt
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,135 @@
+name: SOBYA Feature Branch Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - '26031'
+      - 'sobya/**'
+      - '.github/workflows/feature-validation.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sobya-feature-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout the exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Validate and extract archived source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s 26031
+          unzip -t 26031
+          mkdir -p project dist reports
+          unzip -q 26031 -d project
+          test -s project/go.mod
+          test -f project/cmd/sobyad/main.go
+          test -s sobya/go.mod
+          test -f sobya/cmd/sobyad/main.go
+          {
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Archive SHA256:"
+            sha256sum 26031
+            echo
+            echo "Archive source module:"
+            grep -E '^(module |go )' project/go.mod
+            echo
+            echo "Working source module:"
+            grep -E '^(module |go )' sobya/go.mod
+            echo
+            echo "Archive/working tree file counts:"
+            printf 'archive='
+            find project -type f | wc -l
+            printf 'sobya='
+            find sobya -type f | wc -l
+            echo
+            echo "Key source file checksums:"
+            for f in app/config.go app/genesis.go app/app.go config.yml; do
+              if [ -f "project/$f" ] && [ -f "sobya/$f" ]; then
+                sha256sum "project/$f" "sobya/$f"
+              fi
+            done
+          } | tee reports/source-audit.txt
+
+      - name: Set up Go for working source
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Resolve working-source dependencies in the runner
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Normalize the module graph and checksums locally. The resulting
+          # go.mod/go.sum are uploaded as an artifact for review and a separate
+          # commit; CI never pushes to the feature branch.
+          go mod tidy
+          go mod download all
+
+      - name: Verify, test, and build working source
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../dist/sobyad-working ./cmd/sobyad
+
+      - name: Set up Go for archived source
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: project/go.mod
+          # The working-source setup-go step already populated the shared
+          # module cache. Avoid restoring a second overlapping cache archive
+          # into the same GOMODCACHE (tar reports "File exists").
+          # Keep this disabled until both source trees use isolated caches.
+          cache: false
+
+      - name: Verify, test, and build archived source
+        working-directory: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../dist/sobyad-archive ./cmd/sobyad
+
+      - name: Record validation result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Branch: ${GITHUB_REF_NAME}"
+            echo "The workflow validates both the tracked source directory and the archived build input."
+            echo "Validation resolves dependencies locally and never pushes commits."
+          } >> reports/source-audit.txt
+
+      - name: Upload audit and binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-feature-validation-${{ github.sha }}
+          path: |
+            reports/
+            dist/
+            sobya/go.mod
+            sobya/go.sum
+          if-no-files-found: warn
+          retention-days: 14

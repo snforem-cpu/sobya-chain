@@ -1,19 +1,33 @@
-
 name: SOBYA Blockchain Scaffold
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - '.github/workflows/scaffold.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   create-chain:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Allow only the authorized development branch
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != "branch" ] || [ "${GITHUB_REF_NAME}" != "maintenance/verify-build" ]; then
+            echo "This workflow may run only on maintenance/verify-build."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -22,43 +36,77 @@ jobs:
           cache: false
 
       - name: Install pinned Ignite v29.10.1
+        shell: bash
         run: |
           git clone --depth 1 --branch v29.10.1 https://github.com/ignite/cli.git ignite-cli
           cd ignite-cli
           make install
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "/usr/local/bin" >> "$GITHUB_PATH"
 
       - name: Verify installed tools
+        shell: bash
         run: |
-          which ignite
+          command -v ignite
           ignite version
           go version
 
-      - name: Generate SOBYA chain
+      - name: Generate SOBYA starter source when absent
+        shell: bash
         run: |
-          ignite scaffold chain sobya \
-            --address-prefix sobya \
-            --no-module \
-            --skip-git
+          if [ -f sobya/go.mod ]; then
+            echo "Existing SOBYA source found; reusing it."
+          elif [ -e sobya ]; then
+            echo "The sobya/ path exists but has no go.mod; refusing to overwrite it."
+            exit 1
+          else
+            ignite scaffold chain sobya \
+              --address-prefix sobya \
+              --no-module \
+              --skip-git
+          fi
 
       - name: Verify generated source
+        shell: bash
         run: |
-          test -d sobya
           test -f sobya/go.mod
-          echo "SOBYA source files generated successfully."
-          find sobya -maxdepth 2 -type f | sort
+          test -d sobya/app
+          echo "SOBYA starter source is present."
+          find sobya -maxdepth 2 -type f | sort | head -200
 
-      - name: Build SOBYA chain
+      - name: Tidy, test, and build source
         working-directory: sobya
+        shell: bash
         run: |
           go mod tidy
+          go test ./...
           go build ./...
 
-      - name: Upload SOBYA source
+      - name: Upload verified SOBYA source
         uses: actions/upload-artifact@v4
         with:
           name: sobya-chain-source
           path: sobya/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Persist verified source on the development branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="maintenance/verify-build"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sobya/
+          if git diff --cached --quiet; then
+            echo "Verified source is unchanged; no commit is needed."
+            exit 0
+          fi
+          git commit -m "Generate and verify SOBYA starter source"
+          # The branch may have advanced while this workflow was building.
+          # Rebase the generated-source commit onto the latest remote head
+          # instead of attempting a stale non-fast-forward push.
+          git fetch origin "$branch"
+          git rebase "origin/$branch"
+          git push origin "HEAD:refs/heads/$branch"

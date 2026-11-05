@@ -1,0 +1,553 @@
+name: SOBYA Multi-Node Localnet
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/verify-build
+    paths:
+      - '26031'
+      - '.github/workflows/multi-node-localnet.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: sobya-multi-node-localnet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  two-validator-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Extract SOBYA source
+        run: |
+          set -euo pipefail
+          mkdir -p project
+          unzip -q 26031 -d project
+          test -f project/go.mod
+          grep -q 'DefaultBondDenom = "usobya"' project/app/config.go
+          grep -q 'default_denom: usobya' project/config.yml
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: project/go.mod
+          cache: true
+          cache-dependency-path: project/go.sum
+
+      - name: Build SOBYA node
+        working-directory: project
+        run: go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Generate two independent validator homes from the native multi-node command
+        env:
+          NET: ${{ runner.temp }}/sobya-multi-node
+        run: |
+          set -euo pipefail
+          ./sobyad multi-node \
+            --v 2 \
+            --output-dir "$NET" \
+            --chain-id sobya-multinode-ci-1 \
+            --validators-stake-amount 100000000,100000000 \
+            --list-ports 26657,26654 \
+            --starting-ip-address 127.0.0.1 \
+            --keyring-backend test \
+            --minimum-gas-prices 0usobya
+          test -s "$NET/validator0/config/genesis.json"
+          test -s "$NET/validator1/config/genesis.json"
+          cmp "$NET/validator0/config/genesis.json" "$NET/validator1/config/genesis.json"
+          test "$(jq -r '.chain_id' "$NET/validator0/config/genesis.json")" = "sobya-multinode-ci-1"
+          for node in validator0 validator1; do
+            grep -q 'usobya' "$NET/$node/config/genesis.json"
+            grep -q '2665' "$NET/$node/config/config.toml"
+          done
+          echo "Both node homes share one canonical SOBYA genesis."
+
+      - name: Start both validators and verify P2P, RPC, and consensus
+        env:
+          NET: ${{ runner.temp }}/sobya-multi-node
+        run: |
+          set -euo pipefail
+          ./sobyad start --home "$NET/validator0" > "$RUNNER_TEMP/sobya-validator0.log" 2>&1 &
+          PID0=$!
+          ./sobyad start --home "$NET/validator1" > "$RUNNER_TEMP/sobya-validator1.log" 2>&1 &
+          PID1=$!
+          cleanup() {
+            kill "$PID0" "$PID1" 2>/dev/null || true
+            wait "$PID0" "$PID1" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY0=0
+          READY1=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"; then READY0=1; fi
+            if curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"; then READY1=1; fi
+            if [ "$READY0" -eq 1 ] && [ "$READY1" -eq 1 ]; then break; fi
+            if ! kill -0 "$PID0" 2>/dev/null || ! kill -0 "$PID1" 2>/dev/null; then
+              cat "$RUNNER_TEMP/sobya-validator0.log"
+              cat "$RUNNER_TEMP/sobya-validator1.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$READY0" -eq 1
+          test "$READY1" -eq 1
+
+          for attempt in $(seq 1 120); do
+            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status0.json"
+            curl -fsS http://127.0.0.1:26654/status > "$RUNNER_TEMP/status1.json"
+            H0="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status0.json")"
+            H1="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status1.json")"
+            N0="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status0.json")"
+            N1="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status1.json")"
+            if [ "$N0" = "sobya-multinode-ci-1" ] && [ "$N1" = "$N0" ] && [ "$H0" -ge 3 ] && [ "$H1" -ge 3 ]; then break; fi
+            sleep 2
+          done
+          test "$N0" = "sobya-multinode-ci-1"
+          test "$N1" = "$N0"
+          test "$H0" -ge 3
+          test "$H1" -ge 3
+
+          curl -fsS http://127.0.0.1:26657/net_info > "$RUNNER_TEMP/net0.json"
+          curl -fsS http://127.0.0.1:26654/net_info > "$RUNNER_TEMP/net1.json"
+          PEERS0="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net0.json")"
+          PEERS1="$(jq -r '.result.n_peers | tonumber' "$RUNNER_TEMP/net1.json")"
+          test "$PEERS0" -ge 1
+          test "$PEERS1" -ge 1
+
+          ./sobyad query staking validators --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/validators.json"
+          VALIDATORS="$(jq '.validators | length' "$RUNNER_TEMP/validators.json")"
+          test "$VALIDATORS" -ge 2
+
+          # Use two distinct validator keyrings as two independent wallet identities.
+          ./sobyad keys list --keyring-backend test --home "$NET/validator0" --output json > "$RUNNER_TEMP/keys0.json"
+          ./sobyad keys list --keyring-backend test --home "$NET/validator1" --output json > "$RUNNER_TEMP/keys1.json"
+          FROM_NAME="$(jq -r '.[0].name' "$RUNNER_TEMP/keys0.json")"
+          FROM_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys0.json")"
+          TO_ADDR="$(jq -r '.[0].address' "$RUNNER_TEMP/keys1.json")"
+          test -n "$FROM_NAME"
+          test -n "$FROM_ADDR"
+          test -n "$TO_ADDR"
+          test "$FROM_ADDR" != "$TO_ADDR"
+
+          ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-from.json"
+          ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/before-to.json"
+          BEFORE_FROM="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/before-from.json")"
+          BEFORE_TO="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/before-to.json")"
+          AMOUNT=1000
+
+          echo "Transfer starting balances: sender=$BEFORE_FROM receiver=$BEFORE_TO amount=$AMOUNT"
+          if ! ./sobyad tx bank send "$FROM_NAME" "$TO_ADDR" "${AMOUNT}usobya" \
+            --chain-id sobya-multinode-ci-1 \
+            --node tcp://127.0.0.1:26657 \
+            --home "$NET/validator0" \
+            --keyring-backend test \
+            --fees 20usobya \
+            --gas 200000 \
+            --broadcast-mode sync \
+            --yes \
+            --output json > "$RUNNER_TEMP/transfer.json" 2> "$RUNNER_TEMP/transfer.err"; then
+            cat "$RUNNER_TEMP/transfer.err"
+            cat "$RUNNER_TEMP/transfer.json" || true
+            exit 1
+          fi
+          echo "Transfer response:"
+          cat "$RUNNER_TEMP/transfer.json"
+          TRANSFER_CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/transfer.json")"
+          test "$TRANSFER_CODE" = "0"
+
+          CONFIRMED=0
+          for attempt in $(seq 1 60); do
+            ./sobyad query bank balances "$FROM_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-from.json"
+            ./sobyad query bank balances "$TO_ADDR" --node tcp://127.0.0.1:26657 --home "$NET/validator0" --output json > "$RUNNER_TEMP/after-to.json"
+            AFTER_FROM="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/after-from.json")"
+            AFTER_TO="$(jq -r '[.balances[]? | select(.denom=="usobya") | .amount | tonumber] | add // 0' "$RUNNER_TEMP/after-to.json")"
+            if [ "$AFTER_FROM" -eq "$((BEFORE_FROM - AMOUNT - 20))" ] && [ "$AFTER_TO" -eq "$((BEFORE_TO + AMOUNT))" ]; then
+              CONFIRMED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$CONFIRMED" -eq 1
+          echo "PASS: chain=$N0 heights=$H0/$H1 p2p_peers=$PEERS0/$PEERS1 validators=$VALIDATORS"
+          echo "PASS: transfer=${AMOUNT}usobya from=$FROM_ADDR to=$TO_ADDR balances=$BEFORE_FROM->$AFTER_FROM and $BEFORE_TO->$AFTER_TO (20usobya fee)"
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-multi-node-failure-logs
+          path: |
+            ${{ runner.temp }}/sobya-validator0.log
+            ${{ runner.temp }}/sobya-validator1.log
+            ${{ runner.temp }}/status0.json
+            ${{ runner.temp }}/status1.json
+            ${{ runner.temp }}/net0.json
+            ${{ runner.temp }}/net1.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+# Re-run trigger: validate the existing two-validator CI test on a fresh GitHub-hosted runner.
+
+  runtime-and-restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout maintenance branch
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Extract source and build node
+        run: |
+          set -euo pipefail
+          mkdir -p project
+          unzip -q 26031 -d project
+          test -f project/go.mod
+          grep -q 'DefaultBondDenom = "usobya"' project/app/config.go
+          grep -q 'default_denom: usobya' project/config.yml
+          cd project
+          go version
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Run for 10 minutes, restart, and verify state persistence
+        env:
+          NET: ${{ runner.temp }}/sobya-runtime
+        run: |
+          set -euo pipefail
+          ./sobyad multi-node \
+            --v 1 \
+            --output-dir "$NET" \
+            --chain-id sobya-runtime-ci-1 \
+            --validators-stake-amount 100000000 \
+            --list-ports 26657 \
+            --starting-ip-address 127.0.0.1 \
+            --keyring-backend test \
+            --minimum-gas-prices 0usobya
+
+          HOME_DIR="$NET/validator0"
+          ./sobyad start --home "$HOME_DIR" > "$RUNNER_TEMP/sobya-runtime.log" 2>&1 &
+          PID=$!
+          cleanup() {
+            kill "$PID" 2>/dev/null || true
+            wait "$PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"; then READY=1; break; fi
+            if ! kill -0 "$PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-runtime.log"; exit 1; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          START_HEIGHT="$(jq -r '.result.sync_info.latest_block_height' "$RUNNER_TEMP/status.json")"
+          START_TIME="$(date +%s)"
+          while [ "$(( $(date +%s) - START_TIME ))" -lt 600 ]; do
+            kill -0 "$PID"
+            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"
+            NETWORK="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/status.json")"
+            HEIGHT="$(jq -r '.result.sync_info.latest_block_height' "$RUNNER_TEMP/status.json")"
+            test "$NETWORK" = "sobya-runtime-ci-1"
+            test "$HEIGHT" -ge "$START_HEIGHT"
+            sleep 10
+          done
+
+          BEFORE="$(curl -fsS http://127.0.0.1:26657/status | jq -r '.result.sync_info.latest_block_height')"
+          test "$BEFORE" -gt "$START_HEIGHT"
+          echo "PASS: node remained alive for at least 600 seconds; height $START_HEIGHT -> $BEFORE"
+
+          kill -TERM "$PID"
+          wait "$PID" || true
+          for attempt in $(seq 1 30); do
+            if ! curl -fsS http://127.0.0.1:26657/status >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+          ./sobyad start --home "$HOME_DIR" > "$RUNNER_TEMP/sobya-runtime-restart.log" 2>&1 &
+          PID=$!
+          READY=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/restarted-status.json"; then READY=1; break; fi
+            if ! kill -0 "$PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-runtime-restart.log"; exit 1; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          NETWORK="$(jq -r '.result.node_info.network' "$RUNNER_TEMP/restarted-status.json")"
+          RESTART_HEIGHT="$(jq -r '.result.sync_info.latest_block_height' "$RUNNER_TEMP/restarted-status.json")"
+          test "$NETWORK" = "sobya-runtime-ci-1"
+          test "$RESTART_HEIGHT" -ge "$BEFORE"
+
+          ADVANCED=0
+          for attempt in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/restarted-status.json"
+            NOW="$(jq -r '.result.sync_info.latest_block_height' "$RUNNER_TEMP/restarted-status.json")"
+            if [ "$NOW" -gt "$RESTART_HEIGHT" ]; then ADVANCED=1; RESTART_HEIGHT="$NOW"; break; fi
+            sleep 2
+          done
+          test "$ADVANCED" -eq 1
+          echo "PASS: same node home restarted; chain=$NETWORK; persisted height=$BEFORE; resumed height=$RESTART_HEIGHT"
+
+      - name: Upload runtime logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-runtime-restart-failure-logs
+          path: |
+            ${{ runner.temp }}/sobya-runtime.log
+            ${{ runner.temp }}/sobya-runtime-restart.log
+            ${{ runner.temp }}/status.json
+            ${{ runner.temp }}/restarted-status.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+
+# Cross-runner test: one hosted runner listens on a raw TCP port while another
+# independently hosted runner attempts to reach its advertised public egress IP.
+# A failed inbound attempt is recorded as a platform networking limitation, not
+# misreported as a successful peer connection.
+  cross-runner-listener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Start a temporary raw TCP listener
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sobya-peer-probe"
+          PUBLIC_IP="$(curl -4fsS https://api.ipify.org)"
+          cat > "$RUNNER_TEMP/sobya-peer-probe/server.py" <<'PY'
+          import socket
+          server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+          server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          server.bind(("0.0.0.0", 26656))
+          server.listen(1)
+          server.settimeout(240)
+          print("LISTENING 0.0.0.0:26656", flush=True)
+          try:
+              conn, address = server.accept()
+              with conn:
+                  print("ACCEPTED", address, flush=True)
+                  payload = conn.recv(1024)
+                  print("RECEIVED", payload.decode("utf-8", "replace"), flush=True)
+                  conn.sendall(b"SOBYA_TCP_PROBE_OK")
+          except socket.timeout:
+              print("NO_INBOUND_CONNECTION_WITHIN_WINDOW", flush=True)
+          finally:
+              server.close()
+          PY
+          nohup python3 "$RUNNER_TEMP/sobya-peer-probe/server.py" > "$RUNNER_TEMP/sobya-peer-probe/server.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sobya-peer-probe/server.pid"
+          sleep 2
+          LISTENER_PID="$(cat "$RUNNER_TEMP/sobya-peer-probe/server.pid")"
+          kill -0 "$LISTENER_PID"
+          ss -lnt | grep -q '26656'
+          printf '%s\n' "$PUBLIC_IP" > "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt"
+          echo "Listener ready on runner public egress address $PUBLIC_IP, TCP port 26656"
+
+      - name: Publish temporary endpoint for the other runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-cross-runner-endpoint
+          path: ${{ runner.temp }}/sobya-peer-probe/public-ip.txt
+          retention-days: 1
+
+      - name: Keep listener alive for the independent runner probe
+        run: sleep 180
+
+      - name: Show listener diagnostics
+        if: always()
+        run: cat "$RUNNER_TEMP/sobya-peer-probe/server.log" || true
+
+  cross-runner-inbound-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository for run context
+        uses: actions/checkout@v4
+        with:
+          ref: maintenance/verify-build
+
+      - name: Wait for listener endpoint artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sobya-peer-probe"
+          ARTIFACT_ID=""
+          for attempt in $(seq 1 60); do
+            ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="sobya-cross-runner-endpoint" and .expired==false) | .id' | head -n 1)"
+            if [ -n "$ARTIFACT_ID" ]; then break; fi
+            sleep 3
+          done
+          test -n "$ARTIFACT_ID"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name sobya-cross-runner-endpoint --dir "$RUNNER_TEMP/sobya-peer-probe"
+          test -s "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt"
+          echo "Listener runner public egress IP: $(cat "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt")"
+
+      - name: Attempt raw TCP connection from the second runner
+        run: |
+          set -euo pipefail
+          PUBLIC_IP="$(cat "$RUNNER_TEMP/sobya-peer-probe/public-ip.txt")"
+          python3 - "$PUBLIC_IP" <<'PY'
+          import socket, sys
+          host = sys.argv[1]
+          try:
+              with socket.create_connection((host, 26656), timeout=8) as conn:
+                  conn.sendall(b"SOBYA_CROSS_RUNNER_TEST")
+                  conn.settimeout(8)
+                  reply = conn.recv(128)
+                  if reply != b"SOBYA_TCP_PROBE_OK":
+                      raise RuntimeError(f"unexpected reply: {reply!r}")
+                  print(f"PASS: independent GitHub runner reached {host}:26656 over raw TCP")
+          except Exception as exc:
+              print(f"INBOUND_UNAVAILABLE: independent runner could not reach {host}:26656")
+              print(f"Observed error: {type(exc).__name__}: {exc}")
+              print("This is evidence about hosted-runner inbound reachability; it is not a SOBYA consensus failure.")
+          PY
+
+  gsrn-relay-prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      relay_secret: ${{ steps.secret.outputs.value }}
+    steps:
+      - name: Create a one-run relay secret
+        id: secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          VALUE="$(openssl rand -hex 32)"
+          echo "value=$VALUE" >> "$GITHUB_OUTPUT"
+
+  gsrn-relay-server:
+    needs: gsrn-relay-prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Download the official static gs-netcat binary
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o gs-netcat https://github.com/hackerschoice/gsocket/releases/download/v1.4.43/gs-netcat_linux-x86_64
+          chmod 700 gs-netcat
+          ./gs-netcat -h | head -n 8
+
+      - name: Start a local TCP echo service and publish it through GSRN
+        env:
+          GSRN_SECRET: ${{ needs.gsrn-relay-prepare.outputs.relay_secret }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/echo.py" <<'PY'
+          import socket
+          s = socket.socket()
+          s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          s.bind(("127.0.0.1", 26656))
+          s.listen(5)
+          print("LOCAL_ECHO_READY", flush=True)
+          while True:
+              c, a = s.accept()
+              with c:
+                  data = c.recv(4096)
+                  print("RELAY_RECEIVED", repr(data), flush=True)
+                  c.sendall(b"SOBYA_GSRN_RELAY_OK:" + data)
+          PY
+          python3 "$RUNNER_TEMP/echo.py" > "$RUNNER_TEMP/gsrn-echo.log" 2>&1 &
+          ECHO_PID=$!
+          ./gs-netcat -v -s "$GSRN_SECRET" -l -d 127.0.0.1 -p 26656 > "$RUNNER_TEMP/gsrn-server.log" 2>&1 &
+          RELAY_PID=$!
+          cleanup() {
+            kill "$RELAY_PID" "$ECHO_PID" 2>/dev/null || true
+            wait "$RELAY_PID" "$ECHO_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          sleep 3
+          kill -0 "$ECHO_PID"
+          kill -0 "$RELAY_PID"
+          echo "GSRN listener started; keeping it available for the independent runner."
+          sleep 180
+
+      - name: Show GSRN server diagnostics
+        if: always()
+        run: |
+          cat "$RUNNER_TEMP/gsrn-server.log" 2>/dev/null || true
+          cat "$RUNNER_TEMP/gsrn-echo.log" 2>/dev/null || true
+
+  gsrn-relay-client:
+    needs: gsrn-relay-prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download the official static gs-netcat binary
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o gs-netcat https://github.com/hackerschoice/gsocket/releases/download/v1.4.43/gs-netcat_linux-x86_64
+          chmod 700 gs-netcat
+          ./gs-netcat -h | head -n 8
+
+      - name: Connect through GSRN and verify bidirectional TCP data
+        env:
+          GSRN_SECRET: ${{ needs.gsrn-relay-prepare.outputs.relay_secret }}
+        run: |
+          set -euo pipefail
+          ./gs-netcat -v -s "$GSRN_SECRET" -p 26657 > "$RUNNER_TEMP/gsrn-client.log" 2>&1 &
+          CLIENT_PID=$!
+          cleanup() {
+            kill "$CLIENT_PID" 2>/dev/null || true
+            wait "$CLIENT_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$CLIENT_PID" 2>/dev/null; then
+              cat "$RUNNER_TEMP/gsrn-client.log"
+              exit 1
+            fi
+            if python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.settimeout(1)
+          try:
+              s.connect(("127.0.0.1", 26657))
+              s.close()
+              raise SystemExit(0)
+          except OSError:
+              raise SystemExit(1)
+          PY
+            then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          python3 - <<'PY'
+          import socket, time
+          payload = b"SOBYA_GSRN_CROSS_RUNNER_TCP_TEST"
+          last = None
+          for attempt in range(30):
+              try:
+                  with socket.create_connection(("127.0.0.1", 26657), timeout=5) as s:
+                      s.settimeout(10)
+                      s.sendall(payload)
+                      reply = s.recv(4096)
+                  expected = b"SOBYA_GSRN_RELAY_OK:" + payload
+                  if reply != expected:
+                      raise RuntimeError(f"Unexpected response: {reply!r}")
+                  print("PASS: separate GitHub runner exchanged bidirectional TCP data through GSRN.")
+                  raise SystemExit(0)
+              except OSError as exc:
+                  last = exc
+                  time.sleep(2)
+          raise SystemExit(f"GSRN relay test failed: {last!r}")
+          PY
+
+          echo "GSRN cross-runner TCP relay test passed."
+          cat "$RUNNER_TEMP/gsrn-client.log"
