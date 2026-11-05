@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile validator genesis self-bonds against SOBYA's 150M reserve.
 
-Run after `sobyad add-genesis-account` has created/funded each validator's
+Run after `sobyad genesis add-genesis-account` has created/funded each validator's
 public account, but before gentx generation/collection. The script moves the
 self-bond amounts from the validator reserve balance to those pre-funded
 accounts without changing total native supply, and seeds the app-owned reserve
@@ -224,10 +224,10 @@ def prepare(genesis: dict, validators: list[dict]) -> dict:
         seen.add(address)
         amount = parse_amount(item.get("self_bond_asobya"), f"validator {address} self_bond_asobya")
         if address not in account_addresses:
-            fail(f"validator {address} is absent from auth.accounts; run sobyad add-genesis-account first")
+            fail(f"validator {address} is absent from auth.accounts; run sobyad genesis add-genesis-account first")
         balance = balance_by_address.get(address)
         if balance is None:
-            fail(f"validator {address} is absent from bank.balances; run sobyad add-genesis-account first")
+            fail(f"validator {address} is absent from bank.balances; run sobyad genesis add-genesis-account first")
         coins = coin_map(balance.get("coins"), f"validator {address} balance")
         if coins.get(BASE_DENOM, 0) != amount:
             fail(f"validator {address} must have exactly {amount} {BASE_DENOM} from add-genesis-account before reconciliation")
