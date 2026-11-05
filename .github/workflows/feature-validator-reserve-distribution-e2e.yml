@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - 'feature/**'
+      - 'release/**'
     paths:
       - 'scripts/validator-reserve-distribution-e2e.sh'
       - 'sobya/app/validator_reserve.go'
