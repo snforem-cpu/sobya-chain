@@ -6,10 +6,17 @@
 
 The coordinator publishes a ceremony proposal and freezes:
 1. Exact SOBYA source commit and release version.
-2. CometBFT chain ID (unique string).
-3. Proposed EVM chain ID `357812033857` (`0x534f425941`, ASCII-derived from SOBYA), subject to owner sign-off and a final registry check. Never use development/CI values `777777` or `777778`.
+2. **Owner-approved CometBFT chain ID:** `sobya-1`.
+3. **Owner-approved production EVM chain ID:** `357812033857`
+   (`0x534f425941`, ASCII-derived from SOBYA). Recheck public chain registries
+   immediately before publishing the launch bundle; registry absence is not a
+   reservation. Never use development/CI values `777777` or `777778`.
 4. Genesis UTC time and launch time.
-5. Minimum Cosmos gas price `1000000000asobya` per gas (1,000,000,000 asobya/gas), matching the default EVM base fee, plus the tested validator self-bond.
+5. **Owner-approved minimum Cosmos gas price:** `1000000000asobya` per gas
+   (1,000,000,000 asobya/gas), plus the tested validator self-bond. Apply this
+   same local `minimum-gas-prices` value on every validator and RPC node. The
+   EVM fee-market base fee is a separate on-chain setting and must be validated
+   independently.
 6. Supported binary platforms and SHA-256 checksums.
 7. The allocation ledger, account codec/address format, and public P2P peer list.
 
