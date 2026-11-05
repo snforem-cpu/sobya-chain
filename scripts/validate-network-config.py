@@ -17,6 +17,16 @@ MAX_EVM_CHAIN_ID = (1 << 64) - 1
 SOBYA_MIN_GAS_PRICES = "1000000000asobya"
 SOBYA_EVM_BASE_FEE = 1_000_000_000
 BASE_DENOM = "asobya"
+ACTIVE_STATIC_PRECOMPILES = [
+    "0x0000000000000000000000000000000000000100",
+    "0x0000000000000000000000000000000000000400",
+    "0x0000000000000000000000000000000000000800",
+    "0x0000000000000000000000000000000000000801",
+    "0x0000000000000000000000000000000000000802",
+    "0x0000000000000000000000000000000000000804",
+    "0x0000000000000000000000000000000000000805",
+    "0x0000000000000000000000000000000000000806",
+]
 
 
 class ConfigError(Exception):
@@ -103,9 +113,36 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
         fail(f"client.toml chain-id {client.get('chain-id')!r} does not match expected {chain_id!r}")
     if not chain_id or genesis.get("chain_id") != chain_id:
         fail(f"genesis chain_id {genesis.get('chain_id')!r} does not match expected {chain_id!r}")
-    if not isinstance(genesis.get("app_state"), dict) or "evm" not in genesis["app_state"]:
-        fail("genesis app_state is missing the evm module")
-    feemarket = genesis["app_state"].get("feemarket")
+    if not isinstance(genesis.get("app_state"), dict):
+        fail("genesis app_state is missing")
+    app_state = genesis["app_state"]
+    bank = app_state.get("bank", {})
+    bank_metadata = bank.get("denom_metadata", [])
+    native_metadata = next((item for item in bank_metadata if isinstance(item, dict) and item.get("base") == BASE_DENOM), None)
+    if not isinstance(native_metadata, dict) or native_metadata.get("display") != "SOBY" or native_metadata.get("symbol") != "SOBY":
+        fail("genesis must include canonical SOBY/asobya bank denomination metadata")
+    mint = app_state.get("mint", {})
+    mint_params = mint.get("params", {})
+    minter = mint.get("minter", {})
+    if mint_params.get("mint_denom") != BASE_DENOM:
+        fail("mint.params.mint_denom must be asobya")
+    if any(Decimal(str(mint_params.get(field, "1"))) != 0 for field in ("inflation_rate_change", "inflation_max", "inflation_min")):
+        fail("mint inflation parameters must all be zero")
+    if Decimal(str(minter.get("inflation", "1"))) != 0 or Decimal(str(minter.get("annual_provisions", "1"))) != 0:
+        fail("mint minter inflation and annual provisions must be zero")
+    distribution = app_state.get("distribution", {})
+    if Decimal(str(distribution.get("params", {}).get("community_tax", "1"))) != 0:
+        fail("distribution community tax must be zero")
+    evm = app_state.get("evm", {})
+    if not isinstance(evm, dict) or not isinstance(evm.get("params"), dict):
+        fail("genesis app_state is missing evm params")
+    evm_params = evm["params"]
+    extended_options = evm_params.get("extended_denom_options", {})
+    if evm_params.get("evm_denom") != BASE_DENOM or extended_options.get("extended_denom") != BASE_DENOM:
+        fail("EVM and extended denoms must both be asobya")
+    if evm_params.get("active_static_precompiles") != ACTIVE_STATIC_PRECOMPILES:
+        fail("EVM active static precompiles do not match the supported SOBYA set")
+    feemarket = app_state.get("feemarket")
     if not isinstance(feemarket, dict) or not isinstance(feemarket.get("params"), dict):
         fail("genesis app_state is missing feemarket params")
     feemarket_params = feemarket["params"]
