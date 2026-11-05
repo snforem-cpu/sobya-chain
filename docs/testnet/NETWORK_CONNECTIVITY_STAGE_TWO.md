@@ -99,9 +99,9 @@ python3 scripts/validate-network-config.py \
   --role rpc
 ```
 
-Use `--role validator` for validator hosts and `--role seed` for seed-only hosts; those profiles require EVM JSON-RPC to remain disabled. The `rpc` profile requires it to be enabled but loopback-bound behind the TLS proxy.
+Use `--role validator` for validator hosts and `--role seed` for seed-only hosts; those profiles require EVM JSON-RPC to remain disabled. The initial seed may have no upstream peers, while validator and RPC nodes must list at least one real peer or seed. The `rpc` profile requires EVM JSON-RPC to be enabled but loopback-bound behind the TLS proxy.
 
-The audit rejects missing EVM genesis state, chain-ID mismatches, the development EVM ID, empty peer/seed lists, placeholder or private advertised addresses, unsafe RPC, public backend listeners, insecure account unlocking, dangerous JSON-RPC namespaces, wildcard WebSocket origins, and unbounded RPC connections.
+The audit rejects missing EVM genesis state, chain-ID mismatches, the development EVM ID, empty peer/seed lists on non-seed nodes, placeholder or private advertised addresses, unsafe RPC, public backend listeners, insecure account unlocking, dangerous JSON-RPC namespaces, wildcard WebSocket origins, and unbounded RPC connections.
 
 This audit validates local files only. It cannot prove that DNS resolves, a firewall is open, a peer accepts connections, or an RPC endpoint is reachable from outside.
 
