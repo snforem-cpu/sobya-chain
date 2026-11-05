@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/validate-network-config.py'
       - 'scripts/prepare-validator-genesis.py'
+      - 'scripts/initialize-production-genesis.py'
       - 'scripts/probe-public-network.sh'
       - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
@@ -68,6 +69,8 @@ jobs:
           python scripts/validate-network-config.py --self-test
           python -m py_compile scripts/prepare-validator-genesis.py
           python scripts/prepare-validator-genesis.py --self-test
+          python -m py_compile scripts/initialize-production-genesis.py
+          python scripts/initialize-production-genesis.py --self-test
           bash -n scripts/probe-public-network.sh
           bash -n scripts/package-release.sh
 
@@ -77,6 +80,7 @@ jobs:
           test -s docs/STAGE_THREE_OPERATOR_KIT.md
           test -s docs/GENESIS_CEREMONY.md
           test -s scripts/prepare-validator-genesis.py
+          test -s scripts/initialize-production-genesis.py
           test -s docs/RELEASE_PROCESS.md
           test -s docs/ANNOUNCEMENTS.md
           grep -qi '150M SOBY lifetime allocation' docs/STAGE_THREE_OPERATOR_KIT.md
