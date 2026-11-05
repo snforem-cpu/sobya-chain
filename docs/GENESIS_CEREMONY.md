@@ -7,7 +7,7 @@
 The coordinator publishes a ceremony proposal and freezes:
 1. Exact SOBYA source commit and release version.
 2. CometBFT chain ID (unique string).
-3. EVM chain ID (unique integer; never use development/CI value 777777).
+3. Proposed EVM chain ID `357812033857` (`0x534f425941`, ASCII-derived from SOBYA), subject to owner sign-off and a final registry check. Never use development/CI values `777777` or `777778`.
 4. Genesis UTC time and launch time.
 5. Minimum gas price and tested validator self-bond.
 6. Supported binary platforms and SHA-256 checksums.
@@ -38,7 +38,7 @@ Canonical native denomination: `asobya`; precision: 18 decimals; conversion: 1 S
 
 The 150M validator allocation is the total lifetime validator budget. Initial validator self-bonds must be accounted **inside** this 150M lifetime allocation, not added on top. Before generating production genesis, the reserve implementation must be tested with the chosen initial self-bond method so the reserve account is funded only with the unallocated remainder and already-created validator stake is not counted or paid twice. Do not create individual validator balances in addition to the same self-bond gentx amounts.
 
-The owner-supplied founder and shared management EVM addresses and their `sobya` Bech32 encodings have been checksum-decoded and verified byte-for-byte: each Bech32 value contains exactly 20 bytes matching its corresponding EVM hex address. This matches the Cosmos EVM v0.6.0 address codec used by this application, which accepts EVM hex or `sobya` Bech32 and validates the decoded address length. This verifies address format and conversion, not private-key ownership. The owner must verify both addresses in their wallet and sign off on the destination mapping before production genesis. The shared address is one on-chain bank balance (450M SOBY) while the five allocation categories remain separate in the approved off-chain ledger. Never infer or copy an address from an old development genesis.
+The proposed production identifier pair is CometBFT `sobya-1` and EVM `357812033857` (`0x534f425941`). These are candidates only until the owner approves them and the final launch manifest freezes them. The EVM candidate was not listed in ethereum-lists/chains on 2026-11-05; registry absence does not reserve an ID or prove no private chain uses it. The owner-supplied founder and shared management EVM addresses and their `sobya` Bech32 encodings have been checksum-decoded and verified byte-for-byte: each Bech32 value contains exactly 20 bytes matching its corresponding EVM hex address. This matches the Cosmos EVM v0.6.0 address codec used by this application, which accepts EVM hex or `sobya` Bech32 and validates the decoded address length. This verifies address format and conversion, not private-key ownership. The owner must verify both addresses in their wallet and sign off on the destination mapping before production genesis. The shared address is one on-chain bank balance (450M SOBY) while the five allocation categories remain separate in the approved off-chain ledger. Never infer or copy an address from an old development genesis.
 
 The genesis native supply must reconcile exactly to the approved total and must not exceed the application cap. Inflation/mint issuance remains disabled under the agreed token rules. Any discrepancy, duplicate balance, unexpected denom, or unaccounted remainder blocks approval.
 
