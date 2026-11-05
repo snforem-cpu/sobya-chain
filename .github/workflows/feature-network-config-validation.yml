@@ -1,0 +1,54 @@
+name: SOBYA Network Configuration Validation
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'scripts/validate-network-config.py'
+      - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
+      - 'sobya/cmd/sobyad/cmd/config.go'
+      - 'sobya/cmd/sobyad/cmd/config_test.go'
+      - '.github/workflows/feature-network-config-validation.yml'
+  pull_request:
+    paths:
+      - 'scripts/validate-network-config.py'
+      - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
+      - 'sobya/cmd/sobyad/cmd/config.go'
+      - 'sobya/cmd/sobyad/cmd/config_test.go'
+      - '.github/workflows/feature-network-config-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-network-config-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  network-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile and self-test network config auditor
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/validate-network-config.py
+          python scripts/validate-network-config.py --self-test
+
+      - name: Run focused Go CLI configuration tests
+        working-directory: sobya
+        run: |
+          set -euo pipefail
+          go test -mod=readonly ./cmd/sobyad/cmd
