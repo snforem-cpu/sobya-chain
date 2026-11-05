@@ -207,6 +207,9 @@ enable = false
         (root / "app.toml").write_text(app, encoding="utf-8")
         (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
         validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "rpc")
+        validator_app = app.replace("enable = true", "enable = false", 1)
+        (root / "app.toml").write_text(validator_app, encoding="utf-8")
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "validator")
         bad_app = app.replace("allow-insecure-unlock = false", "allow-insecure-unlock = true")
         (root / "app.toml").write_text(bad_app, encoding="utf-8")
         try:
