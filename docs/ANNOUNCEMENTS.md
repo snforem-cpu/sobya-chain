@@ -1,10 +1,10 @@
 # SOBYA Validator Recruitment — Publication Pack
 
-**Current wording: recruiting expressions of interest for a SOBYA mainnet launch.** Do not say the testnet is live, applications are approved, or rewards are guaranteed. Add official contact/channel links only after the project owner confirms them.
+**Current wording: recruiting expressions of interest for a SOBYA mainnet launch.** Do not say the mainnet is live, applications are approved, or rewards are guaranteed. Add official contact/channel links only after the project owner confirms them.
 
 ## X post (English)
 
-SOBYA is preparing the SOBYA public mainnet launch and inviting expressions of interest from experienced Cosmos SDK / CometBFT operators.
+SOBYA is preparing its public mainnet launch and inviting expressions of interest from experienced Cosmos SDK / CometBFT operators.
 
 We are looking for operators who control their own Linux infrastructure, can maintain reliable uptime, and can provide public P2P connectivity. Validators keep their own signing keys; SOBYA will never ask for seed phrases or private keys.
 
@@ -60,7 +60,7 @@ Do not include credentials, account IDs, private keys, mnemonics, seed phrases, 
 
 **Do I need to send my validator key to the project?** Never. Generate and retain it locally. Only public details and the signed gentx are shared when the official ceremony begins.
 
-**Will I earn money or guaranteed tokens?** No financial return or reimbursement is promised. Testnet tokens have no monetary value. The protocol reserve rules are documented in `sobya/TOKENOMICS.md`.
+**Will I earn money or guaranteed tokens?** Validator distributions follow the protocol reserve and signing-eligibility rules in `sobya/TOKENOMICS.md`; no fiat return, market price, liquidity, exchange listing, or infrastructure reimbursement is promised.
 
 **Can I use a GitHub Actions runner as my validator?** No. CI runners are temporary and are for tests/builds only.
 
