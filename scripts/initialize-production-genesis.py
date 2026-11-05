@@ -2,7 +2,7 @@
 """Build and validate SOBYA's fixed 1B-SOBY genesis allocation before validators join.
 
 Run after `sobyad init` and after adding the founder and shared wallet balances
-with the exact `sobyad add-genesis-account` commands. The validator-reserve
+with the exact `sobyad genesis add-genesis-account` commands. The validator-reserve
 module account is created by the app's module-account wiring; this script adds
 its 150M bank balance without replacing the module account with a user account.
 """
@@ -161,7 +161,7 @@ def prepare(genesis: dict) -> dict:
     ):
         balance = balance_by_address.get(address)
         if balance is None:
-            fail(f"{label} balance is missing; run sobyad add-genesis-account for the exact allocation")
+            fail(f"{label} balance is missing; run sobyad genesis add-genesis-account for the exact allocation")
         actual = coin_map(balance.get("coins"), f"{label} balance").get(BASE_DENOM, 0)
         if actual != expected:
             fail(f"{label} balance is {actual} {BASE_DENOM}; expected exactly {expected}")
