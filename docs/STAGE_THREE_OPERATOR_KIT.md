@@ -45,6 +45,8 @@ Use the official chain ID from the launch bundle. Example command shape (replace
 export SOBYA_HOME="$HOME/.sobya"
 install -d -m 700 "$SOBYA_HOME"
 ./sobyad init "YOUR_MONIKER" --chain-id "<OFFICIAL_COMETBFT_CHAIN_ID>" --home "$SOBYA_HOME"
+
+`sobyad init` also synchronizes `config/client.toml` `chain-id` with the generated `config/genesis.json`. Keep these identical; do not try to set a `chain_id` field in CometBFT `config.toml` (that file does not own the chain ID).
 ./sobyad keys add validator --keyring-backend os --home "$SOBYA_HOME"
 ./sobyad tendermint show-node-id --home "$SOBYA_HOME"
 ```
