@@ -40,12 +40,16 @@ jobs:
   build:
     name: Build Linux ${{ matrix.arch }} operator binary
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - name: Checkout exact tagged source
         uses: actions/checkout@v4
@@ -64,7 +68,7 @@ jobs:
           SOURCE_COMMIT: ${{ github.sha }}
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: "0"
+          CGO_ENABLED: "1"
         run: |
           set -euo pipefail
           mkdir -p ../dist
