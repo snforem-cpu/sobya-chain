@@ -6,7 +6,7 @@ This process describes how to create a versioned operator binary. A source commi
 
 - Release only from a reviewed, exact source commit on the approved branch.
 - Use a version tag such as `v0.1.0-rc.1` only after the release candidate passes the agreed tests.
-- The current root workflow builds a Linux amd64 candidate and publishes it as a GitHub prerelease with SHA-256 checksums.
+- The dedicated `.github/workflows/validator-binary-release.yml` workflow runs the full Go test suite, builds Linux amd64 and arm64 binaries from the exact tag, packages both, combines their SHA-256 checksums, and publishes a GitHub prerelease.
 - A prerelease is a pre-mainnet operator candidate, not launch authorization. Release notes must state the exact source commit and that operators must wait for the signed launch bundle and genesis.
 - Never attach genesis files containing private data or any operator keys/secrets.
 
@@ -22,7 +22,7 @@ Before tagging:
 
 ## Publish
 
-After approval, create and push the agreed version tag on the reviewed commit. The root workflow builds `linux/amd64`, packages `sobyad`, emits `SHA256SUMS`, and creates a GitHub prerelease. Inspect the release assets and checksum before sharing them with operators.
+After approval, create and push the agreed version tag on the reviewed commit. The release workflow builds `linux/amd64` and `linux/arm64`, packages `sobyad`, emits one combined `SHA256SUMS`, and creates a GitHub prerelease. Inspect the release assets and checksum before sharing them with operators.
 
 No tag is created by this preparation change. No binary is claimed as released until the workflow actually completes and the release page contains the assets.
 
