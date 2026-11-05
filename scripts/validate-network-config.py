@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 MAX_EVM_CHAIN_ID = (1 << 64) - 1
 SOBYA_MIN_GAS_PRICES = "1000000000asobya"
 SOBYA_EVM_BASE_FEE = 1_000_000_000
+BASE_DENOM = "asobya"
 
 
 class ConfigError(Exception):
