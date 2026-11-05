@@ -197,6 +197,10 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
 def self_test() -> None:
     import tempfile
 
+    client = """chain-id = "sobya-testnet-stage2"
+keyring-backend = "test"
+node = "tcp://127.0.0.1:26657"
+"""
     config = """[p2p]
 laddr = "tcp://0.0.0.0:26656"
 external_address = "seed1.sobya.network:26656"
@@ -234,6 +238,7 @@ enable = false
     }}
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
+        (root / "client.toml").write_text(client, encoding="utf-8")
         (root / "config.toml").write_text(config, encoding="utf-8")
         (root / "app.toml").write_text(app, encoding="utf-8")
         (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
