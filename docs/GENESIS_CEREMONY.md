@@ -53,7 +53,7 @@ python3 scripts/initialize-production-genesis.py \
   --genesis "$SOBYA_HOME/config/genesis.json"
 ```
 
-The bootstrap script validates the two exact owner allocations and the pre-existing `validator_reserve` module account, adds 150M SOBY to that module account's bank balance without replacing its module-account permissions, recalculates bank supply, and requires exactly 1B SOBY total native supply. The script updates the initialized genesis in place. Its self-test runs in GitHub Actions. Do not use `add-genesis-account` to replace the reserve module account with a normal account.
+The bootstrap script validates the two exact owner allocations and adds 150M SOBY to the reserved module address in bank genesis. The app's `InitChainer` creates the corresponding `validator_reserve` module account with its configured permissions after auth genesis; the script does not replace or fabricate an auth module account. It recalculates bank supply and requires exactly 1B SOBY total native supply. The script updates the initialized genesis in place. Its self-test runs in GitHub Actions. Do not use `add-genesis-account` to replace the reserve module account with a normal account.
 
 ### Initial validator self-bonds — deterministic reserve accounting
 
