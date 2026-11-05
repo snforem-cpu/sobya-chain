@@ -1,6 +1,6 @@
 # SOBYA — Independent Operator Onboarding Kit
 
-**Status: preparation / recruitment. This is not a live testnet or mainnet.** This kit is for operators who want to volunteer an independently controlled host. Do not start a node on a guessed chain ID or draft genesis.
+**Status: preparation / recruitment. The SOBYA mainnet is not live yet.** This kit is for operators who want to volunteer an independently controlled host. Do not start a node on a guessed chain ID or draft genesis.
 
 ## 1. Roles and minimum topology
 
@@ -8,7 +8,7 @@
 - **Seed:** helps peers discover one another; no validator signing key is required.
 - **RPC/full node:** non-validator node that may offer read access through a hardened HTTPS reverse proxy. It must not expose backend RPC ports directly.
 
-Target the initial public testnet at four independent validator operators, plus one non-validator RPC/full-node operator. A seed operator is helpful but may be one of the volunteers if roles are separated carefully. Operators should use different providers/networks where practical. This is a recruitment target, not a claim that operators already exist.
+Target the initial SOBYA mainnet at four independent validator operators, plus one non-validator RPC/full-node operator. A seed operator is helpful but may be one of the volunteers if roles are separated carefully. Operators should use different providers/networks where practical. This is a recruitment target, not a claim that operators already exist.
 
 Each operator supplies their own persistent Linux host, stable power/network, SSD, public inbound P2P reachability (normally TCP 26656), time synchronization, monitoring, backups, and maintenance. No founder-owned host is a prerequisite.
 
@@ -127,6 +127,6 @@ Do not include passwords, API keys, mnemonics, private keys, keyring archives, o
 
 ## 11. Token and reward disclosures
 
-SOBY uses base denomination `asobya`, 18 decimals, and a planned 1,000,000,000 SOBY native supply cap. The agreed allocation and fee policy are documented in `sobya/TOKENOMICS.md`. The validator reserve is a protocol-controlled allocation with a 48-period schedule and a 95% signing eligibility rule; it is not a guaranteed income. Testnet tokens have no monetary value. Operators pay for and control their own infrastructure; no reimbursement, profit, exchange listing, or token price is promised.
+SOBY uses base denomination `asobya`, 18 decimals, and a planned 1,000,000,000 SOBY native supply cap. The agreed allocation and fee policy are documented in `sobya/TOKENOMICS.md`. The validator reserve is a protocol-controlled 150M SOBY lifetime allocation with a 48-period schedule and a 95% signing eligibility rule. Actual SOBY distributions depend on the chain operating and the on-chain eligibility rules; no fiat income, market price, liquidity, exchange listing, or infrastructure reimbursement is promised. Operators pay for and control their own infrastructure.
 
 **Never run a production validator until the official release, chain IDs, final genesis, checksum, peers, and launch time have been published.**
