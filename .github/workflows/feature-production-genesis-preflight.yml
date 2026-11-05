@@ -102,7 +102,7 @@ jobs:
           test -n "$HEIGHT"
           test "$HEIGHT" -gt 0
 
-          SUPPLY="$(./sobyad query bank total-supply --denom asobya --home "$SOBYA_HOME" --output json | jq -r '[.supply[] | select(.denom=="asobya")][0].amount')"
+          SUPPLY="$(./sobyad query bank total-supply-of asobya --home "$SOBYA_HOME" --output json | jq -r '.amount.amount')"
           RESERVE="$(./sobyad query bank balances sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr --home "$SOBYA_HOME" --output json | jq -r '[.balances[] | select(.denom=="asobya")][0].amount')"
           DELEGATION="$(./sobyad query staking delegations "$VALIDATOR_ADDRESS" --home "$SOBYA_HOME" --output json | jq -r '[.delegation_responses[].balance | select(.denom=="asobya")][0].amount')"
           test "$SUPPLY" = "1000000000000000000000000000"
