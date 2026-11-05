@@ -69,9 +69,11 @@ def parse_peer_list(raw: str, label: str) -> list[tuple[str, str, int]]:
 
 
 def is_loopback_listener(value: str, label: str) -> None:
+    if "://" not in value:
+        value = "tcp://" + value
     parsed = urlsplit(value)
     if parsed.scheme not in {"tcp", "http"} or not parsed.hostname or not parsed.port:
-        fail(f"{label}: expected tcp://host:port or http://host:port, got {value!r}")
+        fail(f"{label}: expected host:port, tcp://host:port, or http://host:port, got {value!r}")
     try:
         loopback = ipaddress.ip_address(parsed.hostname).is_loopback
     except ValueError:
