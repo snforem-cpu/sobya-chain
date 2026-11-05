@@ -143,6 +143,12 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	if err := cdc.UnmarshalJSON(appState[evmtypes.ModuleName], &gotEVM); err != nil {
 		t.Fatalf("unmarshal normalized EVM genesis: %v", err)
 	}
+	if gotEVM.Params.EvmDenom != BaseDenom {
+		t.Fatalf("EVM gas denom = %s, want native SOBYA denom %s", gotEVM.Params.EvmDenom, BaseDenom)
+	}
+	if gotEVM.Params.ExtendedDenomOptions == nil || gotEVM.Params.ExtendedDenomOptions.ExtendedDenom != BaseDenom {
+		t.Fatalf("EVM extended denom options = %v, want %s", gotEVM.Params.ExtendedDenomOptions, BaseDenom)
+	}
 	wantPrecompiles := []string{
 		evmtypes.P256PrecompileAddress,
 		evmtypes.Bech32PrecompileAddress,
