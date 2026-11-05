@@ -176,19 +176,35 @@ def prepare(genesis: dict, validators: list[dict]) -> dict:
         balance_by_address[address] = balance
 
     account_addresses = set()
-    for account in accounts:
-        if not isinstance(account, dict):
-            continue
-        address = account.get("address")
-        if isinstance(address, str):
-            account_addresses.add(address)
+    def collect_account_addresses(value: object) -> None:
+        if isinstance(value, dict):
+            address = value.get("address")
+            if isinstance(address, str):
+                account_addresses.add(address)
+            for child in value.values():
+                collect_account_addresses(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect_account_addresses(child)
+    collect_account_addresses(accounts)
 
-    reserve_balance = balance_by_address.get(RESERVE_ADDRESS)
-    if reserve_balance is None:
-        fail("validator reserve module account balance is missing from bank genesis")
+    expected_allocations = (
+        (FOUNDER_ADDRESS, 400_000_000 * 10**18, "founder"),
+        (SHARED_ADDRESS, 450_000_000 * 10**18, "shared management"),
+        (RESERVE_ADDRESS, RESERVE_AMOUNT, "validator reserve module"),
+    )
+    for address, expected_amount, label in expected_allocations:
+        if address not in account_addresses:
+            fail(f"{label} account {address} is missing from auth.accounts")
+        balance = balance_by_address.get(address)
+        if balance is None:
+            fail(f"{label} balance {address} is missing from bank.balances")
+        amount = coin_map(balance.get("coins"), f"{label} balance").get(BASE_DENOM, 0)
+        if amount != expected_amount:
+            fail(f"{label} allocation is {amount} {BASE_DENOM}; expected exactly {expected_amount}")
+
+    reserve_balance = balance_by_address[RESERVE_ADDRESS]
     reserve_coins = coin_map(reserve_balance.get("coins"), "validator reserve balance")
-    if reserve_coins.get(BASE_DENOM, 0) != RESERVE_AMOUNT:
-        fail("validator reserve must start with exactly 150,000,000 SOBY before self-bond reconciliation")
 
     if not validators:
         fail("at least one validator public account and self-bond allocation is required")
