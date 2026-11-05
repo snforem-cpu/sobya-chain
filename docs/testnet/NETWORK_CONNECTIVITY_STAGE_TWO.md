@@ -95,8 +95,11 @@ python3 scripts/validate-network-config.py \
   --app-config "$HOME/.sobya/config/app.toml" \
   --genesis "$HOME/.sobya/config/genesis.json" \
   --chain-id "<OFFICIAL_COMETBFT_CHAIN_ID>" \
-  --evm-chain-id "<OFFICIAL_EVM_CHAIN_ID>"
+  --evm-chain-id "<OFFICIAL_EVM_CHAIN_ID>" \
+  --role rpc
 ```
+
+Use `--role validator` for validator hosts and `--role seed` for seed-only hosts; those profiles require EVM JSON-RPC to remain disabled. The `rpc` profile requires it to be enabled but loopback-bound behind the TLS proxy.
 
 The audit rejects missing EVM genesis state, chain-ID mismatches, the development EVM ID, empty peer/seed lists, placeholder or private advertised addresses, unsafe RPC, public backend listeners, insecure account unlocking, dangerous JSON-RPC namespaces, wildcard WebSocket origins, and unbounded RPC connections.
 
