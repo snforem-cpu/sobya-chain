@@ -95,7 +95,12 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
         app = tomllib.load(stream)
     with genesis_path.open(encoding="utf-8") as stream:
         genesis = json.load(stream)
+    client_path = config_path.with_name("client.toml")
+    with client_path.open("rb") as stream:
+        client = tomllib.load(stream)
 
+    if client.get("chain-id") != chain_id:
+        fail(f"client.toml chain-id {client.get('chain-id')!r} does not match expected {chain_id!r}")
     if not chain_id or genesis.get("chain_id") != chain_id:
         fail(f"genesis chain_id {genesis.get('chain_id')!r} does not match expected {chain_id!r}")
     if not isinstance(genesis.get("app_state"), dict) or "evm" not in genesis["app_state"]:
