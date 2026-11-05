@@ -1,4 +1,4 @@
-name: SOBYA Validator Binary Prerelease
+name: SOBYA Validator Binary Release Candidate
 
 on:
   push:
@@ -13,10 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  linux-amd64:
-    name: Build Linux amd64 operator binary
+  test:
+    name: Full Go tests on release source
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout exact tagged source
         uses: actions/checkout@v4
@@ -27,30 +27,88 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: sobya/go.mod
+          cache: true
           cache-dependency-path: sobya/go.sum
 
-      - name: Verify dependencies and test
+      - name: Verify dependencies and run full test suite
         working-directory: sobya
         run: |
           set -euo pipefail
           go mod verify
-          go test -mod=readonly ./...
+          go test -count=1 -mod=readonly ./...
+
+  build:
+    name: Build Linux ${{ matrix.arch }} operator binary
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout exact tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
 
       - name: Build and package
         working-directory: sobya
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
           SOURCE_COMMIT: ${{ github.sha }}
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: "0"
         run: |
           set -euo pipefail
           mkdir -p ../dist
-          GOOS=linux GOARCH=amd64 go build -mod=readonly -trimpath \
+          go build -mod=readonly -trimpath \
             -ldflags "-X github.com/cosmos/cosmos-sdk/version.Name=sobya -X github.com/cosmos/cosmos-sdk/version.AppName=sobyad -X github.com/cosmos/cosmos-sdk/version.Version=$RELEASE_VERSION -X github.com/cosmos/cosmos-sdk/version.Commit=$SOURCE_COMMIT" \
             -o ../dist/sobyad ./cmd/sobyad
-          ../dist/sobyad version
-          tar -C ../dist -czf ../dist/sobyad-${RELEASE_VERSION}-linux-amd64.tar.gz sobyad
+          if [ "$GOARCH" = "amd64" ]; then
+            ../dist/sobyad version
+          else
+            file ../dist/sobyad
+            go version -m ../dist/sobyad
+          fi
+          tar -C ../dist -czf "../dist/sobyad-${RELEASE_VERSION}-linux-${GOARCH}.tar.gz" sobyad
           cd ../dist
-          sha256sum sobyad-${RELEASE_VERSION}-linux-amd64.tar.gz > SHA256SUMS
+          sha256sum "sobyad-${RELEASE_VERSION}-linux-${GOARCH}.tar.gz" > "SHA256SUMS-${GOARCH}"
+          sha256sum -c "SHA256SUMS-${GOARCH}"
+
+      - name: Upload architecture package
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-linux-${{ matrix.arch }}
+          path: |
+            dist/sobyad-${{ github.ref_name }}-linux-${{ matrix.arch }}.tar.gz
+            dist/SHA256SUMS-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish pre-mainnet candidate assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download architecture packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sobya-linux-*
+          path: dist
+          merge-multiple: true
+
+      - name: Combine and verify checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          cat SHA256SUMS-* > SHA256SUMS
           sha256sum -c SHA256SUMS
 
       - name: Publish GitHub prerelease
@@ -62,6 +120,7 @@ jobs:
           generate_release_notes: true
           files: |
             dist/sobyad-${{ github.ref_name }}-linux-amd64.tar.gz
+            dist/sobyad-${{ github.ref_name }}-linux-arm64.tar.gz
             dist/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
