@@ -7,7 +7,14 @@ on:
     paths:
       - 'scripts/validate-network-config.py'
       - 'scripts/probe-public-network.sh'
+      - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
+      - 'docs/STAGE_THREE_OPERATOR_KIT.md'
+      - 'docs/GENESIS_CEREMONY.md'
+      - 'docs/RELEASE_PROCESS.md'
+      - 'docs/ANNOUNCEMENTS.md'
+      - 'docs/VALIDATOR_RECRUITMENT.md'
+      - 'docs/testnet/validator-operator.md'
       - 'sobya/cmd/sobyad/cmd/config.go'
       - 'sobya/cmd/sobyad/cmd/config_test.go'
       - '.github/workflows/feature-network-config-validation.yml'
@@ -15,7 +22,14 @@ on:
     paths:
       - 'scripts/validate-network-config.py'
       - 'scripts/probe-public-network.sh'
+      - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
+      - 'docs/STAGE_THREE_OPERATOR_KIT.md'
+      - 'docs/GENESIS_CEREMONY.md'
+      - 'docs/RELEASE_PROCESS.md'
+      - 'docs/ANNOUNCEMENTS.md'
+      - 'docs/VALIDATOR_RECRUITMENT.md'
+      - 'docs/testnet/validator-operator.md'
       - 'sobya/cmd/sobyad/cmd/config.go'
       - 'sobya/cmd/sobyad/cmd/config_test.go'
       - '.github/workflows/feature-network-config-validation.yml'
@@ -49,6 +63,17 @@ jobs:
           python -m py_compile scripts/validate-network-config.py
           python scripts/validate-network-config.py --self-test
           bash -n scripts/probe-public-network.sh
+          bash -n scripts/package-release.sh
+
+      - name: Check stage-three deliverables exist
+        run: |
+          set -euo pipefail
+          test -s docs/STAGE_THREE_OPERATOR_KIT.md
+          test -s docs/GENESIS_CEREMONY.md
+          test -s docs/RELEASE_PROCESS.md
+          test -s docs/ANNOUNCEMENTS.md
+          grep -q 'testnet tokens have no monetary value' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -q '777777' docs/GENESIS_CEREMONY.md
 
       - name: Run focused Go CLI configuration tests
         working-directory: sobya
