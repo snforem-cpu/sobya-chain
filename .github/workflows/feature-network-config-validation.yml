@@ -22,6 +22,8 @@ on:
       - 'sobya/cmd/sobyad/cmd/config.go'
       - 'sobya/cmd/sobyad/cmd/config_test.go'
       - '.github/workflows/feature-network-config-validation.yml'
+      - '.github/workflows/validator-binary-release.yml'
+      - '.github/workflows/feature-production-genesis-preflight.yml'
   pull_request:
     paths:
       - 'scripts/validate-network-config.py'
@@ -61,6 +63,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Parse all GitHub Actions workflow YAML files
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; Dir.glob(".github/workflows/*.{yml,yaml}").sort.each { |path| YAML.load_file(path, aliases: true); puts "PASS #{path}" }'
 
       - name: Compile and self-test network config auditor
         run: |
