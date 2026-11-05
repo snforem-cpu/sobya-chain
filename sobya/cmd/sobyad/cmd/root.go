@@ -17,6 +17,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
 	evmhd "github.com/cosmos/evm/crypto/hd"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+erc20module "github.com/cosmos/evm/x/erc20"
+erc20types "github.com/cosmos/evm/x/erc20/types"
+feemarketmodule "github.com/cosmos/evm/x/feemarket"
+feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	"github.com/spf13/cobra"
 
 	"sobya/app"
@@ -43,6 +47,14 @@ func NewRootCmd() *cobra.Command {
 	); err != nil {
 		panic(err)
 	}
+
+	// Cosmos EVM modules are registered manually in the application runtime,
+	// so depinject cannot discover their AppModuleBasic implementations.
+	// Add them to the CLI module manager explicitly; init and multi-node use
+	// this manager to construct every module's default genesis state.
+	moduleBasicManager[evmtypes.ModuleName] = app.EVMAppModuleBasic()
+	moduleBasicManager[feemarkettypes.ModuleName] = feemarketmodule.AppModuleBasic{}
+	moduleBasicManager[erc20types.ModuleName] = erc20module.AppModuleBasic{}
 
 	rootCmd := &cobra.Command{
 		Use:           app.Name + "d",
