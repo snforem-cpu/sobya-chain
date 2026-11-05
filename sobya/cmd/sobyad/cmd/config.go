@@ -34,10 +34,19 @@ func defaultAppConfig() *evmserverconfig.Config {
 	// before generating a public genesis.
 	evmCfg.EVMChainID = 777777
 
+	jsonRPC := evmserverconfig.DefaultJSONRPCConfig()
+	// The upstream Cosmos EVM default permits insecure account unlocking.
+	// SOBYA never enables that on an operator-facing node. Keep JSON-RPC bound
+	// to loopback by default; a reviewed TLS reverse proxy may expose it later.
+	jsonRPC.AllowInsecureUnlock = false
+	jsonRPC.EnableProfiling = false
+	jsonRPC.MaxOpenConnections = 100
+	jsonRPC.WSOrigins = []string{"127.0.0.1", "localhost"}
+
 	return &evmserverconfig.Config{
 		Config:  *srvCfg,
 		EVM:     *evmCfg,
-		JSONRPC: *evmserverconfig.DefaultJSONRPCConfig(),
+		JSONRPC: *jsonRPC,
 		TLS:     *evmserverconfig.DefaultTLSConfig(),
 	}
 }
