@@ -6,6 +6,7 @@ on:
       - 'feature/**'
     paths:
       - 'scripts/validate-network-config.py'
+      - 'scripts/probe-public-network.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
       - 'sobya/cmd/sobyad/cmd/config.go'
       - 'sobya/cmd/sobyad/cmd/config_test.go'
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'scripts/validate-network-config.py'
+      - 'scripts/probe-public-network.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
       - 'sobya/cmd/sobyad/cmd/config.go'
       - 'sobya/cmd/sobyad/cmd/config_test.go'
@@ -46,6 +48,7 @@ jobs:
           set -euo pipefail
           python -m py_compile scripts/validate-network-config.py
           python scripts/validate-network-config.py --self-test
+          bash -n scripts/probe-public-network.sh
 
       - name: Run focused Go CLI configuration tests
         working-directory: sobya
