@@ -182,6 +182,10 @@ func initTestnetFiles(
 	appConfig.Telemetry.Enabled = false
 	appConfig.Telemetry.PrometheusRetentionTime = 0
 
+	// Every generated CometBFT config must carry the same chain ID as the
+	// genesis document; otherwise the node rejects InitChain at startup.
+	nodeConfig.ChainID = args.chainID
+
 	var (
 		genAccounts     []authtypes.GenesisAccount
 		genBalances     []banktypes.Balance
