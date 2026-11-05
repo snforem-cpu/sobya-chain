@@ -191,7 +191,6 @@ def prepare(genesis: dict, validators: list[dict]) -> dict:
     expected_allocations = (
         (FOUNDER_ADDRESS, 400_000_000 * 10**18, "founder"),
         (SHARED_ADDRESS, 450_000_000 * 10**18, "shared management"),
-        (RESERVE_ADDRESS, RESERVE_AMOUNT, "validator reserve module"),
     )
     for address, expected_amount, label in expected_allocations:
         if address not in account_addresses:
@@ -203,7 +202,9 @@ def prepare(genesis: dict, validators: list[dict]) -> dict:
         if amount != expected_amount:
             fail(f"{label} allocation is {amount} {BASE_DENOM}; expected exactly {expected_amount}")
 
-    reserve_balance = balance_by_address[RESERVE_ADDRESS]
+    reserve_balance = balance_by_address.get(RESERVE_ADDRESS)
+    if reserve_balance is None:
+        fail("validator reserve module bank balance is missing from bank.balances")
     reserve_coins = coin_map(reserve_balance.get("coins"), "validator reserve balance")
 
     if not validators:
@@ -288,7 +289,6 @@ def self_test() -> None:
     accounts = [
         {"@type": "/cosmos.auth.v1beta1.BaseAccount", "address": FOUNDER_ADDRESS, "pub_key": None, "account_number": "0", "sequence": "0"},
         {"@type": "/cosmos.auth.v1beta1.BaseAccount", "address": SHARED_ADDRESS, "pub_key": None, "account_number": "1", "sequence": "0"},
-        {"@type": "/cosmos.auth.v1beta1.ModuleAccount", "base_account": {"address": RESERVE_ADDRESS, "pub_key": None, "account_number": "2", "sequence": "0"}, "name": "validator_reserve", "permissions": []},
         {"@type": "/cosmos.auth.v1beta1.BaseAccount", "address": validator, "pub_key": None, "account_number": "3", "sequence": "0"},
     ]
     reserve_remaining = RESERVE_AMOUNT - 100 * 10**18
