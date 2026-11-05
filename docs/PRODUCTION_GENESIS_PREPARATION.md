@@ -34,16 +34,12 @@ supply ceiling.
   network identifier, not a value already embedded in an approved genesis.
   It must be checked against any previously published SOBYA network and then
   frozen before operators create gentxs.
-- **Production EVM chain ID:** intentionally unset. The repository currently
-  uses `777777` for development and its own network-config self-test uses
-  `777778`; neither is approved for production. A production integer must be
-  checked against the current EVM chain registry and wallet/network ecosystem
-  before it is committed. Do not infer that an unlisted integer is reserved.
-- **Genesis UTC time, release tag, minimum gas price, self-bond amount, peer
-  list, and launch time:** unset until the release and validator ceremony are
-  agreed.
+- **Proposed production EVM chain ID:** `357812033857` (`0x534f425941`, ASCII bytes for `SOBYA`). This is within the exact-integer range used by JavaScript and the uint64 range accepted by SOBYA's EVM configuration. The corresponding `eip155-357812033857.json` entry was not present in the ethereum-lists/chains repository when checked on 2026-11-05. Registry absence is not a reservation and cannot prove that no private chain uses it; the owner must approve the candidate and it must be rechecked before genesis is frozen. The repository's `777777` and `777778` values remain development/CI-only.
+- **Proposed minimum Cosmos gas price:** `1000000000asobya` per gas (1e-9 SOBY/gas), matching Cosmos EVM v0.6.0's default initial EVM base fee. Every validator and RPC node must use this same value; the configuration auditor enforces it. Owner approval is required before freezing the launch bundle.
+- **Genesis UTC time, release tag, validator self-bond amount, peer list, and
+  launch time:** unset until the release and validator ceremony are agreed.
 
-CometBFT chain ID and EVM chain ID are separate values and must not be confused.
+CometBFT chain ID and EVM chain ID are separate values and must not be confused. The proposed pair is CometBFT `sobya-1` and EVM `${id}`; neither becomes frozen until the owner signs off.
 
 
 **Owner-provided MetaMask destinations recovered from the earlier project discussion:**
@@ -51,6 +47,10 @@ CometBFT chain ID and EVM chain ID are separate values and must not be confused.
 - Shared wallet for Community, Treasury, Development, Liquidity, and Emergency (450M SOBY combined): `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f` → SOBYA account encoding `sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3`.
 
 Both Bech32 strings were checksum-decoded and verified to contain exactly 20 bytes, with byte-for-byte values matching the two owner-supplied EVM hex addresses. This matches the exact Cosmos EVM v0.6.0 `NewEvmCodec` behavior used by SOBYA: it accepts EVM hex or Bech32, requires the configured `sobya` HRP for Bech32, and applies the SDK account-address length check. This verifies address format and conversion only; it does not prove control of either wallet's private key. The shared wallet does not merge the five tokenomics categories: keep their separate amounts in the off-chain allocation ledger even though the on-chain bank genesis will contain one aggregated balance for that address.
+
+The production allocation bootstrap also writes canonical `SOBY`/`asobya` bank metadata, fixes the EVM and extended EVM denoms to `asobya`, enables only the supported Cosmos EVM v0.6.0 static precompiles, sets mint inflation and annual provisions to zero, and sets distribution community tax to zero. The validator reconciliation script refuses to proceed if any of these canonical settings are missing or changed.
+
+The `validator_reserve` address is an app-owned module account configured in the application's module-account permissions. It is intentionally not fabricated as a normal entry in the initial `auth.accounts` list: SOBYA's `InitChainer` creates the module account after auth/bank genesis, while the bootstrap script funds its deterministic bank address. The production preflight exercises this exact sequence with the real binary.
 
 ## Allocation ledger — destinations recorded; final sign-off pending
 

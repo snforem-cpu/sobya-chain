@@ -169,6 +169,49 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	}
 }
 
+
+func TestPrepareGenesisStatePreservesValidatorReserveGenesisExtension(t *testing.T) {
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	bankBytes, err := cdc.MarshalJSON(banktypes.DefaultGenesisState())
+	if err != nil {
+		t.Fatalf("marshal bank genesis: %v", err)
+	}
+	mintBytes, err := cdc.MarshalJSON(minttypes.DefaultGenesisState())
+	if err != nil {
+		t.Fatalf("marshal mint genesis: %v", err)
+	}
+	distrBytes, err := cdc.MarshalJSON(distrtypes.DefaultGenesisState())
+	if err != nil {
+		t.Fatalf("marshal distribution genesis: %v", err)
+	}
+	evmBytes, err := cdc.MarshalJSON(evmtypes.DefaultGenesisState())
+	if err != nil {
+		t.Fatalf("marshal EVM genesis: %v", err)
+	}
+	reserveExtension := json.RawMessage(`{"version":1,"entries":[{"key":"AA","value":"eyJzdGFydF90aW1lIjoiMjAyNy0wMS0wMVQwMDowMDowMFoiLCJsYXN0X2Jsb2NrX3RpbWUiOiIyMDI3LTAxLTAxVDAwOjAwOjAwWiIsImxhc3RfaGVpZ2h0IjowLCJ0b3RhbF9wYWlkX2Fzb2J5YSI6IjEwMDAwMDAwMDAwMDAwMDAwMDAwMDAifQ"}]}`)
+	raw, err := json.Marshal(map[string]json.RawMessage{
+		banktypes.ModuleName: bankBytes,
+		minttypes.ModuleName: mintBytes,
+		distrtypes.ModuleName: distrBytes,
+		evmtypes.ModuleName: evmBytes,
+		validatorReserveGenesisKey: reserveExtension,
+	})
+	if err != nil {
+		t.Fatalf("marshal application genesis: %v", err)
+	}
+	normalized, err := prepareGenesisState(cdc, raw)
+	if err != nil {
+		t.Fatalf("prepareGenesisState() error: %v", err)
+	}
+	appState := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(normalized, &appState); err != nil {
+		t.Fatalf("unmarshal normalized application genesis: %v", err)
+	}
+	if string(appState[validatorReserveGenesisKey]) != string(reserveExtension) {
+		t.Fatalf("validator reserve genesis extension changed: got %s, want %s", appState[validatorReserveGenesisKey], reserveExtension)
+	}
+}
+
 func TestPrepareGenesisStateRejectsSupplyAboveCap(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	bankGenesis := banktypes.DefaultGenesisState()

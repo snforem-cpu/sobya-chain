@@ -2,6 +2,8 @@ package app
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -228,6 +230,59 @@ func TestValidatorReserveGenesisStoreRoundTrip(t *testing.T) {
 
 	_ = baseA
 	_ = baseB
+}
+
+
+func TestValidatorReserveGenesisSeedsInitialSelfBondAgainstLifetimeBudget(t *testing.T) {
+	db := dbm.NewMemDB()
+	base := baseapp.NewBaseApp("validator-reserve-initial-self-bond-test", log.NewNopLogger(), db, func(tx []byte) (sdk.Tx, error) {
+		return nil, nil
+	})
+	key := storetypes.NewKVStoreKey(validatorReserveStoreKeyName)
+	base.MountKVStores(map[string]*storetypes.KVStoreKey{validatorReserveStoreKeyName: key})
+	if err := base.LoadLatestVersion(); err != nil {
+		t.Fatalf("load reserve test store: %v", err)
+	}
+	ctx := base.NewContextLegacy(true, cmtproto.Header{Height: 1})
+	app := &App{validatorReserveStoreKey: key}
+
+	start := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC)
+	initialSelfBond := new(big.Int).Mul(big.NewInt(1_000), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+	meta := validatorReserveMeta{
+		StartTime:     start.Format(time.RFC3339Nano),
+		LastBlockTime: start.Format(time.RFC3339Nano),
+		LastHeight:    0,
+		TotalPaid:     initialSelfBond.String(),
+	}
+	metaBytes, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal initial reserve metadata: %v", err)
+	}
+	state := validatorReserveGenesisState{
+		Version: 1,
+		Entries: []validatorReserveGenesisEntry{{
+			Key:   base64.RawStdEncoding.EncodeToString(validatorReserveMetaKey),
+			Value: base64.RawStdEncoding.EncodeToString(metaBytes),
+		}},
+	}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal initial reserve genesis state: %v", err)
+	}
+	if err := app.initValidatorReserveGenesis(ctx, raw); err != nil {
+		t.Fatalf("initialize reserve with initial self-bond accounting: %v", err)
+	}
+	got, err := app.loadValidatorReserveMeta(ctx.KVStore(key))
+	if err != nil {
+		t.Fatalf("load initial reserve metadata: %v", err)
+	}
+	if got.TotalPaid != initialSelfBond.String() || got.LastHeight != 0 || got.StartTime != start.Format(time.RFC3339Nano) {
+		t.Fatalf("initial reserve metadata = %+v; initial self-bond accounting was not preserved", got)
+	}
+	wantFirstPeriod := new(big.Int).Sub(new(big.Int).Set(validatorReserveMonthlyTranche), initialSelfBond)
+	if gotBudget := validatorReserveAccruedBudget(0, initialSelfBond); gotBudget.Cmp(wantFirstPeriod) != 0 {
+		t.Fatalf("first-period reserve budget = %s, want %s after counting initial self-bond", gotBudget, wantFirstPeriod)
+	}
 }
 
 func TestValidatorReserveModuleAccountAddress(t *testing.T) {

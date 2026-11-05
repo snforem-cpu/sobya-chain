@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal, InvalidOperation
 import ipaddress
 import json
 import re
@@ -11,6 +12,21 @@ import sys
 import tomllib
 from pathlib import Path
 from urllib.parse import urlsplit
+
+MAX_EVM_CHAIN_ID = (1 << 64) - 1
+SOBYA_MIN_GAS_PRICES = "1000000000asobya"
+SOBYA_EVM_BASE_FEE = 1_000_000_000
+BASE_DENOM = "asobya"
+ACTIVE_STATIC_PRECOMPILES = [
+    "0x0000000000000000000000000000000000000100",
+    "0x0000000000000000000000000000000000000400",
+    "0x0000000000000000000000000000000000000800",
+    "0x0000000000000000000000000000000000000801",
+    "0x0000000000000000000000000000000000000802",
+    "0x0000000000000000000000000000000000000804",
+    "0x0000000000000000000000000000000000000805",
+    "0x0000000000000000000000000000000000000806",
+]
 
 
 class ConfigError(Exception):
@@ -89,11 +105,56 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
         app = tomllib.load(stream)
     with genesis_path.open(encoding="utf-8") as stream:
         genesis = json.load(stream)
+    client_path = config_path.with_name("client.toml")
+    with client_path.open("rb") as stream:
+        client = tomllib.load(stream)
 
+    if client.get("chain-id") != chain_id:
+        fail(f"client.toml chain-id {client.get('chain-id')!r} does not match expected {chain_id!r}")
     if not chain_id or genesis.get("chain_id") != chain_id:
         fail(f"genesis chain_id {genesis.get('chain_id')!r} does not match expected {chain_id!r}")
-    if not isinstance(genesis.get("app_state"), dict) or "evm" not in genesis["app_state"]:
-        fail("genesis app_state is missing the evm module")
+    if not isinstance(genesis.get("app_state"), dict):
+        fail("genesis app_state is missing")
+    app_state = genesis["app_state"]
+    bank = app_state.get("bank", {})
+    bank_metadata = bank.get("denom_metadata", [])
+    native_metadata = next((item for item in bank_metadata if isinstance(item, dict) and item.get("base") == BASE_DENOM), None)
+    if not isinstance(native_metadata, dict) or native_metadata.get("display") != "SOBY" or native_metadata.get("symbol") != "SOBY":
+        fail("genesis must include canonical SOBY/asobya bank denomination metadata")
+    mint = app_state.get("mint", {})
+    mint_params = mint.get("params", {})
+    minter = mint.get("minter", {})
+    if mint_params.get("mint_denom") != BASE_DENOM:
+        fail("mint.params.mint_denom must be asobya")
+    if any(Decimal(str(mint_params.get(field, "1"))) != 0 for field in ("inflation_rate_change", "inflation_max", "inflation_min")):
+        fail("mint inflation parameters must all be zero")
+    if Decimal(str(minter.get("inflation", "1"))) != 0 or Decimal(str(minter.get("annual_provisions", "1"))) != 0:
+        fail("mint minter inflation and annual provisions must be zero")
+    distribution = app_state.get("distribution", {})
+    if Decimal(str(distribution.get("params", {}).get("community_tax", "1"))) != 0:
+        fail("distribution community tax must be zero")
+    evm = app_state.get("evm", {})
+    if not isinstance(evm, dict) or not isinstance(evm.get("params"), dict):
+        fail("genesis app_state is missing evm params")
+    evm_params = evm["params"]
+    extended_options = evm_params.get("extended_denom_options", {})
+    if evm_params.get("evm_denom") != BASE_DENOM or extended_options.get("extended_denom") != BASE_DENOM:
+        fail("EVM and extended denoms must both be asobya")
+    if evm_params.get("active_static_precompiles") != ACTIVE_STATIC_PRECOMPILES:
+        fail("EVM active static precompiles do not match the supported SOBYA set")
+    feemarket = app_state.get("feemarket")
+    if not isinstance(feemarket, dict) or not isinstance(feemarket.get("params"), dict):
+        fail("genesis app_state is missing feemarket params")
+    feemarket_params = feemarket["params"]
+    if feemarket_params.get("no_base_fee") is not False:
+        fail("feemarket.params.no_base_fee must be false")
+    try:
+        base_fee = Decimal(str(feemarket_params.get("base_fee", "0")))
+        enable_height = int(feemarket_params.get("enable_height", -1))
+    except (TypeError, ValueError, InvalidOperation):
+        fail("feemarket base_fee or enable_height is invalid")
+    if base_fee != Decimal(SOBYA_EVM_BASE_FEE) or enable_height != 0:
+        fail(f"EVM base fee must start at exactly {SOBYA_EVM_BASE_FEE} {BASE_DENOM}/gas and be enabled at genesis")
 
     p2p = comet.get("p2p", {})
     laddr = p2p.get("laddr", "")
@@ -117,8 +178,13 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
 
     evm = app.get("evm", {})
     actual_evm_id = evm.get("evm-chain-id")
-    if actual_evm_id != evm_chain_id or evm_chain_id <= 0:
+    if type(actual_evm_id) is not int or actual_evm_id != evm_chain_id:
         fail(f"[evm].evm-chain-id {actual_evm_id!r} does not match expected {evm_chain_id}")
+    if not 0 < evm_chain_id <= MAX_EVM_CHAIN_ID:
+        fail(f"EVM chain ID must be a positive uint64, got {evm_chain_id}")
+    minimum_gas_prices = app.get("minimum-gas-prices", "")
+    if minimum_gas_prices != SOBYA_MIN_GAS_PRICES:
+        fail(f"minimum-gas-prices must be exactly {SOBYA_MIN_GAS_PRICES!r}, got {minimum_gas_prices!r}")
     if evm_chain_id in {777777, 777778}:
         fail(f"{evm_chain_id} is reserved for SOBYA development/CI and cannot be used for a public network")
 
@@ -158,6 +224,8 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     return [
         f"PASS chain ID: {chain_id}",
         f"PASS EVM chain ID: {evm_chain_id}",
+        f"PASS Cosmos minimum gas price: {SOBYA_MIN_GAS_PRICES}",
+        f"PASS EVM base fee: {SOBYA_EVM_BASE_FEE} {BASE_DENOM}/gas from height 0",
         f"PASS public P2P listener: {laddr}",
         f"PASS advertised P2P endpoint: {ext_host}:{ext_port}",
         f"PASS configured peers/seeds: {len(peers)} persistent, {len(seeds)} seeds",
@@ -171,6 +239,10 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
 def self_test() -> None:
     import tempfile
 
+    client = """chain-id = "sobya-testnet-stage2"
+keyring-backend = "test"
+node = "tcp://127.0.0.1:26657"
+"""
     config = """[p2p]
 laddr = "tcp://0.0.0.0:26656"
 external_address = "seed1.sobya.network:26656"
@@ -181,7 +253,9 @@ seeds = ""
 laddr = "tcp://127.0.0.1:26657"
 unsafe = false
 """
-    app = """[evm]
+    app = """minimum-gas-prices = "1000000000asobya"
+
+[evm]
 evm-chain-id = 42424242
 
 [json-rpc]
@@ -200,13 +274,38 @@ enable = false
 [grpc]
 enable = false
 """
-    genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {"evm": {}}}
+    genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {
+        "bank": {"denom_metadata": [{
+            "base": BASE_DENOM, "display": "SOBY", "symbol": "SOBY",
+        }]},
+        "mint": {
+            "params": {"mint_denom": BASE_DENOM, "inflation_rate_change": "0", "inflation_max": "0", "inflation_min": "0"},
+            "minter": {"inflation": "0", "annual_provisions": "0"},
+        },
+        "distribution": {"params": {"community_tax": "0"}},
+        "evm": {"params": {
+            "evm_denom": BASE_DENOM,
+            "extended_denom_options": {"extended_denom": BASE_DENOM},
+            "active_static_precompiles": list(ACTIVE_STATIC_PRECOMPILES),
+        }},
+        "feemarket": {"params": {"no_base_fee": False, "base_fee": "1000000000.000000000000000000", "enable_height": "0"}},
+    }}
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
+        (root / "client.toml").write_text(client, encoding="utf-8")
         (root / "config.toml").write_text(config, encoding="utf-8")
         (root / "app.toml").write_text(app, encoding="utf-8")
         (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
         validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        bad_client = client.replace("sobya-testnet-stage2", "wrong-client-chain")
+        (root / "client.toml").write_text(bad_client, encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject client.toml/genesis chain ID mismatch")
+        (root / "client.toml").write_text(client, encoding="utf-8")
         validator_app = app.replace("enable = true", "enable = false", 1)
         (root / "app.toml").write_text(validator_app, encoding="utf-8")
         validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "validator")
@@ -219,6 +318,29 @@ enable = false
         else:
             fail("self-test did not reject insecure account unlocking")
 
+        bad_fee_app = app.replace('minimum-gas-prices = "1000000000asobya"', 'minimum-gas-prices = "0asobya"')
+        (root / "app.toml").write_text(bad_fee_app, encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject zero Cosmos minimum gas price")
+
+        bad_fee_genesis = {"chain_id": "sobya-testnet-stage2", "app_state": {
+            "evm": {},
+            "feemarket": {"params": {"no_base_fee": True, "base_fee": "0", "enable_height": "0"}},
+        }}
+        (root / "app.toml").write_text(app, encoding="utf-8")
+        (root / "genesis.json").write_text(json.dumps(bad_fee_genesis), encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject disabled EVM base fee")
+        (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
+
         for reserved_id in (777777, 777778):
             reserved_app = app.replace("42424242", str(reserved_id))
             (root / "app.toml").write_text(reserved_app, encoding="utf-8")
@@ -228,7 +350,22 @@ enable = false
                 pass
             else:
                 fail(f"self-test did not reject reserved EVM chain ID {reserved_id}")
-    print("PASS network config validator self-test (valid config accepted; unsafe and reserved IDs rejected)")
+
+        sobya_candidate = 357812033857
+        candidate_app = app.replace("42424242", str(sobya_candidate))
+        (root / "app.toml").write_text(candidate_app, encoding="utf-8")
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", sobya_candidate, "rpc")
+
+        oversized_id = 1 << 64
+        oversized_app = app.replace("42424242", str(oversized_id))
+        (root / "app.toml").write_text(oversized_app, encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", oversized_id, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject an EVM chain ID outside uint64")
+    print("PASS network config validator self-test (valid config, gas policies, SOBYA candidate uint64, unsafe/reserved IDs, and uint64 overflow)")
 
 
 def main() -> int:

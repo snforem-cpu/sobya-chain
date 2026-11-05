@@ -1,8 +1,8 @@
 # SOBYA Independent Validator Recruitment
 
-**Status: expressions of interest may be invited; the public testnet is not live.**
+**Status: expressions of interest may be invited; the SOBYA mainnet is not live yet.**
 
-SOBYA is preparing a public testnet operated by independent validators. The project does not require a founder-owned validator host. Each participating operator controls and maintains their own Linux host and keeps their own signing keys.
+SOBYA is preparing its public mainnet launch, operated by independent validators. The project does not require a founder-owned validator host. Each participating operator controls and maintains their own Linux host and keeps their own signing keys.
 
 ## Recruitment target
 
@@ -14,7 +14,7 @@ Operators should be able to provide:
 - SSD capacity, time synchronization, monitoring, backups, and routine maintenance.
 - Experience with Linux operations; Cosmos SDK / CometBFT experience is preferred.
 
-The operator pays for and controls their own infrastructure. No reimbursement, financial return, token price, or guaranteed reward is promised. Testnet tokens have no monetary value.
+The operator pays for and controls their own infrastructure. No reimbursement, financial return, token price, or guaranteed reward is promised. Validator distributions follow the protocol reserve and signing-eligibility rules; no fiat return, market price, liquidity, exchange listing, or infrastructure reimbursement is promised.
 
 ## Safe participation
 
@@ -34,6 +34,6 @@ The launch bundle must include the exact source commit and binary checksums, app
 - [Ready-to-publish X and Telegram messages](ANNOUNCEMENTS.md)
 - [P2P/RPC security and connectivity](testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md)
 
-## Live-testnet gate
+## Mainnet activation gate
 
-A public testnet may be described as live only after independent hosts connect over public P2P, report the same chain ID and advancing height, commit blocks, and complete cross-node transactions. Public RPC/EVM endpoints require separate external health and security checks. No placeholder IDs, peer addresses, genesis files, or RPC URLs may be presented as live.
+The SOBYA mainnet may be described as live only after independent hosts connect over public P2P, report the same chain ID and advancing height, commit blocks, and complete cross-node transactions. Public RPC/EVM endpoints require separate external health and security checks. No placeholder IDs, peer addresses, genesis files, or RPC URLs may be presented as live.

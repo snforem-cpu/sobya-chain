@@ -7,6 +7,8 @@ on:
       - 'release/**'
     paths:
       - 'scripts/validate-network-config.py'
+      - 'scripts/prepare-validator-genesis.py'
+      - 'scripts/initialize-production-genesis.py'
       - 'scripts/probe-public-network.sh'
       - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
@@ -20,9 +22,12 @@ on:
       - 'sobya/cmd/sobyad/cmd/config.go'
       - 'sobya/cmd/sobyad/cmd/config_test.go'
       - '.github/workflows/feature-network-config-validation.yml'
+      - '.github/workflows/validator-binary-release.yml'
+      - '.github/workflows/feature-production-genesis-preflight.yml'
   pull_request:
     paths:
       - 'scripts/validate-network-config.py'
+      - 'scripts/prepare-validator-genesis.py'
       - 'scripts/probe-public-network.sh'
       - 'scripts/package-release.sh'
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
@@ -59,11 +64,26 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Parse all GitHub Actions workflow YAML files
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; Dir.glob(".github/workflows/*.{yml,yaml}").sort.each { |path| YAML.load_file(path, aliases: true); puts "PASS #{path}" }'
+
+      - name: Self-test production and validator genesis scripts
+        run: |
+          set -euo pipefail
+          python3 scripts/initialize-production-genesis.py --self-test
+          python3 scripts/prepare-validator-genesis.py --self-test
+
       - name: Compile and self-test network config auditor
         run: |
           set -euo pipefail
           python -m py_compile scripts/validate-network-config.py
           python scripts/validate-network-config.py --self-test
+          python -m py_compile scripts/prepare-validator-genesis.py
+          python scripts/prepare-validator-genesis.py --self-test
+          python -m py_compile scripts/initialize-production-genesis.py
+          python scripts/initialize-production-genesis.py --self-test
           bash -n scripts/probe-public-network.sh
           bash -n scripts/package-release.sh
 
@@ -72,9 +92,12 @@ jobs:
           set -euo pipefail
           test -s docs/STAGE_THREE_OPERATOR_KIT.md
           test -s docs/GENESIS_CEREMONY.md
+          test -s scripts/prepare-validator-genesis.py
+          test -s scripts/initialize-production-genesis.py
           test -s docs/RELEASE_PROCESS.md
           test -s docs/ANNOUNCEMENTS.md
-          grep -qi 'testnet tokens have no monetary value' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi '150M SOBY lifetime allocation' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi '95% signing eligibility' docs/STAGE_THREE_OPERATOR_KIT.md
           grep -q '777777' docs/GENESIS_CEREMONY.md
 
       - name: Run focused Go CLI configuration tests
