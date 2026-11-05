@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'feature/**'
+      - 'release/**'
     paths:
       - 'scripts/validate-network-config.py'
       - 'scripts/probe-public-network.sh'
@@ -11,6 +12,7 @@ on:
       - 'docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md'
       - 'docs/STAGE_THREE_OPERATOR_KIT.md'
       - 'docs/GENESIS_CEREMONY.md'
+      - 'docs/PRODUCTION_GENESIS_PREPARATION.md'
       - 'docs/RELEASE_PROCESS.md'
       - 'docs/ANNOUNCEMENTS.md'
       - 'docs/VALIDATOR_RECRUITMENT.md'

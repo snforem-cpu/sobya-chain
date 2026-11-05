@@ -17,7 +17,7 @@ Each operator supplies their own persistent Linux host, stable power/network, SS
 Wait for the coordinator to publish a **versioned launch bundle** containing all of:
 - SOBYA source commit and version/tag.
 - Tested binary download and SHA-256 checksum, or exact reproducible build instructions.
-- Official CometBFT chain ID and unique EVM chain ID (not development ID 777777).
+- Official CometBFT chain ID and unique EVM chain ID (not development/CI IDs 777777 or 777778).
 - Final genesis file and SHA-256 checksum.
 - Exact self-bond amount, tested gentx command, minimum gas price, P2P peers/seeds, launch UTC time.
 - Support and incident-reporting channel.

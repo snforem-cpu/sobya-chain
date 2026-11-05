@@ -75,7 +75,7 @@ evm-chain-id = <OFFICIAL_EVM_CHAIN_ID>
 
 CometBFT RPC remains at `tcp://127.0.0.1:26657` in `config.toml`. Expose the required read-only routes through a TLS reverse proxy on 443, with rate limits and request-size/time limits. Do not expose `personal`, `debug`, or `miner` JSON-RPC namespaces; do not enable insecure account unlocking or profiling. Use an explicit WebSocket origin allowlist for the official wallet/application origins after those domains exist.
 
-The EVM chain ID `777777` is reserved for development/CI and must not be used for a public network. The official EVM chain ID and CometBFT chain ID must be frozen together with the genesis in the launch bundle. This stage does not invent or finalize either identifier.
+The EVM chain IDs `777777` (development default) and `777778` (network-config CI fixture) are reserved for development/testing and must not be used for a public network. The official EVM chain ID and CometBFT chain ID must be frozen together with the genesis in the launch bundle. This stage does not invent or finalize either identifier.
 
 ## Firewall policy
 

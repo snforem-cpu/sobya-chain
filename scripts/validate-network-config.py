@@ -119,8 +119,8 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     actual_evm_id = evm.get("evm-chain-id")
     if actual_evm_id != evm_chain_id or evm_chain_id <= 0:
         fail(f"[evm].evm-chain-id {actual_evm_id!r} does not match expected {evm_chain_id}")
-    if evm_chain_id == 777777:
-        fail("777777 is the development/CI EVM chain ID and cannot be used for a public network")
+    if evm_chain_id in {777777, 777778}:
+        fail(f"{evm_chain_id} is reserved for SOBYA development/CI and cannot be used for a public network")
 
     if role not in {"validator", "seed", "rpc"}:
         fail(f"unknown node role {role!r}")
@@ -182,7 +182,7 @@ laddr = "tcp://127.0.0.1:26657"
 unsafe = false
 """
     app = """[evm]
-evm-chain-id = 777778
+evm-chain-id = 42424242
 
 [json-rpc]
 enable = true
@@ -206,19 +206,29 @@ enable = false
         (root / "config.toml").write_text(config, encoding="utf-8")
         (root / "app.toml").write_text(app, encoding="utf-8")
         (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
-        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "rpc")
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
         validator_app = app.replace("enable = true", "enable = false", 1)
         (root / "app.toml").write_text(validator_app, encoding="utf-8")
-        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "validator")
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "validator")
         bad_app = app.replace("allow-insecure-unlock = false", "allow-insecure-unlock = true")
         (root / "app.toml").write_text(bad_app, encoding="utf-8")
         try:
-            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "rpc")
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
         except ConfigError:
             pass
         else:
             fail("self-test did not reject insecure account unlocking")
-    print("PASS network config validator self-test (valid config accepted; insecure unlock rejected)")
+
+        for reserved_id in (777777, 777778):
+            reserved_app = app.replace("42424242", str(reserved_id))
+            (root / "app.toml").write_text(reserved_app, encoding="utf-8")
+            try:
+                validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", reserved_id, "rpc")
+            except ConfigError:
+                pass
+            else:
+                fail(f"self-test did not reject reserved EVM chain ID {reserved_id}")
+    print("PASS network config validator self-test (valid config accepted; unsafe and reserved IDs rejected)")
 
 
 def main() -> int:
