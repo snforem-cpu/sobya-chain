@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: sobya-production-genesis-preflight-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   production-genesis-preflight:
