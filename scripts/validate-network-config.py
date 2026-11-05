@@ -82,7 +82,7 @@ def is_loopback_listener(value: str, label: str) -> None:
         fail(f"{label}: must bind to loopback behind a hardened TLS reverse proxy, got {value!r}")
 
 
-def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: str, evm_chain_id: int) -> list[str]:
+def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: str, evm_chain_id: int, role: str) -> list[str]:
     with config_path.open("rb") as stream:
         comet = tomllib.load(stream)
     with app_path.open("rb") as stream:
@@ -122,9 +122,14 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     if evm_chain_id == 777777:
         fail("777777 is the development/CI EVM chain ID and cannot be used for a public network")
 
+    if role not in {"validator", "seed", "rpc"}:
+        fail(f"unknown node role {role!r}")
     json_rpc = app.get("json-rpc", {})
-    if not json_rpc.get("enable", False):
+    rpc_enabled = bool(json_rpc.get("enable", False))
+    if role == "rpc" and not rpc_enabled:
         fail("[json-rpc].enable must be true on the designated RPC node")
+    if role in {"validator", "seed"} and rpc_enabled:
+        fail(f"[json-rpc].enable must remain false on a {role} node")
     is_loopback_listener("tcp://" + json_rpc.get("address", ""), "[json-rpc].address")
     is_loopback_listener("tcp://" + json_rpc.get("ws-address", ""), "[json-rpc].ws-address")
     if json_rpc.get("allow-insecure-unlock", True):
@@ -134,10 +139,11 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     if json_rpc.get("max-open-connections", 0) <= 0:
         fail("[json-rpc].max-open-connections must be a finite positive limit")
     namespaces = set(json_rpc.get("api", []))
-    if not {"eth", "net", "web3"}.issubset(namespaces):
-        fail("[json-rpc].api must include eth, net, and web3")
-    if namespaces.intersection({"personal", "debug", "miner"}):
-        fail("public JSON-RPC must not expose personal, debug, or miner namespaces")
+    if rpc_enabled:
+        if not {"eth", "net", "web3"}.issubset(namespaces):
+            fail("[json-rpc].api must include eth, net, and web3")
+        if namespaces.intersection({"personal", "debug", "miner"}):
+            fail("public JSON-RPC must not expose personal, debug, or miner namespaces")
     origins = json_rpc.get("ws-origins", [])
     if not origins or "*" in origins:
         fail("[json-rpc].ws-origins must be explicitly restricted; wildcard origins are forbidden")
@@ -156,7 +162,8 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
         f"PASS advertised P2P endpoint: {ext_host}:{ext_port}",
         f"PASS configured peers/seeds: {len(peers)} persistent, {len(seeds)} seeds",
         "PASS CometBFT RPC is loopback-only and unsafe RPC is disabled",
-        "PASS EVM JSON-RPC is enabled on loopback with restricted namespaces and no insecure unlock",
+        f"PASS node role: {role}",
+        "PASS EVM JSON-RPC exposure matches node role and has no insecure unlock",
         "NOTE This validates local configuration only; it does not prove Internet reachability or consensus.",
     ]
 
@@ -199,11 +206,11 @@ enable = false
         (root / "config.toml").write_text(config, encoding="utf-8")
         (root / "app.toml").write_text(app, encoding="utf-8")
         (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
-        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778)
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "rpc")
         bad_app = app.replace("allow-insecure-unlock = false", "allow-insecure-unlock = true")
         (root / "app.toml").write_text(bad_app, encoding="utf-8")
         try:
-            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778)
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "rpc")
         except ConfigError:
             pass
         else:
@@ -218,6 +225,7 @@ def main() -> int:
     parser.add_argument("--genesis", type=Path, help="the exact genesis.json used by this node")
     parser.add_argument("--chain-id", help="expected CometBFT chain ID from the signed launch bundle")
     parser.add_argument("--evm-chain-id", type=int, help="expected EVM chain ID from the signed launch bundle")
+    parser.add_argument("--role", choices=("validator", "seed", "rpc"), default="validator", help="node role; validator/seed nodes keep EVM JSON-RPC disabled")
     parser.add_argument("--self-test", action="store_true", help="run built-in positive and negative tests")
     args = parser.parse_args()
 
@@ -228,7 +236,7 @@ def main() -> int:
         required = [args.config, args.app_config, args.genesis, args.chain_id, args.evm_chain_id]
         if any(value is None for value in required):
             parser.error("provide --config, --app-config, --genesis, --chain-id, and --evm-chain-id (or use --self-test)")
-        for line in validate(args.config, args.app_config, args.genesis, args.chain_id, args.evm_chain_id):
+        for line in validate(args.config, args.app_config, args.genesis, args.chain_id, args.evm_chain_id, args.role):
             print(line)
         return 0
     except (ConfigError, OSError, json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
