@@ -39,7 +39,6 @@ import (
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
-	evmmodule "github.com/cosmos/evm/x/vm"
 	erc20module "github.com/cosmos/evm/x/erc20"
 	feemarketmodule "github.com/cosmos/evm/x/feemarket"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
