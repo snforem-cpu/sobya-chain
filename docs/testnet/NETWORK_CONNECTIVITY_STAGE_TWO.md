@@ -25,6 +25,10 @@ The first five items can be prepared in the repository. Item 6 requires real pub
 
 Recommended initial topology: four independent validator operators, one separate RPC/full node, and one seed node if a stable independent host is available. Do not place all roles on one free-tier machine or assume a Cloudflare Worker is a validator.
 
+## Client chain ID — `config/client.toml`
+
+`chain-id` in `client.toml` must match `genesis.json` exactly. Cosmos EVM reads this value when constructing BaseApp; an empty or stale value causes CometBFT to reject `InitChain`. The SOBYA `sobyad init` command now synchronizes it from the generated genesis, and the multi-node generator writes it for every generated node. The network-config auditor checks this file as a mandatory preflight.
+
 ## CometBFT `config/config.toml`
 
 After generating the node home with the exact approved SOBYA binary, set the following values. Replace every uppercase placeholder using information collected from the actual host and approved launch bundle; never publish a placeholder as a working peer.
