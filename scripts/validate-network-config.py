@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal, InvalidOperation
 import ipaddress
 import json
 import re
@@ -106,12 +107,12 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     if feemarket_params.get("no_base_fee") is not False:
         fail("feemarket.params.no_base_fee must be false")
     try:
-        base_fee = int(str(feemarket_params.get("base_fee", "0")).split(".", 1)[0])
+        base_fee = Decimal(str(feemarket_params.get("base_fee", "0")))
         enable_height = int(feemarket_params.get("enable_height", -1))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, InvalidOperation):
         fail("feemarket base_fee or enable_height is invalid")
-    if base_fee != SOBYA_EVM_BASE_FEE or enable_height != 0:
-        fail(f"EVM base fee must start at {SOBYA_EVM_BASE_FEE} {BASE_DENOM}/gas and be enabled at genesis")
+    if base_fee != Decimal(SOBYA_EVM_BASE_FEE) or enable_height != 0:
+        fail(f"EVM base fee must start at exactly {SOBYA_EVM_BASE_FEE} {BASE_DENOM}/gas and be enabled at genesis")
 
     p2p = comet.get("p2p", {})
     laddr = p2p.get("laddr", "")
