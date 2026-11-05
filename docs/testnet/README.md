@@ -1,5 +1,10 @@
 # SOBYA Public Testnet Launch Preparation
 
+## Stage 2 connectivity package
+
+The dedicated [P2P and RPC network readiness guide](NETWORK_CONNECTIVITY_STAGE_TWO.md) defines the CometBFT peer settings, secure local RPC backends, EVM JSON-RPC exposure policy, firewall rules, configuration audit command, and external acceptance checks. The guide is preparation only until independent public hosts and endpoints are supplied and verified.
+
+
 ## Current status
 
 The application-side reserve distribution path has passed a two-validator end-to-end test on commit `ec8206d151b3877dbced9c6df7362ffe8259f350`. The test created real validator commission and self-delegator rewards, committed all four withdrawal transactions, and verified that the same reserve period was not released again in the next block.
