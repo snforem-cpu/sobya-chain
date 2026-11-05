@@ -79,7 +79,8 @@ jobs:
           test -s scripts/prepare-validator-genesis.py
           test -s docs/RELEASE_PROCESS.md
           test -s docs/ANNOUNCEMENTS.md
-          grep -qi 'testnet tokens have no monetary value' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi '150M SOBY lifetime allocation' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi '95% signing eligibility' docs/STAGE_THREE_OPERATOR_KIT.md
           grep -q '777777' docs/GENESIS_CEREMONY.md
 
       - name: Run focused Go CLI configuration tests
