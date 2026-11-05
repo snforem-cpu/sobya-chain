@@ -69,6 +69,12 @@ jobs:
           set -euo pipefail
           ruby -e 'require "yaml"; Dir.glob(".github/workflows/*.{yml,yaml}").sort.each { |path| YAML.load_file(path, aliases: true); puts "PASS #{path}" }'
 
+      - name: Self-test production and validator genesis scripts
+        run: |
+          set -euo pipefail
+          python3 scripts/initialize-production-genesis.py --self-test
+          python3 scripts/prepare-validator-genesis.py --self-test
+
       - name: Compile and self-test network config auditor
         run: |
           set -euo pipefail
