@@ -43,7 +43,7 @@ laddr = "tcp://127.0.0.1:26657"
 unsafe = false
 ```
 
-- The P2P listening port and advertised port must match. If a host maps an external port to a different internal port, advertise the externally reachable mapped port and configure the listener/proxy according to that provider's documented TCP forwarding.
+- On a directly reachable host, advertise the P2P listener port. If a provider maps a public port to a different internal port, advertise the externally reachable mapped port and verify the forwarding from a second network; the config auditor accepts this documented mapping.
 - `persistent_peers` should contain known stable peers; `seeds` can help discover additional peers. The values must be real CometBFT node IDs and reachable host/port pairs.
 - Never copy `node_key.json` between operators. Each host must generate its own node key.
 - Do not open CometBFT RPC port 26657 to the public Internet. Keep unsafe RPC disabled.
