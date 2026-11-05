@@ -47,8 +47,8 @@ The genesis native supply must reconcile exactly to the approved total and must 
 After `sobyad init` has created the empty application genesis and its module accounts, add the two owner-controlled accounts with the exact canonical Bech32 destinations and amounts:
 
 ```bash
-sobyad add-genesis-account sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq 400000000000000000000000000asobya --home "$SOBYA_HOME"
-sobyad add-genesis-account sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3 450000000000000000000000000asobya --home "$SOBYA_HOME"
+sobyad genesis add-genesis-account sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq 400000000000000000000000000asobya --home "$SOBYA_HOME"
+sobyad genesis add-genesis-account sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3 450000000000000000000000000asobya --home "$SOBYA_HOME"
 python3 scripts/initialize-production-genesis.py \
   --genesis "$SOBYA_HOME/config/genesis.json" \
   --output "$SOBYA_HOME/config/genesis.base.json"
@@ -61,7 +61,7 @@ The bootstrap script validates the two exact owner allocations and the pre-exist
 The validator self-bonds are funded **from inside** the 150,000,000 SOBY validator allocation. They must not be added on top of the reserve or counted twice. The repository now includes `scripts/prepare-validator-genesis.py` to reconcile this safely after operators provide public account addresses and the agreed self-bond amounts:
 
 1. Initialize the coordinator genesis with the exact release binary and add the founder, shared management wallet, and 150M reserve allocation.
-2. For each participating validator, add the operator's public account address with exactly the agreed self-bond amount using `sobyad add-genesis-account <sobya-account-address> <amount>asobya`. This command creates the auth account and initial bank balance needed for the operator's gentx.
+2. For each participating validator, add the operator's public account address with exactly the agreed self-bond amount using `sobyad genesis add-genesis-account <sobya-account-address> <amount>asobya`. This command creates the auth account and initial bank balance needed for the operator's gentx.
 3. Create `validators.json` as a JSON array of objects with `address` and `self_bond_asobya` (integer string) fields. Use the exact same address and amount used in `add-genesis-account`.
 4. Run `python scripts/prepare-validator-genesis.py --genesis <path-to-genesis.json> --validators validators.json --output <reconciled-genesis.json>`.
 5. The script validates each `sobya` Bech32 address/checksum, requires the matching auth and bank accounts, deducts the self-bond total from the 150M reserve module balance, recalculates all bank supply denominations, and requires native supply to remain exactly 1B SOBY. It writes the app-owned `sobya_validator_reserve` genesis extension with `total_paid_asobya` equal to the initial self-bonds, so the 150M lifetime ceiling and 48-tranche schedule account for them.
@@ -75,7 +75,7 @@ Using the exact release binary and documented version-specific command sequence:
 1. Generate the agreed initial genesis.
 2. Apply only reviewed allocation changes.
 3. Collect the approved gentx files.
-4. Run the binary's `collect-gentxs` and `validate-genesis` commands.
+4. Run `sobyad genesis collect-gentxs` and `sobyad genesis validate-genesis` using the same release binary.
 5. Run application genesis validation and supply-cap checks.
 6. Run the repository's tokenomics/reserve tests against this exact source commit.
 7. Parse and independently reconcile all native balances and module-account balances.
