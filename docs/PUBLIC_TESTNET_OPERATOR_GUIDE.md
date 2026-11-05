@@ -1,6 +1,6 @@
-# SOBYA Public Testnet Operator Guide (Preparation)
+# SOBYA Public Network Operator Guide — Superseded filename
 
-This document is an operational preparation guide, not an announcement that a public testnet is live. A public launch remains blocked until independent operators, public P2P reachability, a reviewed common genesis, and successful cross-node transfers have been verified.
+This legacy filename is retained for backward compatibility. The current mainnet preparation and operator instructions are maintained in docs/STAGE_THREE_OPERATOR_KIT.md, docs/GENESIS_CEREMONY.md, and docs/VALIDATOR_RECRUITMENT.md. Do not treat the old testnet-specific instructions below as current launch instructions.
 
 ## Current development token parameters
 
@@ -9,7 +9,7 @@ This document is an operational preparation guide, not an announcement that a pu
 - Precision: 18 decimals (`1 SOBY = 10^18 asobya`).
 - Maximum native supply: 1 billion SOBY.
 
-These are development parameters. The public testnet chain ID, EVM chain ID, genesis time, validator allocations, minimum gas price, and launch date are not yet finalized.
+These are the intended SOBYA native-token parameters. The production CometBFT/EVM chain IDs, genesis time, validator self-bonds, minimum gas price, and launch date must be approved in the final launch bundle.
 
 ## Before announcing a public testnet
 
