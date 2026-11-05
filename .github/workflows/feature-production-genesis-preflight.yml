@@ -63,6 +63,7 @@ jobs:
           ./sobyad init "SOBYA production genesis preflight" --chain-id "$CHAIN_ID" --home "$SOBYA_HOME"
           ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator.json"
           VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator.json")"
+          rm -f "$RUNNER_TEMP/validator.json"
           test -n "$VALIDATOR_ADDRESS"
 
           ./sobyad genesis add-genesis-account sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq 400000000000000000000000000asobya --home "$SOBYA_HOME"
@@ -120,6 +121,5 @@ jobs:
           path: |
             ${{ runner.temp }}/sobya-production-genesis-preflight/config/genesis.json
             ${{ runner.temp }}/sobya-preflight.log
-            ${{ runner.temp }}/validator.json
           if-no-files-found: warn
           retention-days: 7
