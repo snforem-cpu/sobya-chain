@@ -70,7 +70,7 @@ max-open-connections = 100
 ws-origins = ["127.0.0.1", "localhost"]
 
 [evm]
-evm-chain-id = <OFFICIAL_EVM_CHAIN_ID>
+evm-chain-id = 357812033857 # proposed SOBYA ID; use only after owner approval and final registry check
 ```
 
 CometBFT RPC remains at `tcp://127.0.0.1:26657` in `config.toml`. Expose the required read-only routes through a TLS reverse proxy on 443, with rate limits and request-size/time limits. Do not expose `personal`, `debug`, or `miner` JSON-RPC namespaces; do not enable insecure account unlocking or profiling. Use an explicit WebSocket origin allowlist for the official wallet/application origins after those domains exist.
