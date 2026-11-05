@@ -1,0 +1,125 @@
+name: SOBYA Production Genesis Preflight
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'release/**'
+    paths:
+      - 'sobya/app/**'
+      - 'sobya/cmd/sobyad/**'
+      - 'sobya/go.mod'
+      - 'sobya/go.sum'
+      - 'scripts/initialize-production-genesis.py'
+      - 'scripts/prepare-validator-genesis.py'
+      - '.github/workflows/feature-production-genesis-preflight.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-production-genesis-preflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  production-genesis-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify dependencies, run full Go tests, and build node
+        working-directory: sobya
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -count=1 -mod=readonly ./...
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Build base allocation, reserve-backed self-bond, gentx, and live single-validator genesis
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-production-genesis-preflight
+          CHAIN_ID: sobya-genesis-preflight-1
+          EVM_CHAIN_ID: "357812033857"
+          SELF_BOND: "1000000000000000000000"
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad init "SOBYA production genesis preflight" --chain-id "$CHAIN_ID" --home "$SOBYA_HOME"
+          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator.json"
+          VALIDATOR_ADDRESS="$(jq -r '.address' "$RUNNER_TEMP/validator.json")"
+          test -n "$VALIDATOR_ADDRESS"
+
+          ./sobyad genesis add-genesis-account sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq 400000000000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis add-genesis-account sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3 450000000000000000000000000asobya --home "$SOBYA_HOME"
+          python3 scripts/initialize-production-genesis.py --genesis "$SOBYA_HOME/config/genesis.json"
+
+          ./sobyad genesis add-genesis-account "$VALIDATOR_ADDRESS" "${SELF_BOND}asobya" --home "$SOBYA_HOME"
+          printf '[{"address":"%s","self_bond_asobya":"%s"}]\n' "$VALIDATOR_ADDRESS" "$SELF_BOND" > "$RUNNER_TEMP/validators.json"
+          python3 scripts/prepare-validator-genesis.py --genesis "$SOBYA_HOME/config/genesis.json" --validators "$RUNNER_TEMP/validators.json"
+
+          sed -i 's/^minimum-gas-prices = ""/minimum-gas-prices = "1000000000asobya"/' "$SOBYA_HOME/config/app.toml"
+          sed -i "s/^evm-chain-id = 777777$/evm-chain-id = $EVM_CHAIN_ID/" "$SOBYA_HOME/config/app.toml"
+          grep -q '^minimum-gas-prices = "1000000000asobya"$' "$SOBYA_HOME/config/app.toml"
+          grep -q "^evm-chain-id = $EVM_CHAIN_ID$" "$SOBYA_HOME/config/app.toml"
+
+          ./sobyad genesis gentx validator "${SELF_BOND}asobya" --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
+          ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
+          ./sobyad genesis validate-genesis --home "$SOBYA_HOME"
+
+          ./sobyad start --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-preflight.log" 2>&1 &
+          NODE_PID=$!
+          trap 'kill "$NODE_PID" 2>/dev/null || true' EXIT
+          HEIGHT=""
+          for attempt in $(seq 1 90); do
+            HEIGHT="$(curl -fsS http://127.0.0.1:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // empty' || true)"
+            if [ -n "$HEIGHT" ] && [ "$HEIGHT" -gt 0 ]; then
+              break
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then
+              cat "$RUNNER_TEMP/sobya-preflight.log"
+              echo "SOBYA node exited before producing the first block" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          test -n "$HEIGHT"
+          test "$HEIGHT" -gt 0
+
+          SUPPLY="$(./sobyad query bank total-supply --denom asobya --home "$SOBYA_HOME" --output json | jq -r '[.supply[] | select(.denom=="asobya")][0].amount')"
+          RESERVE="$(./sobyad query bank balances sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr --home "$SOBYA_HOME" --output json | jq -r '[.balances[] | select(.denom=="asobya")][0].amount')"
+          DELEGATION="$(./sobyad query staking delegations "$VALIDATOR_ADDRESS" --home "$SOBYA_HOME" --output json | jq -r '[.delegation_responses[].balance | select(.denom=="asobya")][0].amount')"
+          test "$SUPPLY" = "1000000000000000000000000000"
+          test "$RESERVE" = "149999000000000000000000000"
+          test "$DELEGATION" = "$SELF_BOND"
+          echo "PASS: block height $HEIGHT"
+          echo "PASS: native supply remains exactly 1B SOBY"
+          echo "PASS: validator self-bond was deducted from the 150M reserve exactly once"
+          echo "PASS: reserve remainder and staking delegation match the genesis allocation"
+
+      - name: Upload genesis preflight diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-production-genesis-preflight-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/sobya-production-genesis-preflight/config/genesis.json
+            ${{ runner.temp }}/sobya-preflight.log
+            ${{ runner.temp }}/validator.json
+          if-no-files-found: warn
+          retention-days: 7
