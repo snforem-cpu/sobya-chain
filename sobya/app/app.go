@@ -150,7 +150,7 @@ func AppConfig() depinject.Config {
 			// is insufficient: their genesis sections would otherwise be absent.
 			map[string]module.AppModuleBasic{
 				genutiltypes.ModuleName:   genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
-				evmtypes.ModuleName:       newEVMAppModuleBasic(),
+				evmtypes.ModuleName:       EVMAppModuleBasic(),
 				feemarkettypes.ModuleName: feemarketmodule.AppModuleBasic{},
 				erc20types.ModuleName:     erc20module.AppModuleBasic{},
 			},
