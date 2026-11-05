@@ -106,8 +106,54 @@ jobs:
 
           sed -i 's/^minimum-gas-prices = ""/minimum-gas-prices = "1000000000asobya"/' "$SOBYA_HOME/config/app.toml"
           sed -i "s/^evm-chain-id = 777777$/evm-chain-id = $EVM_CHAIN_ID/" "$SOBYA_HOME/config/app.toml"
-          grep -q '^minimum-gas-prices = "1000000000asobya"$' "$SOBYA_HOME/config/app.toml"
+          grep -q '^minimum-gas-prices = "1000000000asobya"
+          ./sobyad genesis gentx validator "${SELF_BOND}asobya" --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
+          ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
+          ./sobyad genesis validate-genesis --home "$SOBYA_HOME"
+
+          ./sobyad start --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-preflight.log" 2>&1 &
+          NODE_PID=$!
+          trap 'kill "$NODE_PID" 2>/dev/null || true' EXIT
+          HEIGHT=""
+          for attempt in $(seq 1 90); do
+            HEIGHT="$(curl -fsS http://127.0.0.1:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // empty' || true)"
+            if [ -n "$HEIGHT" ] && [ "$HEIGHT" -gt 0 ]; then
+              break
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then
+              cat "$RUNNER_TEMP/sobya-preflight.log"
+              echo "SOBYA node exited before producing the first block" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          test -n "$HEIGHT"
+          test "$HEIGHT" -gt 0
+
+          SUPPLY="$(./sobyad query bank total-supply-of asobya --home "$SOBYA_HOME" --output json | jq -r '.amount.amount')"
+          RESERVE="$(./sobyad query bank balances sobya1hmh9jk9gmk7k63qrpl3a9vsylcvrp379v3h0kr --home "$SOBYA_HOME" --output json | jq -r '[.balances[] | select(.denom=="asobya")][0].amount')"
+          DELEGATION="$(./sobyad query staking delegations "$VALIDATOR_ADDRESS" --home "$SOBYA_HOME" --output json | jq -r '[.delegation_responses[].balance | select(.denom=="asobya")][0].amount')"
+          test "$SUPPLY" = "1000000000000000000000000000"
+          test "$RESERVE" = "149999000000000000000000000"
+          test "$DELEGATION" = "$SELF_BOND"
+          echo "PASS: block height $HEIGHT"
+          echo "PASS: native supply remains exactly 1B SOBY"
+          echo "PASS: validator self-bond was deducted from the 150M reserve exactly once"
+          echo "PASS: reserve remainder and staking delegation match the genesis allocation"
+
+      - name: Upload genesis preflight diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-production-genesis-preflight-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/sobya-production-genesis-preflight/config/genesis.json
+            ${{ runner.temp }}/sobya-preflight.log
+          if-no-files-found: warn
+          retention-days: 7
+ "$SOBYA_HOME/config/app.toml"
           grep -q "^evm-chain-id = $EVM_CHAIN_ID$" "$SOBYA_HOME/config/app.toml"
+          grep -q "^chain_id = \"$CHAIN_ID\"$" "$SOBYA_HOME/config/config.toml"
 
           ./sobyad genesis gentx validator "${SELF_BOND}asobya" --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
           ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
