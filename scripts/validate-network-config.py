@@ -103,8 +103,8 @@ def validate(config_path: Path, app_path: Path, genesis_path: Path, chain_id: st
     if not p2p.get("external_address"):
         fail("[p2p].external_address is empty; publish the node's real public P2P address")
     ext_host, ext_port = parse_host_port(p2p["external_address"], "[p2p].external_address")
-    if ext_port != parsed_laddr.port:
-        fail("[p2p].external_address port must match the P2P listener port")
+    # A provider may map a public TCP port to a different local listener port.
+    # The operator must verify that mapping from an independent network.
     peers = parse_peer_list(p2p.get("persistent_peers", ""), "[p2p].persistent_peers")
     seeds = parse_peer_list(p2p.get("seeds", ""), "[p2p].seeds")
     if not peers and not seeds:
