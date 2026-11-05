@@ -42,6 +42,20 @@ The owner-supplied founder and shared management EVM addresses and their `sobya`
 
 The genesis native supply must reconcile exactly to the approved total and must not exceed the application cap. Inflation/mint issuance remains disabled under the agreed token rules. Any discrepancy, duplicate balance, unexpected denom, or unaccounted remainder blocks approval.
 
+### Initial fixed allocation — prepare this before validators arrive
+
+After `sobyad init` has created the empty application genesis and its module accounts, add the two owner-controlled accounts with the exact canonical Bech32 destinations and amounts:
+
+```bash
+sobyad add-genesis-account sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq 400000000000000000000000000asobya --home "$SOBYA_HOME"
+sobyad add-genesis-account sobya1zhu55fp76czndk6342vn5e7n7t4q8as08t5yw3 450000000000000000000000000asobya --home "$SOBYA_HOME"
+python3 scripts/initialize-production-genesis.py \
+  --genesis "$SOBYA_HOME/config/genesis.json" \
+  --output "$SOBYA_HOME/config/genesis.base.json"
+```
+
+The bootstrap script validates the two exact owner allocations and the pre-existing `validator_reserve` module account, adds 150M SOBY to that module account's bank balance without replacing its module-account permissions, recalculates bank supply, and requires exactly 1B SOBY total native supply. Use the output as the initial coordinator genesis. Its self-test runs in GitHub Actions. Do not use `add-genesis-account` to replace the reserve module account with a normal account.
+
 ### Initial validator self-bonds — deterministic reserve accounting
 
 The validator self-bonds are funded **from inside** the 150,000,000 SOBY validator allocation. They must not be added on top of the reserve or counted twice. The repository now includes `scripts/prepare-validator-genesis.py` to reconcile this safely after operators provide public account addresses and the agreed self-bond amounts:
