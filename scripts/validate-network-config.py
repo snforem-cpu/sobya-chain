@@ -230,7 +230,22 @@ enable = false
                 pass
             else:
                 fail(f"self-test did not reject reserved EVM chain ID {reserved_id}")
-    print("PASS network config validator self-test (valid config accepted; unsafe and reserved IDs rejected)")
+
+        sobya_candidate = 357812033857
+        candidate_app = app.replace("42424242", str(sobya_candidate))
+        (root / "app.toml").write_text(candidate_app, encoding="utf-8")
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", sobya_candidate, "rpc")
+
+        oversized_id = 1 << 64
+        oversized_app = app.replace("42424242", str(oversized_id))
+        (root / "app.toml").write_text(oversized_app, encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", oversized_id, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject an EVM chain ID outside uint64")
+    print("PASS network config validator self-test (valid config, SOBYA candidate uint64, unsafe/reserved IDs, and uint64 overflow)")
 
 
 def main() -> int:
