@@ -21,7 +21,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
-	cmtcfg "github.com/cometbft/cometbft/config"
 	"github.com/cosmos/cosmos-sdk/server"
 	cosmosevmserver "github.com/cosmos/evm/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
@@ -66,10 +65,10 @@ func initRootCmd(
 }
 
 // addModuleInitFlags adds more flags to the start command.
-// newInitCmd wraps the SDK init command and synchronizes CometBFT's
-// config.toml chain_id with the generated genesis.json. The upstream SDK
-// InitCmd writes the chain ID to genesis.json but leaves config.toml's
-// ChainID empty, which makes CometBFT reject InitChain at first startup.
+// newInitCmd wraps the SDK init command and synchronizes client.toml's
+// chain-id with the generated genesis.json. Cosmos EVM reads BaseApp's chain
+// ID from client.toml at startup; the upstream SDK init command writes the
+// genesis chain ID but leaves this client setting empty.
 func newInitCmd(basicManager module.BasicManager, defaultNodeHome string) *cobra.Command {
 	initCmd := genutilcli.InitCmd(basicManager, defaultNodeHome)
 	originalRunE := initCmd.RunE
@@ -84,14 +83,14 @@ func newInitCmd(basicManager module.BasicManager, defaultNodeHome string) *cobra
 		if home == "" {
 			home = defaultNodeHome
 		}
-		return syncCometBFTChainID(home)
+		return syncClientChainIDFromGenesis(home)
 	}
 	return initCmd
 }
 
-// syncCometBFTChainID makes the CometBFT node config agree with the chain ID
-// written by the SDK init command in config/genesis.json.
-func syncCometBFTChainID(home string) error {
+// syncClientChainIDFromGenesis copies the generated genesis chain ID into
+// config/client.toml, which Cosmos EVM uses when constructing BaseApp.
+func syncClientChainIDFromGenesis(home string) error {
 	genesisPath := filepath.Join(home, "config", "genesis.json")
 	genesisBytes, err := os.ReadFile(genesisPath)
 	if err != nil {
@@ -106,11 +105,44 @@ func syncCometBFTChainID(home string) error {
 	if genesis.ChainID == "" {
 		return errors.New("initialized genesis has an empty chain_id")
 	}
+	return writeClientChainID(home, genesis.ChainID)
+}
 
-	configPath := filepath.Join(home, "config", "config.toml")
-	cometConfig := cmtcfg.LoadConfigFile(configPath)
-	cometConfig.ChainID = genesis.ChainID
-	cmtcfg.WriteConfigFile(configPath, cometConfig)
+// writeClientChainID updates client.toml without discarding existing client
+// settings. If no client file exists yet, it writes the SDK's standard defaults.
+func writeClientChainID(home, chainID string) error {
+	if chainID == "" {
+		return errors.New("cannot write an empty client chain ID")
+	}
+	configDir := filepath.Join(home, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return fmt.Errorf("create client config directory: %w", err)
+	}
+	configPath := filepath.Join(configDir, "client.toml")
+	v := viper.New()
+	v.SetConfigFile(configPath)
+	v.SetConfigType("toml")
+	if _, err := os.Stat(configPath); err == nil {
+		if err := v.ReadInConfig(); err != nil {
+			return fmt.Errorf("read client.toml: %w", err)
+		}
+	} else if os.IsNotExist(err) {
+		v.Set("keyring-backend", "os")
+		v.Set("keyring-default-keyname", "")
+		v.Set("output", "text")
+		v.Set("node", "tcp://localhost:26657")
+		v.Set("broadcast-mode", "sync")
+	} else {
+		return fmt.Errorf("stat client.toml: %w", err)
+	}
+	v.Set("chain-id", chainID)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := v.WriteConfigAs(configPath); err != nil {
+			return fmt.Errorf("write client.toml: %w", err)
+		}
+	} else if err := v.WriteConfig(); err != nil {
+		return fmt.Errorf("update client.toml: %w", err)
+	}
 	return nil
 }
 
