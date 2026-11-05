@@ -37,6 +37,11 @@ import (
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+	evmmodule "github.com/cosmos/evm/x/vm"
+	erc20module "github.com/cosmos/evm/x/erc20"
+	feemarketmodule "github.com/cosmos/evm/x/feemarket"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -140,9 +145,15 @@ func AppConfig() depinject.Config {
 	return depinject.Configs(
 		appConfig,
 		depinject.Supply(
-			// supply custom module basics
+			// Supply basics for modules registered outside depinject as well.
+			// These basics are used by init, multi-node, and genesis export
+			// to create a complete app_state. Registering only runtime AppModules
+			// is insufficient: their genesis sections would otherwise be absent.
 			map[string]module.AppModuleBasic{
-				genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
+				genutiltypes.ModuleName:   genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
+				evmtypes.ModuleName:       newEVMAppModuleBasic(),
+				feemarkettypes.ModuleName: feemarketmodule.AppModuleBasic{},
+				erc20types.ModuleName:     erc20module.AppModuleBasic{},
 			},
 		),
 		// The SDK runtime collects CustomGetSigner providers and passes them
