@@ -12,6 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
+	"github.com/cosmos/cosmos-sdk/types/module"
 	evmconfig "github.com/cosmos/evm/config"
 	evmmempool "github.com/cosmos/evm/mempool"
 
@@ -58,7 +59,7 @@ func (b evmAppModuleBasic) GetTxCmd() *cobra.Command {
 	return evmcli.NewTxCmd(b.accountCodec)
 }
 
-func newEVMAppModuleBasic() evmAppModuleBasic {
+func EVMAppModuleBasic() module.AppModuleBasic {
 	return evmAppModuleBasic{
 		accountCodec: evmaddress.NewEvmCodec(sdk.GetConfig().GetBech32AccountAddrPrefix()),
 	}
