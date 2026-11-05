@@ -209,16 +209,26 @@ enable = false
         validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
         validator_app = app.replace("enable = true", "enable = false", 1)
         (root / "app.toml").write_text(validator_app, encoding="utf-8")
-        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "validator")
+        validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "validator")
         bad_app = app.replace("allow-insecure-unlock = false", "allow-insecure-unlock = true")
         (root / "app.toml").write_text(bad_app, encoding="utf-8")
         try:
-            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 777778, "rpc")
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
         except ConfigError:
             pass
         else:
             fail("self-test did not reject insecure account unlocking")
-    print("PASS network config validator self-test (valid config accepted; insecure unlock rejected)")
+
+        for reserved_id in (777777, 777778):
+            reserved_app = app.replace("42424242", str(reserved_id))
+            (root / "app.toml").write_text(reserved_app, encoding="utf-8")
+            try:
+                validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", reserved_id, "rpc")
+            except ConfigError:
+                pass
+            else:
+                fail(f"self-test did not reject reserved EVM chain ID {reserved_id}")
+    print("PASS network config validator self-test (valid config accepted; unsafe and reserved IDs rejected)")
 
 
 def main() -> int:
