@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,6 +21,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
+	cmtcfg "github.com/cometbft/cometbft/config"
 	"github.com/cosmos/cosmos-sdk/server"
 	cosmosevmserver "github.com/cosmos/evm/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
@@ -34,7 +39,7 @@ func initRootCmd(
 	basicManager module.BasicManager,
 ) {
 	rootCmd.AddCommand(
-		genutilcli.InitCmd(basicManager, app.DefaultNodeHome),
+		newInitCmd(basicManager, app.DefaultNodeHome),
 		NewInPlaceTestnetCmd(),
 		NewTestnetMultiNodeCmd(basicManager, banktypes.GenesisBalancesIterator{}),
 		debug.Cmd(),
@@ -61,6 +66,54 @@ func initRootCmd(
 }
 
 // addModuleInitFlags adds more flags to the start command.
+// newInitCmd wraps the SDK init command and synchronizes CometBFT's
+// config.toml chain_id with the generated genesis.json. The upstream SDK
+// InitCmd writes the chain ID to genesis.json but leaves config.toml's
+// ChainID empty, which makes CometBFT reject InitChain at first startup.
+func newInitCmd(basicManager module.BasicManager, defaultNodeHome string) *cobra.Command {
+	initCmd := genutilcli.InitCmd(basicManager, defaultNodeHome)
+	originalRunE := initCmd.RunE
+	initCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := originalRunE(cmd, args); err != nil {
+			return err
+		}
+		home, err := cmd.Flags().GetString(flags.FlagHome)
+		if err != nil {
+			return err
+		}
+		if home == "" {
+			home = defaultNodeHome
+		}
+		return syncCometBFTChainID(home)
+	}
+	return initCmd
+}
+
+// syncCometBFTChainID makes the CometBFT node config agree with the chain ID
+// written by the SDK init command in config/genesis.json.
+func syncCometBFTChainID(home string) error {
+	genesisPath := filepath.Join(home, "config", "genesis.json")
+	genesisBytes, err := os.ReadFile(genesisPath)
+	if err != nil {
+		return fmt.Errorf("read initialized genesis: %w", err)
+	}
+	var genesis struct {
+		ChainID string `json:"chain_id"`
+	}
+	if err := json.Unmarshal(genesisBytes, &genesis); err != nil {
+		return fmt.Errorf("decode initialized genesis chain ID: %w", err)
+	}
+	if genesis.ChainID == "" {
+		return errors.New("initialized genesis has an empty chain_id")
+	}
+
+	configPath := filepath.Join(home, "config", "config.toml")
+	cometConfig := cmtcfg.LoadConfigFile(configPath)
+	cometConfig.ChainID = genesis.ChainID
+	cmtcfg.WriteConfigFile(configPath, cometConfig)
+	return nil
+}
+
 func addModuleInitFlags(startCmd *cobra.Command) {
 	// Cosmos EVM's default start command does not expose the SDK chain-id flag.
 	// newEVMApp reads this value through appOpts and passes it to BaseApp so
