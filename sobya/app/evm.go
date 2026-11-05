@@ -50,7 +50,7 @@ const DefaultEVMChainID uint64 = 777777
 // evmAppModuleBasic supplies the address codec required by the EVM CLI while
 // exposing the upstream module's genesis defaults and interface registration.
 type evmAppModuleBasic struct {
-	evm.AppModuleBasic
+	vm.AppModuleBasic
 	accountCodec address.Codec
 }
 
