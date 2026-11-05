@@ -77,7 +77,7 @@ jobs:
             file ../dist/sobyad
             go version -m ../dist/sobyad
           fi
-          tar -C ../dist -czf "../dist/sobyad-${RELEASE_VERSION}-linux-${GOARCH}.tar.gz" sobyad
+          tar -czf "../dist/sobyad-${RELEASE_VERSION}-linux-${GOARCH}.tar.gz" -C ../dist sobyad
           cd ../dist
           sha256sum "sobyad-${RELEASE_VERSION}-linux-${GOARCH}.tar.gz" > "SHA256SUMS-${GOARCH}"
           sha256sum -c "SHA256SUMS-${GOARCH}"
