@@ -34,16 +34,12 @@ supply ceiling.
   network identifier, not a value already embedded in an approved genesis.
   It must be checked against any previously published SOBYA network and then
   frozen before operators create gentxs.
-- **Production EVM chain ID:** intentionally unset. The repository currently
-  uses `777777` for development and its own network-config self-test uses
-  `777778`; neither is approved for production. A production integer must be
-  checked against the current EVM chain registry and wallet/network ecosystem
-  before it is committed. Do not infer that an unlisted integer is reserved.
+- **Proposed production EVM chain ID:** `357812033857` (`0x534f425941`, ASCII bytes for `SOBYA`). This is within the exact-integer range used by JavaScript and the uint64 range accepted by SOBYA's EVM configuration. The corresponding `eip155-357812033857.json` entry was not present in the ethereum-lists/chains repository when checked on 2026-11-05. Registry absence is not a reservation and cannot prove that no private chain uses it; the owner must approve the candidate and it must be rechecked before genesis is frozen. The repository's `777777` and `777778` values remain development/CI-only.
 - **Genesis UTC time, release tag, minimum gas price, self-bond amount, peer
   list, and launch time:** unset until the release and validator ceremony are
   agreed.
 
-CometBFT chain ID and EVM chain ID are separate values and must not be confused.
+CometBFT chain ID and EVM chain ID are separate values and must not be confused. The proposed pair is CometBFT `sobya-1` and EVM `${id}`; neither becomes frozen until the owner signs off.
 
 
 **Owner-provided MetaMask destinations recovered from the earlier project discussion:**
