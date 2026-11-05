@@ -5,11 +5,17 @@ This file defines the exact CI evidence required before phase one is marked comp
 ## Required checks on one identical feature-branch commit
 
 - Feature validation: dependency verification, full Go tests, and node builds for both the working source and archived source.
-- EVM JSON-RPC smoke: node startup, chain/network identifiers, block production, signed EVM transfer and receipt, Solidity deployment/read/write, ERC-20 behavior, WebSocket subscription, and bank precompile balance read.
+- EVM JSON-RPC smoke: node startup, chain/network identifiers, block production, signed EVM transfer and receipt, Solidity deployment/read/write, ERC-20 behavior, WebSocket subscription, and native `eth_getBalance` verification and bank-precompile query response.
 - Single-node localnet: 18-decimal asobya initialization, CometBFT block production, bank queries, and native-supply checks.
 - Multi-node localnet: independent validator nodes, peer connectivity, consensus progress, and transaction propagation.
 - Fee-routing integration: committed Cosmos/EVM fee transactions, exact 50/20/30 routing accounting, and no duplicate routing on subsequent empty blocks.
 - Validator-reserve audit: focused reserve tests, uncached full Go test suite, and node build.
+
+## EVM genesis invariants
+
+- The CLI module-basic manager must include the manually registered EVM, FeeMarket, and ERC-20 module basics so `init` and `multi-node` generate all three genesis sections.
+- Genesis normalization must set the EVM gas denomination and extended denomination to the canonical native `asobya` denomination, retain the 18-decimal SOBY bank metadata, and enable the supported static precompiles.
+- The bank precompile reports only denoms with registered ERC-20 token pairs. The CI genesis does not create an asobya ERC-20 pair, so the smoke test verifies the native value through `eth_getBalance` and verifies that the bank precompile query is callable; it does not claim an unregistered token-pair mapping.
 
 ## Completion rule
 
