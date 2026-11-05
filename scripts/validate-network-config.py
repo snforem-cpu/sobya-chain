@@ -248,6 +248,15 @@ enable = false
         (root / "app.toml").write_text(app, encoding="utf-8")
         (root / "genesis.json").write_text(json.dumps(genesis), encoding="utf-8")
         validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        bad_client = client.replace("sobya-testnet-stage2", "wrong-client-chain")
+        (root / "client.toml").write_text(bad_client, encoding="utf-8")
+        try:
+            validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "rpc")
+        except ConfigError:
+            pass
+        else:
+            fail("self-test did not reject client.toml/genesis chain ID mismatch")
+        (root / "client.toml").write_text(client, encoding="utf-8")
         validator_app = app.replace("enable = true", "enable = false", 1)
         (root / "app.toml").write_text(validator_app, encoding="utf-8")
         validate(root / "config.toml", root / "app.toml", root / "genesis.json", "sobya-testnet-stage2", 42424242, "validator")
