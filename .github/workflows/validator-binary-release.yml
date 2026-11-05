@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../dist
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=readonly -trimpath \
+          GOOS=linux GOARCH=amd64 go build -mod=readonly -trimpath \
             -ldflags "-X github.com/cosmos/cosmos-sdk/version.Name=sobya -X github.com/cosmos/cosmos-sdk/version.AppName=sobyad -X github.com/cosmos/cosmos-sdk/version.Version=$RELEASE_VERSION -X github.com/cosmos/cosmos-sdk/version.Commit=$SOURCE_COMMIT" \
             -o ../dist/sobyad ./cmd/sobyad
           ../dist/sobyad version
