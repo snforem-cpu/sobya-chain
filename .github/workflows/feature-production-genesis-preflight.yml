@@ -1,8 +1,10 @@
 name: SOBYA Production Genesis Preflight
 
 on:
+  workflow_dispatch:
   push:
     branches:
+      - main
       - 'feature/**'
       - 'release/**'
     paths:
