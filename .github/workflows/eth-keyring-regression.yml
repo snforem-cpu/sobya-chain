@@ -1,0 +1,52 @@
+name: SOBYA eth_secp256k1 File Keyring Regression
+
+on:
+  push:
+    branches:
+      - fix/eth-secp256k1-keyring-roundtrip
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/eth-keyring-regression.yml'
+  pull_request:
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/eth-keyring-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-eth-keyring-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  file-keyring-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Verify dependencies
+        working-directory: sobya
+        run: go mod verify
+
+      - name: Reproduce and verify eth_secp256k1 file-keyring round trip
+        working-directory: sobya
+        run: go test -mod=readonly ./cmd/sobyad/cmd -run '^TestEthSecp256k1FileKeyringRoundTrip$' -count=1 -v
+
+      - name: Run complete SOBYA test suite
+        working-directory: sobya
+        run: go test -mod=readonly ./...
+
+      - name: Build SOBYA daemon
+        working-directory: sobya
+        run: go build -mod=readonly ./cmd/sobyad
