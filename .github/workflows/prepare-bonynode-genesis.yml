@@ -26,7 +26,7 @@ jobs:
       GENESIS_TIME: "2026-11-09T19:32:00Z"
       BONYNODE_ACCOUNT: sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58
       SELF_BOND_ASOByA: "1000000000000000000"
-      SOBYA_HOME: ${{ runner.temp }}/sobya-bonynode-genesis
+      SOBYA_HOME: ${{ github.workspace }}/.sobya-bonynode-genesis
     steps:
       - name: Checkout reviewed rc.2 source and genesis scripts
         uses: actions/checkout@v4
