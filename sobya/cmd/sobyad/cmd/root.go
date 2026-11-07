@@ -15,8 +15,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
-	evmhd evmcryptocodec "github.com/cosmos/evm/crypto/codec"
-	"github.com/cosmos/evm/crypto/hd"
+	evmcryptocodec "github.com/cosmos/evm/crypto/codec"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 erc20module "github.com/cosmos/evm/x/erc20"
 erc20types "github.com/cosmos/evm/x/erc20/types"
@@ -125,6 +125,7 @@ func ProvideClientContext(
 	// the running App. Register Cosmos EVM protobuf messages on this registry
 	// before constructing its TxConfig; the EVM JSON-RPC transaction decoder
 	// uses this client TxConfig when querying committed Ethereum transactions.
+	registerEVMKeyringInterfaces(interfaceRegistry)
 	evmtypes.RegisterInterfaces(interfaceRegistry)
 
 	clientCtx := client.Context{}.
