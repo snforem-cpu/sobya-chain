@@ -1,0 +1,21 @@
+name: SOBYA Actions runner diagnostic
+
+on:
+  push:
+    branches:
+      - feature/genesis-bonynode-candidate
+    paths:
+      - .github/workflows/sobya-actions-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  runner-diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm GitHub Actions runner starts
+        run: |
+          echo "SOBYA_ACTIONS_RUNNER_STARTED"
+          echo "Commit: $GITHUB_SHA"
+          uname -a
