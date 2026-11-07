@@ -15,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	evmcryptocodec "github.com/cosmos/evm/crypto/codec"
 	evmhd "github.com/cosmos/evm/crypto/hd"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 erc20module "github.com/cosmos/evm/x/erc20"
@@ -105,6 +106,13 @@ func NewRootCmd() *cobra.Command {
 	return rootCmd
 }
 
+// registerEVMKeyringInterfaces adds Cosmos EVM's concrete account key types to
+// the protobuf Any registry used by the CLI keyring. The SDK's standard
+// registry does not include eth_secp256k1 by itself.
+func registerEVMKeyringInterfaces(registry codectypes.InterfaceRegistry) {
+	evmcryptocodec.RegisterInterfaces(registry)
+}
+
 // ProvideClientContext creates and provides a fully initialized client.Context,
 // allowing it to be used for dependency injection and CLI operations.
 func ProvideClientContext(
@@ -117,6 +125,7 @@ func ProvideClientContext(
 	// the running App. Register Cosmos EVM protobuf messages on this registry
 	// before constructing its TxConfig; the EVM JSON-RPC transaction decoder
 	// uses this client TxConfig when querying committed Ethereum transactions.
+	registerEVMKeyringInterfaces(interfaceRegistry)
 	evmtypes.RegisterInterfaces(interfaceRegistry)
 
 	clientCtx := client.Context{}.

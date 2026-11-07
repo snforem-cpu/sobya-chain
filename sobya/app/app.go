@@ -33,6 +33,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	evmaddress "github.com/cosmos/evm/encoding/address"
+	evmcryptocodec "github.com/cosmos/evm/crypto/codec"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
@@ -229,6 +230,11 @@ func New(
 	); err != nil {
 		panic(err)
 	}
+
+	// Register Cosmos EVM account public/private key implementations on the
+	// app codec registry. Without these registrations, protobuf Any values in
+	// file-backed keyring records cannot be unpacked after the record is read.
+	evmcryptocodec.RegisterInterfaces(app.interfaceRegistry)
 
 	// Cosmos EVM modules are registered manually after runtime app wiring.
 	// Register their protobuf interfaces on the same registry used by appCodec
