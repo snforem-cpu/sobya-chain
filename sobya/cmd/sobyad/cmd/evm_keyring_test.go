@@ -10,7 +10,7 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/std"
-	"cosmossdk.io/x/tx/signing"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 
 	evmhd "github.com/cosmos/evm/crypto/hd"
 )
