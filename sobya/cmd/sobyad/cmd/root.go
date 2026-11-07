@@ -106,6 +106,13 @@ func NewRootCmd() *cobra.Command {
 	return rootCmd
 }
 
+// registerEVMKeyringInterfaces adds Cosmos EVM's concrete account key types to
+// the protobuf Any registry used by the CLI keyring. The SDK's standard
+// registry does not include eth_secp256k1 by itself.
+func registerEVMKeyringInterfaces(registry codectypes.InterfaceRegistry) {
+	evmcryptocodec.RegisterInterfaces(registry)
+}
+
 // ProvideClientContext creates and provides a fully initialized client.Context,
 // allowing it to be used for dependency injection and CLI operations.
 func ProvideClientContext(
