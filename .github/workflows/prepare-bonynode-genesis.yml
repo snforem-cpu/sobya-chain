@@ -60,7 +60,7 @@ jobs:
           python3 scripts/initialize-production-genesis.py --genesis "$SOBYA_HOME/config/genesis.json"
 
           "$SOBYAD" genesis add-genesis-account "$BONYNODE_ACCOUNT" "${SELF_BOND_ASOByA}asobya" --home "$SOBYA_HOME"
-          printf '[{"address":"%s","self_bond_asobya":"%s"}]\\n' "$BONYNODE_ACCOUNT" "$SELF_BOND_ASOByA" > "$RUNNER_TEMP/validators.json"
+          printf '[{"address":"%s","self_bond_asobya":"%s"}]\n' "$BONYNODE_ACCOUNT" "$SELF_BOND_ASOByA" > "$RUNNER_TEMP/validators.json"
 
           python3 - "$SOBYA_HOME/config/genesis.json" "$GENESIS_TIME" <<'PY'
           import json, sys
@@ -68,7 +68,7 @@ jobs:
           p = Path(sys.argv[1])
           data = json.loads(p.read_text(encoding="utf-8"))
           data["genesis_time"] = sys.argv[2]
-          p.write_text(json.dumps(data, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+          p.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           PY
 
           python3 scripts/prepare-validator-genesis.py --genesis "$SOBYA_HOME/config/genesis.json" --validators "$RUNNER_TEMP/validators.json"
