@@ -132,7 +132,7 @@ jobs:
           EOF
           (cd "$RUNNER_TEMP/sobya-bundle" && sha256sum genesis.json app.toml client.toml config.toml > SHA256SUMS)
           tar -czf "$GITHUB_WORKSPACE/sobya-bonynode-pregenesis.tar.gz" -C "$RUNNER_TEMP/sobya-bundle" .
-          sha256sum "$GITHUB_WORKSPACE/sobya-bonynode-pregenesis.tar.gz" > "$GITHUB_WORKSPACE/sobya-bonynode-pregenesis.tar.gz.sha256"
+          (cd "$GITHUB_WORKSPACE" && sha256sum sobya-bonynode-pregenesis.tar.gz > sobya-bonynode-pregenesis.tar.gz.sha256)
 
       - name: Upload pre-gentx Genesis candidate
         uses: actions/upload-artifact@v4
