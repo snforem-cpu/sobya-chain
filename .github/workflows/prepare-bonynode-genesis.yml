@@ -131,15 +131,15 @@ jobs:
           Pending: collect and validate gentx; confirm public P2P endpoint is listening; confirm all participating operators; final genesis validation and SHA256 sign-off; immutable launch bundle.
           EOF
           (cd "$RUNNER_TEMP/sobya-bundle" && sha256sum genesis.json app.toml client.toml config.toml > SHA256SUMS)
-          tar -czf "$RUNNER_TEMP/sobya-bonynode-pregenesis.tar.gz" -C "$RUNNER_TEMP/sobya-bundle" .
-          sha256sum "$RUNNER_TEMP/sobya-bonynode-pregenesis.tar.gz" > "$RUNNER_TEMP/sobya-bonynode-pregenesis.tar.gz.sha256"
+          tar -czf "$GITHUB_WORKSPACE/sobya-bonynode-pregenesis.tar.gz" -C "$RUNNER_TEMP/sobya-bundle" .
+          sha256sum "$GITHUB_WORKSPACE/sobya-bonynode-pregenesis.tar.gz" > "$GITHUB_WORKSPACE/sobya-bonynode-pregenesis.tar.gz.sha256"
 
       - name: Upload pre-gentx Genesis candidate
         uses: actions/upload-artifact@v4
         with:
           name: sobya-bonynode-pre-gentx-genesis
           path: |
-            ${{ runner.temp }}/sobya-bonynode-pregenesis.tar.gz
-            ${{ runner.temp }}/sobya-bonynode-pregenesis.tar.gz.sha256
+            ${{ github.workspace }}/sobya-bonynode-pregenesis.tar.gz
+            ${{ github.workspace }}/sobya-bonynode-pregenesis.tar.gz.sha256
           if-no-files-found: error
           retention-days: 14
