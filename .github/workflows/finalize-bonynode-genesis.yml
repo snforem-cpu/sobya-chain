@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: sobya-final-genesis-bonynode
@@ -204,6 +204,23 @@ jobs:
           tar -czf "$GITHUB_WORKSPACE/sobya-final-genesis-bonynode.tar.gz" -C "$OUT" .
           (cd "$GITHUB_WORKSPACE" && sha256sum sobya-final-genesis-bonynode.tar.gz > sobya-final-genesis-bonynode.tar.gz.sha256)
           sha256sum "$OUT/genesis.json" > "$GITHUB_WORKSPACE/sobya-final-genesis.json.sha256"
+
+      - name: Publish immutable launch files on the ceremony branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST="$GITHUB_WORKSPACE/genesis/launch-2026-11-09"
+          mkdir -p "$DEST"
+          OUT="$RUNNER_TEMP/sobya-final-bundle"
+          cp "$OUT/genesis.json" "$OUT/app.toml" "$OUT/client.toml" "$OUT/config.toml" "$OUT/bonynode-gentx.json" "$OUT/LAUNCH-MANIFEST.txt" "$OUT/SHA256SUMS" "$DEST/"
+          cp "$GITHUB_WORKSPACE/sobya-final-genesis-bonynode.tar.gz" "$DEST/"
+          cp "$GITHUB_WORKSPACE/sobya-final-genesis-bonynode.tar.gz.sha256" "$DEST/"
+          cp "$GITHUB_WORKSPACE/sobya-final-genesis.json.sha256" "$DEST/"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DEST"
+          git commit -m "genesis: publish BonyNode testnet genesis candidate for 2026-11-09"
+          git push origin "HEAD:$GITHUB_REF_NAME"
 
       - name: Upload final Genesis package
         uses: actions/upload-artifact@v4
