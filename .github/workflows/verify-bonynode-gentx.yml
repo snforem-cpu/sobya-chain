@@ -22,10 +22,8 @@ jobs:
       SOBYA_HOME: ${{ github.workspace }}/.sobya-verify
       SOURCE_RUN_ID: "42407460164"
     steps:
-      - name: Checkout reviewed source
+      - name: Checkout verification branch
         uses: actions/checkout@v4
-        with:
-          ref: 90512106ee2f3c2a38c8f5bab66edc17688fba43
 
       - name: Download exact pre-gentx Genesis artifact
         uses: actions/download-artifact@v4
