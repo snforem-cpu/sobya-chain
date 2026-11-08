@@ -203,12 +203,12 @@ pprof_laddr = "localhost:6060"
 [p2p]
 
 # Address to listen for incoming connections
-laddr = "tcp://0.0.0.0:26656"
+laddr = "tcp://0.0.0.0:42656"
 
 # Address to advertise to peers for them to dial. If empty, will use the same
 # port as the laddr, and will introspect on the listener to figure out the
 # address. IP and port are required. Example: 159.89.10.97:26656
-external_address = ""
+external_address = "88.198.46.55:42656"
 
 # Comma separated list of seed nodes to connect to
 seeds = ""
