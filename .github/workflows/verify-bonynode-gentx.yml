@@ -1,0 +1,111 @@
+name: Verify BonyNode rc.2 gentx against pre-gentx Genesis
+
+on:
+  push:
+    branches:
+      - verify/bonynode-gentx-rc2
+    paths:
+      - '.github/workflows/verify-bonynode-gentx.yml'
+      - 'verification/bonynode/SOBYA-gentx-BonyNode-2026-11-08-corrected.json'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: v0.1.0-rc.2
+      CHAIN_ID: sobya-1
+      SOBYA_HOME: ${{ github.workspace }}/.sobya-verify
+      SOURCE_RUN_ID: "42407460164"
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+        with:
+          ref: 90512106ee2f3c2a38c8f5bab66edc17688fba43
+
+      - name: Download exact pre-gentx Genesis artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sobya-bonynode-pre-gentx-genesis
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/pregen-artifact
+
+      - name: Verify Genesis archive checksum and prepare node home
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ runner.temp }}/pregen-artifact"
+          ls -la
+          sha256sum -c sobya-bonynode-pregenesis.tar.gz.sha256
+          mkdir -p "${{ runner.temp }}/pregen"
+          tar -xzf sobya-bonynode-pregenesis.tar.gz -C "${{ runner.temp }}/pregen"
+          mkdir -p "$SOBYA_HOME"
+          "$RUNNER_TEMP/sobyad" version >/dev/null 2>&1 || true
+          echo "Genesis archive checksum verified."
+
+      - name: Download and verify official rc.2 binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sobya-bin"
+          curl -fL --retry 3 -o "$RUNNER_TEMP/sobyad-${RELEASE_TAG}-linux-amd64.tar.gz" "https://github.com/snforem-cpu/sobya-chain/releases/download/${RELEASE_TAG}/sobyad-${RELEASE_TAG}-linux-amd64.tar.gz"
+          curl -fL --retry 3 -o "$RUNNER_TEMP/SHA256SUMS" "https://github.com/snforem-cpu/sobya-chain/releases/download/${RELEASE_TAG}/SHA256SUMS"
+          grep "sobyad-${RELEASE_TAG}-linux-amd64.tar.gz" "$RUNNER_TEMP/SHA256SUMS" > "$RUNNER_TEMP/binary-checksum.txt"
+          test -s "$RUNNER_TEMP/binary-checksum.txt"
+          (cd "$RUNNER_TEMP" && sha256sum -c binary-checksum.txt)
+          tar -xzf "$RUNNER_TEMP/sobyad-${RELEASE_TAG}-linux-amd64.tar.gz" -C "$RUNNER_TEMP/sobya-bin"
+          test -x "$RUNNER_TEMP/sobya-bin/sobyad"
+          "$RUNNER_TEMP/sobya-bin/sobyad" version --long
+          echo "SOBYAD=$RUNNER_TEMP/sobya-bin/sobyad" >> "$GITHUB_ENV"
+
+      - name: Run official collect-gentxs and validate-genesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOBYAD="$RUNNER_TEMP/sobya-bin/sobyad"
+          mkdir -p "$SOBYA_HOME/config/gentx"
+          cp "${{ runner.temp }}/pregen/genesis.json" "$SOBYA_HOME/config/genesis.json"
+          cp "${{ runner.temp }}/pregen/app.toml" "$SOBYA_HOME/config/app.toml"
+          cp "${{ runner.temp }}/pregen/client.toml" "$SOBYA_HOME/config/client.toml"
+          cp "${{ runner.temp }}/pregen/config.toml" "$SOBYA_HOME/config/config.toml"
+          cp "verification/bonynode/SOBYA-gentx-BonyNode-2026-11-08-corrected.json" "$SOBYA_HOME/config/gentx/gentx-bonynode.json"
+
+          # Initialize the node's local CometBFT validator files without replacing the supplied Genesis.
+          "$SOBYAD" init "SOBYA BonyNode verification" --chain-id "$CHAIN_ID" --home "$SOBYA_HOME" --overwrite
+          cp "${{ runner.temp }}/pregen/genesis.json" "$SOBYA_HOME/config/genesis.json"
+          cp "${{ runner.temp }}/pregen/app.toml" "$SOBYA_HOME/config/app.toml"
+          cp "${{ runner.temp }}/pregen/client.toml" "$SOBYA_HOME/config/client.toml"
+          cp "${{ runner.temp }}/pregen/config.toml" "$SOBYA_HOME/config/config.toml"
+          mkdir -p "$SOBYA_HOME/config/gentx"
+          cp "verification/bonynode/SOBYA-gentx-BonyNode-2026-11-08-corrected.json" "$SOBYA_HOME/config/gentx/gentx-bonynode.json"
+
+          "$SOBYAD" genesis collect-gentxs --home "$SOBYA_HOME"
+          "$SOBYAD" genesis validate-genesis --home "$SOBYA_HOME"
+
+          python3 - "$SOBYA_HOME/config/genesis.json" <<'PY'
+          import json, sys
+          g = json.load(open(sys.argv[1], encoding="utf-8"))
+          txs = g["app_state"]["genutil"]["gen_txs"]
+          assert len(txs) == 1, f"expected exactly one collected gentx, got {len(txs)}"
+          msg = txs[0]["body"]["messages"][0]
+          assert msg["validator_address"] == "sobyavaloper19umw830rw5f5pwgfqk4yz976j5nl3h8ha3ddjl"
+          assert msg["value"]["denom"] == "asobya"
+          assert msg["value"]["amount"] == "1000000000000000000"
+          print("PASS: exactly one BonyNode gentx collected into Genesis; validator address and 1 SOBY self-bond match.")
+          PY
+
+      - name: Upload collected Genesis and validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-bonynode-gentx-validation
+          path: |
+            ${{ env.SOBYA_HOME }}/config/genesis.json
+            ${{ env.SOBYA_HOME }}/config/gentx/gentx-bonynode.json
+          if-no-files-found: warn
+          retention-days: 14
