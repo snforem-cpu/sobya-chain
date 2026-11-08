@@ -31,7 +31,7 @@ jobs:
       BONYNODE_NODE_ID: b1e9672699b077da1aeb4620c08776061251aeb7
       BONYNODE_P2P: 88.198.46.55:42656
       SELF_BOND_ASOByA: "1000000000000000000"
-      SOBYA_HOME: ${{ runner.temp }}/sobya-final-genesis
+      SOBYA_HOME: ${{ github.workspace }}/.sobya-final-genesis
       GENTX_PATH: gentxs/bonynode/SOBYA-gentx-BonyNode-2026-11-08-corrected.json
     steps:
       - name: Checkout ceremony branch
@@ -42,7 +42,7 @@ jobs:
       - name: Checkout exact rc.2 source and genesis scripts
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.SOURCE_COMMIT }}
+          ref: 90512106ee2f3c2a38c8f5bab66edc17688fba43
           path: source
 
       - name: Verify signed Gentx file hash
