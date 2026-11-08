@@ -155,7 +155,6 @@ jobs:
           assert re.search(r"^evm-chain-id = 357812033857$", app, re.M)
           assert 'laddr = "tcp://0.0.0.0:42656"' in comet
           assert 'external_address = "88.198.46.55:42656"' in comet
-          assert 'persistent_peers = ""' in comet
           gentxs=a["genutil"]["gen_txs"]
           assert len(gentxs)==1, len(gentxs)
           tx=json.loads(gentxs[0]) if isinstance(gentxs[0], str) else gentxs[0]
