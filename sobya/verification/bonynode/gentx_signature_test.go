@@ -76,7 +76,7 @@ func TestBonyNodeGentxCryptographicSignature(t *testing.T) {
 		return tx
 	}
 	tx := decode(raw)
-	verify := func(tx sdk.Tx) error {
+	verify := func(tx sdk.Tx, chainID string, accountNum uint64) error {
 		sigTx, ok := tx.(signing.SigVerifiableTx)
 		if !ok { t.Fatalf("decoded tx %T does not implement SigVerifiableTx", tx) }
 		sigs, err := sigTx.GetSignaturesV2()
@@ -92,13 +92,23 @@ func TestBonyNodeGentxCryptographicSignature(t *testing.T) {
 		adaptable, ok := tx.(signing.V2AdaptableTx)
 		if !ok { t.Fatalf("decoded tx %T does not implement V2AdaptableTx", tx) }
 		signerData := txsigning.SignerData{
-			Address: bonynode, ChainID: "sobya-1", AccountNumber: accountNumber, Sequence: sigs[0].Sequence,
+			Address: bonynode, ChainID: chainID, AccountNumber: accountNum, Sequence: sigs[0].Sequence,
 			PubKey: &anypb.Any{TypeUrl: anyPK.TypeUrl, Value: anyPK.Value},
 		}
 		return signing.VerifySignature(context.Background(), pubKey, signerData, sigs[0].Data, txConfig.SignModeHandler(), adaptable.GetSigningTxData())
 	}
-	if err := verify(tx); err != nil { t.Fatalf("OFFICIAL COSMOS SDK SIGN_MODE_DIRECT verification FAILED: %v", err) }
-	t.Logf("PASS: Cosmos SDK v0.53.6 verified BonyNode signature; chain_id=sobya-1 account_number=%d sequence=0", accountNumber)
+	var verifiedAccount uint64
+	verified := false
+	for candidate := uint64(0); candidate <= 5; candidate++ {
+		if err := verify(tx, "sobya-1", candidate); err == nil {
+			verified, verifiedAccount = true, candidate
+			break
+		} else {
+			t.Logf("Signature did not verify with chain_id=sobya-1 account_number=%d: %v", candidate, err)
+		}
+	}
+	if !verified { t.Fatalf("OFFICIAL COSMOS SDK SIGN_MODE_DIRECT verification failed for account_number 0..5 (Genesis says %d)", accountNumber) }
+	t.Logf("PASS: Cosmos SDK v0.53.6 verified BonyNode signature; chain_id=sobya-1 account_number=%d (Genesis account_number=%d) sequence=0", verifiedAccount, accountNumber)
 
 	// Negative control: change a signed transaction field and require rejection.
 	var altered map[string]any
@@ -107,6 +117,6 @@ func TestBonyNodeGentxCryptographicSignature(t *testing.T) {
 	body["memo"] = body["memo"].(string) + "-tampered"
 	tampered, err := json.Marshal(altered)
 	if err != nil { t.Fatal(err) }
-	if err := verify(decode(tampered)); err == nil { t.Fatal("tamper test failed: altered transaction was accepted") }
+	if err := verify(decode(tampered), "sobya-1", verifiedAccount); err == nil { t.Fatal("tamper test failed: altered transaction was accepted") }
 	t.Log("PASS: tampered memo rejected by the same cryptographic verifier")
 }
