@@ -11,6 +11,7 @@ import (
 
 	txsigning "cosmossdk.io/x/tx/signing"
 	"github.com/cosmos/cosmos-sdk/codec"
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -63,7 +64,7 @@ func TestBonyNodeGentxCryptographicSignature(t *testing.T) {
 	}
 	if !found { t.Fatalf("BonyNode account %s absent from pre-gentx Genesis", bonynode) }
 
-	registry := codectypes.NewInterfaceRegistry()
+	registry := codectestutil.CodecOptions{AccAddressPrefix: "sobya", ValAddressPrefix: "sobyavaloper"}.NewInterfaceRegistry()
 	std.RegisterInterfaces(registry)
 	stakingtypes.RegisterInterfaces(registry)
 	protoCodec := codec.NewProtoCodec(registry)
