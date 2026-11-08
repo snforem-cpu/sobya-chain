@@ -1,0 +1,62 @@
+{
+  "body": {
+    "messages": [
+      {
+        "@type": "/cosmos.staking.v1beta1.MsgCreateValidator",
+        "description": {
+          "moniker": "BonyNode",
+          "identity": "",
+          "website": "https://bonynode.online",
+          "security_contact": "support@bonynode.online",
+          "details": ""
+        },
+        "commission": {
+          "rate": "0.050000000000000000",
+          "max_rate": "0.200000000000000000",
+          "max_change_rate": "0.010000000000000000"
+        },
+        "min_self_delegation": "1",
+        "delegator_address": "sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58",
+        "validator_address": "sobyavaloper19umw830rw5f5pwgfqk4yz976j5nl3h8ha3ddjl",
+        "pubkey": {
+          "@type": "/cosmos.crypto.ed25519.PubKey",
+          "key": "Y4zim0f1Njel10csqFEaTceDV4H3L+0kxSfcMNR8nag="
+        },
+        "value": {
+          "denom": "asobya",
+          "amount": "1000000000000000000"
+        }
+      }
+    ],
+    "memo": "b1e9672699b077da1aeb4620c08776061251aeb7@88.198.46.55:42656",
+    "timeout_height": "0",
+    "unordered": false,
+    "timestamp": null
+  },
+  "auth_info": {
+    "signer_infos": [
+      {
+        "public_key": {
+          "@type": "/cosmos.crypto.secp256k1.PubKey",
+          "key": "AtcEXhmT0CZ8aOU8MswZyEfsPBpDVrkL1FyQyCtXLbGl"
+        },
+        "mode_info": {
+          "single": {
+            "mode": "SIGN_MODE_DIRECT"
+          }
+        },
+        "sequence": "0"
+      }
+    ],
+    "fee": {
+      "amount": [],
+      "gas_limit": "200000",
+      "payer": "",
+      "granter": ""
+    },
+    "tip": null
+  },
+  "signatures": [
+    "XYUzr54YOhceskddTs7ii/LczvnKyd+rPqKJ4vGnN+AOvQh+yHTTyiDNgF5OpYzY0UIb5R/bPzc9KG1aR2opXA=="
+  ]
+}
