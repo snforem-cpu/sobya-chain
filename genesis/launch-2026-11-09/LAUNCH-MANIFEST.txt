@@ -3,7 +3,7 @@ Release: v0.1.0-rc.2
 Source commit: 90512106ee2f3c2a38c8f5bab66edc17688fba43
 CometBFT chain ID: sobya-1
 EVM chain ID: 357812033857
-Genesis time: 2026-11-09T08:00:00Z (10:00 Sudan time, UTC+2)
+Genesis time: 2026-11-09T10:00:00Z (10:00 GMT / 12:00 Sudan time, UTC+0 / UTC+2)
 Validator count in genesis: 1
 Validator: BonyNode
 Operator account: sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58
