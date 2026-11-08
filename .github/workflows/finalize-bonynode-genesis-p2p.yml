@@ -127,16 +127,26 @@ jobs:
           "$SOBYAD" genesis collect-gentxs --home "$SOBYA_HOME"
           "$SOBYAD" genesis validate-genesis --home "$SOBYA_HOME"
 
+          # Re-apply operator-specific P2P values after CLI genesis commands.
+          sed -i -E 's|^laddr = "tcp://0.0.0.0:26656"$|laddr = "tcp://0.0.0.0:42656"|' "$SOBYA_HOME/config/config.toml"
+          sed -i -E 's|^external_address = ".*"$|external_address = "88.198.46.55:42656"|' "$SOBYA_HOME/config/config.toml"
+          sed -i -E 's|^persistent_peers = ".*"$|persistent_peers = ""|' "$SOBYA_HOME/config/config.toml"
+          grep -q '^laddr = "tcp://0.0.0.0:42656"$' "$SOBYA_HOME/config/config.toml"
+          grep -q '^external_address = "88.198.46.55:42656"$' "$SOBYA_HOME/config/config.toml"
+          grep -q '^persistent_peers = ""$' "$SOBYA_HOME/config/config.toml"
+          grep -nE '^(laddr|external_address|persistent_peers) =' "$SOBYA_HOME/config/config.toml"
+
       - name: Independently reconcile final Genesis and validator set
         shell: bash
         run: |
           set -euo pipefail
           python3 - "$SOBYA_HOME/config/genesis.json" "$SOBYA_HOME/config/app.toml" "$SOBYA_HOME/config/config.toml" <<'PY'
-          import base64, json, re, sys
+          import base64, json, re, sys, tomllib
           from pathlib import Path
           g=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
           app=Path(sys.argv[2]).read_text(encoding="utf-8")
           comet=Path(sys.argv[3]).read_text(encoding="utf-8")
+          comet_config=tomllib.loads(comet)
           assert g["chain_id"]=="sobya-1", g["chain_id"]
           assert g["genesis_time"]=="2026-11-09T08:00:00Z", g["genesis_time"]
           a=g["app_state"]
@@ -155,6 +165,7 @@ jobs:
           assert re.search(r"^evm-chain-id = 357812033857$", app, re.M)
           assert 'laddr = "tcp://0.0.0.0:42656"' in comet
           assert 'external_address = "88.198.46.55:42656"' in comet
+          assert comet_config["p2p"]["persistent_peers"] == ""
           gentxs=a["genutil"]["gen_txs"]
           assert len(gentxs)==1, len(gentxs)
           tx=json.loads(gentxs[0]) if isinstance(gentxs[0], str) else gentxs[0]
