@@ -1,0 +1,6 @@
+broadcast-mode = 'sync'
+chain-id = 'sobya-1'
+keyring-backend = 'os'
+keyring-default-keyname = ''
+node = 'tcp://localhost:26657'
+output = 'text'
