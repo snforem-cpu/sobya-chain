@@ -7,6 +7,13 @@ on:
     paths:
       - '.github/workflows/verify-bonynode-gentx.yml'
       - 'verification/bonynode/SOBYA-gentx-BonyNode-2026-11-08-corrected.json'
+  pull_request:
+    branches:
+      - feature/genesis-bonynode-candidate
+    paths:
+      - '.github/workflows/verify-bonynode-gentx.yml'
+      - 'verification/bonynode/SOBYA-gentx-BonyNode-2026-11-08-corrected.json'
+      - 'sobya/verification/bonynode/gentx_signature_test.go'
   workflow_dispatch:
 
 permissions:
