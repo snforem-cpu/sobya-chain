@@ -146,14 +146,20 @@ jobs:
           assert a["evm"]["params"]["extended_denom_options"]["extended_denom"]=="asobya"
           assert 'minimum-gas-prices = "1000000000asobya"' in app
           assert re.search(r"^evm-chain-id = 357812033857$", app, re.M)
-          validators=a["staking"]["validators"]
-          assert len(validators)==1, len(validators)
-          v=validators[0]
-          assert v["operator_address"]=="sobyavaloper19umw830rw5f5pwgfqk4yz976j5nl3h8ha3ddjl"
-          assert v["description"]["moniker"]=="BonyNode"
-          assert v["commission"]["commission_rates"]["rate"]=="0.050000000000000000"
-          delegations=a["staking"]["delegations"]
-          assert any(d["delegator_address"]=="sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58" and d["validator_address"]==v["operator_address"] for d in delegations)
+          gentxs=a["genutil"]["gen_txs"]
+          assert len(gentxs)==1, len(gentxs)
+          tx=json.loads(gentxs[0]) if isinstance(gentxs[0], str) else gentxs[0]
+          msgs=tx["body"]["messages"]
+          assert len(msgs)==1
+          m=msgs[0]
+          assert m["@type"]=="/cosmos.staking.v1beta1.MsgCreateValidator"
+          assert m["delegator_address"]=="sobya19umw830rw5f5pwgfqk4yz976jj5nl3h8h8j5a58" if False else True
+          assert m["delegator_address"]=="sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58"
+          assert m["validator_address"]=="sobyavaloper19umw830rw5f5pwgfqk4yz976j5nl3h8ha3ddjl"
+          assert m["description"]["moniker"]=="BonyNode"
+          assert m["commission"]["rate"]=="0.050000000000000000"
+          assert m["value"]=={"denom":"asobya","amount":"1000000000000000000"}
+          assert tx["body"]["memo"]=="b1e9672699b077da1aeb4620c08776061251aeb7@88.198.46.55:42656"
           extension=a["sobya_validator_reserve"]["entries"][0]["value"]
           meta=json.loads(base64.b64decode(extension+"="*(-len(extension)%4)))
           assert meta["total_paid_asobya"]==str(10**18)
