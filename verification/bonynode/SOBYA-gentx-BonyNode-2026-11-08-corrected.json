@@ -30,8 +30,7 @@
     ],
     "memo": "b1e9672699b077da1aeb4620c08776061251aeb7@88.198.46.55:42656",
     "timeout_height": "0",
-    "unordered": false,
-    "timestamp": null
+    "unordered": false
   },
   "auth_info": {
     "signer_infos": [
