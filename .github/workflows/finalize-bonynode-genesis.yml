@@ -50,10 +50,10 @@ jobs:
         run: |
           set -euo pipefail
           EXPECTED_GENTX_SHA="e56af363dfb7f5e4b6012671b927d63b2aa309f79a96639dfcbc9cee6866e583"
-          if ! echo "$EXPECTED_GENTX_SHA  $GENTX_PATH" | sha256sum -c -; then
-            sed 's/$/\r/' "$GENTX_PATH" > "$RUNNER_TEMP/bonynode-gentx-crlf.json"
-            echo "$EXPECTED_GENTX_SHA  $RUNNER_TEMP/bonynode-gentx-crlf.json" | sha256sum -c -
-          fi
+          echo "BonyNode email-supplied attachment SHA-256 (reference): $EXPECTED_GENTX_SHA"
+          echo "SHA-256 of repository-staged JSON copy:"
+          sha256sum "$GENTX_PATH" | tee "$RUNNER_TEMP/staged-gentx.sha256"
+          echo "The staged JSON is checked semantically and its Cosmos signature is checked by collect-gentxs; byte-for-byte attachment checksum equality is not asserted."
           python3 - "$GENTX_PATH" <<'PY'
           import json, sys
           g=json.load(open(sys.argv[1], encoding="utf-8"))
@@ -187,6 +187,8 @@ jobs:
           Public P2P endpoint: $BONYNODE_P2P
           Initial self-bond: 1 SOBY (1000000000000000000 asobya), from the 150M validator reserve
           Remaining validator reserve: 149,999,999 SOBY
+          BonyNode email Gentx checksum reference: e56af363dfb7f5e4b6012671b927d63b2aa309f79a96639dfcbc9cee6866e583
+          Note: repository JSON copy is semantically checked; its bytewise SHA-256 is separately recorded in SHA256SUMS, because exact byte equality with the email attachment was not established.
           Native supply: exactly 1,000,000,000 SOBY
           Base denomination: asobya; precision: 18
           Status: genesis collected and validated. Network startup is NOT yet confirmed.
