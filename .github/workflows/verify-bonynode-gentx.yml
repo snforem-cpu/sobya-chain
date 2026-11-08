@@ -1,5 +1,6 @@
 name: Verify BonyNode rc.2 gentx against pre-gentx Genesis
 # Isolated verification only; never merge this workflow into main.
+# Test matrix now checks the Genesis account number and candidate zero-based signer counters.
 
 on:
   push:
