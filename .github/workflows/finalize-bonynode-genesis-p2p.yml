@@ -25,7 +25,7 @@ jobs:
       SOURCE_COMMIT: 90512106ee2f3c2a38c8f5bab66edc17688fba43
       CHAIN_ID: sobya-1
       EVM_CHAIN_ID: "357812033857"
-      GENESIS_TIME: "2026-11-09T08:00:00Z"
+      GENESIS_TIME: "2026-11-09T10:00:00Z"
       BONYNODE_ACCOUNT: sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58
       BONYNODE_OPERATOR: sobyavaloper19umw830rw5f5pwgfqk4yz976j5nl3h8ha3ddjl
       BONYNODE_NODE_ID: b1e9672699b077da1aeb4620c08776061251aeb7
@@ -148,7 +148,7 @@ jobs:
           comet=Path(sys.argv[3]).read_text(encoding="utf-8")
           comet_config=tomllib.loads(comet)
           assert g["chain_id"]=="sobya-1", g["chain_id"]
-          assert g["genesis_time"]=="2026-11-09T08:00:00Z", g["genesis_time"]
+          assert g["genesis_time"]=="2026-11-09T10:00:00Z", g["genesis_time"]
           a=g["app_state"]
           balances={x["address"]:{c["denom"]:int(c["amount"]) for c in x["coins"]} for x in a["bank"]["balances"]}
           assert balances["sobya16vtfjdprl33xsqu0fm375lqv2qu9z0qc0097pq"]["asobya"]==400_000_000*10**18
@@ -182,8 +182,8 @@ jobs:
           extension=a["sobya_validator_reserve"]["entries"][0]["value"]
           meta=json.loads(base64.b64decode(extension+"="*(-len(extension)%4)))
           assert meta["total_paid_asobya"]==str(10**18)
-          assert meta["start_time"]=="2026-11-09T08:00:00.000000Z", meta
-          print("PASS: final chain IDs, 10:00 Sudan genesis time, BonyNode validator and delegation, 5% commission, 1 SOBY self-bond, 149,999,999 SOBY remaining reserve, exact 1B SOBY supply, canonical denoms and gas settings")
+          assert meta["start_time"]=="2026-11-09T10:00:00.000000Z", meta
+          print("PASS: final chain IDs, 10:00 GMT (12:00 Sudan) genesis time, BonyNode validator and delegation, 5% commission, 1 SOBY self-bond, 149,999,999 SOBY remaining reserve, exact 1B SOBY supply, canonical denoms and gas settings")
           PY
 
       - name: Assemble immutable operator bundle and checksums
@@ -203,7 +203,7 @@ jobs:
           Source commit: $SOURCE_COMMIT
           CometBFT chain ID: $CHAIN_ID
           EVM chain ID: $EVM_CHAIN_ID
-          Genesis time: $GENESIS_TIME (10:00 Sudan time, UTC+2)
+          Genesis time: $GENESIS_TIME (10:00 GMT / 12:00 Sudan time, UTC+0 / UTC+2)
           Validator count in genesis: 1
           Validator: BonyNode
           Operator account: $BONYNODE_ACCOUNT
