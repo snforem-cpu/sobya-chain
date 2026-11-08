@@ -153,7 +153,6 @@ jobs:
           assert len(msgs)==1
           m=msgs[0]
           assert m["@type"]=="/cosmos.staking.v1beta1.MsgCreateValidator"
-          assert m["delegator_address"]=="sobya19umw830rw5f5pwgfqk4yz976jj5nl3h8h8j5a58" if False else True
           assert m["delegator_address"]=="sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58"
           assert m["validator_address"]=="sobyavaloper19umw830rw5f5pwgfqk4yz976j5nl3h8ha3ddjl"
           assert m["description"]["moniker"]=="BonyNode"
