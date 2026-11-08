@@ -1,4 +1,5 @@
 name: Verify BonyNode rc.2 gentx against pre-gentx Genesis
+# Isolated verification only; never merge this workflow into main.
 
 on:
   push:
