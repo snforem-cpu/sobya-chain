@@ -115,7 +115,12 @@ jobs:
           sed -i -E 's|^laddr = "tcp://0.0.0.0:26656"$|laddr = "tcp://0.0.0.0:42656"|' "$SOBYA_HOME/config/config.toml"
           sed -i -E 's|^external_address = ".*"$|external_address = "88.198.46.55:42656"|' "$SOBYA_HOME/config/config.toml"
           sed -i -E 's|^persistent_peers = ".*"$|persistent_peers = ""|' "$SOBYA_HOME/config/config.toml"
-          grep -q '^minimum-gas-prices = "1000000000asobya"
+          grep -q '^minimum-gas-prices = "1000000000asobya"$' "$SOBYA_HOME/config/app.toml"
+          grep -q "^evm-chain-id = $EVM_CHAIN_ID$" "$SOBYA_HOME/config/app.toml"
+          grep -q '^laddr = "tcp://0.0.0.0:42656"$' "$SOBYA_HOME/config/config.toml"
+          grep -q '^external_address = "88.198.46.55:42656"$' "$SOBYA_HOME/config/config.toml"
+          grep -q '^persistent_peers = ""$' "$SOBYA_HOME/config/config.toml"
+          grep -Eq "^chain-id = ['\"]$CHAIN_ID['\"]$" "$SOBYA_HOME/config/client.toml"
 
           mkdir -p "$SOBYA_HOME/config/gentx"
           cp "$GENTX_PATH" "$SOBYA_HOME/config/gentx/bonynode.json"
