@@ -81,7 +81,7 @@ jobs:
           assert bonynode["account_number"]=="2", bonynode
           accounts.append({"@type":"/cosmos.auth.v1beta1.BaseAccount","address":address,"pub_key":None,"account_number":"3","sequence":"0"})
           g["app_state"]["bank"]["balances"].append({"address":address,"coins":[{"denom":"asobya","amount":"1000000000000000000"}]})
-          p.write_text(json.dumps(g, indent=2, sort_keys=True)+"\\n", encoding="utf-8")
+          p.write_text(json.dumps(g, indent=2, sort_keys=True)+"\n", encoding="utf-8")
           PY
 
           python3 - "$SOBYA_HOME/config/genesis.json" "$GENESIS_TIME" <<'PY'
@@ -90,7 +90,7 @@ jobs:
           p=Path(sys.argv[1])
           g=json.loads(p.read_text(encoding="utf-8"))
           g["genesis_time"]=sys.argv[2]
-          p.write_text(json.dumps(g, indent=2, sort_keys=True)+"\\n", encoding="utf-8")
+          p.write_text(json.dumps(g, indent=2, sort_keys=True)+"\n", encoding="utf-8")
           PY
 
           printf '[{"address":"%s","self_bond_asobya":"%s"},{"address":"%s","self_bond_asobya":"%s"}]\n' "$BONYNODE_ACCOUNT" "$SELF_BOND_ASOByA" "$NODESAFE_ACCOUNT" "$SELF_BOND_ASOByA" > "$RUNNER_TEMP/validators.json"
