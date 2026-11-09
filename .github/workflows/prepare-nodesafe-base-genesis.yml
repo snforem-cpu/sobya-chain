@@ -69,7 +69,20 @@ jobs:
           python3 source/scripts/initialize-production-genesis.py --genesis "$SOBYA_HOME/config/genesis.json"
 
           "$SOBYAD" genesis add-genesis-account "$BONYNODE_ACCOUNT" "${SELF_BOND_ASOByA}asobya" --home "$SOBYA_HOME"
-          "$SOBYAD" genesis add-genesis-account "$NODESAFE_ACCOUNT" "${SELF_BOND_ASOByA}asobya" --home "$SOBYA_HOME"
+          python3 - "$SOBYA_HOME/config/genesis.json" "$NODESAFE_ACCOUNT" <<'PY'
+          import json, sys
+          from pathlib import Path
+          p=Path(sys.argv[1])
+          g=json.loads(p.read_text(encoding="utf-8"))
+          address=sys.argv[2]
+          accounts=g["app_state"]["auth"]["accounts"]
+          assert not any(x.get("address")==address for x in accounts if isinstance(x,dict))
+          bonynode=next(x for x in accounts if x.get("address")=="sobya19umw830rw5f5pwgfqk4yz976j5nl3h8h8j5a58")
+          assert bonynode["account_number"]=="2", bonynode
+          accounts.append({"@type":"/cosmos.auth.v1beta1.BaseAccount","address":address,"pub_key":None,"account_number":"3","sequence":"0"})
+          g["app_state"]["bank"]["balances"].append({"address":address,"coins":[{"denom":"asobya","amount":"1000000000000000000"}]})
+          p.write_text(json.dumps(g, indent=2, sort_keys=True)+"\\n", encoding="utf-8")
+          PY
 
           python3 - "$SOBYA_HOME/config/genesis.json" "$GENESIS_TIME" <<'PY'
           import json, sys
