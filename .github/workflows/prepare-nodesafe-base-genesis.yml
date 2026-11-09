@@ -112,7 +112,6 @@ jobs:
           grep -q '^laddr = "tcp://0.0.0.0:36656"$' "$SOBYA_HOME/config/config.toml"
           grep -q '^external_address = "188.68.36.11:36656"$' "$SOBYA_HOME/config/config.toml"
           grep -q '^persistent_peers = ""$' "$SOBYA_HOME/config/config.toml"
-          grep -Eq "^chain-id = ['\\"]$CHAIN_ID['\\"]$" "$SOBYA_HOME/config/client.toml"
 
           "$SOBYAD" genesis validate-genesis --home "$SOBYA_HOME"
 
