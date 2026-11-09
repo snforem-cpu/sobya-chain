@@ -80,7 +80,7 @@ jobs:
           p.write_text(json.dumps(g, indent=2, sort_keys=True)+"\\n", encoding="utf-8")
           PY
 
-          printf '[{"address":"%s","self_bond_asobya":"%s"},{"address":"%s","self_bond_asobya":"%s"}]\\n' "$BONYNODE_ACCOUNT" "$SELF_BOND_ASOByA" "$NODESAFE_ACCOUNT" "$SELF_BOND_ASOByA" > "$RUNNER_TEMP/validators.json"
+          printf '[{"address":"%s","self_bond_asobya":"%s"},{"address":"%s","self_bond_asobya":"%s"}]\n' "$BONYNODE_ACCOUNT" "$SELF_BOND_ASOByA" "$NODESAFE_ACCOUNT" "$SELF_BOND_ASOByA" > "$RUNNER_TEMP/validators.json"
           python3 source/scripts/prepare-validator-genesis.py --genesis "$SOBYA_HOME/config/genesis.json" --validators "$RUNNER_TEMP/validators.json"
 
           sed -i -E 's/^minimum-gas-prices = .*/minimum-gas-prices = "1000000000asobya"/' "$SOBYA_HOME/config/app.toml"
