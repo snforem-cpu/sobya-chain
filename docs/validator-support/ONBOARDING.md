@@ -1,85 +1,66 @@
 # SOBYA Validator Onboarding
 
-This guide separates expressions of interest from permission to execute live-chain transactions. SOBYA mainnet is live on CometBFT chain ID `sobya-1`. External preflight checks were run from GitHub-hosted runners on 2026-11-11.
+SOBYA mainnet uses CometBFT chain ID `sobya-1`. This guide has two stages: (A) prepare and synchronize an independent node, which interested operators can start now; and (B) create the live validator, which is done only after the node is fully synchronized and the final transaction settings are confirmed.
 
-## 1. Apply (manual intake)
+## 1. Apply and coordinate
 
-Submit the public [SOBYA Validator Application](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml).
+Submit the no-fee [SOBYA Validator Application](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml), or coordinate directly with the SOBYA team if already invited.
 
-The issue is public. Provide only public operator details, public addresses, public consensus keys, and public P2P/RPC endpoints. Never submit a seed phrase, private key, validator signing key, server password, SSH key, access token, or private contact information.
+The issue is public. Share only public operator details, account/operator addresses, consensus public key, and public P2P/RPC endpoints. Never submit a seed phrase, private key, validator signing key, server password, SSH key, access token, or private contact information.
 
-There is no application fee. Applying does not guarantee admission or a support grant. The issue form is a manual GitHub workflow; it is not connected to the experimental Go support API.
+Applying is free. Admission and any optional support are reviewed separately; applying does not guarantee a grant.
 
-## 2. Published public endpoints
+## 2. Network details
 
-NodeSafe supplied these public endpoints:
-
-- CometBFT RPC: https://sobya-rpc.nodesafe-app.xyz
-- Cosmos REST API: https://sobya-api.nodesafe-app.xyz
+- CometBFT chain ID: `sobya-1`
+- Native coin: `SOBY`; base denomination: `asobya`; precision: 18 decimals (1 SOBY = 10^18 asobya)
+- Public CometBFT RPC: https://sobya-rpc.nodesafe-app.xyz
+- Cosmos REST: https://sobya-api.nodesafe-app.xyz
 - EVM JSON-RPC: https://sobya-evm-rpc.nodesafe-app.xyz
 - Explorer: https://explorer.nodesafe-app.xyz/sobya
+- Current candidate NodeSafe P2P peer: `1dad50ff897c247cba0ff646d0ee1ad59c3abc88@188.68.36.11:26656`
 
-External read-only preflight results on 2026-11-11:
+Read-only external checks on 2026-11-11 confirmed the RPC chain ID and advancing blocks, Cosmos REST chain ID, EVM chain ID `357812033857`, and TCP reachability of `188.68.36.11:26656`. The old launch-package port `:36656` timed out. TCP reachability is not proof of a CometBFT handshake; the first joining operator's sync will provide the practical peer test. The candidate peer should be tested during node preparation.
 
-- CometBFT RPC returned chain ID `sobya-1`, Node ID `1dad50ff897c247cba0ff646d0ee1ad59c3abc88`, and advancing block heights (12902 to 12906 over 20 seconds).
-- Cosmos REST returned chain ID `sobya-1`; the staking query returned one validator record.
-- EVM JSON-RPC returned production EVM chain ID `357812033857` (`0x534f425941`), a non-zero block height, and valid `eth_getBalance` responses for both owner wallet addresses. The balances matched 400,000,000 SOBY and 450,000,000 SOBY.
-- External TCP to `188.68.36.11:26656` succeeded. The previously reported port `36656` timed out.
-- CometBFT `/net_info` reported `listening: true` and zero connected peers at the time checked.
-- Live staking parameters returned: bond denom `asobya`, `max_validators=100`, `unbonding_time=1814400s` (21 days), and `min_commission_rate=0`.
-- NodeSafe's live validator record returned `BONDED`, not jailed, `tokens=1000000000000000000` (1 SOBY), `min_self_delegation=1` (one asobya base unit), and commission rate 10% (max 50%, max change 10%). This records NodeSafe's current settings; it does not establish a universal recommended bond for every future validator.
-- Fee-market REST queries returned HTTP 501. EVM RPC returned `eth_gasPrice=0`, `eth_maxPriorityFeePerGas=0`, and zero base-fee/reward samples in `eth_feeHistory`. No live transaction was sent. Do not infer that all transactions are free or quote a live transaction fee from these values.
-- A read-only preflight run on workflow run 6 completed successfully: RPC chain/height, REST staking queries, EVM read-only calls, and TCP port checks all passed. This does not establish a second-node CometBFT handshake or sync.
+## 3. Stage A — prepare and synchronize (operators can start now)
 
-The reachable P2P peer string is:
+1. Provision a Linux server suitable for continuous operation. Keep the operating system updated and secure SSH access.
+2. Download the published SOBYA `v0.1.0-rc.2` release for the server architecture from the project's GitHub Releases. Verify the published checksum before running it.
+3. Obtain the exact immutable launch Genesis from the official SOBYA launch package. Its SHA-256 is `35207c189ee5548cb376cb4d5d9dbe4aa0509b3daf85b057e8e59db1c4b0314a`. NodeSafe confirmed it used this Genesis at launch. Do not generate a new Genesis, use the BonyNode rehearsal Genesis, or create a genesis `gentx`.
+4. Configure the node for chain ID `sobya-1`, use the candidate NodeSafe peer above as a persistent peer, and expose the CometBFT P2P port required by the operator's configuration. Do not expose private validator keys or RPC admin interfaces.
+5. Start the node and allow it to synchronize. Compare its reported chain ID and block height with the public RPC. Wait until `catching_up=false` and its height follows the live network.
+6. Send the SOBYA team the public node ID, P2P endpoint, software version/commit, and a recent status/height. Never send `priv_validator_key.json`, `node_key.json`, keyring files, or passwords.
 
-```text
-1dad50ff897c247cba0ff646d0ee1ad59c3abc88@188.68.36.11:26656
-```
+The team can review the peer handshake, sync, and release compatibility while the operator completes preparation. A new operator does not need to wait for a validator-creation transaction to begin this stage.
 
-TCP reachability is confirmed on `188.68.36.11:26656`; the launch package's old `:36656` endpoint timed out from the external runner. However, a second independent SOBYA node has not yet completed a CometBFT handshake and block sync. A zero peer count on the single existing node does not by itself mean that the public P2P port is closed. Treat `:26656` as the current candidate bootstrap endpoint pending a successful peer handshake; do not publish `:36656` as reachable.
+## 4. Live network facts checked
 
-## 3. Mandatory live validator preflight — PARTIALLY CLEARED
+- Live staking denomination: `asobya`.
+- `max_validators=100`; unbonding period 21 days; minimum commission rate 0.
+- NodeSafe is BONDED and not jailed. Its current self-bond is 1 SOBY and its commission is 10%. These are NodeSafe's current values, not a universal recommended self-bond for every new operator.
+- The chain's `min_self_delegation` field is one `asobya` base unit; it is not a meaningful network-wide self-bond recommendation.
+- The launch package sets local Cosmos `minimum-gas-prices = "1000000000asobya"`. EVM RPC returned zero gas-price samples, while FeeMarket REST endpoints returned HTTP 501. These observations do not establish that Cosmos staking transactions are free.
+- No live validator-creation transaction has been sent by the SOBYA team.
 
-Before telling an applicant to create a validator, the team must verify and publish all of the following:
+## 5. Stage B — create the validator (only after sync and final confirmation)
 
-1. **P2P/bootstrap:** use the reachable NodeSafe peer above; confirm an independent node actually connects, catches up, and follows advancing blocks.
-2. **Genesis:** use the exact immutable Genesis file from the project launch bundle that NodeSafe confirmed it used at launch. Do not ask for a replacement, modify it, regenerate it, or use the BonyNode rehearsal Genesis.
-3. **Binary:** GitHub publishes `v0.1.0-rc.2` with Linux amd64/arm64 assets. NodeSafe must confirm the running `sobyad version` and source commit match the approved release before new operators are instructed to install it.
-4. **Staking:** read current on-chain staking parameters, minimum self-delegation, denomination, transaction fees, and validator eligibility rules.
-5. **Support:** publish the operator support contact and incident procedure.
+A validator joining after launch is created with a signed live-chain staking transaction, not a genesis `gentx`.
 
-The Genesis identity is already settled by the launch confirmation. The remaining transaction gate is to capture the current live staking parameters, existing validator record, running binary version/commit, and fee-market behavior. Until those live values are captured and reconciled with the exact release, send host-preparation and sync instructions only; do not guess a self-bond amount, gas price, or validator-creation command.
+Before issuing the final command, the SOBYA team and operator must confirm:
+- the node is fully synchronized and follows advancing blocks;
+- the running `sobyad` version and source commit match the approved release;
+- the operator's own account address, consensus public key, moniker, commission settings, and public P2P endpoint are correct;
+- the exact self-bond amount and source of any starter funding are agreed;
+- the Cosmos transaction gas/fee policy is confirmed with the live operator.
 
-## 4. Review applications
+The operator creates and signs the transaction locally using its own wallet/keyring. The SOBYA team must never request or receive the operator's mnemonic, private account key, or validator signing key. Do not copy an unverified gas price or self-bond amount from old configuration.
 
-The team reviews each application manually:
+## 6. Validator incentives and support
 
-- Confirm operator identity and uniqueness.
-- Check the exact binary, public consensus key, P2P reachability, infrastructure, monitoring, and backup plan.
-- Verify the applicant can securely hold its own validator keys and operate independently.
-- Do not fetch applicant-supplied URLs automatically; verify endpoints through controlled tooling.
+The published validator program reserves 150,000,000 SOBY for validator incentives and allocates 30% of network transaction fees to validators, subject to the live implementation and eligibility rules. NodeSafe is the initial launch operator and is recognized as the founding operator with continuing program privileges.
 
-## 5. Joining after chain launch
-
-A validator joining after chain launch is not a genesis validator:
-
-- Use only the immutable launch Genesis already confirmed by NodeSafe and the verified peer/bootstrap information.
-- Synchronize to the live chain and verify chain ID and advancing height before attempting validator creation.
-- Do not generate or submit a genesis gentx for a network that is already running.
-- The operator creates its own validator with a signed live-chain staking transaction from its own wallet only after the exact binary, current staking parameters, self-bond requirement, and gas policy have been confirmed.
-- The operator signs its own transactions. The SOBYA team must never request a seed phrase or private validator key.
-
-The live chain confirms `asobya` as the staking denomination and NodeSafe's current self-bond is 1 SOBY; its on-chain `min_self_delegation` is 1 asobya. The chain does not expose a global minimum self-bond in the queried staking parameters. The launch package sets local Cosmos `minimum-gas-prices = "1000000000asobya"`, but live EVM fee quotes are zero and FeeMarket REST queries are not implemented (HTTP 501). The exact transaction gas/fee must therefore be reconciled with NodeSafe before any operator signs or broadcasts `create-validator`.
-
-The exact live binary running on NodeSafe still needs its version/commit confirmed against the published `v0.1.0-rc.2` release. Do not use a genesis gentx. Do not send an operator a transaction command until binary, fee policy, funding source for the 1 SOBY self-bond, and successful P2P sync are resolved.
-
-## 6. Conditional support
-
-Support is separate from technical admission. No applicant pays an application fee or sends funds to an individual to be considered. A grant can be considered only after eligibility is verified, a separate spendable support budget is independently confirmed, and the amount/milestones are approved by the required humans.
-
-The consensus-controlled validator reserve is not an onboarding wallet. The experimental support service records administrative decisions only; it does not sign or broadcast transfers.
+The current validator-reserve module releases scheduled rewards to eligible validators; it does not provide an immediate post-launch starter grant. Any initial 1 SOBY self-bond support must be approved separately and transferred only after the recipient address is verified. The reserve is not an onboarding wallet. No applicant pays an application fee or sends funds to an individual to apply.
 
 ## 7. Safety boundary
 
-This onboarding process must not require changing the running NodeSafe validator, modifying Genesis, restarting existing validators, or upgrading the live chain. Every new operator runs and secures their own infrastructure and keys.
+This onboarding process must not require changing the running NodeSafe validator, modifying or regenerating Genesis, restarting existing validators, or upgrading the live chain. Each operator runs and secures their own infrastructure and keys.
