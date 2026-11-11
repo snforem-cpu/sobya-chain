@@ -1,0 +1,31 @@
+name: SOBYA Wrapped Native Token
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/wsoby-wrapper.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wsoby-wrapper-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wrapper-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Format Solidity
+        working-directory: contracts
+        run: forge fmt --check
+      - name: Run wrapper unit and fuzz tests
+        working-directory: contracts
+        run: forge test -vvv
