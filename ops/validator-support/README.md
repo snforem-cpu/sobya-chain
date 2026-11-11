@@ -15,11 +15,13 @@ export ADMIN_TOKEN="$(openssl rand -hex 32)"
 export LISTEN_ADDR="127.0.0.1:8097"
 export DATA_FILE="./data/validator-support.json"
 # Required: total approved support budget in verified base-denomination units
-export SUPPORT_BUDGET_BASE_UNITS="100000000000000000000000"
+# Optional: leave unset until a separate spendable support budget is verified.
+# Without a valid value, grant approvals and the budget endpoint stay disabled.
+unset SUPPORT_BUDGET_BASE_UNITS
 go run .
 ```
 
-The service binds to loopback by default. Do not expose it publicly without a
+The service binds to loopback by default. It is not connected to GitHub Issues and is not an applicant portal. Do not expose it publicly without a
 TLS reverse proxy, rate limiting, backups, access controls, and a security
 review. Keep `ADMIN_TOKEN` secret. The JSON data file contains operator contact
 details; protect it and restrict filesystem access.
@@ -101,9 +103,9 @@ go vet ./...
 
 ## Fast validator intake
 
-For the public application form and the live-network joining checklist, see
+For the manual public application form and the live-network joining checklist, see
 [`docs/validator-support/ONBOARDING.md`](../../docs/validator-support/ONBOARDING.md).
-The GitHub issue form collects public operator information only; it is not a
+The GitHub issue form collects public operator information only and does not call this API; it is not a
 grant approval and must never be used to collect secrets. Do not publish this
 service as an internet-facing application portal until production hosting,
 TLS, rate limiting, privacy controls, and a reviewed data store are in place.
