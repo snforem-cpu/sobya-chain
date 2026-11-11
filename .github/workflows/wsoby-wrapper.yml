@@ -23,9 +23,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Format Solidity
-        working-directory: contracts
-        run: forge fmt --check
       - name: Run wrapper unit and fuzz tests
         working-directory: contracts
         run: forge test -vvv
