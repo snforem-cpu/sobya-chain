@@ -63,7 +63,7 @@ contract WSOBYSecurityTest {
         vm.deal(address(this), 2 ether);
     }
 
-    function testFailedNativeWithdrawalPreservesWrappedBalanceAndBacking() public {
+    function testWithdrawalFailurePreservesWrappedBalanceAndBacking() public {
         RejectingNativeRecipient recipient = new RejectingNativeRecipient(token);
         recipient.wrap{value: 1 ether}();
 
