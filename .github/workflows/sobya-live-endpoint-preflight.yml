@@ -61,6 +61,25 @@ jobs:
           count="$(jq -r '.validators | length' <<<"$validators")"
           echo "PASS: staking REST responded; validator records returned=$count"
 
+          # Read live staking parameters and the current operator record.
+          # These are read-only queries; do not infer a new operator's self-bond
+          # from the existing validator's balance.
+          staking_params="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 20 "$API/cosmos/staking/v1beta1/params")"
+          echo "LIVE_STAKING_PARAMS=$(jq -c '.params // .' <<<"$staking_params")"
+          node_validator='sobyavaloper1qt8da4yt8glv9ehzfl9x248aqulfzhry08wu3a'
+          validator_record="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 20 "$API/cosmos/staking/v1beta1/validators/$node_validator")"
+          echo "LIVE_NODE_SAFE_VALIDATOR=$(jq -c '.validator // .' <<<"$validator_record")"
+
+          # Probe fee-market REST separately; some builds may not expose this
+          # query service. Preserve the HTTP status and response for diagnosis.
+          fee_code="$(curl --silent --show-error --connect-timeout 8 --max-time 15 -o /tmp/sobya-feemarket-params.json -w '%{http_code}' "$API/cosmos/feemarket/v1/params" || true)"
+          echo "LIVE_FEEMARKET_PARAMS_HTTP=$fee_code"
+          if [[ "$fee_code" == "200" ]]; then
+            echo "LIVE_FEEMARKET_PARAMS=$(jq -c . /tmp/sobya-feemarket-params.json)"
+          else
+            echo "LIVE_FEEMARKET_PARAMS_BODY=$(cat /tmp/sobya-feemarket-params.json 2>/dev/null || true)"
+          fi
+
       - name: Check EVM JSON-RPC chain ID, block height, gas price and owner wallet balances
         shell: bash
         run: |
