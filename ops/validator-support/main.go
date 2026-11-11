@@ -234,6 +234,13 @@ func (sv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == "GET" && r.URL.Path == "/admin/applications":
 		if !sv.admin(w, r) { return }
 		jsonOut(w, 200, sv.store.list())
+	case r.Method == "GET" && r.URL.Path == "/admin/budget":
+		if !sv.admin(w, r) { return }
+		if sv.budget == nil || sv.budget.Sign() <= 0 { http.Error(w, "support budget is not configured", 503); return }
+		used, err := sv.store.budgetUsed()
+		if err != nil { http.Error(w, "stored grant accounting is invalid", 500); return }
+		remaining := new(big.Int).Sub(new(big.Int).Set(sv.budget), used)
+		jsonOut(w, 200, map[string]string{"budget_base_units": sv.budget.String(), "approved_base_units": used.String(), "remaining_base_units": remaining.String()})
 	case strings.HasPrefix(r.URL.Path, "/admin/applications/"):
 		if r.Method != "POST" { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
 		if !sv.admin(w, r) { return }
