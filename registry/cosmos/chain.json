@@ -10,11 +10,15 @@
   "bech32_prefix": "sobya",
   "daemon_name": "sobyad",
   "node_home": "$HOME/.sobya",
-  "key_algos": ["secp256k1"],
+  "key_algos": [
+    "secp256k1"
+  ],
   "slip44": 118,
   "staking": {
     "staking_tokens": [
-      { "denom": "asobya" }
+      {
+        "denom": "asobya"
+      }
     ]
   },
   "logo_URIs": {
@@ -35,21 +39,10 @@
       }
     ]
   },
-  "evm": {
-    "chain_id": "357812033857",
-    "rpc": [
-      {
-        "address": "https://sobya-evm-rpc.nodesafe-app.xyz",
-        "provider": "NodeSafe"
-      }
-    ]
-  },
   "explorers": [
     {
       "kind": "other",
-      "url": "https://explorer.nodesafe-app.xyz/sobya",
-      "tx_page": "https://explorer.nodesafe-app.xyz/sobya/txs/${txHash}",
-      "account_page": "https://explorer.nodesafe-app.xyz/sobya/accounts/${accountAddress}"
+      "url": "https://explorer.nodesafe-app.xyz/sobya"
     }
   ]
 }
