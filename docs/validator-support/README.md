@@ -84,3 +84,12 @@ and published before applications open.
   change consensus behavior, or access validator signing keys.
 - CI proves the new directory is independent of the chain runtime.
 - No production deployment or transfer occurs without explicit owner approval.
+
+
+## Fast path for new validators
+
+Use the [live validator onboarding guide](ONBOARDING.md) and the public
+[validator application form](../../issues/new?template=validator-application.yml).
+Applications are free. Technical admission and any conditional support grant
+are separate decisions; no grant is promised before the spendable support
+budget is verified.
