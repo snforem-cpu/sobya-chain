@@ -85,15 +85,33 @@ jobs:
           gas_response="$(rpc eth_gasPrice '[]')"
           gas_price="$(jq -r '.result // empty' <<<"$gas_response")"
           [[ "$gas_price" =~ ^0x[0-9a-fA-F]+$ ]]
-          founder="$(rpc eth_getBalance '["0xd316993423Fc6268038F4EE3EA7C0C5038513C18","latest"]')"
-          shared="$(rpc eth_getBalance '["0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f","latest"]')"
+          priority_response="$(rpc eth_maxPriorityFeePerGas '[]')"
+          priority_fee="$(jq -r '.result // empty' <<<"$priority_response")"
+          fee_history="$(rpc eth_feeHistory '["0x4","latest",[25,50,75]]')"
+          fee_history_json="$(jq -c '.result // .error' <<<"$fee_history")"
+          founder_address='0xd316993423Fc6268038F4EE3EA7C0C5038513C18'
+          shared_address='0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f'
+          founder="$(rpc eth_getBalance "[\"$founder_address\",\"latest\"]")"
+          shared="$(rpc eth_getBalance "[\"$shared_address\",\"latest\"]")"
           founder_balance="$(jq -r '.result // empty' <<<"$founder")"
           shared_balance="$(jq -r '.result // empty' <<<"$shared")"
           [[ "$founder_balance" =~ ^0x[0-9a-fA-F]+$ ]]
           [[ "$shared_balance" =~ ^0x[0-9a-fA-F]+$ ]]
-          echo "PASS: EVM chain_id=$chain block=$block gasPrice_wei=$gas_price"
+          nonce_response="$(rpc eth_getTransactionCount "[\"$founder_address\",\"latest\"]")"
+          nonce="$(jq -r '.result // empty' <<<"$nonce_response")"
+          estimate_response="$(rpc eth_estimateGas "[{\"from\":\"$founder_address\",\"to\":\"$shared_address\",\"value\":\"0x0\"}]")"
+          estimate="$(jq -r '.result // empty' <<<"$estimate_response")"
+          [[ "$estimate" =~ ^0x[0-9a-fA-F]+$ ]]
+          echo "PASS: EVM chain_id=$chain block=$block gasPrice_wei=$gas_price priorityFee_wei=$priority_fee"
+          echo "EVM feeHistory=$fee_history_json"
+          echo "Founder nonce=$nonce estimated_zero_value_transfer_gas=$estimate"
           echo "Founder eth_getBalance (wei hex)=$founder_balance"
           echo "Shared eth_getBalance (wei hex)=$shared_balance"
+          for path in /cosmos/feemarket/v1/params /cosmos/feemarket/v1/base_fee /cosmos/evm/v1/params; do
+            code="$(curl --silent --show-error --connect-timeout 8 --max-time 15 -o /tmp/sobya-fee-query.json -w '%{http_code}' "https://sobya-api.nodesafe-app.xyz$path" || true)"
+            echo "REST $path HTTP $code"
+            if [[ "$code" == "200" ]]; then jq -c . /tmp/sobya-fee-query.json; fi
+          done
           echo "Read-only checks only; no transaction was signed or broadcast."
 
   p2p-connectivity:
