@@ -2,45 +2,48 @@
 
 # SOBYA Chain
 
-SOBYA is an in-development Cosmos SDK / CometBFT blockchain with a partially integrated Cosmos EVM environment. The active development branch is `feature/tokenomics-fee-split`. This repository is public; the project is not yet a live public network.
+SOBYA is a Cosmos SDK / CometBFT blockchain project. The configured public chain identifier in the operator launch materials is sobya-1. Repository status, an accepted Genesis file, and a scheduled startup are not by themselves proof that a public network is currently producing blocks; live operation must be confirmed from independent, read-only network evidence.
 
 ## Native token and agreed tokenomics
 
-- Display symbol: `SOBY`
-- Base denomination: `asobya`
-- Precision: 18 decimal places (`1 SOBY = 10^18 asobya`)
-- Intended maximum native supply: 1,000,000,000 SOBY (`10^27 asobya`)
+- Display symbol: SOBY
+- Base denomination: asobya
+- Precision: 18 decimal places (1 SOBY = 10^18 asobya)
+- Intended maximum native supply: 1,000,000,000 SOBY (10^27 asobya)
 - Agreed allocation: Founder 40%, Community 20%, Validators 15%, Development 10%, Liquidity 10%, Treasury 3%, Emergency 2%.
 - Transaction fees: 50% Treasury, 30% Validators, 20% Community.
 - Automatic inflation is disabled under the current token rules.
 
-See [tokenomics and launch rules](sobya/TOKENOMICS.md). Production wallet destinations and validator gentxs must be validated in the final genesis ceremony; development balances are not production allocations.
+See [tokenomics and launch rules](sobya/TOKENOMICS.md). Production wallet destinations and validator allocations must be validated against the approved Genesis package; development balances are not production allocations.
 
 ## Development capabilities and evidence
 
-The development branch contains Cosmos SDK transaction processing, native 18-decimal denomination configuration, fee-routing and validator-reserve logic, local multi-validator workflows, and Cosmos EVM integration work. These are distinct capabilities and must be judged against completed CI runs on the exact commit.
+The repository contains Cosmos SDK transaction-processing code, native 18-decimal denomination configuration, fee-routing and validator-reserve logic, local multi-validator workflows, and Cosmos EVM integration work. These capabilities must be judged against completed CI runs on the exact commit.
 
-A passing build or local CI network does not establish public consensus, a production genesis, continuous hosting, or full wallet compatibility. See [EVM integration status](docs/COSMOS_EVM_INTEGRATION.md) and the current [GitHub Actions runs](https://github.com/snforem-cpu/sobya-chain/actions).
+A passing build or local CI network does not establish public consensus, continuous hosting, or full wallet compatibility. See [EVM integration status](docs/COSMOS_EVM_INTEGRATION.md) and the current [GitHub Actions runs](https://github.com/snforem-cpu/sobya-chain/actions).
 
-## Stage three — independent operator preparation
+## Validator participation
 
-The stage-three preparation pack is now documented:
-1. [Independent validator/operator onboarding kit](docs/STAGE_THREE_OPERATOR_KIT.md)
-2. [Genesis ceremony and launch-bundle procedure](docs/GENESIS_CEREMONY.md)
-3. [Versioned binary release process](docs/RELEASE_PROCESS.md)
-4. [Arabic/English recruitment announcements and application template](docs/ANNOUNCEMENTS.md)
-5. [P2P/RPC security and external connectivity checks](docs/testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md)
+Independent operators may submit a no-fee expression of interest through the [public GitHub validator application form](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml). Intake is manual: submitting an issue does not call the separate Go support service, approve a grant, or create a validator.
 
-The project can invite expressions of interest from independent operators now. Actual node startup must wait for a tested versioned release, approved CometBFT and EVM chain IDs, final genesis and SHA-256, peer list, and coordinated launch time. The first public network should be a testnet rehearsal; mainnet requires a separate approval and launch ceremony.
+Read the [validator onboarding guide](docs/validator-support/ONBOARDING.md) before applying. Do not generate a new genesis gentx to join a network that has already started. A joining operator must synchronize to the verified live chain and create its validator using the supported live-chain transaction flow only after the team confirms the current binary, chain state, staking parameters, minimum self-delegation, and fees.
 
-## Current operational status
+## Current operational status (documentation review: 2026-11-11)
 
-- No public peer address, public RPC endpoint, production genesis hash, or independently operated validator is currently confirmed in this repository.
-- The EVM chain ID `777777` is development/CI only and must not be reused for a public network.
+- Chain ID in the operator launch materials: sobya-1.
+- NodeSafe reported acceptance of the single-validator launch Genesis with SHA-256 35207c189ee5548cb376cb4d5d9dbe4aa0509b3daf85b057e8e59db1c4b0314a, scheduled for 2026-11-10T16:00:00Z. This is an operator-reported launch artifact, not independent proof of current block production.
+- NodeSafe previously supplied P2P endpoint 188.68.36.11:36656. Its current reachability and the current peer set must be checked before distributing connection instructions.
+- No public RPC endpoint is currently published in this repository. NodeSafe's reported RPC address was loopback-only and is not usable by external applicants.
+- Until an independently reachable read-only RPC endpoint and a recent block-height/chain-ID check are published, this repository does not claim that continuous public consensus has been independently verified. Do not send applicants transaction commands, self-delegation amounts, or fee figures based only on old configuration or Genesis files.
+- The earlier two-validator Genesis draft is not the final launch artifact identified above. Do not use its validator list or hash for joining instructions.
+- The EVM chain ID 777777 is development/CI only and must not be reused for a public network.
 - GitHub Actions runners are temporary CI machines, not validator hosting.
-- The repository includes a tagged Linux amd64 prerelease workflow. It has not published a release merely by being added; a reviewed version tag and successful workflow are required.
-- No mainnet launch, token sale, investment return, or exchange-listing claim is authorized.
+- No mainnet investment, token sale, return, or exchange-listing claim is authorized by this repository.
+
+## Validator support service status
+
+The Go service under ops/validator-support is an isolated experimental administrative MVP. It is not deployed, is not connected to the GitHub issue form, does not query a live RPC, and cannot sign or broadcast transactions. GitHub Issues are the only currently documented application intake path. Do not treat an example/configured budget cap as evidence of spendable funds.
 
 ## Security
 
-Never commit or share mnemonics, private keys, keyring directories, `priv_validator_key.json`, or `node_key.json`. Each operator generates and retains their own keys. Testnet tokens have no monetary value, and no validator income or infrastructure reimbursement is promised.
+Never commit or share mnemonics, private keys, keyring directories, priv_validator_key.json, or node_key.json. Each operator generates and retains their own keys. Applicants must never send secrets through GitHub Issues.
