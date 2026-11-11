@@ -117,3 +117,36 @@ func TestPersistence(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if len(s2.list()) != 1 { t.Fatal("application was not persisted") }
 }
+
+func TestMissingBudgetDisablesGrantApprovalWithoutBreakingIntake(t *testing.T) {
+	s := testServer(t)
+	s.budget = nil
+	payload, err := json.Marshal(map[string]string{
+		"operator_name": "No Budget",
+		"contact": "ops@example.test",
+		"account_address": "sobya1nobudget",
+		"consensus_pubkey": "pub",
+		"node_endpoint": "node.example:26656",
+		"software_version": "v0.1.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := request(s, "POST", "/applications", string(payload), false); w.Code != 201 {
+		t.Fatalf("application intake should remain available: %d %s", w.Code, w.Body)
+	}
+	apps := s.store.list()
+	if len(apps) != 1 {
+		t.Fatalf("expected one application, got %d", len(apps))
+	}
+	if w := request(s, "GET", "/admin/budget", "", true); w.Code != 503 {
+		t.Fatalf("budget endpoint should fail closed: %d", w.Code)
+	}
+	approval, err := json.Marshal(map[string]string{"amount": "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := request(s, "POST", "/admin/applications/"+apps[0].ID+"/approve", string(approval), true); w.Code != 409 {
+		t.Fatalf("approval without budget should be rejected: %d", w.Code)
+	}
+}

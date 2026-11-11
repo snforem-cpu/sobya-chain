@@ -1,5 +1,5 @@
 name: SOBYA Validator Application
-description: Apply to operate an independent validator on the live SOBYA network.
+description: Submit a manual expression of interest to operate an independent SOBYA validator. Live transaction instructions follow only after network preflight.
 title: "[Validator Application]: "
 body:
   - type: markdown
@@ -7,7 +7,7 @@ body:
       value: |
         Thank you for your interest in validating SOBYA.
 
-        **This form is public.** Submit only public operator information and public network endpoints. Never post passwords, seed phrases, private keys, validator signing keys, access tokens, or private contact details. The SOBYA team will use your GitHub account to follow up in this issue.
+        **This form is public.** Submit only public operator information and public network endpoints. Never post passwords, seed phrases, private keys, validator signing keys, access tokens, or private contact details. The SOBYA team will use your GitHub account to follow up in this issue. This form is reviewed manually and is not connected to an automated support API.
 
         Applying is free. Submission does not guarantee a grant or validator admission. Any support is conditional on eligibility and a separately verified support budget.
   - type: input
@@ -68,7 +68,7 @@ body:
   - type: input
     id: p2p
     attributes:
-      label: Public P2P endpoint
+      label: Public P2P endpoint (if available)
       description: Host:port reachable by peers, if available. Do not include credentials.
       placeholder: host.example:26656
     validations:
@@ -77,7 +77,7 @@ body:
     id: rpc
     attributes:
       label: Public RPC endpoint (optional)
-      description: Read-only public endpoint, if available. Do not include credentials.
+      description: Read-only public endpoint, if available. The project has not published a public RPC; do not include credentials.
       placeholder: https://rpc.example
     validations:
       required: false

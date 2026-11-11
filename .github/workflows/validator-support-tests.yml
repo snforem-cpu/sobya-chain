@@ -1,7 +1,7 @@
 name: Validator Support Service Tests
 on:
   push:
-    branches: [feature/validator-support-offchain]
+    branches: [main, feature/validator-support-offchain, fix/validator-onboarding-docs-ci]
     paths:
       - 'ops/validator-support/**'
       - '.github/workflows/validator-support-tests.yml'
@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-      - run: gofmt -w .
-      - run: go test -race ./...
-      - run: go vet ./...
+      - name: Format Go sources
+        run: gofmt -w .
+      - name: Run race-enabled tests
+        run: go test -race ./...
+      - name: Run go vet
+        run: go vet ./...
