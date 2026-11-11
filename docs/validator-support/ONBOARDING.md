@@ -40,12 +40,12 @@ TCP reachability is confirmed, but a second independent SOBYA node has not yet c
 Before telling an applicant to create a validator, the team must verify and publish all of the following:
 
 1. **P2P/bootstrap:** use the reachable NodeSafe peer above; confirm an independent node actually connects, catches up, and follows advancing blocks.
-2. **Exact live Genesis:** obtain the Genesis file and SHA-256 from the current mainnet operator and compare it with an independently trusted copy. Do not use the repository's older BonyNode rehearsal Genesis; its manifest identifies it as a public testnet rehearsal, not the currently running NodeSafe mainnet.
+2. **Genesis:** use the exact immutable Genesis file from the project launch bundle that NodeSafe confirmed it used at launch. Do not ask for a replacement, modify it, regenerate it, or use the BonyNode rehearsal Genesis.
 3. **Binary:** GitHub publishes `v0.1.0-rc.2` with Linux amd64/arm64 assets. NodeSafe must confirm the running `sobyad version` and source commit match the approved release before new operators are instructed to install it.
 4. **Staking:** read current on-chain staking parameters, minimum self-delegation, denomination, transaction fees, and validator eligibility rules.
 5. **Support:** publish the operator support contact and incident procedure.
 
-Until the exact live Genesis checksum and staking/self-delegation/fee parameters are confirmed, collect expressions of interest and prepare operator hosts only. Do not send applicants a genesis gentx, live `create-validator` command, self-bond amount, or fee instructions.
+The Genesis identity is already settled by the launch confirmation. The remaining transaction gate is to capture the current live staking parameters, existing validator record, running binary version/commit, and fee-market behavior. Until those live values are captured and reconciled with the exact release, send host-preparation and sync instructions only; do not guess a self-bond amount, gas price, or validator-creation command.
 
 ## 4. Review applications
 
@@ -60,10 +60,10 @@ The team reviews each application manually:
 
 A validator joining after chain launch is not a genesis validator:
 
-- Use only the approved live Genesis and verified peer/bootstrap information.
-- Synchronize to the live chain and verify chain ID and height before attempting validator creation.
-- Do not generate or submit a new genesis gentx for a network that is already running.
-- Only after the synchronization and eligibility checks are complete may the operator use its own wallet and the supported binary's live-chain validator-creation transaction.
+- Use only the immutable launch Genesis already confirmed by NodeSafe and the verified peer/bootstrap information.
+- Synchronize to the live chain and verify chain ID and advancing height before attempting validator creation.
+- Do not generate or submit a genesis gentx for a network that is already running.
+- The operator creates its own validator with a signed live-chain staking transaction from its own wallet only after the exact binary, current staking parameters, self-bond requirement, and gas policy have been confirmed.
 - The operator signs its own transactions. The SOBYA team must never request a seed phrase or private validator key.
 
 The exact command, denomination, required amount, and transaction fees remain unpublished until confirmed against the current live binary and on-chain parameters.
