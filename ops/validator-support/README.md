@@ -14,6 +14,8 @@ cd ops/validator-support
 export ADMIN_TOKEN="$(openssl rand -hex 32)"
 export LISTEN_ADDR="127.0.0.1:8097"
 export DATA_FILE="./data/validator-support.json"
+# Required: total approved support budget in verified base-denomination units
+export SUPPORT_BUDGET_BASE_UNITS="100000000000000000000000"
 go run .
 ```
 
@@ -29,6 +31,8 @@ details; protect it and restrict filesystem access.
   an upstream rate limiter before internet exposure).
 - `GET /admin/applications` — list applications; requires
   `Authorization: Bearer $ADMIN_TOKEN`.
+- `GET /admin/budget` — show configured, approved, and remaining program
+  budget in base-denomination units; requires the admin token.
 - `POST /admin/applications/{id}/approve` — record a human-approved grant
   amount and notes.
 - `POST /admin/applications/{id}/evidence` — append a manually reviewed,
@@ -50,9 +54,11 @@ procedure.
 Amounts must be positive integer base-denomination units (for SOBYA, use the
 verified live-chain base denom; do not assume display-unit amounts). Each
 application's planned, paid, and withheld tranches are summed and cannot exceed
-that application's approved grant amount. Duplicate non-empty transaction
-hashes are rejected. This is an application-level cap only: it does not prove
-that a support wallet has funds or enforce a total program-wide budget.
+that application's approved grant amount. The sum of all approved grants is also
+checked against the required `SUPPORT_BUDGET_BASE_UNITS` ceiling. The service
+reserves the full approved amount in its accounting, even before tranches are
+paid. This is an administrative cap only: it does not prove that a support
+wallet has funds or verify its on-chain balance.
 
 ## Current MVP limitations
 
@@ -61,8 +67,8 @@ that a support wallet has funds or enforce a total program-wide budget.
 - A 95% signed-block threshold is a provisional code default for this MVP, not
   an adopted network rule. It must be reviewed against actual chain parameters
   and a published support policy before use.
-- There is no live spendable-balance check, total-program budget cap, or
-  cumulative support-wallet ledger.
+- There is no live spendable-balance check or cumulative support-wallet ledger.
+  The configured program-wide ceiling is not a balance oracle.
 - There is no automatic repayment/clawback. Conditionality is implemented by
   withholding future tranches, not reversing irreversible transfers.
 - JSON-file storage is suitable only for isolated development/testing, not a
@@ -76,8 +82,10 @@ that a support wallet has funds or enforce a total program-wide budget.
    validator eligibility rules against the running release and live chain.
 3. Replace local JSON storage with a reviewed database and backups; add TLS,
    rate limiting, audit-log integrity, and multi-person payout approval.
-4. Implement read-only RPC monitoring with endpoint allowlists, freshness
-   checks, and independent cross-checks. No write RPC or signing key.
+4. Implement read-only RPC monitoring only after trusted RPC endpoints, chain ID,
+   validator consensus-address mapping, and monitoring windows are verified.
+   Applicant-supplied endpoints must never be fetched blindly. No write RPC or
+   signing key.
 5. Configure a program-wide budget, performance windows, appeal rules, and
    staged milestones; obtain owner approval and publish the policy.
 6. Run tests and an independent security review. Deploy this service separately
