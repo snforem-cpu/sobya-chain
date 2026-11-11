@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -99,7 +100,7 @@ func (sv *Server) admin(w http.ResponseWriter,r *http.Request) bool {
 	if got!=sv.token { http.Error(w,"unauthorized",http.StatusUnauthorized); return false }; return true
 }
 func jsonOut(w http.ResponseWriter,status int,v any){w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_ = json.NewEncoder(w).Encode(v)}
-func decode(r *http.Request,v any) error { d:=json.NewDecoder(http.MaxBytesReader(nil,r.Body,1<<20)); d.DisallowUnknownFields(); return d.Decode(v) }
+func decode(r *http.Request,v any) error { d:=json.NewDecoder(io.LimitReader(r.Body,1<<20)); d.DisallowUnknownFields(); return d.Decode(v) }
 func (sv *Server) ServeHTTP(w http.ResponseWriter,r *http.Request) {
 	w.Header().Set("X-Content-Type-Options","nosniff")
 	switch {
@@ -115,6 +116,7 @@ func (sv *Server) ServeHTTP(w http.ResponseWriter,r *http.Request) {
 	case r.Method=="GET" && r.URL.Path=="/admin/applications":
 		if !sv.admin(w,r){return}; jsonOut(w,200,sv.store.list())
 	case strings.HasPrefix(r.URL.Path,"/admin/applications/"):
+		if r.Method!="POST" { http.Error(w,"method not allowed",http.StatusMethodNotAllowed); return }
 		if !sv.admin(w,r){return}
 		parts:=strings.Split(strings.TrimPrefix(r.URL.Path,"/admin/applications/"),"/")
 		if len(parts)!=2 {http.NotFound(w,r);return}
