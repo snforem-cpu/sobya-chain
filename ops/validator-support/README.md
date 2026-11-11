@@ -97,3 +97,13 @@ wallet has funds or verify its on-chain balance.
 go test -race ./...
 go vet ./...
 ```
+
+
+## Fast validator intake
+
+For the public application form and the live-network joining checklist, see
+[`docs/validator-support/ONBOARDING.md`](../../docs/validator-support/ONBOARDING.md).
+The GitHub issue form collects public operator information only; it is not a
+grant approval and must never be used to collect secrets. Do not publish this
+service as an internet-facing application portal until production hosting,
+TLS, rate limiting, privacy controls, and a reviewed data store are in place.
