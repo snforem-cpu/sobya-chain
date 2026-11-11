@@ -14,8 +14,7 @@ cd ops/validator-support
 export ADMIN_TOKEN="$(openssl rand -hex 32)"
 export LISTEN_ADDR="127.0.0.1:8097"
 export DATA_FILE="./data/validator-support.json"
-# Required: total approved support budget in verified base-denomination units
-# Optional: leave unset until a separate spendable support budget is verified.
+# Optional: set only after a separate spendable support budget is verified.
 # Without a valid value, grant approvals and the budget endpoint stay disabled.
 unset SUPPORT_BUDGET_BASE_UNITS
 go run .
@@ -57,7 +56,9 @@ Amounts must be positive integer base-denomination units (for SOBYA, use the
 verified live-chain base denom; do not assume display-unit amounts). Each
 application's planned, paid, and withheld tranches are summed and cannot exceed
 that application's approved grant amount. The sum of all approved grants is also
-checked against the required `SUPPORT_BUDGET_BASE_UNITS` ceiling. The service
+checked against the configured `SUPPORT_BUDGET_BASE_UNITS` ceiling. When this
+variable is unset or invalid, the service starts in no-grants mode: applications
+can be recorded, but budget queries and grant approvals remain disabled. The service
 reserves the full approved amount in its accounting, even before tranches are
 paid. This is an administrative cap only: it does not prove that a support
 wallet has funds or verify its on-chain balance.
