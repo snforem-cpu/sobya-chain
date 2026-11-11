@@ -33,16 +33,20 @@ jobs:
           first="$(fetch_status)"
           chain="$(jq -r '.result.node_info.network // empty' <<<"$first")"
           height1="$(jq -r '.result.sync_info.latest_block_height // empty' <<<"$first")"
+          node_id="$(jq -r '.result.node_info.id // empty' <<<"$first")"
           test "$chain" = "$EXPECTED_CHAIN"
+          test "$node_id" = '1dad50ff897c247cba0ff646d0ee1ad59c3abc88'
           [[ "$height1" =~ ^[0-9]+$ ]] && (( height1 > 0 ))
-          echo "CometBFT chain_id=$chain first_height=$height1"
+          echo "CometBFT chain_id=$chain node_id=$node_id first_height=$height1"
           sleep 20
           second="$(fetch_status)"
           chain2="$(jq -r '.result.node_info.network // empty' <<<"$second")"
           height2="$(jq -r '.result.sync_info.latest_block_height // empty' <<<"$second")"
           test "$chain2" = "$EXPECTED_CHAIN"
           [[ "$height2" =~ ^[0-9]+$ ]] && (( height2 > height1 ))
-          echo "PASS: CometBFT height advanced from $height1 to $height2"
+          node_id2="$(jq -r '.result.node_info.id // empty' <<<"$second")"
+          test "$node_id2" = "$node_id"
+          echo "PASS: CometBFT node_id=$node_id height advanced from $height1 to $height2"
 
       - name: Check public Cosmos REST and staking endpoint
         shell: bash
