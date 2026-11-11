@@ -2,7 +2,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"\n\t"math/big"
+	"encoding/json"
+\t"math/big"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
@@ -13,7 +14,8 @@ func testServer(t *testing.T) *Server {
 	t.Helper()
 	s, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil { t.Fatal(err) }
-	budget, _ := new(big.Int).SetString("1000000000000000000000000000000", 10)\n\treturn &Server{store: s, token: "test-secret", budget: budget}
+	budget, _ := new(big.Int).SetString("1000000000000000000000000000000", 10)
+\treturn &Server{store: s, token: "test-secret", budget: budget}
 }
 
 func request(s *Server, method, path, body string, admin bool) *httptest.ResponseRecorder {
