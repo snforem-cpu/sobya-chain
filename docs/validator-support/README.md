@@ -1,95 +1,82 @@
 # SOBYA Validator Support Program (Off-chain, isolated)
 
+## Current status and intake
+
+The public application route is GitHub Issues and is handled manually by the SOBYA team:
+[Submit a validator application](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml).
+
+The GitHub issue form is **not integrated** with the Go service described below. An issue does not create an API record, trigger an automated review, approve a grant, or transfer funds. Follow-up takes place in the public issue unless the applicant and team arrange a safer private channel for non-public contact details. Never post secrets or private credentials in an issue.
+
+The Go service is an experimental, standalone administrative MVP only. It is not hosted or production-ready. Do not advertise it as an application portal or expose it to the public internet.
+
 ## Safety boundary
 
 This program is an off-chain administrative service. It MUST NOT be imported by
-`sobya/app`, registered as an SDK module, added to consensus hooks, or change
+sobya/app, registered as an SDK module, added to consensus hooks, or change
 genesis, app wiring, staking parameters, validator-reserve accounting, fee
 routing, or the running NodeSafe node.
 
-Development and deployment are separate from the live chain. No deployment,
-wallet signing, token transfer, validator restart, or software upgrade is
-performed by this repository change.
+No deployment, wallet signing, token transfer, validator restart, or software
+upgrade is performed by this repository change.
 
 ## Purpose
 
-Provide conditional, staged onboarding grants to independent validator
-operators. The program helps eligible operators obtain the funds needed to
-meet the chain's actual self-delegation requirement without charging an
-application fee.
+The intended program may consider conditional, staged onboarding grants to
+independent validator operators. There is no promise of support, and no grant
+may be approved until a separate spendable support budget and the published
+policy are verified. Applicants pay no application fee.
 
 ## Important distinction
 
-The existing on-chain `validator_reserve` is a consensus-controlled rewards
+The existing on-chain validator_reserve is a consensus-controlled rewards
 mechanism. Its balance and permissions must not be treated as a liquid
-onboarding budget. This program must use a separately verified, spendable
-support wallet/budget. The existence and balance of such a budget are not
-assumed by this design.
+onboarding budget. Any support must come from a separately verified,
+spendable support wallet/budget. Its existence and balance are not assumed.
 
 ## Grant lifecycle
 
-1. Application: collect operator address, validator operator address (when
-   available), consensus public key, node/P2P endpoint, software version,
-   proposed commission, and operational contact. Never request seed phrases,
-   private keys, or validator signing keys.
-2. Eligibility review: verify chain ID, binary release, node synchronization,
-   unique operator identity, current staking parameters, actual minimum
-   self-delegation, and available support budget.
-3. Approval: human approval records the amount, vesting/milestones, monitoring
-   window, and policy version. No automatic approval or transfer.
-4. Staged disbursement: pay small, explicitly approved tranches from a
-   separate support wallet. The operator controls its own wallet and signs
-   its own create-validator/delegation transactions.
-5. Monitoring: read-only observations from public RPC (or independently
-   operated trusted endpoints) track bonded status, signed-block ratio,
-   uptime/availability, jailed status, and evidence timestamps.
-6. Completion or suspension: release later tranches only when configured
-   milestones are met. Stop future tranches when conditions fail and allow a
-   human appeal/review.
+1. Manual application review using public operator details only.
+2. Verify chain ID, exact binary release, synchronization, unique operator
+   identity, current staking parameters, actual minimum self-delegation, and
+   spendable support budget from trusted sources.
+3. Human approval records amount, milestones, monitoring window, and policy
+   version. No automatic approval or transfer.
+4. If approved, authorized humans prepare and sign staged transfers using a
+   separately approved wallet procedure. The recipient controls its own keys.
+5. Monitoring is manual in this MVP. Do not claim automatic RPC monitoring.
+6. Stop future tranches when conditions fail; provide a human appeal/review.
 
 ## Irreversibility and enforcement
 
 On-chain transfers are generally irreversible. Do not describe an already
-transferred grant as automatically recoverable, and do not implement a
-privileged clawback. Conditionality is enforced primarily by staged payments:
-unreleased tranches remain in the support wallet. Any voluntary repayment is
-a separate transaction initiated by the recipient.
+transferred grant as automatically recoverable or implement a privileged
+clawback. Conditionality is enforced by staged payments: unreleased tranches
+remain in the support wallet.
 
 ## Security controls
 
 - Separate support wallet from founder, treasury, emergency, liquidity, and
   validator-reserve accounts.
-- Multisignature or equivalent two-person approval for every payout.
+- Two-person approval for every payout.
 - Hard per-validator and total-program budget caps.
-- Idempotency key per application and payout; duplicate prevention.
-- Immutable audit log of decisions, evidence, transactions, and policy version.
-- Read-only RPC credentials; no validator private-key access.
-- Fail closed when RPC data is stale, inconsistent, or unavailable.
+- Idempotency and auditable records for every decision and payout.
+- Read-only RPC access only after trusted endpoints are established.
 - Never automatically jail, unbond, slash, or alter a validator.
-- No automated transaction signing in the initial release.
+- No automated transaction signing.
 
-## Initial policy defaults (not yet approved for production)
+## Initial policy defaults (not approved for production)
 
-All numeric thresholds and grant amounts remain unset until the live chain is
-read and verified. In particular, do not assume a 1 SOBY minimum or any
-particular self-delegation amount. Eligibility thresholds must be configurable
-and published before applications open.
+All thresholds and grant amounts remain unset. Do not assume a 1 SOBY minimum
+or any particular self-delegation amount. Publish eligibility thresholds only
+after verification against the running chain and owner approval.
 
-## Acceptance criteria
+## Acceptance criteria before production
 
-- Unit tests cover duplicate applications, budget exhaustion, stale RPC data,
-  missed performance thresholds, and payout idempotency.
-- Integration tests use a local disposable testnet only.
-- A security review confirms that the service cannot write to chain state,
-  change consensus behavior, or access validator signing keys.
-- CI proves the new directory is independent of the chain runtime.
+- Unit and integration tests cover application validation, duplicate records,
+  budget exhaustion, stale evidence, and payout idempotency.
+- Integration tests use a disposable local testnet only.
+- Independent security review confirms no chain-state writes or access to
+  validator signing keys.
+- Production storage, backups, TLS, rate limiting, privacy controls, audit-log
+  integrity, and multi-person payout approval are implemented and reviewed.
 - No production deployment or transfer occurs without explicit owner approval.
-
-
-## Fast path for new validators
-
-Use the [live validator onboarding guide](ONBOARDING.md) and the public
-[validator application form](../../issues/new?template=validator-application.yml).
-Applications are free. Technical admission and any conditional support grant
-are separate decisions; no grant is promised before the spendable support
-budget is verified.
