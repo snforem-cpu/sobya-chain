@@ -313,8 +313,17 @@ func main() {
 	store, err := NewStore(path)
 	if err != nil { panic(err) }
 	budgetText := os.Getenv("SUPPORT_BUDGET_BASE_UNITS")
-	budget, budgetErr := parseAmount(budgetText)
-	if budgetErr != nil { panic("SUPPORT_BUDGET_BASE_UNITS must be set to a positive integer in base-denomination units") }
+	var budget *big.Int
+	if strings.TrimSpace(budgetText) != "" {
+		parsed, budgetErr := parseAmount(budgetText)
+		if budgetErr == nil {
+			budget = parsed
+		} else {
+			fmt.Fprintln(os.Stderr, "SUPPORT_BUDGET_BASE_UNITS is invalid; starting with grant approvals disabled")
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, "SUPPORT_BUDGET_BASE_UNITS is unset; starting with grant approvals disabled")
+	}
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" { addr = "127.0.0.1:8097" }
 	s := &http.Server{Addr: addr, Handler: &Server{store: store, token: os.Getenv("ADMIN_TOKEN"), budget: budget}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
