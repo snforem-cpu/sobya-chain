@@ -4,11 +4,13 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,6 +38,7 @@ type Application struct {
 	Evidence []Evidence `json:"evidence,omitempty"`
 	Tranches []Tranche `json:"tranches,omitempty"`
 }
+
 type Evidence struct {
 	ObservedAt time.Time `json:"observed_at"`
 	Source string `json:"source"`
@@ -46,110 +49,227 @@ type Evidence struct {
 	Jailed bool `json:"jailed"`
 	Notes string `json:"notes,omitempty"`
 }
+
 type Tranche struct {
 	Amount string `json:"amount"`
 	TxHash string `json:"tx_hash,omitempty"`
 	Status string `json:"status"`
 	RecordedAt time.Time `json:"recorded_at"`
 }
+
 type Store struct {
 	mu sync.Mutex
 	path string
 	apps map[string]Application
 }
-func newID() (string,error) { b:=make([]byte,16); if _,e:=rand.Read(b); e!=nil{return "",e}; return hex.EncodeToString(b),nil }
-func NewStore(path string) (*Store,error) {
-	s:=&Store{path:path,apps:map[string]Application{}}
-	b,e:=os.ReadFile(path); if e==nil { if e=json.Unmarshal(b,&s.apps); e!=nil{return nil,fmt.Errorf("decode store: %w",e)} } else if !errors.Is(e,os.ErrNotExist) { return nil,e }
-	return s,nil
+
+func newID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil { return "", err }
+	return hex.EncodeToString(b), nil
 }
+
+func NewStore(path string) (*Store, error) {
+	s := &Store{path: path, apps: map[string]Application{}}
+	b, err := os.ReadFile(path)
+	if err == nil {
+		if err = json.Unmarshal(b, &s.apps); err != nil { return nil, fmt.Errorf("decode store: %w", err) }
+		if s.apps == nil { s.apps = map[string]Application{} }
+	} else if !errors.Is(err, os.ErrNotExist) { return nil, err }
+	return s, nil
+}
+
 func (s *Store) saveLocked() error {
-	b,e:=json.MarshalIndent(s.apps,"","  "); if e!=nil{return e}
-	if e=os.MkdirAll(filepath.Dir(s.path),0700); e!=nil{return e}
-	tmp:=s.path+".tmp"
-	if e=os.WriteFile(tmp,b,0600); e!=nil{return e}
-	if e=os.Rename(tmp,s.path); e!=nil{_ = os.Remove(tmp); return e}
+	b, err := json.MarshalIndent(s.apps, "", "  ")
+	if err != nil { return err }
+	if err = os.MkdirAll(filepath.Dir(s.path), 0700); err != nil { return err }
+	tmp := s.path + ".tmp"
+	if err = os.WriteFile(tmp, b, 0600); err != nil { return err }
+	if err = os.Rename(tmp, s.path); err != nil { _ = os.Remove(tmp); return err }
 	return nil
 }
-func (s *Store) create(a Application) (Application,error) {
-	s.mu.Lock(); defer s.mu.Unlock()
-	for _,old:=range s.apps { if old.AccountAddress==a.AccountAddress { return Application{},errors.New("an application already exists for this account") } }
-	id,e:=newID(); if e!=nil{return Application{},e}
-	now:=time.Now().UTC(); a.ID=id; a.Status="submitted"; a.CreatedAt=now; a.UpdatedAt=now
-	s.apps[id]=a
-	if e=s.saveLocked(); e!=nil{delete(s.apps,id);return Application{},e}
-	return a,nil
+
+func (s *Store) create(a Application) (Application, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, old := range s.apps {
+		if old.AccountAddress == a.AccountAddress { return Application{}, errors.New("an application already exists for this account") }
+	}
+	id, err := newID()
+	if err != nil { return Application{}, err }
+	now := time.Now().UTC()
+	a.ID, a.Status, a.CreatedAt, a.UpdatedAt = id, "submitted", now, now
+	s.apps[id] = a
+	if err = s.saveLocked(); err != nil { delete(s.apps, id); return Application{}, err }
+	return a, nil
 }
+
 func (s *Store) list() []Application {
-	s.mu.Lock(); defer s.mu.Unlock()
-	out:=make([]Application,0,len(s.apps)); for _,a:=range s.apps {out=append(out,a)}; return out
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]Application, 0, len(s.apps))
+	for _, a := range s.apps { out = append(out, a) }
+	return out
 }
-func (s *Store) mutate(id string, fn func(*Application) error) (Application,error) {
-	s.mu.Lock(); defer s.mu.Unlock()
-	a,ok:=s.apps[id]; if !ok{return Application{},errors.New("application not found")}
-	old:=a
-	if e:=fn(&a); e!=nil{return Application{},e}
-	a.UpdatedAt=time.Now().UTC(); s.apps[id]=a
-	if e:=s.saveLocked(); e!=nil{s.apps[id]=old;return Application{},e}
-	return a,nil
+
+func (s *Store) mutate(id string, fn func(*Application) error) (Application, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.apps[id]
+	if !ok { return Application{}, errors.New("application not found") }
+	old := a
+	if err := fn(&a); err != nil { return Application{}, err }
+	a.UpdatedAt = time.Now().UTC()
+	s.apps[id] = a
+	if err := s.saveLocked(); err != nil { s.apps[id] = old; return Application{}, err }
+	return a, nil
 }
+
+// parseAmount accepts positive integer base-denomination units only.
+func parseAmount(v string) (*big.Int, error) {
+	if v == "" || strings.TrimSpace(v) != v { return nil, errors.New("amount must be a positive integer in base-denomination units") }
+	n, ok := new(big.Int).SetString(v, 10)
+	if !ok || n.Sign() <= 0 { return nil, errors.New("amount must be a positive integer in base-denomination units") }
+	return n, nil
+}
+
+func allocatedAmount(a *Application) *big.Int {
+	total := new(big.Int)
+	for _, tranche := range a.Tranches {
+		if n, err := parseAmount(tranche.Amount); err == nil { total.Add(total, n) }
+	}
+	return total
+}
+
 type Server struct { store *Store; token string }
-func (sv *Server) admin(w http.ResponseWriter,r *http.Request) bool {
-	if sv.token=="" { http.Error(w,"admin API disabled: ADMIN_TOKEN is required",http.StatusServiceUnavailable); return false }
-	got:=strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"),"Bearer "))
-	if got!=sv.token { http.Error(w,"unauthorized",http.StatusUnauthorized); return false }; return true
+
+func (sv *Server) admin(w http.ResponseWriter, r *http.Request) bool {
+	if sv.token == "" { http.Error(w, "admin API disabled: ADMIN_TOKEN is required", http.StatusServiceUnavailable); return false }
+	const prefix = "Bearer "
+	header := r.Header.Get("Authorization")
+	if !strings.HasPrefix(header, prefix) { http.Error(w, "unauthorized", http.StatusUnauthorized); return false }
+	got := strings.TrimPrefix(header, prefix)
+	if len(got) != len(sv.token) || subtle.ConstantTimeCompare([]byte(got), []byte(sv.token)) != 1 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized); return false
+	}
+	return true
 }
-func jsonOut(w http.ResponseWriter,status int,v any){w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_ = json.NewEncoder(w).Encode(v)}
-func decode(r *http.Request,v any) error { d:=json.NewDecoder(io.LimitReader(r.Body,1<<20)); d.DisallowUnknownFields(); return d.Decode(v) }
-func (sv *Server) ServeHTTP(w http.ResponseWriter,r *http.Request) {
-	w.Header().Set("X-Content-Type-Options","nosniff")
+
+func jsonOut(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func decode(r *http.Request, v any) error {
+	d := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	d.DisallowUnknownFields()
+	if err := d.Decode(v); err != nil { return err }
+	var extra any
+	if err := d.Decode(&extra); err != io.EOF { return errors.New("request must contain exactly one JSON value") }
+	return nil
+}
+
+func (sv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	switch {
-	case r.Method=="GET" && r.URL.Path=="/health":
-		jsonOut(w,200,map[string]string{"status":"ok","mode":"off-chain-admin-only"})
-	case r.Method=="POST" && r.URL.Path=="/applications":
+	case r.Method == "GET" && r.URL.Path == "/health":
+		jsonOut(w, 200, map[string]string{"status": "ok", "mode": "off-chain-admin-only"})
+	case r.Method == "POST" && r.URL.Path == "/applications":
 		var a Application
-		if e:=decode(r,&a); e!=nil {http.Error(w,"invalid JSON application",400);return}
-		a.ID="";a.Status="";a.CreatedAt=time.Time{};a.UpdatedAt=time.Time{};a.Evidence=nil;a.Tranches=nil
-		if a.OperatorName==""||a.Contact==""||a.AccountAddress==""||a.ConsensusPubKey==""||a.NodeEndpoint==""||a.SoftwareVersion=="" {http.Error(w,"missing required application fields",400);return}
-		if len(a.AccountAddress)>160||len(a.NodeEndpoint)>300||len(a.ConsensusPubKey)>1000 {http.Error(w,"field too long",400);return}
-		created,e:=sv.store.create(a); if e!=nil {http.Error(w,e.Error(),409);return}; jsonOut(w,201,created)
-	case r.Method=="GET" && r.URL.Path=="/admin/applications":
-		if !sv.admin(w,r){return}; jsonOut(w,200,sv.store.list())
-	case strings.HasPrefix(r.URL.Path,"/admin/applications/"):
-		if r.Method!="POST" { http.Error(w,"method not allowed",http.StatusMethodNotAllowed); return }
-		if !sv.admin(w,r){return}
-		parts:=strings.Split(strings.TrimPrefix(r.URL.Path,"/admin/applications/"),"/")
-		if len(parts)!=2 {http.NotFound(w,r);return}
-		id,action:=parts[0],parts[1]
-		var out Application; var e error
+		if err := decode(r, &a); err != nil { http.Error(w, "invalid JSON application", 400); return }
+		a.ID, a.Status, a.CreatedAt, a.UpdatedAt = "", "", time.Time{}, time.Time{}
+		a.Evidence, a.Tranches = nil, nil
+		if a.OperatorName == "" || a.Contact == "" || a.AccountAddress == "" || a.ConsensusPubKey == "" || a.NodeEndpoint == "" || a.SoftwareVersion == "" {
+			http.Error(w, "missing required application fields", 400); return
+		}
+		if len(a.OperatorName) > 160 || len(a.Contact) > 320 || len(a.AccountAddress) > 160 || len(a.ValidatorAddress) > 160 || len(a.NodeEndpoint) > 300 || len(a.ConsensusPubKey) > 1000 || len(a.SoftwareVersion) > 100 || len(a.Commission) > 32 {
+			http.Error(w, "field too long", 400); return
+		}
+		created, err := sv.store.create(a)
+		if err != nil { http.Error(w, err.Error(), 409); return }
+		jsonOut(w, 201, created)
+	case r.Method == "GET" && r.URL.Path == "/admin/applications":
+		if !sv.admin(w, r) { return }
+		jsonOut(w, 200, sv.store.list())
+	case strings.HasPrefix(r.URL.Path, "/admin/applications/"):
+		if r.Method != "POST" { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
+		if !sv.admin(w, r) { return }
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/admin/applications/"), "/")
+		if len(parts) != 2 || parts[0] == "" { http.NotFound(w, r); return }
+		id, action := parts[0], parts[1]
+		var out Application
+		var err error
 		switch action {
 		case "approve":
-			var body struct{Amount string `json:"amount"`; Notes string `json:"notes"`}
-			if e=decode(r,&body);e!=nil||body.Amount=="" {http.Error(w,"amount is required",400);return}
-			out,e=sv.store.mutate(id,func(a *Application)error{if a.Status!="submitted"&&a.Status!="under_review"{return errors.New("application is not approvable")};a.Status="approved";a.ApprovedAmount=body.Amount;a.Notes=body.Notes;return nil})
+			var body struct { Amount string `json:"amount"`; Notes string `json:"notes"` }
+			if err = decode(r, &body); err != nil { http.Error(w, "invalid approval payload", 400); return }
+			if _, err = parseAmount(body.Amount); err != nil { http.Error(w, err.Error(), 400); return }
+			out, err = sv.store.mutate(id, func(a *Application) error {
+				if a.Status != "submitted" && a.Status != "under_review" { return errors.New("application is not approvable") }
+				a.Status, a.ApprovedAmount, a.Notes = "approved", body.Amount, body.Notes
+				return nil
+			})
 		case "evidence":
 			var ev Evidence
-			if e=decode(r,&ev);e!=nil {http.Error(w,"invalid evidence",400);return}
-			if ev.Source==""||ev.ObservedAt.IsZero()||ev.WindowBlocks<0||ev.SignedBlocks<0||ev.SignedBlocks>ev.WindowBlocks {http.Error(w,"invalid evidence fields",400);return}
-			out,e=sv.store.mutate(id,func(a *Application)error{if a.Status!="approved"&&a.Status!="active"{return errors.New("application must be approved before monitoring")};a.Evidence=append(a.Evidence,ev);if ev.Bonded&&!ev.Jailed&&ev.WindowBlocks>0&&ev.SignedBlocks*100>=ev.WindowBlocks*95{a.Status="active"}else{a.Status="under_review"};return nil})
+			if err = decode(r, &ev); err != nil { http.Error(w, "invalid evidence", 400); return }
+			if ev.Source == "" || ev.ObservedAt.IsZero() || ev.Height < 0 || ev.WindowBlocks <= 0 || ev.SignedBlocks < 0 || ev.SignedBlocks > ev.WindowBlocks {
+				http.Error(w, "invalid evidence fields", 400); return
+			}
+			out, err = sv.store.mutate(id, func(a *Application) error {
+				if a.Status != "approved" && a.Status != "active" { return errors.New("application must be approved or active before monitoring") }
+				a.Evidence = append(a.Evidence, ev)
+				// Provisional 95% threshold; not a network consensus parameter.
+				ratio := new(big.Int).Mul(big.NewInt(ev.SignedBlocks), big.NewInt(100))
+				required := new(big.Int).Mul(big.NewInt(ev.WindowBlocks), big.NewInt(95))
+				if ev.Bonded && !ev.Jailed && ratio.Cmp(required) >= 0 { a.Status = "active" } else { a.Status = "under_review" }
+				return nil
+			})
 		case "tranches":
 			var t Tranche
-			if e=decode(r,&t);e!=nil||t.Amount==""||(t.Status!="planned"&&t.Status!="paid"&&t.Status!="withheld") {http.Error(w,"amount and valid status (planned|paid|withheld) are required",400);return}
-			if t.Status=="paid"&&t.TxHash=="" {http.Error(w,"paid tranche requires a transaction hash",400);return}
-			out,e=sv.store.mutate(id,func(a *Application)error{if a.Status!="approved"&&a.Status!="active"&&a.Status!="under_review"{return errors.New("application is not approved")};for _,x:=range a.Tranches{if t.TxHash!=""&&x.TxHash==t.TxHash{return errors.New("transaction already recorded")}};t.RecordedAt=time.Now().UTC();a.Tranches=append(a.Tranches,t);return nil})
+			if err = decode(r, &t); err != nil { http.Error(w, "invalid tranche payload", 400); return }
+			amount, amountErr := parseAmount(t.Amount)
+			if amountErr != nil || (t.Status != "planned" && t.Status != "paid" && t.Status != "withheld") {
+				http.Error(w, "positive integer amount and valid status (planned|paid|withheld) are required", 400); return
+			}
+			if t.Status == "paid" && strings.TrimSpace(t.TxHash) == "" { http.Error(w, "paid tranche requires a transaction hash", 400); return }
+			if len(t.TxHash) > 160 { http.Error(w, "transaction hash too long", 400); return }
+			out, err = sv.store.mutate(id, func(a *Application) error {
+				if a.Status != "approved" && a.Status != "active" && a.Status != "under_review" { return errors.New("application is not approved") }
+				approved, e := parseAmount(a.ApprovedAmount)
+				if e != nil { return errors.New("approved grant amount is invalid") }
+				if new(big.Int).Add(allocatedAmount(a), amount).Cmp(approved) > 0 { return errors.New("tranche exceeds the approved grant amount") }
+				for _, existing := range a.Tranches {
+					if t.TxHash != "" && existing.TxHash == t.TxHash { return errors.New("transaction already recorded") }
+				}
+				t.RecordedAt = time.Now().UTC()
+				a.Tranches = append(a.Tranches, t)
+				return nil
+			})
 		case "complete":
-			out,e=sv.store.mutate(id,func(a *Application)error{if a.Status!="active"{return errors.New("only active validators can complete")};a.Status="completed";return nil})
-		default: http.NotFound(w,r);return
+			out, err = sv.store.mutate(id, func(a *Application) error {
+				if a.Status != "active" { return errors.New("only active validators can complete") }
+				a.Status = "completed"
+				return nil
+			})
+		default:
+			http.NotFound(w, r); return
 		}
-		if e!=nil {http.Error(w,e.Error(),409);return};jsonOut(w,200,out)
-	default: http.NotFound(w,r)
+		if err != nil { http.Error(w, err.Error(), 409); return }
+		jsonOut(w, 200, out)
+	default:
+		http.NotFound(w, r)
 	}
 }
-func main(){
-	path:=os.Getenv("DATA_FILE");if path==""{path="./data/validator-support.json"}
-	store,e:=NewStore(path);if e!=nil{panic(e)}
-	addr:=os.Getenv("LISTEN_ADDR");if addr==""{addr="127.0.0.1:8097"}
-	s:=&http.Server{Addr:addr,Handler:&Server{store:store,token:os.Getenv("ADMIN_TOKEN")},ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:10*time.Second,IdleTimeout:60*time.Second}
-	fmt.Printf("validator-support listening on %s (off-chain only)\n",addr)
-	if e=s.ListenAndServe();e!=nil&&e!=http.ErrServerClosed{panic(e)}
+
+func main() {
+	path := os.Getenv("DATA_FILE")
+	if path == "" { path = "./data/validator-support.json" }
+	store, err := NewStore(path)
+	if err != nil { panic(err) }
+	addr := os.Getenv("LISTEN_ADDR")
+	if addr == "" { addr = "127.0.0.1:8097" }
+	s := &http.Server{Addr: addr, Handler: &Server{store: store, token: os.Getenv("ADMIN_TOKEN")}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	fmt.Printf("validator-support listening on %s (off-chain only)\n", addr)
+	if err = s.ListenAndServe(); err != nil && err != http.ErrServerClosed { panic(err) }
 }
