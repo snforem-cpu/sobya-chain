@@ -1,6 +1,6 @@
 # SOBYA Independent Validator Recruitment
 
-**Status: SOBYA mainnet is live on `sobya-1`; independent validator onboarding is open for expressions of interest, while the public P2P/State Sync gate is being resolved.**
+**Status: SOBYA mainnet is live on `sobya-1`; independent validator onboarding is open for expressions of interest.**
 
 SOBYA is expanding from its initial NodeSafe-operated validator to independent validators. Each participating operator controls and maintains their own Linux host and keeps their own signing keys.
 
@@ -10,7 +10,7 @@ The initial target is four independent validator operators, plus one non-validat
 
 Operators should be able to provide:
 - Persistent Linux infrastructure and reliable power/network.
-- Public inbound TCP P2P connectivity (normally port 26656; use only the verified project endpoint/port when published).
+- Public inbound TCP P2P connectivity (normally port 26656; use the verified project peer below for initial synchronization).
 - SSD capacity, time synchronization, monitoring, backups, and routine maintenance.
 - Experience with Linux operations; Cosmos SDK / CometBFT experience is preferred.
 
@@ -24,7 +24,9 @@ Each operator creates account, node, and private-validator keys locally. Never s
 
 Interested operators may submit an expression of interest using the public [validator application template](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml). Host preparation and questions are welcome.
 
-**Do not create production gentxs or broadcast `create-validator` transactions yet.** The external preflight on 2026-11-11 verified the public CometBFT RPC, Cosmos REST, and EVM JSON-RPC endpoints, but the previously supplied P2P endpoint `188.68.36.11:36656` timed out from an external runner and CometBFT reported zero connected peers. The team must obtain a reachable P2P/seed endpoint or a verified State Sync procedure, then publish the exact supported binary/checksum, live Genesis checksum, and current staking/self-delegation/fee parameters.
+The external preflight on 2026-11-11 verified the public CometBFT RPC, Cosmos REST, EVM JSON-RPC, and TCP reachability of NodeSafe's CometBFT P2P port 26656. The peer endpoint is `1dad50ff897c247cba0ff646d0ee1ad59c3abc88@188.68.36.11:26656`. A second independent node has not yet completed a P2P handshake and block sync.
+
+**Do not create production gentxs or broadcast `create-validator` transactions yet.** The team must obtain the exact live mainnet Genesis and SHA-256, confirm the running binary/version, and publish current staking/self-delegation/fee parameters. The repository's older BonyNode rehearsal Genesis is not the live NodeSafe mainnet Genesis and must not be used for onboarding.
 
 ## Required reading
 
@@ -35,4 +37,4 @@ Interested operators may submit an expression of interest using the public [vali
 
 ## Mainnet operation
 
-SOBYA mainnet is live. A public RPC endpoint is not a substitute for P2P connectivity or a State Sync procedure. New operators must independently synchronize to the live chain, verify chain ID and height, and only then create their own validator using the approved live-chain procedure. Do not generate a new genesis gentx for the already-running network.
+SOBYA mainnet is live. Public RPC helps operators inspect the chain, while P2P provides peer connectivity and block synchronization. New operators must independently synchronize to the live chain, verify chain ID and height, and only then create their own validator using the approved live-chain procedure. Do not generate a new genesis gentx for the already-running network.
