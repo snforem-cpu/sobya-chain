@@ -152,5 +152,5 @@ jobs:
           jq '{listening: .result.listening, listen_addr: .result.listen_addr, n_peers: .result.n_peers, peers: [.result.peers[]? | {node_id: .node_info.id, remote_ip: .remote_ip, listen_addr: .node_info.listen_addr}]}' <<<"$response"
           peers="$(jq -r '.result.n_peers // "unknown"' <<<"$response")"
           if [[ "$peers" == "0" ]]; then
-            echo "WARNING: CometBFT reports zero connected peers; new-validator peer discovery/synchronization remains blocked."
+            echo "WARNING: CometBFT currently reports zero connected peers. The P2P TCP port is reachable, but a second-node handshake and block sync still need verification."
           fi
