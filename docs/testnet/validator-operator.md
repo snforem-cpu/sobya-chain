@@ -7,7 +7,7 @@ This page is retained as a stable entry point. SOBYA mainnet is live on `sobya-1
 - [Release verification process](../RELEASE_PROCESS.md)
 - [P2P/RPC connectivity and security guide](NETWORK_CONNECTIVITY_STAGE_TWO.md)
 
-**Important:** public CometBFT RPC, Cosmos REST, and EVM JSON-RPC endpoints have passed external read-only checks. The previously supplied P2P endpoint `188.68.36.11:36656` timed out from an external runner, and CometBFT reported zero connected peers. Do not create a production gentx or broadcast `create-validator` until a reachable P2P/seed endpoint or verified State Sync method, supported binary/checksum, live Genesis checksum, and current staking/fee parameters are confirmed.
+**Important:** public CometBFT RPC, Cosmos REST, and EVM JSON-RPC endpoints have passed external read-only checks. NodeSafe's P2P TCP port `188.68.36.11:26656` is externally reachable and the Node ID was verified through RPC. A second independent node has not yet completed a P2P handshake and block sync. Do not create a production gentx or broadcast `create-validator` until the exact live Genesis/checksum, running binary, and current staking/self-delegation/fee parameters are confirmed.
 
 Generate and retain all account, node, and private-validator keys locally. Never send mnemonic phrases, keyrings, private keys, `priv_validator_key.json`, or `node_key.json` to the coordinator. Operators must sign their own transactions.
 
