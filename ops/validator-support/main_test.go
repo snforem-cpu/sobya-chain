@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json"\n\t"math/big"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
@@ -13,7 +13,7 @@ func testServer(t *testing.T) *Server {
 	t.Helper()
 	s, err := NewStore(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil { t.Fatal(err) }
-	return &Server{store: s, token: "test-secret"}
+	budget, _ := new(big.Int).SetString("1000000000000000000000000000000", 10)\n\treturn &Server{store: s, token: "test-secret", budget: budget}
 }
 
 func request(s *Server, method, path, body string, admin bool) *httptest.ResponseRecorder {
@@ -66,6 +66,18 @@ func TestApprovalEvidenceAndCappedTranches(t *testing.T) {
 	if w := request(s, "POST", path+"/tranches", tr, true); w.Code != 409 { t.Fatalf("duplicate tx: %d", w.Code) }
 	if w := request(s, "POST", path+"/tranches", `{"amount":"401","status":"planned"}`, true); w.Code != 409 { t.Fatalf("over grant cap: %d", w.Code) }
 	if w := request(s, "POST", path+"/tranches", `{"amount":"400","status":"planned"}`, true); w.Code != 200 { t.Fatalf("within cap: %d", w.Code) }
+}
+
+func TestProgramWideBudgetCap(t *testing.T) {
+	s := testServer(t)
+	a1 := createApplication(t, s, "sobya1budget1")
+	a2 := createApplication(t, s, "sobya1budget2")
+	s.budget = big.NewInt(1000)
+	if _, err := s.store.approveGrant(a1.ID, "700", "", s.budget); err != nil { t.Fatal(err) }
+	if _, err := s.store.approveGrant(a2.ID, "301", "", s.budget); err == nil { t.Fatal("program-wide budget overrun was approved") }
+	if _, err := s.store.approveGrant(a2.ID, "300", "", s.budget); err != nil { t.Fatalf("grant at budget cap rejected: %v", err) }
+	used, err := s.store.budgetUsed()
+	if err != nil || used.String() != "1000" { t.Fatalf("wrong budget accounting: %v %v", used, err) }
 }
 
 func TestAdminAuthAndNoRPCWriteSurface(t *testing.T) {
