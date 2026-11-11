@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cosmos/chain-registry/master/assetlist.schema.json",
+  "chain_name": "sobya",
+  "assets": [
+    {
+      "description": "The native coin of the SOBYA blockchain.",
+      "denom_units": [
+        {
+          "denom": "asobya",
+          "exponent": 0
+        },
+        {
+          "denom": "SOBY",
+          "exponent": 18
+        }
+      ],
+      "base": "asobya",
+      "name": "SOBYA",
+      "display": "SOBY",
+      "symbol": "SOBY",
+      "logo_URIs": {
+        "png": "https://raw.githubusercontent.com/snforem-cpu/sobya-chain/main/assets/logo/sobya-coin-128.png"
+      },
+      "images": [
+        {
+          "png": "https://raw.githubusercontent.com/snforem-cpu/sobya-chain/main/assets/logo/sobya-coin-128.png"
+        }
+      ],
+      "type_asset": "sdk.coin"
+    }
+  ]
+}
