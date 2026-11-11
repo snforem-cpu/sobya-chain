@@ -1,0 +1,125 @@
+name: SOBYA Live Endpoint Preflight
+
+on:
+  push:
+    branches:
+      - 'feature/live-endpoint-preflight'
+    paths:
+      - '.github/workflows/sobya-live-endpoint-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-live-endpoint-preflight
+  cancel-in-progress: false
+
+jobs:
+  public-rpc-rest-evm:
+    name: Public RPC, REST and EVM read-only checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check CometBFT RPC status and advancing blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          RPC='https://sobya-rpc.nodesafe-app.xyz'
+          EXPECTED_CHAIN='sobya-1'
+          fetch_status() {
+            curl --fail --silent --show-error --connect-timeout 8 --max-time 15 "$RPC/status"
+          }
+          first="$(fetch_status)"
+          chain="$(jq -r '.result.node_info.network // empty' <<<"$first")"
+          height1="$(jq -r '.result.sync_info.latest_block_height // empty' <<<"$first")"
+          test "$chain" = "$EXPECTED_CHAIN"
+          [[ "$height1" =~ ^[0-9]+$ ]] && (( height1 > 0 ))
+          echo "CometBFT chain_id=$chain first_height=$height1"
+          sleep 20
+          second="$(fetch_status)"
+          chain2="$(jq -r '.result.node_info.network // empty' <<<"$second")"
+          height2="$(jq -r '.result.sync_info.latest_block_height // empty' <<<"$second")"
+          test "$chain2" = "$EXPECTED_CHAIN"
+          [[ "$height2" =~ ^[0-9]+$ ]] && (( height2 > height1 ))
+          echo "PASS: CometBFT height advanced from $height1 to $height2"
+
+      - name: Check public Cosmos REST and staking endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://sobya-api.nodesafe-app.xyz'
+          node_info="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 15 "$API/cosmos/base/tendermint/v1beta1/node_info")"
+          rest_chain="$(jq -r '.default_node_info.network // empty' <<<"$node_info")"
+          test "$rest_chain" = 'sobya-1'
+          echo "PASS: Cosmos REST node_info chain_id=$rest_chain"
+          validators="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 20 "$API/cosmos/staking/v1beta1/validators?pagination.limit=100")"
+          count="$(jq -r '.validators | length' <<<"$validators")"
+          echo "PASS: staking REST responded; validator records returned=$count"
+
+      - name: Check EVM JSON-RPC chain ID, block height and owner wallet balances
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVM='https://sobya-evm-rpc.nodesafe-app.xyz'
+          EXPECTED='0x534f425941'
+          rpc() {
+            local method="$1"
+            local params="$2"
+            curl --fail --silent --show-error --connect-timeout 8 --max-time 20 \
+              -H 'Content-Type: application/json' \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":$params}" \
+              "$EVM"
+          }
+          chain_response="$(rpc eth_chainId '[]')"
+          chain="$(jq -r '.result // empty' <<<"$chain_response")"
+          [[ "${chain,,}" == "$EXPECTED" ]]
+          block_response="$(rpc eth_blockNumber '[]')"
+          block="$(jq -r '.result // empty' <<<"$block_response")"
+          [[ "$block" =~ ^0x[0-9a-fA-F]+$ ]]
+          (( $(python3 -c 'import sys; print(int(sys.argv[1],16))' "$block") > 0 ))
+          founder="$(rpc eth_getBalance '["0xd316993423Fc6268038F4EE3EA7C0C5038513C18","latest"]')"
+          shared="$(rpc eth_getBalance '["0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f","latest"]')"
+          founder_balance="$(jq -r '.result // empty' <<<"$founder")"
+          shared_balance="$(jq -r '.result // empty' <<<"$shared")"
+          [[ "$founder_balance" =~ ^0x[0-9a-fA-F]+$ ]]
+          [[ "$shared_balance" =~ ^0x[0-9a-fA-F]+$ ]]
+          echo "PASS: EVM chain_id=$chain block=$block"
+          echo "Founder eth_getBalance (wei hex)=$founder_balance"
+          echo "Shared eth_getBalance (wei hex)=$shared_balance"
+          echo "Read-only checks only; no transaction was signed or broadcast."
+
+  p2p-connectivity:
+    name: Public P2P reachability and peer observation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe NodeSafe public P2P TCP endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOST='188.68.36.11'
+          PORT='36656'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq netcat-openbsd
+          if nc -vz -w 8 "$HOST" "$PORT"; then
+            echo "PASS: public P2P TCP endpoint reachable at $HOST:$PORT"
+          else
+            echo "FAIL: public P2P TCP endpoint is not reachable from this external runner at $HOST:$PORT"
+            exit 1
+          fi
+
+      - name: Observe CometBFT peer count
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          response="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 15 'https://sobya-rpc.nodesafe-app.xyz/net_info')" || {
+            echo "WARNING: could not read CometBFT /net_info"
+            exit 0
+          }
+          peers="$(jq -r '.result.n_peers // "unknown"' <<<"$response")"
+          echo "CometBFT currently reports connected_peers=$peers"
+          if [[ "$peers" == "0" ]]; then
+            echo "WARNING: NodeSafe previously reported zero connected peers; this remains a peer-discovery/sync risk for new validators."
+          fi
