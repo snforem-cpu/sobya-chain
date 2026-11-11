@@ -24,7 +24,7 @@ These are draft contributions prepared for review by the official external regis
 Use only the supplied SOBYA crystal-and-gold-ring artwork. The Cosmos registry metadata references the intended final path:
 `https://raw.githubusercontent.com/cosmos/chain-registry/master/sobya/images/sobya.png`
 
-That URL will not exist until the logo is added and the upstream contribution is merged. The original binary logo is prepared separately at 256x256 and 512x512.
+That URL will not exist until the logo is added and the upstream contribution is merged. The repository now includes a 128x128 reference copy at `assets/logo/sobya-official-128.png`. Separate 256x256 and 512x512 exports were prepared from the supplied original artwork for registry upload; use the required upstream dimensions when contributing to Cosmos.
 
 ## Submission gates
 
