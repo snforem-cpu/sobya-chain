@@ -57,7 +57,7 @@ jobs:
           count="$(jq -r '.validators | length' <<<"$validators")"
           echo "PASS: staking REST responded; validator records returned=$count"
 
-      - name: Check EVM JSON-RPC chain ID, block height and owner wallet balances
+      - name: Check EVM JSON-RPC chain ID, block height, gas price and owner wallet balances
         shell: bash
         run: |
           set -euo pipefail
@@ -78,13 +78,16 @@ jobs:
           block="$(jq -r '.result // empty' <<<"$block_response")"
           [[ "$block" =~ ^0x[0-9a-fA-F]+$ ]]
           (( $(python3 -c 'import sys; print(int(sys.argv[1],16))' "$block") > 0 ))
+          gas_response="$(rpc eth_gasPrice '[]')"
+          gas_price="$(jq -r '.result // empty' <<<"$gas_response")"
+          [[ "$gas_price" =~ ^0x[0-9a-fA-F]+$ ]]
           founder="$(rpc eth_getBalance '["0xd316993423Fc6268038F4EE3EA7C0C5038513C18","latest"]')"
           shared="$(rpc eth_getBalance '["0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f","latest"]')"
           founder_balance="$(jq -r '.result // empty' <<<"$founder")"
           shared_balance="$(jq -r '.result // empty' <<<"$shared")"
           [[ "$founder_balance" =~ ^0x[0-9a-fA-F]+$ ]]
           [[ "$shared_balance" =~ ^0x[0-9a-fA-F]+$ ]]
-          echo "PASS: EVM chain_id=$chain block=$block"
+          echo "PASS: EVM chain_id=$chain block=$block gasPrice_wei=$gas_price"
           echo "Founder eth_getBalance (wei hex)=$founder_balance"
           echo "Shared eth_getBalance (wei hex)=$shared_balance"
           echo "Read-only checks only; no transaction was signed or broadcast."
@@ -94,22 +97,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe NodeSafe public P2P TCP endpoint
+      - name: Probe reported and standard CometBFT P2P TCP ports
         shell: bash
         run: |
           set -euo pipefail
           HOST='188.68.36.11'
-          PORT='36656'
           sudo apt-get update -qq
           sudo apt-get install -y -qq netcat-openbsd
-          if nc -vz -w 8 "$HOST" "$PORT"; then
-            echo "PASS: public P2P TCP endpoint reachable at $HOST:$PORT"
-          else
-            echo "FAIL: public P2P TCP endpoint is not reachable from this external runner at $HOST:$PORT"
+          reachable=0
+          for PORT in 36656 26656; do
+            if nc -vz -w 8 "$HOST" "$PORT"; then
+              echo "TCP reachable: $HOST:$PORT"
+              reachable=1
+            else
+              echo "TCP not reachable: $HOST:$PORT"
+            fi
+          done
+          if (( reachable == 0 )); then
+            echo "FAIL: neither the reported nor standard CometBFT P2P port is reachable externally."
             exit 1
           fi
 
-      - name: Observe CometBFT peer count
+      - name: Observe CometBFT listener and peer count
         if: always()
         shell: bash
         run: |
@@ -118,8 +127,8 @@ jobs:
             echo "WARNING: could not read CometBFT /net_info"
             exit 0
           }
+          jq '{listening: .result.listening, listen_addr: .result.listen_addr, n_peers: .result.n_peers, peers: [.result.peers[]? | {node_id: .node_info.id, remote_ip: .remote_ip, listen_addr: .node_info.listen_addr}]}' <<<"$response"
           peers="$(jq -r '.result.n_peers // "unknown"' <<<"$response")"
-          echo "CometBFT currently reports connected_peers=$peers"
           if [[ "$peers" == "0" ]]; then
-            echo "WARNING: NodeSafe previously reported zero connected peers; this remains a peer-discovery/sync risk for new validators."
+            echo "WARNING: CometBFT reports zero connected peers; new-validator peer discovery/synchronization remains blocked."
           fi
