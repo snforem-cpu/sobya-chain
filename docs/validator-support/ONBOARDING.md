@@ -26,6 +26,10 @@ External read-only preflight results on 2026-11-11:
 - EVM JSON-RPC returned production EVM chain ID `357812033857` (`0x534f425941`), a non-zero block height, and valid `eth_getBalance` responses for both owner wallet addresses. The balances matched 400,000,000 SOBY and 450,000,000 SOBY.
 - External TCP to `188.68.36.11:26656` succeeded. The previously reported port `36656` timed out.
 - CometBFT `/net_info` reported `listening: true` and zero connected peers at the time checked.
+- Live staking parameters returned: bond denom `asobya`, `max_validators=100`, `unbonding_time=1814400s` (21 days), and `min_commission_rate=0`.
+- NodeSafe's live validator record returned `BONDED`, not jailed, `tokens=1000000000000000000` (1 SOBY), `min_self_delegation=1` (one asobya base unit), and commission rate 10% (max 50%, max change 10%). This records NodeSafe's current settings; it does not establish a universal recommended bond for every future validator.
+- Fee-market REST queries returned HTTP 501. EVM RPC returned `eth_gasPrice=0`, `eth_maxPriorityFeePerGas=0`, and zero base-fee/reward samples in `eth_feeHistory`. No live transaction was sent. Do not infer that all transactions are free or quote a live transaction fee from these values.
+- A read-only preflight run on workflow run 6 completed successfully: RPC chain/height, REST staking queries, EVM read-only calls, and TCP port checks all passed. This does not establish a second-node CometBFT handshake or sync.
 
 The reachable P2P peer string is:
 
@@ -33,7 +37,7 @@ The reachable P2P peer string is:
 1dad50ff897c247cba0ff646d0ee1ad59c3abc88@188.68.36.11:26656
 ```
 
-TCP reachability is confirmed, but a second independent SOBYA node has not yet completed a CometBFT handshake and block sync. A zero peer count on the single existing node does not by itself mean that the public P2P port is closed.
+TCP reachability is confirmed on `188.68.36.11:26656`; the launch package's old `:36656` endpoint timed out from the external runner. However, a second independent SOBYA node has not yet completed a CometBFT handshake and block sync. A zero peer count on the single existing node does not by itself mean that the public P2P port is closed. Treat `:26656` as the current candidate bootstrap endpoint pending a successful peer handshake; do not publish `:36656` as reachable.
 
 ## 3. Mandatory live validator preflight — PARTIALLY CLEARED
 
@@ -66,7 +70,9 @@ A validator joining after chain launch is not a genesis validator:
 - The operator creates its own validator with a signed live-chain staking transaction from its own wallet only after the exact binary, current staking parameters, self-bond requirement, and gas policy have been confirmed.
 - The operator signs its own transactions. The SOBYA team must never request a seed phrase or private validator key.
 
-The exact command, denomination, required amount, and transaction fees remain unpublished until confirmed against the current live binary and on-chain parameters.
+The live chain confirms `asobya` as the staking denomination and NodeSafe's current self-bond is 1 SOBY; its on-chain `min_self_delegation` is 1 asobya. The chain does not expose a global minimum self-bond in the queried staking parameters. The launch package sets local Cosmos `minimum-gas-prices = "1000000000asobya"`, but live EVM fee quotes are zero and FeeMarket REST queries are not implemented (HTTP 501). The exact transaction gas/fee must therefore be reconciled with NodeSafe before any operator signs or broadcasts `create-validator`.
+
+The exact live binary running on NodeSafe still needs its version/commit confirmed against the published `v0.1.0-rc.2` release. Do not use a genesis gentx. Do not send an operator a transaction command until binary, fee policy, funding source for the 1 SOBY self-bond, and successful P2P sync are resolved.
 
 ## 6. Conditional support
 
