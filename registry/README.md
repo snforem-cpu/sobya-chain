@@ -1,36 +1,34 @@
-# SOBYA wallet and chain-registry submission bundle
+# SOBYA external registry submission bundle
 
-This directory contains draft metadata for external registry submissions. It is not itself an accepted listing.
+These are draft contributions prepared for review by the official external registries. They are not accepted listings.
 
-## Canonical network identifiers
+## Canonical identifiers
 
 - Cosmos chain ID: `sobya-1`
 - EVM chain ID: `357812033857` (`0x534f425941`)
-- Native symbol: `SOBY`
-- Cosmos base denomination: `asobya`
+- Native asset: `SOBY`
+- Cosmos base denom: `asobya`
 - Precision: 18 decimals
 - Bech32 account prefix: `sobya`
-- SLIP-0044 coin type configured in the application: 118
+- SLIP-0044 coin type: 118
 
-## Current public endpoints supplied for the mainnet
+## Public endpoints supplied for mainnet
 
 - CometBFT RPC: https://sobya-rpc.nodesafe-app.xyz
 - Cosmos REST: https://sobya-api.nodesafe-app.xyz
 - EVM JSON-RPC: https://sobya-evm-rpc.nodesafe-app.xyz
 - Explorer: https://explorer.nodesafe-app.xyz/sobya
 
-## Logo
+## Official logo
 
-The existing repository asset `assets/logo/sobya-coin-128.png` matches the official SOBYA crystal-and-gold-ring logo. The registry metadata references this stable raw GitHub asset URL.
+Use only the supplied SOBYA crystal-and-gold-ring artwork. The Cosmos registry metadata references the intended final path:
+`https://raw.githubusercontent.com/cosmos/chain-registry/master/sobya/images/sobya.png`
 
-A 256x256 copy is prepared separately for wallet registries that require that size. Do not claim the external logo has been published until that binary is committed to a public repository and the final raw URL has been checked.
+That URL will not exist until the logo is added and the upstream contribution is merged. The original binary logo is prepared separately at 256x256 and 512x512.
 
-## Submission status and limitations
+## Submission gates
 
-- Chainlist / ethereum-lists: draft EVM metadata is prepared. Its chain icon metadata requires a publicly retrievable IPFS CID; no CID is included yet, so the network icon portion is not submission-ready.
-- Cosmos Chain Registry: draft chain and asset metadata is prepared. Submission still requires review of live endpoint availability and schema/CI validation.
-- Keplr: a separate non-native-chain integration request may be required; Cosmos registry inclusion alone does not guarantee automatic enablement.
-- MetaMask: Chainlist metadata can simplify manual network addition after acceptance; it does not guarantee automatic addition to every user's wallet or automatic native-token logo display.
-- Trust Wallet and other wallets: each has independent asset/network listing policies and review requirements.
-
-No Genesis, chain state, balances, keys, or live-node configuration are modified by these metadata files.
+- Chainlist: EVM metadata is prepared at `_data/chains/eip155-357812033857.json`. No icon is declared yet because its icon registry requires a publicly retrievable IPFS CID and explicitly discourages Pinata. Add the `icon` field and `_data/icons/sobya.json` only after a compliant CID is available.
+- Cosmos Chain Registry: contribution structure is `sobya/chain.json`, `sobya/assetlist.json`, and `sobya/images/sobya.png`. The `sobya` Bech32 prefix may require SLIP-0173 registration; this must be confirmed before submission.
+- Keplr: requires a separate community-driven integration contribution and validation; Cosmos registry acceptance does not guarantee Keplr integration.
+- No changes to Genesis, live chain state, balances, keys, validators, or node configuration are part of this metadata work.
