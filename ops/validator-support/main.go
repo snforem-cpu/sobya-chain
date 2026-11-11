@@ -112,6 +112,48 @@ func (s *Store) list() []Application {
 	return out
 }
 
+func (s *Store) approveGrant(id, amount, notes string, budget *big.Int) (Application, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if budget == nil || budget.Sign() <= 0 {
+		return Application{}, errors.New("support budget is not configured")
+	}
+	requested, err := parseAmount(amount)
+	if err != nil { return Application{}, err }
+	a, ok := s.apps[id]
+	if !ok { return Application{}, errors.New("application not found") }
+	committed := new(big.Int)
+	for otherID, other := range s.apps {
+		if otherID == id { continue }
+		if other.ApprovedAmount == "" { continue }
+		n, parseErr := parseAmount(other.ApprovedAmount)
+		if parseErr != nil { return Application{}, fmt.Errorf("existing approved grant for %s is invalid", otherID) }
+		committed.Add(committed, n)
+	}
+	if new(big.Int).Add(committed, requested).Cmp(budget) > 0 {
+		return Application{}, errors.New("approval exceeds the total program support budget")
+	}
+	old := a
+	a.Status, a.ApprovedAmount, a.Notes = "approved", amount, notes
+	a.UpdatedAt = time.Now().UTC()
+	s.apps[id] = a
+	if err = s.saveLocked(); err != nil { s.apps[id] = old; return Application{}, err }
+	return a, nil
+}
+
+func (s *Store) budgetUsed() (*big.Int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	total := new(big.Int)
+	for id, a := range s.apps {
+		if a.ApprovedAmount == "" { continue }
+		n, err := parseAmount(a.ApprovedAmount)
+		if err != nil { return nil, fmt.Errorf("invalid approved grant for %s", id) }
+		total.Add(total, n)
+	}
+	return total, nil
+}
+
 func (s *Store) mutate(id string, fn func(*Application) error) (Application, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -141,7 +183,7 @@ func allocatedAmount(a *Application) *big.Int {
 	return total
 }
 
-type Server struct { store *Store; token string }
+type Server struct { store *Store; token string; budget *big.Int }
 
 func (sv *Server) admin(w http.ResponseWriter, r *http.Request) bool {
 	if sv.token == "" { http.Error(w, "admin API disabled: ADMIN_TOKEN is required", http.StatusServiceUnavailable); return false }
@@ -205,11 +247,7 @@ func (sv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var body struct { Amount string `json:"amount"`; Notes string `json:"notes"` }
 			if err = decode(r, &body); err != nil { http.Error(w, "invalid approval payload", 400); return }
 			if _, err = parseAmount(body.Amount); err != nil { http.Error(w, err.Error(), 400); return }
-			out, err = sv.store.mutate(id, func(a *Application) error {
-				if a.Status != "submitted" && a.Status != "under_review" { return errors.New("application is not approvable") }
-				a.Status, a.ApprovedAmount, a.Notes = "approved", body.Amount, body.Notes
-				return nil
-			})
+			out, err = sv.store.approveGrant(id, body.Amount, body.Notes, sv.budget)
 		case "evidence":
 			var ev Evidence
 			if err = decode(r, &ev); err != nil { http.Error(w, "invalid evidence", 400); return }
@@ -267,9 +305,12 @@ func main() {
 	if path == "" { path = "./data/validator-support.json" }
 	store, err := NewStore(path)
 	if err != nil { panic(err) }
+	budgetText := os.Getenv("SUPPORT_BUDGET_BASE_UNITS")
+	budget, budgetErr := parseAmount(budgetText)
+	if budgetErr != nil { panic("SUPPORT_BUDGET_BASE_UNITS must be set to a positive integer in base-denomination units") }
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" { addr = "127.0.0.1:8097" }
-	s := &http.Server{Addr: addr, Handler: &Server{store: store, token: os.Getenv("ADMIN_TOKEN")}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	s := &http.Server{Addr: addr, Handler: &Server{store: store, token: os.Getenv("ADMIN_TOKEN"), budget: budget}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	fmt.Printf("validator-support listening on %s (off-chain only)\n", addr)
 	if err = s.ListenAndServe(); err != nil && err != http.ErrServerClosed { panic(err) }
 }
