@@ -29,6 +29,6 @@ That URL will not exist until the logo is added and the upstream contribution is
 ## Submission gates
 
 - Chainlist: EVM metadata is prepared at `_data/chains/eip155-357812033857.json`. No icon is declared yet because its icon registry requires a publicly retrievable IPFS CID and explicitly discourages Pinata. Add the `icon` field and `_data/icons/sobya.json` only after a compliant CID is available.
-- Cosmos Chain Registry: contribution structure is `sobya/chain.json`, `sobya/assetlist.json`, and `sobya/images/sobya.png`. The `sobya` Bech32 prefix is not present in the current SLIP-0173 registered human-readable-parts list. A separate SLIP-0173 registration request is therefore a prerequisite for Cosmos registry acceptance.
+- Cosmos Chain Registry: contribution structure is `sobya/chain.json`, `sobya/assetlist.json`, and `sobya/images/sobya.png`. The `sobya` Bech32 prefix is not present in the current SLIP-0173 list. Cosmos Chain Registry describes SLIP-0173 registration as highly recommended, not mandatory. We should request registration, but it must not be treated as a hard prerequisite for submitting the Cosmos chain metadata.
 - Keplr: requires a separate community-driven integration contribution and validation; Cosmos registry acceptance does not guarantee Keplr integration.
 - No changes to Genesis, live chain state, balances, keys, validators, or node configuration are part of this metadata work.
