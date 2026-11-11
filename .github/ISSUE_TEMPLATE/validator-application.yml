@@ -1,0 +1,112 @@
+name: SOBYA Validator Application
+description: Apply to operate an independent validator on the live SOBYA network.
+title: "[Validator Application]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your interest in validating SOBYA.
+
+        **This form is public.** Submit only public operator information and public network endpoints. Never post passwords, seed phrases, private keys, validator signing keys, access tokens, or private contact details. The SOBYA team will use your GitHub account to follow up in this issue.
+
+        Applying is free. Submission does not guarantee a grant or validator admission. Any support is conditional on eligibility and a separately verified support budget.
+  - type: input
+    id: operator
+    attributes:
+      label: Operator / organization name
+      placeholder: Your validator operator name
+    validations:
+      required: true
+  - type: input
+    id: github
+    attributes:
+      label: GitHub account
+      description: Your GitHub username for follow-up.
+      placeholder: "@username"
+    validations:
+      required: true
+  - type: input
+    id: chain_id
+    attributes:
+      label: Target chain ID
+      placeholder: sobya-1
+      value: sobya-1
+    validations:
+      required: true
+  - type: input
+    id: software
+    attributes:
+      label: SOBYA binary release / version
+      description: Include the exact release tag and build source you intend to run.
+      placeholder: Release tag and commit
+    validations:
+      required: true
+  - type: input
+    id: account
+    attributes:
+      label: Operator account address
+      description: Public address only.
+      placeholder: SOBYA account address
+    validations:
+      required: true
+  - type: input
+    id: valoper
+    attributes:
+      label: Validator operator address (if already created)
+      description: Leave blank if you have not created the validator yet.
+      placeholder: Validator operator address
+    validations:
+      required: false
+  - type: textarea
+    id: consensus
+    attributes:
+      label: Consensus public key
+      description: Public consensus key only. Never provide a private validator key.
+      placeholder: Public consensus key / JSON
+    validations:
+      required: true
+  - type: input
+    id: p2p
+    attributes:
+      label: Public P2P endpoint
+      description: Host:port reachable by peers, if available. Do not include credentials.
+      placeholder: host.example:26656
+    validations:
+      required: true
+  - type: input
+    id: rpc
+    attributes:
+      label: Public RPC endpoint (optional)
+      description: Read-only public endpoint, if available. Do not include credentials.
+      placeholder: https://rpc.example
+    validations:
+      required: false
+  - type: textarea
+    id: infrastructure
+    attributes:
+      label: Server and operations
+      description: Provider / region, CPU, RAM, storage, bandwidth, Linux distribution, monitoring and backup approach.
+      placeholder: Describe your validator infrastructure and 24/7 operations capability.
+    validations:
+      required: true
+  - type: textarea
+    id: readiness
+    attributes:
+      label: Current readiness
+      description: State whether your node is running, syncing, fully synced, or not deployed yet. Include current block height if available.
+      placeholder: Node status, height, uptime history, relevant experience.
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Required confirmations
+      options:
+        - label: I understand this is an application, not a guarantee of admission or financial support.
+          required: true
+        - label: I understand I must meet the live chain's verified staking and validator requirements before creating a validator.
+          required: true
+        - label: I will never share seed phrases, private keys, validator signing keys, or server credentials.
+          required: true
+        - label: I understand that joining an already-running network uses the live-chain validator creation process; a new genesis gentx is not a substitute.
+          required: true
