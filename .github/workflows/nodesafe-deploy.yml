@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 concurrency:
   group: sobya-nodesafe-production
