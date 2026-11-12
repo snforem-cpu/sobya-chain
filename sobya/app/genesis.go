@@ -9,6 +9,7 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
@@ -23,11 +24,14 @@ const (
 	DisplayDenom = "SOBY"
 	// DisplayExponent defines 1 SOBY = 10^18 asobya.
 	DisplayExponent uint32 = 18
+
+	// ApprovedEVMBaseFee is the owner-approved EIP-1559 starting fee in asobya
+	// per gas. It is deliberately separate from the validator-local minimum.
+	ApprovedEVMBaseFee int64 = 1_000_000_000
 )
 
 // MaxSupply is the hard maximum native supply in base units (1 billion SOBY).
 var MaxSupply = sdkmath.NewIntWithDecimal(1_000_000_000, 18)
-
 
 // validateNativeSupply rejects genesis states that exceed the agreed SOBYA cap.
 func validateNativeSupply(supply sdkmath.Int) error {
@@ -72,8 +76,9 @@ func defaultActiveEVMStaticPrecompiles() []string {
 }
 
 // prepareGenesisState canonicalizes native token metadata, disables inflation,
-// enables the supported Cosmos EVM static precompiles by default, and rejects
-// a genesis allocation above the fixed maximum supply.
+// enables the supported Cosmos EVM static precompiles, applies the approved
+// EIP-1559 starting base fee, and rejects allocations above the supply cap.
+// This only affects a newly initialized genesis; it never rewrites live state.
 func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 	appState := make(map[string]json.RawMessage)
 	if err := json.Unmarshal(raw, &appState); err != nil {
@@ -155,6 +160,31 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("encode zero-tax distribution genesis: %w", err)
 	}
 	appState[distrtypes.ModuleName] = distrBytes
+
+	// Set the approved EIP-1559 base fee explicitly. The upstream default may
+	// be overridden by an operator-provided genesis; leaving it at zero causes
+	// eth_gasPrice and eth_feeHistory to quote zero and leaves MetaMask without
+	// a usable fee estimate. MinGasPrice remains a separate governance/local
+	// admission control; the approved starting base fee is the charge baseline.
+	feeMarketRaw, ok := appState[feemarkettypes.ModuleName]
+	if !ok {
+		return nil, fmt.Errorf("application genesis is missing %q state", feemarkettypes.ModuleName)
+	}
+	var feeMarketGenesis feemarkettypes.GenesisState
+	if err := cdc.UnmarshalJSON(feeMarketRaw, &feeMarketGenesis); err != nil {
+		return nil, fmt.Errorf("decode fee market genesis: %w", err)
+	}
+	if feeMarketGenesis.Params == nil {
+		return nil, fmt.Errorf("fee market genesis is missing params")
+	}
+	feeMarketGenesis.Params.NoBaseFee = false
+	feeMarketGenesis.Params.EnableHeight = 0
+	feeMarketGenesis.Params.BaseFee = sdkmath.LegacyNewDec(ApprovedEVMBaseFee)
+	feeMarketBytes, err := cdc.MarshalJSON(&feeMarketGenesis)
+	if err != nil {
+		return nil, fmt.Errorf("encode approved fee market genesis: %w", err)
+	}
+	appState[feemarkettypes.ModuleName] = feeMarketBytes
 
 	// The EVM keeper registers the precompile implementations, but Cosmos EVM
 	// executes only addresses enabled in evm.Params.ActiveStaticPrecompiles.
