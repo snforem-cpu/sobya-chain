@@ -1,8 +1,12 @@
 name: SOBYA NodeSafe Production Deployment
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    secrets:
+      NODESAFE_DEPLOY_URL:
+        required: false
+      NODESAFE_DEPLOY_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -15,7 +19,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy published stable release to NodeSafe
-    if: github.event.release.prerelease == false && github.event.release.draft == false
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: sobya-production
@@ -35,7 +39,7 @@ jobs:
         id: release
         uses: actions/github-script@v7
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         with:
           script: |
             const tag = process.env.RELEASE_TAG;
@@ -164,7 +168,7 @@ jobs:
             --header 'Content-Type: application/json' \
             --data "$payload")"
           echo "NodeSafe HTTP status: $http_code"
-          jq 'del(.private_key,.token,.secret)' "$response" || cat "$response"
+          jq '{status,deployment_id,release_tag,deployed_commit,chain_id,height,checks}' "$response" || { echo "::error::NodeSafe returned invalid JSON."; exit 1; }
           test "$http_code" = "200" || { echo "::error::NodeSafe did not confirm a completed deployment."; exit 1; }
           jq -e \
             --arg tag "$RELEASE_TAG" \
@@ -173,7 +177,7 @@ jobs:
              and .release_tag == $tag
              and .deployed_commit == $commit
              and .chain_id == 357812033857
-             and (.height | tostring | length > 0)
+             and (.height != null)\n             and ((.height | tonumber) > 0)
              and .checks.cometbft_rpc == true
              and .checks.block_production == true
              and .checks.evm_chain_id == true
