@@ -1,0 +1,28 @@
+name: SOBYA EVM Keyring Regression
+on:
+  push:
+    branches:
+      - 'fix/**'
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/eth-keyring-regression.yml'
+  pull_request:
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/eth-keyring-regression.yml'
+permissions:
+  contents: read
+jobs:
+  eth-keyring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+      - name: Verify EVM file-keyring reopen and signing
+        working-directory: sobya
+        run: go test -mod=readonly ./cmd/sobyad/cmd -run '^TestEthSecp256k1FileKeyringRoundTrip$' -count=1
