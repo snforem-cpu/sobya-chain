@@ -254,7 +254,32 @@ jobs:
           assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
           assert((await provider.getBalance(wallet.address)) > parseEther("1"), "EVM test account not funded");
           const nativeRecipient = "0x000000000000000000000000000000000000dEaD";
+          // Exercise the exact fee RPC surface that the public wallet depends on.
+          const quotedGasPrice = BigInt(await provider.send("eth_gasPrice", []));
+          const priorityFee = BigInt(await provider.send("eth_maxPriorityFeePerGas", []));
+          const estimate = BigInt(await provider.send("eth_estimateGas", [{
+            from: wallet.address,
+            to: nativeRecipient,
+            value: "0x2386f26fc10000" // 0.01 SOBYA
+          }]));
+          const feeHistory = await provider.send("eth_feeHistory", ["0x5", "latest", [25, 50, 75]]);
+          const latestForFees = await provider.send("eth_getBlockByNumber", ["latest", false]);
+          assert(quotedGasPrice > 0n, "eth_gasPrice returned zero");
+          assert(priorityFee > 0n, "eth_maxPriorityFeePerGas returned zero");
+          assert(estimate > 0n, "eth_estimateGas returned zero");
+          assert(feeHistory.baseFeePerGas?.length >= 2, "eth_feeHistory omitted baseFeePerGas samples");
+          assert(feeHistory.baseFeePerGas.every(value => BigInt(value) > 0n), "eth_feeHistory contains a zero base fee");
+          assert(latestForFees?.baseFeePerGas && BigInt(latestForFees.baseFeePerGas) > 0n, "latest EVM block has no active base fee");
+          console.log("PASS non-zero EVM gas RPCs:", {
+            gasPrice: quotedGasPrice.toString(),
+            maxPriorityFeePerGas: priorityFee.toString(),
+            estimateGas: estimate.toString(),
+            baseFeePerGas: BigInt(latestForFees.baseFeePerGas).toString()
+          });
+
+          const senderBalanceBefore = await provider.getBalance(wallet.address);
           const signed = await wallet.sendTransaction({ to: nativeRecipient, value: parseEther("0.01"), gasLimit: 21000n });
+
           const signedReceipt = await signed.wait(1);
           assert.equal(signedReceipt.status, 1, "signed EVM transfer failed");
           const rpcReceipt = await provider.send("eth_getTransactionReceipt", [signed.hash]);
