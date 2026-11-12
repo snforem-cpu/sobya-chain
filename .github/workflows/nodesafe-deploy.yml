@@ -21,7 +21,7 @@ jobs:
     name: Deploy published stable release to NodeSafe
     if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 95
     environment: sobya-production
     steps:
       - name: Require NodeSafe integration secrets
@@ -98,7 +98,7 @@ jobs:
               "two-validator-network",
               "evm-rpc"
             ];
-            const deadline = Date.now() + 25 * 60 * 1000;
+            const deadline = Date.now() + 60 * 60 * 1000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             while (Date.now() < deadline) {
               const { data } = await github.rest.checks.listForRef({
@@ -129,7 +129,7 @@ jobs:
               core.info(`Waiting for exact-commit CI checks. Missing: ${missing.join(", ") || "none"}; pending: ${pending.join(", ") || "none"}`);
               await sleep(15000);
             }
-            core.setFailed("Timed out waiting for all required CI checks on the exact release commit; production deployment was blocked.");
+            core.setFailed("Timed out after 60 minutes waiting for all required CI checks on the exact release commit; production deployment was blocked.");
 
       - name: Ask NodeSafe to upgrade the existing SOBYA chain and verify it
         shell: bash

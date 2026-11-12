@@ -13,6 +13,7 @@ on:
       - '.github/workflows/feature-validator-reserve-distribution-e2e.yml'
       - '.github/workflows/nodesafe-deploy.yml'
       - '.github/workflows/validator-binary-release.yml'
+      - 'sobya/**'
 
 permissions:
   contents: read

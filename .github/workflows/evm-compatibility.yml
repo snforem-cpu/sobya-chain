@@ -12,6 +12,7 @@ on:
       - 'docs/COSMOS_EVM_INTEGRATION.md'
       - '.github/workflows/nodesafe-deploy.yml'
       - '.github/workflows/validator-binary-release.yml'
+      - 'sobya/**'
 
 permissions:
   contents: read

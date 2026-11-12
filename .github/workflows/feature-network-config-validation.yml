@@ -21,6 +21,7 @@ on:
       - '.github/workflows/feature-network-config-validation.yml'
       - '.github/workflows/nodesafe-deploy.yml'
       - '.github/workflows/validator-binary-release.yml'
+      - 'sobya/**'
   pull_request:
     paths:
       - 'scripts/validate-network-config.py'
