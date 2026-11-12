@@ -125,6 +125,7 @@ jobs:
              and .checks.cometbft_rpc == true
              and .checks.block_production == true
              and .checks.evm_chain_id == true
+             and .checks.eth_max_priority_fee == true
              and .checks.eth_gas_price == true
              and .checks.eth_estimate_gas == true
              and .checks.eth_fee_history == true
