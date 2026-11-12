@@ -9,12 +9,22 @@ import (
 	"github.com/cosmos/gogoproto/proto"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
-	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
+
+func defaultFeeMarketGenesisRaw(t *testing.T, cdc codec.Codec) json.RawMessage {
+	t.Helper()
+	raw, err := cdc.MarshalJSON(feemarkettypes.DefaultGenesisState())
+	if err != nil {
+		t.Fatalf("marshal fee market genesis: %v", err)
+	}
+	return raw
+}
 
 func TestValidateNativeSupply(t *testing.T) {
 	tests := []struct {
@@ -83,10 +93,11 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 		t.Fatalf("marshal EVM genesis: %v", err)
 	}
 	raw, err := json.Marshal(map[string]json.RawMessage{
-		banktypes.ModuleName: bankBytes,
-		minttypes.ModuleName: mintBytes,
-		distrtypes.ModuleName: distrBytes,
-		evmtypes.ModuleName: evmBytes,
+		banktypes.ModuleName:      bankBytes,
+		minttypes.ModuleName:      mintBytes,
+		distrtypes.ModuleName:     distrBytes,
+		feemarkettypes.ModuleName: defaultFeeMarketGenesisRaw(t, cdc),
+		evmtypes.ModuleName:       evmBytes,
 	})
 	if err != nil {
 		t.Fatalf("marshal app genesis: %v", err)
@@ -169,7 +180,6 @@ func TestPrepareGenesisStateNormalizesTokenRules(t *testing.T) {
 	}
 }
 
-
 func TestPrepareGenesisStatePreservesValidatorReserveGenesisExtension(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	bankBytes, err := cdc.MarshalJSON(banktypes.DefaultGenesisState())
@@ -190,10 +200,11 @@ func TestPrepareGenesisStatePreservesValidatorReserveGenesisExtension(t *testing
 	}
 	reserveExtension := json.RawMessage(`{"version":1,"entries":[{"key":"AA","value":"eyJzdGFydF90aW1lIjoiMjAyNy0wMS0wMVQwMDowMDowMFoiLCJsYXN0X2Jsb2NrX3RpbWUiOiIyMDI3LTAxLTAxVDAwOjAwOjAwWiIsImxhc3RfaGVpZ2h0IjowLCJ0b3RhbF9wYWlkX2Fzb2J5YSI6IjEwMDAwMDAwMDAwMDAwMDAwMDAwMDAifQ"}]}`)
 	raw, err := json.Marshal(map[string]json.RawMessage{
-		banktypes.ModuleName: bankBytes,
-		minttypes.ModuleName: mintBytes,
-		distrtypes.ModuleName: distrBytes,
-		evmtypes.ModuleName: evmBytes,
+		banktypes.ModuleName:      bankBytes,
+		minttypes.ModuleName:      mintBytes,
+		distrtypes.ModuleName:     distrBytes,
+		feemarkettypes.ModuleName: defaultFeeMarketGenesisRaw(t, cdc),
+		evmtypes.ModuleName:       evmBytes,
 		validatorReserveGenesisKey: reserveExtension,
 	})
 	if err != nil {
@@ -272,7 +283,6 @@ func TestNativeSupplyCapEndBlockInvariant(t *testing.T) {
 	}
 }
 
-
 func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	bankGenesis := banktypes.DefaultGenesisState()
@@ -290,10 +300,11 @@ func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T
 		return raw
 	}
 	raw, err := json.Marshal(map[string]json.RawMessage{
-		banktypes.ModuleName:  marshal(bankGenesis),
-		minttypes.ModuleName:  marshal(mintGenesis),
-		distrtypes.ModuleName: marshal(distrGenesis),
-		evmtypes.ModuleName:   marshal(evmGenesis),
+		banktypes.ModuleName:      marshal(bankGenesis),
+		minttypes.ModuleName:      marshal(mintGenesis),
+		distrtypes.ModuleName:     marshal(distrGenesis),
+		feemarkettypes.ModuleName: defaultFeeMarketGenesisRaw(t, cdc),
+		evmtypes.ModuleName:       marshal(evmGenesis),
 	})
 	if err != nil {
 		t.Fatalf("marshal application genesis: %v", err)
@@ -316,7 +327,6 @@ func TestPrepareGenesisStatePreservesExplicitEVMPrecompileSelection(t *testing.T
 	}
 }
 
-
 func TestPrepareGenesisStateRejectsMissingEVMGenesis(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	marshal := func(value proto.Message) json.RawMessage {
@@ -328,9 +338,10 @@ func TestPrepareGenesisStateRejectsMissingEVMGenesis(t *testing.T) {
 		return raw
 	}
 	raw, err := json.Marshal(map[string]json.RawMessage{
-		banktypes.ModuleName:  marshal(banktypes.DefaultGenesisState()),
-		minttypes.ModuleName:  marshal(minttypes.DefaultGenesisState()),
-		distrtypes.ModuleName: marshal(distrtypes.DefaultGenesisState()),
+		banktypes.ModuleName:      marshal(banktypes.DefaultGenesisState()),
+		minttypes.ModuleName:      marshal(minttypes.DefaultGenesisState()),
+		distrtypes.ModuleName:     marshal(distrtypes.DefaultGenesisState()),
+		feemarkettypes.ModuleName: defaultFeeMarketGenesisRaw(t, cdc),
 	})
 	if err != nil {
 		t.Fatalf("marshal application genesis: %v", err)
