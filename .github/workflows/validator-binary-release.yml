@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  checks: read
 
 concurrency:
   group: sobya-release-${{ github.ref }}
@@ -65,3 +66,10 @@ jobs:
             dist/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-nodesafe:
+    name: Deploy stable release to NodeSafe
+    needs: linux-amd64
+    if: ${{ !contains(github.ref_name, '-') }}
+    uses: ./.github/workflows/nodesafe-deploy.yml
+    secrets: inherit
