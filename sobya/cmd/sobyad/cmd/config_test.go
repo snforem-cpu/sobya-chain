@@ -25,6 +25,9 @@ func TestDefaultAppConfigKeepsRPCPrivateAndLocked(t *testing.T) {
 	if cfg.EVM.EVMChainID != 777777 {
 		t.Fatalf("development EVM chain ID changed unexpectedly: %d", cfg.EVM.EVMChainID)
 	}
+	if cfg.MinGasPrices != "1000000000asobya" {
+		t.Fatalf("minimum gas prices = %q, want 1000000000asobya", cfg.MinGasPrices)
+	}
 }
 
 func TestDefaultCometBFTConfigKeepsAdminRPCPrivate(t *testing.T) {
