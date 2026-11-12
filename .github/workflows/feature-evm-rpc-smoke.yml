@@ -236,8 +236,8 @@ jobs:
           network = int(read("net-version.json"))
           height = int(read("block-number.json"), 16)
           latest = read("latest-block.json")
-          assert chain_id == 777777, f"unexpected EVM chain ID: {chain_id}"
-          assert network == 777777, f"unexpected net_version: {network}"
+          assert chain_id == 357812033857, f"unexpected EVM chain ID: {chain_id}"
+          assert network == 357812033857, f"unexpected net_version: {network}"
           assert height >= 1, f"no EVM block produced: {height}"
           assert latest and int(latest["number"], 16) == height, "latest block RPC mismatch"
           print(f"PASS: eth_chainId={chain_id}, net_version={network}, block={height}")
@@ -249,17 +249,56 @@ jobs:
           import assert from "node:assert/strict";
           import solc from "solc";
           import { Contract, ContractFactory, JsonRpcProvider, Wallet, WebSocketProvider, parseEther, parseUnits } from "ethers";
-          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
+          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 357812033857, { staticNetwork: true });
           const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
-          assert.equal(BigInt(await provider.send("eth_chainId", [])), 777777n);
+          assert.equal(BigInt(await provider.send("eth_chainId", [])), 357812033857n);
           assert((await provider.getBalance(wallet.address)) > parseEther("1"), "EVM test account not funded");
           const nativeRecipient = "0x000000000000000000000000000000000000dEaD";
+          // Exercise the exact fee RPC surface that the public wallet depends on.
+          const quotedGasPrice = BigInt(await provider.send("eth_gasPrice", []));
+          const priorityFee = BigInt(await provider.send("eth_maxPriorityFeePerGas", []));
+          const estimate = BigInt(await provider.send("eth_estimateGas", [{
+            from: wallet.address,
+            to: nativeRecipient,
+            value: "0x2386f26fc10000" // 0.01 SOBYA
+          }]));
+          const feeHistory = await provider.send("eth_feeHistory", ["0x5", "latest", [25, 50, 75]]);
+          const latestForFees = await provider.send("eth_getBlockByNumber", ["latest", false]);
+          assert(quotedGasPrice > 0n, "eth_gasPrice returned zero");
+          assert(priorityFee > 0n, "eth_maxPriorityFeePerGas returned zero");
+          assert(estimate > 0n, "eth_estimateGas returned zero");
+          assert(feeHistory.baseFeePerGas?.length >= 2, "eth_feeHistory omitted baseFeePerGas samples");
+          assert(feeHistory.baseFeePerGas.every(value => BigInt(value) > 0n), "eth_feeHistory contains a zero base fee");
+          assert(latestForFees?.baseFeePerGas && BigInt(latestForFees.baseFeePerGas) > 0n, "latest EVM block has no active base fee");
+          console.log("PASS non-zero EVM gas RPCs:", {
+            gasPrice: quotedGasPrice.toString(),
+            maxPriorityFeePerGas: priorityFee.toString(),
+            estimateGas: estimate.toString(),
+            baseFeePerGas: BigInt(latestForFees.baseFeePerGas).toString()
+          });
+
+          const senderBalanceBefore = await provider.getBalance(wallet.address);
           const signed = await wallet.sendTransaction({ to: nativeRecipient, value: parseEther("0.01"), gasLimit: 21000n });
+
           const signedReceipt = await signed.wait(1);
           assert.equal(signedReceipt.status, 1, "signed EVM transfer failed");
           const rpcReceipt = await provider.send("eth_getTransactionReceipt", [signed.hash]);
           assert.equal(rpcReceipt.status, "0x1", "eth_getTransactionReceipt did not return a successful receipt");
           assert.equal(BigInt(rpcReceipt.blockNumber), BigInt(signedReceipt.blockNumber), "receipt block number mismatch");
+          const effectiveGasPrice = BigInt(rpcReceipt.effectiveGasPrice ?? "0x0");
+          const gasUsed = BigInt(rpcReceipt.gasUsed ?? "0x0");
+          assert(effectiveGasPrice > 0n, "receipt effectiveGasPrice is zero");
+          assert(gasUsed > 0n, "receipt gasUsed is zero");
+          const senderBalanceAfter = await provider.getBalance(wallet.address);
+          assert.equal(
+            senderBalanceBefore - senderBalanceAfter,
+            parseEther("0.01") + gasUsed * effectiveGasPrice,
+            "sender balance debit did not equal transfer value plus actual EVM gas fee"
+          );
+          console.log("PASS actual EVM fee deduction:", {
+            gasUsed: gasUsed.toString(),
+            effectiveGasPrice: effectiveGasPrice.toString()
+          });
           console.log("PASS signed EVM transaction and eth_getTransactionReceipt:", signed.hash);
 
           // Native SOBYA value transfers are exposed by the EVM account balance
@@ -308,7 +347,7 @@ jobs:
           assert(tokenTransferReceipt.logs.some(log => log.address.toLowerCase() === tokenAddress), "ERC-20 transfer receipt is missing token logs");
           console.log("PASS ERC-20 deployment, metadata, supply, transfer and receipt logs:", await token.getAddress());
 
-          const ws = new WebSocketProvider("ws://127.0.0.1:8546",777777);
+          const ws = new WebSocketProvider("ws://127.0.0.1:8546",357812033857);
           try {
             await ws.getNetwork();
             const block = await new Promise((resolve,reject) => {
