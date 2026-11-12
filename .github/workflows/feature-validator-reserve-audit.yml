@@ -11,6 +11,8 @@ on:
       - 'sobya/go.mod'
       - 'sobya/go.sum'
       - '.github/workflows/feature-validator-reserve-audit.yml'
+      - '.github/workflows/nodesafe-deploy.yml'
+      - '.github/workflows/validator-binary-release.yml'
 
 permissions:
   contents: read

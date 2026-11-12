@@ -7,6 +7,8 @@ on:
     paths:
       - 'sobya/**'
       - '.github/workflows/eth-keyring-regression.yml'
+      - '.github/workflows/nodesafe-deploy.yml'
+      - '.github/workflows/validator-binary-release.yml'
   pull_request:
     paths:
       - 'sobya/**'

@@ -9,6 +9,8 @@ on:
     paths:
       - 'sobya/**'
       - '.github/workflows/feature-fee-routing-integration.yml'
+      - '.github/workflows/nodesafe-deploy.yml'
+      - '.github/workflows/validator-binary-release.yml'
 
 permissions:
   contents: read

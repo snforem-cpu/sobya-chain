@@ -11,6 +11,8 @@ on:
       - 'sobya/cmd/sobyad/cmd/testnet_multi_node.go'
       - 'sobya/app/**'
       - 'sobya/TOKENOMICS.md'
+      - '.github/workflows/nodesafe-deploy.yml'
+      - '.github/workflows/validator-binary-release.yml'
 
 permissions:
   contents: read

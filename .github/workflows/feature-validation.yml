@@ -10,6 +10,8 @@ on:
       - '26031'
       - 'sobya/**'
       - '.github/workflows/feature-validation.yml'
+      - '.github/workflows/nodesafe-deploy.yml'
+      - '.github/workflows/validator-binary-release.yml'
 
 permissions:
   contents: write
