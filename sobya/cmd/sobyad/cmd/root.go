@@ -10,6 +10,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/config"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	evmcryptocodec "github.com/cosmos/evm/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
@@ -107,6 +108,11 @@ func NewRootCmd() *cobra.Command {
 
 // ProvideClientContext creates and provides a fully initialized client.Context,
 // allowing it to be used for dependency injection and CLI operations.
+// registerEVMKeyringInterfaces adds Cosmos EVM concrete account key types to the CLI protobuf Any registry.
+func registerEVMKeyringInterfaces(registry codectypes.InterfaceRegistry) {
+	evmcryptocodec.RegisterInterfaces(registry)
+}
+
 func ProvideClientContext(
 	appCodec codec.Codec,
 	interfaceRegistry codectypes.InterfaceRegistry,
