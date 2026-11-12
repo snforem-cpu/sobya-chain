@@ -18,7 +18,9 @@ This repository-side preparation does not grant access to NodeSafe and cannot de
 
 Create a GitHub Actions environment named `sobya-production`. Protect it with required reviewers / deployment approval if supported by the repository plan.
 
-Protect the `v*` tag namespace with a GitHub tag ruleset that blocks tag updates and deletion (or an equivalent immutable-tag policy). Production release tags must not be movable after publication.\n\nAdd these **environment secrets** (never commit their values):
+Protect the `v*` tag namespace with a GitHub tag ruleset that blocks tag updates and deletion (or an equivalent immutable-tag policy). Production release tags must not be movable after publication.
+
+Add these **environment secrets** (never commit their values):
 
 - `NODESAFE_DEPLOY_URL`: HTTPS endpoint supplied by NodeSafe for the SOBYA production deployment receiver.
 - `NODESAFE_DEPLOY_TOKEN`: dedicated, revocable bearer token accepted only by that receiver. It must not be a node key, wallet key, mnemonic, SSH private key, or general hosting credential.
@@ -76,7 +78,8 @@ The endpoint must return HTTP 200 only after the rollout and health checks are c
     "cometbft_rpc": true,
     "block_production": true,
     "evm_chain_id": true,
-    "eth_gas_price": true,\n    "eth_max_priority_fee": true,
+    "eth_gas_price": true,
+    "eth_max_priority_fee": true,
     "eth_estimate_gas": true,
     "eth_fee_history": true,
     "existing_data_preserved": true,
