@@ -285,6 +285,20 @@ jobs:
           const rpcReceipt = await provider.send("eth_getTransactionReceipt", [signed.hash]);
           assert.equal(rpcReceipt.status, "0x1", "eth_getTransactionReceipt did not return a successful receipt");
           assert.equal(BigInt(rpcReceipt.blockNumber), BigInt(signedReceipt.blockNumber), "receipt block number mismatch");
+          const effectiveGasPrice = BigInt(rpcReceipt.effectiveGasPrice ?? "0x0");
+          const gasUsed = BigInt(rpcReceipt.gasUsed ?? "0x0");
+          assert(effectiveGasPrice > 0n, "receipt effectiveGasPrice is zero");
+          assert(gasUsed > 0n, "receipt gasUsed is zero");
+          const senderBalanceAfter = await provider.getBalance(wallet.address);
+          assert.equal(
+            senderBalanceBefore - senderBalanceAfter,
+            parseEther("0.01") + gasUsed * effectiveGasPrice,
+            "sender balance debit did not equal transfer value plus actual EVM gas fee"
+          );
+          console.log("PASS actual EVM fee deduction:", {
+            gasUsed: gasUsed.toString(),
+            effectiveGasPrice: effectiveGasPrice.toString()
+          });
           console.log("PASS signed EVM transaction and eth_getTransactionReceipt:", signed.hash);
 
           // Native SOBYA value transfers are exposed by the EVM account balance
