@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - 'feature/**'
+      - 'release/**'
     paths:
       - '.github/workflows/feature-multinode-smoke.yml'
       - 'sobya/cmd/sobyad/cmd/testnet_multi_node.go'
