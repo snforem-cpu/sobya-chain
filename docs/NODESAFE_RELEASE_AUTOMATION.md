@@ -76,7 +76,7 @@ The endpoint must return HTTP 200 only after the rollout and health checks are c
     "cometbft_rpc": true,
     "block_production": true,
     "evm_chain_id": true,
-    "eth_gas_price": true,
+    "eth_gas_price": true,\n    "eth_max_priority_fee": true,
     "eth_estimate_gas": true,
     "eth_fee_history": true,
     "existing_data_preserved": true,
