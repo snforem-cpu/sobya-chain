@@ -21,7 +21,7 @@ func defaultAppConfig() *evmserverconfig.Config {
 	srvCfg.Mempool.MaxTxs = 5000
 
 	evmCfg := evmserverconfig.DefaultEVMConfig()
-	evmCfg.EVMChainID = 777777
+	evmCfg.EVMChainID = 357812033857
 
 	jsonRPC := evmserverconfig.DefaultJSONRPCConfig()
 	jsonRPC.AllowInsecureUnlock = false

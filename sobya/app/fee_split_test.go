@@ -64,14 +64,21 @@ func TestSplitCollectedFeesForRouting(t *testing.T) {
 		sdk.NewCoin("uatom", sdkmath.NewInt(7)),
 	)
 
-	sharedWallet, validators := splitCollectedFeesForRouting(fees)
+	sharedWallet, validators, treasury, community := splitCollectedFeesForRouting(fees)
 
 	assertFeeAmount(t, sharedWallet, BaseDenom, 70)
+	assertFeeAmount(t, treasury, BaseDenom, 50)
+	assertFeeAmount(t, community, BaseDenom, 20)
 	assertFeeAmount(t, validators, BaseDenom, 30)
 	// For 7 units, treasury receives the 4-unit remainder and community
-	// receives 1; both go to the shared wallet, while validators retain 2.
+	// receives 1; both are separately reported but sent to the shared wallet.
+	assertFeeAmount(t, treasury, "uatom", 4)
+	assertFeeAmount(t, community, "uatom", 1)
 	assertFeeAmount(t, sharedWallet, "uatom", 5)
 	assertFeeAmount(t, validators, "uatom", 2)
+	if treasury.Add(community...).String() != sharedWallet.String() {
+		t.Fatalf("treasury/community sub-ledgers do not equal shared wallet amount: treasury=%s community=%s shared=%s", treasury, community, sharedWallet)
+	}
 	if sharedWallet.Add(validators...).String() != fees.String() {
 		t.Fatalf("routed fee amounts do not conserve collected fees: shared=%s validators=%s input=%s", sharedWallet, validators, fees)
 	}

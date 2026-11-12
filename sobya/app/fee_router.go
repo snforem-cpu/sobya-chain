@@ -14,9 +14,9 @@ const sharedFeeWallet = "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f"
 // splitCollectedFeesForRouting sends the treasury and community portions to
 // the shared management wallet. The remaining 30% stays in fee_collector for
 // the standard distribution module to allocate to validators and delegators.
-func splitCollectedFeesForRouting(fees sdk.Coins) (sharedWallet, validators sdk.Coins) {
-	treasury, validators, community := splitTransactionFees(fees)
-	return treasury.Add(community...), validators
+func splitCollectedFeesForRouting(fees sdk.Coins) (sharedWallet, validators, treasury, community sdk.Coins) {
+	treasury, validators, community = splitTransactionFees(fees)
+	return treasury.Add(community...), validators, treasury, community
 }
 
 // installFeeRouter wraps the runtime module pre-blocker. It executes the
@@ -43,7 +43,7 @@ func (app *App) installFeeRouter() error {
 		feeCollector := authtypes.NewModuleAddress(authtypes.FeeCollectorName)
 		collected := app.BankKeeper.GetAllBalances(ctx, feeCollector)
 		if len(collected) > 0 {
-			sharedAmount, validatorAmount := splitCollectedFeesForRouting(collected)
+			sharedAmount, validatorAmount, treasuryAmount, communityAmount := splitCollectedFeesForRouting(collected)
 			if len(sharedAmount) > 0 {
 				if err := app.BankKeeper.SendCoinsFromModuleToAccount(
 					ctx,
@@ -59,6 +59,8 @@ func (app *App) installFeeRouter() error {
 				"sobya_fee_split",
 				sdk.NewAttribute("shared_wallet", sharedFeeWallet),
 				sdk.NewAttribute("shared_wallet_amount", sharedAmount.String()),
+				sdk.NewAttribute("treasury_amount", treasuryAmount.String()),
+				sdk.NewAttribute("community_amount", communityAmount.String()),
 				sdk.NewAttribute("validator_amount", validatorAmount.String()),
 			))
 		}

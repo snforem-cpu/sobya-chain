@@ -1,6 +1,6 @@
 # SOBYA Cosmos EVM Integration
 
-Status: **partially wired; EVM runtime acceptance tests are not yet passing because the EVM RPC/mempool server path is not integrated.** Do not treat this branch as a public EVM network or claim wallet compatibility yet.
+Status: **EVM runtime, unified mempool, broadcast path, fee market, ERC-20 wiring, and local JSON-RPC/WebSocket smoke coverage are implemented on the release feature branch.** Public NodeSafe operation still requires independent live-RPC and committed-transaction verification.
 
 ## Confirmed on the current feature branch
 
@@ -12,7 +12,7 @@ The SOBYA application currently contains:
 - Manual registration of the EVM, FeeMarket, and ERC-20 application modules.
 - EVM ante-handler installation through evmante.NewAnteHandler.
 - Runtime module lifecycle entries for EVM, FeeMarket, and ERC-20 in app/app_config.go.
-- A development EVM chain ID default of 777777; this is not a production network ID.
+- The approved public EVM chain ID default: `357812033857` (`0x534f425941`); keep `app.toml`, MetaMask, and release tests aligned.
 - Native coin metadata configured as SOBY / asobya with 18 decimals.
 
 The 3 November 2026 GitHub Actions runs on commit 5734ecfc92987e5bc866a4a97ab4067de06bada5 passed:
@@ -22,7 +22,7 @@ The 3 November 2026 GitHub Actions runs on commit 5734ecfc92987e5bc866a4a97ab406
 
 These tests prove Cosmos-native chain functionality only. They do not prove Ethereum transaction execution, EVM JSON-RPC, contract deployment, or wallet connectivity.
 
-## Remaining EVM runtime work
+## Remaining production verification
 
 1. **Ethereum-compatible encoding and transaction configuration**
    - Review the account, validator, and consensus address codecs.
@@ -51,8 +51,8 @@ These tests prove Cosmos-native chain functionality only. They do not prove Ethe
    - Integrate and test ERC-20/IBC transfer middleware and callbacks only after the keeper/address-codec wiring is validated.
 
 6. **Production readiness**
-   - Select and collision-check a permanent EVM chain ID before public genesis.
-   - Finalize fee policy, including the agreed 50/30/20 fee allocation through explicit custom distribution logic.
+   - Preserve the approved EVM chain ID `357812033857` and collision-check it against any external network before release.
+   - Preserve the 50/30/20 fee calculation: 50% treasury and 20% community are sent to the shared management wallet as separately identified amounts; 30% remains for standard validator/delegator distribution. The `sobya_fee_split` event reports the treasury and community sub-ledgers separately.
    - Review validator economics, genesis allocation, upgrade safety, RPC exposure, monitoring, backups, and permanent validator hosting.
 
 ## Token rules that must remain invariant
@@ -61,7 +61,7 @@ These tests prove Cosmos-native chain functionality only. They do not prove Ethe
 - Precision: 18 decimal places.
 - Maximum supply: 1,000,000,000 SOBY = 10^27 asobya, enforced with arbitrary-precision integers.
 - Founder allocation: 40% (400 million SOBY), as previously agreed.
-- Network fee allocation: 50% treasury, 30% validators, 20% community. This is separate from initial token allocation and is not yet implemented.
+- Network fee allocation: 50% treasury, 30% validators, 20% community. Treasury and community are separately calculated and emitted in `sobya_fee_split` event attributes, while their combined 70% is routed to the shared management wallet; 30% remains for validator/delegator distribution.
 - Do not invent allocations for the remaining initial supply. Do not add a presale or imply exchange listings.
 
 ## Wallet and network claims

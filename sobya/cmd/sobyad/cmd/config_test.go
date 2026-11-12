@@ -22,8 +22,8 @@ func TestDefaultAppConfigKeepsRPCPrivateAndLocked(t *testing.T) {
 	if cfg.JSONRPC.MaxOpenConnections != 100 {
 		t.Fatalf("JSON-RPC max connections = %d, want 100", cfg.JSONRPC.MaxOpenConnections)
 	}
-	if cfg.EVM.EVMChainID != 777777 {
-		t.Fatalf("development EVM chain ID changed unexpectedly: %d", cfg.EVM.EVMChainID)
+	if cfg.EVM.EVMChainID != 357812033857 {
+		t.Fatalf("EVM chain ID = %d, want approved SOBYA mainnet ID 357812033857", cfg.EVM.EVMChainID)
 	}
 	if cfg.MinGasPrices != "1000000000asobya" {
 		t.Fatalf("minimum gas prices = %q, want 1000000000asobya", cfg.MinGasPrices)

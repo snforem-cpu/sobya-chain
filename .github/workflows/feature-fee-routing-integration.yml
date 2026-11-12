@@ -249,7 +249,7 @@ jobs:
           REWARDS_BEFORE="$(validator_outstanding)"
           EVM_RESULT="$(node --input-type=module <<'JS'
           import { JsonRpcProvider, Wallet } from "ethers";
-          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 777777, { staticNetwork: true });
+          const provider = new JsonRpcProvider("http://127.0.0.1:8545", 357812033857, { staticNetwork: true });
           const wallet = new Wallet(process.env.EVM_TEST_PRIVATE_KEY, provider);
           const tx = await wallet.sendTransaction({ to: wallet.address, value: 0n, gasLimit: 21000n });
           const receipt = await tx.wait(1);
