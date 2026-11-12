@@ -105,7 +105,7 @@ jobs:
               const latest = new Map();
               for (const check of data.check_runs) {
                 const previous = latest.get(check.name);
-                if (!previous || String(check.started_at || "") < String(previous.started_at || "")) {
+                if (!previous || String(check.started_at || "") > String(previous.started_at || "")) {
                   latest.set(check.name, check);
                 }
               }
