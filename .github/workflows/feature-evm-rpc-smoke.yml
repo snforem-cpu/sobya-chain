@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - 'feature/**'
+      - 'release/**'
     paths:
       - 'sobya/**'
       - '.github/workflows/feature-evm-rpc-smoke.yml'
