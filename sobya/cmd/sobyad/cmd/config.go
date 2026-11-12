@@ -30,6 +30,11 @@ func initCometBFTConfig() *cmtcfg.Config {
 // configuration used by both normal node startup and generated testnets.
 func defaultAppConfig() *evmserverconfig.Config {
 	srvCfg := serverconfig.DefaultConfig()
+	// SOBYA's owner-approved local minimum gas price. This is independent of
+	// the on-chain EIP-1559 base fee and must be identical on every validator
+	// and RPC node so transactions are not rejected inconsistently.
+	srvCfg.MinGasPrices = "1000000000asobya"
+
 	// Cosmos SDK defaults its application mempool to disabled (-1). Cosmos EVM
 	// requires the unified EVM/Cosmos mempool for CheckTx and proposal handling.
 	// Keep a bounded queue instead of silently starting with EVM disabled.
