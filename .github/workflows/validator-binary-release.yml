@@ -1,4 +1,4 @@
-name: SOBYA Validator Binary Prerelease
+name: SOBYA Versioned Validator Binary Release
 
 on:
   push:
@@ -53,12 +53,12 @@ jobs:
           sha256sum sobyad-${RELEASE_VERSION}-linux-amd64.tar.gz > SHA256SUMS
           sha256sum -c SHA256SUMS
 
-      - name: Publish GitHub prerelease
+      - name: Publish versioned GitHub release (RC tags remain prereleases)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: SOBYA ${{ github.ref_name }} (testnet candidate)
-          prerelease: true
+          name: SOBYA ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: |
             dist/sobyad-${{ github.ref_name }}-linux-amd64.tar.gz

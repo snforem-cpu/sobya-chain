@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'fix/**'
+      - 'release/**'
     paths:
       - 'sobya/**'
       - '.github/workflows/eth-keyring-regression.yml'
