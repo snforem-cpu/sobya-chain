@@ -1,0 +1,136 @@
+name: SOBYA NodeSafe Production Deployment
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-nodesafe-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy published stable release to NodeSafe
+    if: github.event.release.prerelease == false && github.event.release.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: sobya-production
+    steps:
+      - name: Require NodeSafe integration secrets
+        shell: bash
+        env:
+          NODESAFE_DEPLOY_URL: ${{ secrets.NODESAFE_DEPLOY_URL }}
+          NODESAFE_DEPLOY_TOKEN: ${{ secrets.NODESAFE_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$NODESAFE_DEPLOY_URL" || { echo "::error::Configure sobya-production secret NODESAFE_DEPLOY_URL after NodeSafe confirms its receiver endpoint."; exit 1; }
+          test -n "$NODESAFE_DEPLOY_TOKEN" || { echo "::error::Configure sobya-production secret NODESAFE_DEPLOY_TOKEN after NodeSafe issues a dedicated token."; exit 1; }
+          case "$NODESAFE_DEPLOY_URL" in https://*) ;; *) echo "::error::NodeSafe endpoint must use HTTPS."; exit 1 ;; esac
+
+      - name: Resolve immutable release source commit and assets
+        id: release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            if (!/^v[0-9]+\\.[0-9]+\\.[0-9]+$/.test(tag)) {
+              core.setFailed(`Production accepts stable vMAJOR.MINOR.PATCH tags only; received ${tag}`);
+              return;
+            }
+            const { data: ref } = await github.rest.git.getRef({
+              owner: context.repo.owner, repo: context.repo.repo, ref: `tags/${tag}`
+            });
+            let object = ref.object;
+            while (object.type === "tag") {
+              const { data: annotated } = await github.rest.git.getTag({
+                owner: context.repo.owner, repo: context.repo.repo, tag_sha: object.sha
+              });
+              object = annotated.object;
+            }
+            if (object.type !== "commit" || !/^[0-9a-f]{40}$/.test(object.sha)) {
+              core.setFailed("Release tag did not resolve to a commit.");
+              return;
+            }
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner, repo: context.repo.repo, tag
+            });
+            const required = [
+              `sobyad-${tag}-linux-amd64.tar.gz`,
+              "SHA256SUMS"
+            ];
+            const assets = Object.fromEntries(release.assets.map(a => [a.name, a.browser_download_url]));
+            for (const name of required) {
+              if (!assets[name]) {
+                core.setFailed(`Missing required release asset: ${name}`);
+                return;
+              }
+            }
+            core.setOutput("tag", tag);
+            core.setOutput("commit", object.sha);
+            core.setOutput("binary_url", assets[required[0]]);
+            core.setOutput("checksum_url", assets["SHA256SUMS"]);
+
+      - name: Ask NodeSafe to upgrade the existing SOBYA chain and verify it
+        shell: bash
+        env:
+          NODESAFE_DEPLOY_URL: ${{ secrets.NODESAFE_DEPLOY_URL }}
+          NODESAFE_DEPLOY_TOKEN: ${{ secrets.NODESAFE_DEPLOY_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          SOURCE_COMMIT: ${{ steps.release.outputs.commit }}
+          BINARY_URL: ${{ steps.release.outputs.binary_url }}
+          CHECKSUM_URL: ${{ steps.release.outputs.checksum_url }}
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg release_tag "$RELEASE_TAG" \
+            --arg source_commit "$SOURCE_COMMIT" \
+            --arg asset_url "$BINARY_URL" \
+            --arg checksum_url "$CHECKSUM_URL" \
+            '{
+              schema_version: 1,
+              repository: $repository,
+              release_tag: $release_tag,
+              source_commit: $source_commit,
+              chain_id: 357812033857,
+              evm_chain_id_hex: "0x534f425941",
+              base_denom: "asobya",
+              decimals: 18,
+              asset_url: $asset_url,
+              checksum_url: $checksum_url
+            }')"
+          response="$RUNNER_TEMP/nodesafe-deployment-response.json"
+          http_code="$(curl --silent --show-error --connect-timeout 10 --max-time 1800 \
+            --output "$response" --write-out '%{http_code}' \
+            --request POST "$NODESAFE_DEPLOY_URL" \
+            --header "Authorization: Bearer $NODESAFE_DEPLOY_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data "$payload")"
+          echo "NodeSafe HTTP status: $http_code"
+          jq 'del(.private_key,.token,.secret)' "$response" || cat "$response"
+          test "$http_code" = "200" || { echo "::error::NodeSafe did not confirm a completed deployment."; exit 1; }
+          jq -e \
+            --arg tag "$RELEASE_TAG" \
+            --arg commit "$SOURCE_COMMIT" \
+            '.status == "success"
+             and .release_tag == $tag
+             and .deployed_commit == $commit
+             and .chain_id == 357812033857
+             and (.height | tostring | length > 0)
+             and .checks.cometbft_rpc == true
+             and .checks.block_production == true
+             and .checks.evm_chain_id == true
+             and .checks.eth_gas_price == true
+             and .checks.eth_estimate_gas == true
+             and .checks.eth_fee_history == true
+             and .checks.existing_data_preserved == true
+             and .checks.rollback_available == true' "$response" >/dev/null || {
+               echo "::error::NodeSafe response did not satisfy the required post-upgrade verification contract."
+               exit 1
+             }
+          echo "NodeSafe confirmed $RELEASE_TAG ($SOURCE_COMMIT) deployed and healthy at height $(jq -r '.height' "$response")."
