@@ -25,12 +25,8 @@ const (
 var MaxSupply = sdkmath.NewIntWithDecimal(1_000_000_000, 18)
 
 func validateNativeSupply(supply sdkmath.Int) error {
-	if supply.IsNegative() {
-		return fmt.Errorf("native SOBYA supply cannot be negative")
-	}
-	if supply.GT(MaxSupply) {
-		return fmt.Errorf("native SOBYA supply %s exceeds maximum %s %s", supply, MaxSupply.String(), BaseDenom)
-	}
+	if supply.IsNegative() { return fmt.Errorf("native SOBYA supply cannot be negative") }
+	if supply.GT(MaxSupply) { return fmt.Errorf("native SOBYA supply %s exceeds maximum %s %s", supply, MaxSupply.String(), BaseDenom) }
 	return nil
 }
 
@@ -47,14 +43,10 @@ func nativeDenomMetadata() banktypes.Metadata {
 
 func defaultActiveEVMStaticPrecompiles() []string {
 	return []string{
-		evmtypes.P256PrecompileAddress,
-		evmtypes.Bech32PrecompileAddress,
-		evmtypes.StakingPrecompileAddress,
-		evmtypes.DistributionPrecompileAddress,
-		evmtypes.ICS20PrecompileAddress,
-		evmtypes.BankPrecompileAddress,
-		evmtypes.GovPrecompileAddress,
-		evmtypes.SlashingPrecompileAddress,
+		evmtypes.P256PrecompileAddress, evmtypes.Bech32PrecompileAddress,
+		evmtypes.StakingPrecompileAddress, evmtypes.DistributionPrecompileAddress,
+		evmtypes.ICS20PrecompileAddress, evmtypes.BankPrecompileAddress,
+		evmtypes.GovPrecompileAddress, evmtypes.SlashingPrecompileAddress,
 	}
 }
 
@@ -62,9 +54,8 @@ func defaultActiveEVMStaticPrecompiles() []string {
 // EVM fee defaults to a newly initialized genesis. It never rewrites live state.
 func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 	appState := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(raw, &appState); err != nil {
-		return nil, fmt.Errorf("decode application genesis: %w", err)
-	}
+	if err := json.Unmarshal(raw, &appState); err != nil { return nil, fmt.Errorf("decode application genesis: %w", err) }
+
 	bankRaw, ok := appState[banktypes.ModuleName]
 	if !ok { return nil, fmt.Errorf("application genesis is missing %q state", banktypes.ModuleName) }
 	var bankGenesis banktypes.GenesisState
@@ -104,12 +95,9 @@ func prepareGenesisState(cdc codec.Codec, raw []byte) ([]byte, error) {
 	if err != nil { return nil, fmt.Errorf("encode zero-tax distribution genesis: %w", err) }
 	appState[distrtypes.ModuleName] = distrBytes
 
-	// Preserve fail-closed behavior if fee-market state is present, and make
-	// the approved 1 gwei base fee explicit instead of inheriting a zero override.
 	if feeMarketRaw, exists := appState[feemarkettypes.ModuleName]; exists {
 		var feeMarketGenesis feemarkettypes.GenesisState
 		if err := cdc.UnmarshalJSON(feeMarketRaw, &feeMarketGenesis); err != nil { return nil, fmt.Errorf("decode fee market genesis: %w", err) }
-		if feeMarketGenesis.Params == nil { return nil, fmt.Errorf("fee market genesis is missing params") }
 		feeMarketGenesis.Params.NoBaseFee = false
 		feeMarketGenesis.Params.EnableHeight = 0
 		feeMarketGenesis.Params.BaseFee = sdkmath.LegacyNewDec(ApprovedEVMBaseFee)
