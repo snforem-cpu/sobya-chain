@@ -53,7 +53,7 @@ jobs:
           sha256sum sobyad-${RELEASE_VERSION}-linux-amd64.tar.gz > SHA256SUMS
           sha256sum -c SHA256SUMS
 
-      - name: Publish GitHub prerelease
+      - name: Publish versioned GitHub release (RC tags remain prereleases)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
