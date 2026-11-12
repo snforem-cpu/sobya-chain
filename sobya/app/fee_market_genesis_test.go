@@ -7,6 +7,7 @@ import (
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/gogoproto/proto"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
@@ -16,7 +17,7 @@ import (
 
 func TestPrepareGenesisStateSetsApprovedEVMFeeMarket(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
-	marshal := func(value interface{ ProtoMessage() }) json.RawMessage {
+	marshal := func(value proto.Message) json.RawMessage {
 		t.Helper()
 		raw, err := cdc.MarshalJSON(value)
 		if err != nil {
@@ -25,11 +26,11 @@ func TestPrepareGenesisStateSetsApprovedEVMFeeMarket(t *testing.T) {
 		return raw
 	}
 	raw, err := json.Marshal(map[string]json.RawMessage{
-		banktypes.ModuleName:    marshal(banktypes.DefaultGenesisState()),
-		minttypes.ModuleName:    marshal(minttypes.DefaultGenesisState()),
-		distrtypes.ModuleName:   marshal(distrtypes.DefaultGenesisState()),
+		banktypes.ModuleName:      marshal(banktypes.DefaultGenesisState()),
+		minttypes.ModuleName:      marshal(minttypes.DefaultGenesisState()),
+		distrtypes.ModuleName:     marshal(distrtypes.DefaultGenesisState()),
 		feemarkettypes.ModuleName: marshal(feemarkettypes.DefaultGenesisState()),
-		evmtypes.ModuleName:     marshal(evmtypes.DefaultGenesisState()),
+		evmtypes.ModuleName:       marshal(evmtypes.DefaultGenesisState()),
 	})
 	if err != nil {
 		t.Fatalf("marshal application genesis: %v", err)
