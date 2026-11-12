@@ -75,6 +75,57 @@ jobs:
             core.setOutput("binary_url", assets[required[0]]);
             core.setOutput("checksum_url", assets["SHA256SUMS"]);
 
+      - name: Require successful CI checks for this exact release commit
+        uses: actions/github-script@v7
+        env:
+          SOURCE_COMMIT: ${{ steps.release.outputs.commit }}
+        with:
+          script: |
+            const required = [
+              "network-config",
+              "eth-keyring",
+              "distribution-e2e",
+              "localnet",
+              "dependency-compatibility",
+              "reserve-audit",
+              "fee-routing",
+              "validate",
+              "two-validator-network",
+              "evm-rpc"
+            ];
+            const deadline = Date.now() + 25 * 60 * 1000;
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+            while (Date.now() < deadline) {
+              const { data } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: process.env.SOURCE_COMMIT,
+                per_page: 100
+              });
+              const latest = new Map();
+              for (const check of data.check_runs) {
+                const previous = latest.get(check.name);
+                if (!previous || String(check.started_at || "") < String(previous.started_at || "")) {
+                  latest.set(check.name, check);
+                }
+              }
+              const missing = required.filter(name => !latest.has(name));
+              const pending = required.filter(name => latest.has(name) && latest.get(name).status !== "completed");
+              const failed = required.filter(name => latest.has(name) &&
+                latest.get(name).status === "completed" && latest.get(name).conclusion !== "success");
+              if (failed.length) {
+                core.setFailed(`Refusing production deploy; failed checks on ${process.env.SOURCE_COMMIT}: ${failed.join(", ")}`);
+                return;
+              }
+              if (!missing.length && !pending.length) {
+                core.info(`All ${required.length} required CI checks passed on exact commit ${process.env.SOURCE_COMMIT}.`);
+                return;
+              }
+              core.info(`Waiting for exact-commit CI checks. Missing: ${missing.join(", ") || "none"}; pending: ${pending.join(", ") || "none"}`);
+              await sleep(15000);
+            }
+            core.setFailed("Timed out waiting for all required CI checks on the exact release commit; production deployment was blocked.");
+
       - name: Ask NodeSafe to upgrade the existing SOBYA chain and verify it
         shell: bash
         env:
