@@ -80,7 +80,7 @@ jobs:
           import pathlib, re, sys
           p = pathlib.Path(sys.argv[1])
           s = p.read_text()
-          s2, n = re.subn(r'(?m)^minimum-gas-prices\\s*=\\s*".*"$',
+          s2, n = re.subn(r'(?m)^minimum-gas-prices\s*=\s*".*"$',
                           'minimum-gas-prices = "1000000000asobya"', s, count=1)
           if n != 1:
               raise SystemExit("could not locate minimum-gas-prices in app.toml")
