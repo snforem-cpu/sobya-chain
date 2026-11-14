@@ -25,13 +25,19 @@ concurrency:
 
 jobs:
   cosmos-direct-signing:
+    strategy:
+      fail-fast: false
+      matrix:
+        source_ref:
+          - ${{ github.sha }}
+          - ecd6fe1e819770749d6b0cc9bfa886d0b08521dc
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ matrix.source_ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
