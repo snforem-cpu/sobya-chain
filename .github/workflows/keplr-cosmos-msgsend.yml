@@ -72,6 +72,7 @@ jobs:
           case "$WALLET_ADDR" in sobya1*) ;; *) echo "Unexpected SOBYA account prefix: $WALLET_ADDR"; exit 1 ;; esac
 
           ./sobyad genesis add-genesis-account "$WALLET_ADDR" 100000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis add-genesis-account "$VALIDATOR_ADDR" 100000000000000000000asobya --home "$SOBYA_HOME"
           ./sobyad genesis gentx validator 1000000000000000000asobya --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
           ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
 
