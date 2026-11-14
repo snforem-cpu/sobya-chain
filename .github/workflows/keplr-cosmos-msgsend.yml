@@ -63,8 +63,8 @@ jobs:
           # SOBYA sets coin type 118 and the standard secp256k1 algorithm;
           # this CLI-created key exercises the same Cosmos Direct-signing
           # transaction format without exposing any real wallet mnemonic.
-          ./sobyad keys add validator --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
-          ./sobyad keys add keplr-cosmos-test --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/keplr-key.json"
+          ./sobyad keys add validator --algo secp256k1 --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
+          ./sobyad keys add keplr-cosmos-test --algo secp256k1 --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/keplr-key.json"
           WALLET_ADDR="$(jq -r '.address' "$RUNNER_TEMP/keplr-key.json")"
           VALIDATOR_ADDR="$(./sobyad keys show validator -a --keyring-backend test --home "$SOBYA_HOME")"
           test -n "$WALLET_ADDR"
