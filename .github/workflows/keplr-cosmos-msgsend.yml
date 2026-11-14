@@ -123,16 +123,16 @@ jobs:
 
           AMOUNT=1000000000000000000
           FEE=200000000000000
-          ./sobyad tx bank send keplr-cosmos-test "$VALIDATOR_ADDR" "${AMOUNT}asobya" \\
-            --chain-id "$CHAIN_ID" \\
-            --node tcp://127.0.0.1:26657 \\
-            --home "$SOBYA_HOME" \\
-            --keyring-backend test \\
-            --fees "${FEE}asobya" \\
-            --gas 200000 \\
-            --sign-mode direct \\
-            --broadcast-mode sync \\
-            --yes \\
+          ./sobyad tx bank send keplr-cosmos-test "$VALIDATOR_ADDR" "${AMOUNT}asobya" \
+            --chain-id "$CHAIN_ID" \
+            --node tcp://127.0.0.1:26657 \
+            --home "$SOBYA_HOME" \
+            --keyring-backend test \
+            --fees "${FEE}asobya" \
+            --gas 200000 \
+            --sign-mode direct \
+            --broadcast-mode sync \
+            --yes \
             --output json > "$RUNNER_TEMP/keplr-msgsend.json"
 
           CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/keplr-msgsend.json")"
