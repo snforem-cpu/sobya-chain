@@ -1,0 +1,13 @@
+name = "sobya-buy-api"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+SALE_ENABLED = "false"
+ALLOWED_ORIGIN = "https://snforem-cpu.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sobya-buy"
+database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+migrations_dir = "migrations"
