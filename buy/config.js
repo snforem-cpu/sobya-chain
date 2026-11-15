@@ -5,7 +5,7 @@ window.SOBYA_BUY_CONFIG = Object.freeze({
   sobyaChainId: 357812033857,
   sobyaRpcUrl: "https://sobya-evm-rpc.nodesafe-app.xyz",
   sobyaExplorerUrl: "https://explorer.nodesafe-app.xyz/sobya",
-  projectReceivingAddress: "",
+  projectReceivingAddress: "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f",
   salePriceUsd: null,
   minimumConfirmations: { ethereum: 12, bsc: 15 },
   assets: {
