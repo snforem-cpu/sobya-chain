@@ -112,16 +112,27 @@ jobs:
           }
           trap cleanup EXIT
 
+          # An HTTP-ready RPC at height 0 is not ready for bank queries or
+          # transaction broadcast. Wait until the disposable validator commits
+          # its first block before proceeding.
           READY=0
           for attempt in $(seq 1 90); do
             if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"; then
-              READY=1
-              break
+              HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status.json")"
+              if [ "$HEIGHT" -ge 1 ]; then
+                READY=1
+                echo "Disposable SOBYA chain reached block height $HEIGHT."
+                break
+              fi
             fi
             if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-keplr-node.log"; exit 1; fi
             sleep 2
           done
-          test "$READY" -eq 1
+          if [ "$READY" -ne 1 ]; then
+            echo "Disposable SOBYA chain did not commit its first block in time."
+            cat "$RUNNER_TEMP/sobya-keplr-node.log"
+            exit 1
+          fi
 
           WALLET_ADDR="$(cat "$RUNNER_TEMP/keplr-wallet-address")"
           VALIDATOR_ADDR="$(cat "$RUNNER_TEMP/validator-address")"
