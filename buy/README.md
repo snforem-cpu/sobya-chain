@@ -8,6 +8,13 @@ A separate purchase portal for buying native SOBY. Initial intended payment choi
 
 The current page supports MetaMask connection and network selection. The purchase action is deliberately disabled until the payment verifier and secure SOBY payout service are configured and tested.
 
+## Wallet roles
+
+- **Project payment receiving wallet (Ethereum / BNB Chain):** `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`
+- **SOBYA BUY Reserve inventory wallet (SOBYA EVM):** `0xebdb899fFE84a89e1d576964b640491c135651AD`
+
+The reserve address is public configuration only. Its private key and recovery phrase must remain under the owner's control and must never be committed to GitHub or entered into the website. The reserve is intended to hold only the SOBY amount explicitly allocated for sale, transferred from the project's liquidity allocation when the owner approves it. No inventory transfer has been performed by this code change.
+
 ## Security architecture
 
 GitHub Pages is a static host. Never put a private key, seed phrase, RPC credential, or payout signer secret in this repository or browser code. The browser must not be trusted to prove a payment happened.
@@ -21,18 +28,18 @@ The production flow must be:
 5. A server-side SOBYA signer sends the quoted native SOBY amount to the buyer's SOBYA EVM address.
 6. The order API returns the payout transaction hash and status.
 
-The project receiving address is public and can be placed in public configuration after confirmation. The SOBYA payout private key must be held only as a server-side secret, never in this repository or browser code.
+The SOBYA payout private key must be held only as a server-side secret, never in this repository or browser code. Prefer a controlled signing service or isolated signer with strict spending limits, transaction logging, and an emergency pause.
 
 ## Current stage
 
-This is the UI and wallet-connect scaffold only. The public configuration intentionally sets paymentsEnabled to false, leaves the project receiving address empty, and does not include a sale price. No funds can be collected and no SOBY can be dispensed from this page yet.
+This is the UI and wallet-connect scaffold only. The public configuration contains the two public wallet addresses, but `paymentsEnabled` remains `false`, the dynamic pricing service and API are not deployed, and no inventory has been transferred. No funds can be collected and no SOBY can be dispensed from this page yet.
 
 ## Required before real purchases
 
-- Confirm the public project receiving EVM address.
-- Decide and publish the SOBY sale price and quote policy.
-- Set up a server-side API and secure SOBYA payout signer, with its key stored in the hosting provider's secret store.
-- Fund the payout wallet with the SOBY inventory allocated for sale and enough native SOBY for network fees.
+- Verify the reserve address and its SOBYA network/account mapping before transferring inventory.
+- Decide the initial reference price and implement the asymmetric dynamic quote policy (demand and remaining inventory).
+- Set up a server-side API and secure SOBYA payout signer, with its key stored only in a secure hosting secret store or isolated signing system.
+- Fund the reserve wallet with the SOBY inventory allocated for sale and enough native SOBY for network fees.
 - Verify official chain RPCs and payment token contracts; start with USDT on Ethereum, ETH on Ethereum, and native BNB on BNB Smart Chain.
 - Add order limits, quote expiry, minimum confirmations, duplicate-payment protection, audit logs, and an operator pause switch.
 - Test in a controlled environment before enabling production payments.
