@@ -1,0 +1,26 @@
+name: SOBYA BUY API tests
+
+on:
+  pull_request:
+    paths:
+      - 'buy-api/**'
+      - '.github/workflows/buy-api-tests.yml'
+  push:
+    branches: [feature/sobya-buy-portal]
+    paths:
+      - 'buy-api/**'
+      - '.github/workflows/buy-api-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pricing-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: buy-api
