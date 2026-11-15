@@ -1,0 +1,175 @@
+name: SOBYA Live Endpoint Preflight
+
+on:
+  push:
+    branches:
+      - 'feature/live-endpoint-preflight'
+    paths:
+      - '.github/workflows/sobya-live-endpoint-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-live-endpoint-preflight
+  cancel-in-progress: false
+
+jobs:
+  public-rpc-rest-evm:
+    name: Public RPC, REST and EVM read-only checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check CometBFT RPC status and advancing blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          RPC='https://sobya-rpc.nodesafe-app.xyz'
+          EXPECTED_CHAIN='sobya-1'
+          fetch_status() {
+            curl --fail --silent --show-error --connect-timeout 8 --max-time 15 "$RPC/status"
+          }
+          first="$(fetch_status)"
+          chain="$(jq -r '.result.node_info.network // empty' <<<"$first")"
+          height1="$(jq -r '.result.sync_info.latest_block_height // empty' <<<"$first")"
+          node_id="$(jq -r '.result.node_info.id // empty' <<<"$first")"
+          test "$chain" = "$EXPECTED_CHAIN"
+          test "$node_id" = '1dad50ff897c247cba0ff646d0ee1ad59c3abc88'
+          [[ "$height1" =~ ^[0-9]+$ ]] && (( height1 > 0 ))
+          echo "CometBFT chain_id=$chain node_id=$node_id first_height=$height1"
+          sleep 20
+          second="$(fetch_status)"
+          chain2="$(jq -r '.result.node_info.network // empty' <<<"$second")"
+          height2="$(jq -r '.result.sync_info.latest_block_height // empty' <<<"$second")"
+          test "$chain2" = "$EXPECTED_CHAIN"
+          [[ "$height2" =~ ^[0-9]+$ ]] && (( height2 > height1 ))
+          node_id2="$(jq -r '.result.node_info.id // empty' <<<"$second")"
+          test "$node_id2" = "$node_id"
+          echo "PASS: CometBFT node_id=$node_id height advanced from $height1 to $height2"
+
+      - name: Check public Cosmos REST and staking endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://sobya-api.nodesafe-app.xyz'
+          node_info="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 15 "$API/cosmos/base/tendermint/v1beta1/node_info")"
+          rest_chain="$(jq -r '.default_node_info.network // empty' <<<"$node_info")"
+          test "$rest_chain" = 'sobya-1'
+          echo "PASS: Cosmos REST node_info chain_id=$rest_chain"
+          validators="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 20 "$API/cosmos/staking/v1beta1/validators?pagination.limit=100")"
+          count="$(jq -r '.validators | length' <<<"$validators")"
+          echo "PASS: staking REST responded; validator records returned=$count"
+
+          # Read live staking parameters and the current operator record.
+          # These are read-only queries; do not infer a new operator's self-bond
+          # from the existing validator's balance.
+          staking_params="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 20 "$API/cosmos/staking/v1beta1/params")"
+          echo "LIVE_STAKING_PARAMS=$(jq -c '.params // .' <<<"$staking_params")"
+          node_validator='sobyavaloper1qt8da4yt8glv9ehzfl9x248aqulfzhry08wu3a'
+          validator_record="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 20 "$API/cosmos/staking/v1beta1/validators/$node_validator")"
+          echo "LIVE_NODE_SAFE_VALIDATOR=$(jq -c '.validator // .' <<<"$validator_record")"
+
+          # Probe fee-market REST separately; some builds may not expose this
+          # query service. Preserve the HTTP status and response for diagnosis.
+          fee_code="$(curl --silent --show-error --connect-timeout 8 --max-time 15 -o /tmp/sobya-feemarket-params.json -w '%{http_code}' "$API/cosmos/feemarket/v1/params" || true)"
+          echo "LIVE_FEEMARKET_PARAMS_HTTP=$fee_code"
+          if [[ "$fee_code" == "200" ]]; then
+            echo "LIVE_FEEMARKET_PARAMS=$(jq -c . /tmp/sobya-feemarket-params.json)"
+          else
+            echo "LIVE_FEEMARKET_PARAMS_BODY=$(cat /tmp/sobya-feemarket-params.json 2>/dev/null || true)"
+          fi
+
+      - name: Check EVM JSON-RPC chain ID, block height, gas price and owner wallet balances
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVM='https://sobya-evm-rpc.nodesafe-app.xyz'
+          EXPECTED='0x534f425941'
+          rpc() {
+            local method="$1"
+            local params="$2"
+            curl --fail --silent --show-error --connect-timeout 8 --max-time 20 \
+              -H 'Content-Type: application/json' \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":$params}" \
+              "$EVM"
+          }
+          chain_response="$(rpc eth_chainId '[]')"
+          chain="$(jq -r '.result // empty' <<<"$chain_response")"
+          [[ "${chain,,}" == "$EXPECTED" ]]
+          block_response="$(rpc eth_blockNumber '[]')"
+          block="$(jq -r '.result // empty' <<<"$block_response")"
+          [[ "$block" =~ ^0x[0-9a-fA-F]+$ ]]
+          (( $(python3 -c 'import sys; print(int(sys.argv[1],16))' "$block") > 0 ))
+          gas_response="$(rpc eth_gasPrice '[]')"
+          gas_price="$(jq -r '.result // empty' <<<"$gas_response")"
+          [[ "$gas_price" =~ ^0x[0-9a-fA-F]+$ ]]
+          priority_response="$(rpc eth_maxPriorityFeePerGas '[]')"
+          priority_fee="$(jq -r '.result // empty' <<<"$priority_response")"
+          fee_history="$(rpc eth_feeHistory '["0x4","latest",[25,50,75]]')"
+          fee_history_json="$(jq -c '.result // .error' <<<"$fee_history")"
+          founder_address='0xd316993423Fc6268038F4EE3EA7C0C5038513C18'
+          shared_address='0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f'
+          founder="$(rpc eth_getBalance "[\"$founder_address\",\"latest\"]")"
+          shared="$(rpc eth_getBalance "[\"$shared_address\",\"latest\"]")"
+          founder_balance="$(jq -r '.result // empty' <<<"$founder")"
+          shared_balance="$(jq -r '.result // empty' <<<"$shared")"
+          [[ "$founder_balance" =~ ^0x[0-9a-fA-F]+$ ]]
+          [[ "$shared_balance" =~ ^0x[0-9a-fA-F]+$ ]]
+          nonce_response="$(rpc eth_getTransactionCount "[\"$founder_address\",\"latest\"]")"
+          nonce="$(jq -r '.result // empty' <<<"$nonce_response")"
+          estimate_response="$(rpc eth_estimateGas "[{\"from\":\"$founder_address\",\"to\":\"$shared_address\",\"value\":\"0x0\"}]")"
+          estimate="$(jq -r '.result // empty' <<<"$estimate_response")"
+          [[ "$estimate" =~ ^0x[0-9a-fA-F]+$ ]]
+          echo "PASS: EVM chain_id=$chain block=$block gasPrice_wei=$gas_price priorityFee_wei=$priority_fee"
+          echo "EVM feeHistory=$fee_history_json"
+          echo "Founder nonce=$nonce estimated_zero_value_transfer_gas=$estimate"
+          echo "Founder eth_getBalance (wei hex)=$founder_balance"
+          echo "Shared eth_getBalance (wei hex)=$shared_balance"
+          for path in /cosmos/feemarket/v1/params /cosmos/feemarket/v1/base_fee /cosmos/evm/v1/params; do
+            code="$(curl --silent --show-error --connect-timeout 8 --max-time 15 -o /tmp/sobya-fee-query.json -w '%{http_code}' "https://sobya-api.nodesafe-app.xyz$path" || true)"
+            echo "REST $path HTTP $code"
+            if [[ "$code" == "200" ]]; then jq -c . /tmp/sobya-fee-query.json; fi
+          done
+          echo "Read-only checks only; no transaction was signed or broadcast."
+
+  p2p-connectivity:
+    name: Public P2P reachability and peer observation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe reported and standard CometBFT P2P TCP ports
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOST='188.68.36.11'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq netcat-openbsd
+          reachable=0
+          for PORT in 36656 26656; do
+            if nc -vz -w 8 "$HOST" "$PORT"; then
+              echo "TCP reachable: $HOST:$PORT"
+              reachable=1
+            else
+              echo "TCP not reachable: $HOST:$PORT"
+            fi
+          done
+          if (( reachable == 0 )); then
+            echo "FAIL: neither the reported nor standard CometBFT P2P port is reachable externally."
+            exit 1
+          fi
+
+      - name: Observe CometBFT listener and peer count
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          response="$(curl --fail --silent --show-error --connect-timeout 8 --max-time 15 'https://sobya-rpc.nodesafe-app.xyz/net_info')" || {
+            echo "WARNING: could not read CometBFT /net_info"
+            exit 0
+          }
+          jq '{listening: .result.listening, listen_addr: .result.listen_addr, n_peers: .result.n_peers, peers: [.result.peers[]? | {node_id: .node_info.id, remote_ip: .remote_ip, listen_addr: .node_info.listen_addr}]}' <<<"$response"
+          peers="$(jq -r '.result.n_peers // "unknown"' <<<"$response")"
+          if [[ "$peers" == "0" ]]; then
+            echo "WARNING: CometBFT currently reports zero connected peers. The P2P TCP port is reachable, but a second-node handshake and block sync still need verification."
+          fi

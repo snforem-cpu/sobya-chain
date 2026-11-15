@@ -1,5 +1,5 @@
 name: SOBYA Validator Application
-description: Submit a manual expression of interest to operate an independent SOBYA validator. Live transaction instructions follow only after network preflight.
+description: Register interest and begin node preparation for an independent SOBYA validator.
 title: "[Validator Application]: "
 body:
   - type: markdown
@@ -7,9 +7,9 @@ body:
       value: |
         Thank you for your interest in validating SOBYA.
 
-        **This form is public.** Submit only public operator information and public network endpoints. Never post passwords, seed phrases, private keys, validator signing keys, access tokens, or private contact details. The SOBYA team will use your GitHub account to follow up in this issue. This form is reviewed manually and is not connected to an automated support API.
+        **This form is public.** Submit only public operator information. Never post passwords, seed phrases, private keys, validator signing keys, access tokens, or private contact details. The SOBYA team will use your GitHub account to follow up in this issue. Applications are reviewed manually.
 
-        Applying is free. Submission does not guarantee a grant or validator admission. Any support is conditional on eligibility and a separately verified support budget.
+        Applying and preparing a node are free. You may apply before your node is running; public node ID, P2P endpoint, account address, and consensus public key can be supplied later during onboarding. Submission does not guarantee admission or a support grant.
   - type: input
     id: operator
     attributes:
@@ -36,19 +36,19 @@ body:
   - type: input
     id: software
     attributes:
-      label: SOBYA binary release / version
-      description: Include the exact release tag and build source you intend to run.
-      placeholder: Release tag and commit
+      label: Intended SOBYA binary release
+      description: Enter v0.1.0-rc.2 if you plan to use the currently published release.
+      placeholder: v0.1.0-rc.2
     validations:
       required: true
   - type: input
     id: account
     attributes:
-      label: Operator account address
-      description: Public address only.
+      label: Operator account address (if already available)
+      description: Public address only. You may provide it later if you are still preparing your node.
       placeholder: SOBYA account address
     validations:
-      required: true
+      required: false
   - type: input
     id: valoper
     attributes:
@@ -60,32 +60,32 @@ body:
   - type: textarea
     id: consensus
     attributes:
-      label: Consensus public key
-      description: Public consensus key only. Never provide a private validator key.
-      placeholder: Public consensus key / JSON
+      label: Consensus public key (if already available)
+      description: Public consensus key only. Never provide a private validator key. You may provide it after node setup.
+      placeholder: Public consensus key
     validations:
-      required: true
+      required: false
   - type: input
     id: p2p
     attributes:
-      label: Public P2P endpoint (if available)
-      description: Host:port reachable by peers, if available. Do not include credentials.
+      label: Public P2P endpoint (if already available)
+      description: Host:port reachable by peers. You may provide it after server setup.
       placeholder: host.example:26656
     validations:
-      required: true
+      required: false
   - type: input
     id: rpc
     attributes:
       label: Public RPC endpoint (optional)
-      description: Read-only public endpoint, if available. The project has not published a public RPC; do not include credentials.
+      description: Read-only public endpoint, if available. Do not include credentials.
       placeholder: https://rpc.example
     validations:
       required: false
   - type: textarea
     id: infrastructure
     attributes:
-      label: Server and operations
-      description: Provider / region, CPU, RAM, storage, bandwidth, Linux distribution, monitoring and backup approach.
+      label: Server and operations plan
+      description: Provider / region, CPU, RAM, storage, bandwidth, Linux distribution, monitoring and backup approach. If not provisioned yet, describe your plan.
       placeholder: Describe your validator infrastructure and 24/7 operations capability.
     validations:
       required: true
@@ -93,8 +93,8 @@ body:
     id: readiness
     attributes:
       label: Current readiness
-      description: State whether your node is running, syncing, fully synced, or not deployed yet. Include current block height if available.
-      placeholder: Node status, height, uptime history, relevant experience.
+      description: State whether your node is planned, being provisioned, syncing, or fully synced.
+      placeholder: Current status, experience, and expected preparation timeline.
     validations:
       required: true
   - type: checkboxes
@@ -104,9 +104,9 @@ body:
       options:
         - label: I understand this is an application, not a guarantee of admission or financial support.
           required: true
-        - label: I understand I must meet the live chain's verified staking and validator requirements before creating a validator.
+        - label: I understand I must synchronize to the live chain and meet verified staking requirements before creating a validator.
           required: true
         - label: I will never share seed phrases, private keys, validator signing keys, or server credentials.
           required: true
-        - label: I understand that joining an already-running network uses the live-chain validator creation process; a new genesis gentx is not a substitute.
+        - label: I understand that joining an already-running network uses a live-chain validator creation transaction; a new genesis gentx is not a substitute.
           required: true
