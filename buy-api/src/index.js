@@ -20,7 +20,12 @@ export default {
     const allowed = env.ALLOWED_ORIGIN || "";
     if (request.method === "OPTIONS") {
       if (origin !== allowed) return json({ error: "origin_not_allowed" }, 403, allowed);
-      return json({}, 204, allowed);
+      return new Response(null, { status: 204, headers: {
+        "access-control-allow-origin": allowed,
+        "access-control-allow-methods": "GET,POST,OPTIONS",
+        "access-control-allow-headers": "content-type,authorization",
+        "vary": "Origin",
+      }});
     }
     if (origin && origin !== allowed) return json({ error: "origin_not_allowed" }, 403, allowed);
 
