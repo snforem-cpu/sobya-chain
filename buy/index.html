@@ -216,7 +216,7 @@
     button.disabled = true;
     try {
       if (!solanaClient) {
-        const { createSolanaClient } = await import("https://esm.sh/@metamask/connect-solana@1.0.0?bundle");
+        const { createSolanaClient } = await import("https://esm.sh/@metamask/connect-solana@2.1.1?bundle");
         solanaClient = await createSolanaClient({
           dapp: {
             name: "SOBYA BUY",
