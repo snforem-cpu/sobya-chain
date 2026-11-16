@@ -2,6 +2,12 @@ name = "sobya-chain"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "sobya-buy-db"
+database_id = "2c25fe97-d6f9-4614-b5e9-fa72133070f9"
+migrations_dir = "migrations"
+
 [vars]
 SALE_ENABLED = "false"
 ALLOWED_ORIGIN = "https://snforem-cpu.github.io"
