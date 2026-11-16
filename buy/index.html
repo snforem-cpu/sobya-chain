@@ -42,6 +42,7 @@
   let evmClient = null;
   let walletError = null;
   const listenedProviders = new WeakSet();
+  const providerSources = [];
   const chainHex = { 1: "0x1", 56: "0x38" };
   const short = value => value ? value.slice(0, 6) + "…" + value.slice(-4) : "Not connected";
 
@@ -70,15 +71,18 @@
   }
 
   function attachProvider(nextProvider) {
-    if (!nextProvider || listenedProviders.has(nextProvider)) return;
-    provider = nextProvider;
+    if (!nextProvider || typeof nextProvider !== "object") return;
+    if (!providerSources.includes(nextProvider)) providerSources.push(nextProvider);
+    if (listenedProviders.has(nextProvider)) return;
     try {
-      listenedProviders.add(provider);
-      provider.on?.("accountsChanged", accounts => {
+      listenedProviders.add(nextProvider);
+      nextProvider.on?.("accountsChanged", accounts => {
+        // MetaMask emits [] when the user disconnects or revokes this dapp.
         setAccount(accounts);
         if (!account) say("Wallet disconnected.", "تم فصل المحفظة.");
+        else say("Wallet account updated.", "تم تحديث حساب المحفظة.");
       });
-      provider.on?.("chainChanged", () => {
+      nextProvider.on?.("chainChanged", () => {
         say("Network changed. Purchases are still disabled.", "تم تغيير الشبكة. الشراء لا يزال غير مفعّل.");
       });
     } catch (_) {
@@ -87,11 +91,18 @@
   }
 
   async function refreshAccount() {
-    if (!provider?.request) return;
-    try {
-      setAccount(await provider.request({ method: "eth_accounts" }));
-    } catch (_) {
-      // A wallet may not have an active session yet.
+    // Prefer the MetaMask Connect provider used for this dapp session.
+    // Only fall back to the injected provider if the Connect provider cannot be queried.
+    const sources = provider ? [provider, ...providerSources.filter(item => item !== provider)] : providerSources;
+    for (const source of sources) {
+      if (!source?.request) continue;
+      try {
+        const accounts = await source.request({ method: "eth_accounts" });
+        setAccount(accounts);
+        return;
+      } catch (_) {
+        // Try the next available provider.
+      }
     }
   }
 
@@ -175,6 +186,10 @@
   });
   $("asset").addEventListener("change", switchNetwork);
   window.addEventListener("pageshow", refreshAccount);
+  window.addEventListener("focus", refreshAccount);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshAccount();
+  });
 
   translate();
   say("Preparing secure wallet connection…", "جارٍ تجهيز الاتصال الآمن بالمحفظة…");
@@ -196,6 +211,7 @@
       analytics: { enabled: false }
     });
     attachProvider(evmClient.getProvider());
+    if (window.ethereum?.request) attachProvider(window.ethereum);
     await refreshAccount();
     if (!account) say("Connect MetaMask to preview wallet connectivity.", "اربط MetaMask لمعاينة اتصال المحفظة.");
   } catch (error) {
