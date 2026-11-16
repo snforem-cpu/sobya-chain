@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { getPriceSnapshot } from "../src/index.js";
 
-function fakeDb({ state, policy = null, demand = {} }) {
+function fakeDb({ state, demand = {} }) {
   const seen = [];
   return {
     seen,
@@ -12,7 +12,6 @@ function fakeDb({ state, policy = null, demand = {} }) {
         bind() { return this; },
         async first() {
           if (sql.includes("FROM pricing_state")) return state;
-          if (sql.includes("FROM pricing_policy")) return policy;
           if (sql.includes("FROM orders o")) return {
             demand_24h: 0,
             demand_7d: 0,
@@ -34,35 +33,28 @@ const state = {
   updated_at: 1_800_000_000,
 };
 
-test("price snapshot reports opening reference until production policy is configured", async () => {
-  const db = fakeDb({ state, policy: null, demand: { demand_24h: 12, demand_7d: 40, purchases_24h: 3 } });
+test("price snapshot keeps the persisted opening price; rolling demand is telemetry only", async () => {
+  const db = fakeDb({ state, demand: { demand_24h: 12, demand_7d: 40, purchases_24h: 3 } });
   const result = await getPriceSnapshot(db);
   assert.equal(result.priceUsd, 0.005);
   assert.equal(result.dynamicPricingEnabled, false);
-  assert.equal(result.priceStatus, "opening_price_policy_pending");
+  assert.equal(result.priceStatus, "stored_price_waiting_for_purchase_engine");
   assert.equal(result.verifiedDemand24hSoby, 12);
   assert.equal(result.verifiedDemand7dSoby, 40);
   assert.equal(result.verifiedPurchases24h, 3);
-  assert.match(db.seen[2], /o\.status = 'paid'/);
+  assert.equal(db.seen.length, 2);
+  assert.match(db.seen[1], /o\\.status = 'paid'/);
 });
 
-test("complete policy calculates an uncapped price from verified demand", async () => {
-  const policy = {
-    baseline_demand_24h: 100,
-    inventory_weight: 0.25,
-    demand_weight: 0.1,
-    upward_smoothing: 0.5,
-    downward_smoothing: 0.1,
-    floor_price_usd: 0.0025,
-  };
-  const db = fakeDb({
-    state: { ...state, current_price_usd: 100 },
-    policy,
-    demand: { demand_24h: 100_000, demand_7d: 100_000, purchases_24h: 25 },
-  });
-  const result = await getPriceSnapshot(db);
-  assert.equal(result.dynamicPricingEnabled, true);
-  assert.ok(result.priceUsd > 100);
+test("elapsed time and changes in rolling demand never alter the stored price", async () => {
+  const lowDemandDb = fakeDb({ state: { ...state, current_price_usd: 0.0125 }, demand: { demand_24h: 0, demand_7d: 8 } });
+  const highDemandDb = fakeDb({ state: { ...state, current_price_usd: 0.0125 }, demand: { demand_24h: 500_000, demand_7d: 900_000 } });
+  const lowDemand = await getPriceSnapshot(lowDemandDb);
+  const highDemand = await getPriceSnapshot(highDemandDb);
+  assert.equal(lowDemand.priceUsd, 0.0125);
+  assert.equal(highDemand.priceUsd, 0.0125);
+  assert.equal(lowDemand.dynamicPricingEnabled, false);
+  assert.equal(highDemand.dynamicPricingEnabled, false);
 });
 
 test("missing pricing state fails rather than fabricating a price", async () => {
