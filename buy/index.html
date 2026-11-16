@@ -136,6 +136,7 @@
       } catch (_) {
         // Do not fall back to a potentially stale injected provider.
       }
+      if (refreshId !== accountRefreshSequence) return;
       setAccount([]);
       return;
     }
@@ -149,6 +150,7 @@
         setAccount(Array.isArray(accounts) ? accounts : []);
         return;
       } catch (_) {
+        if (refreshId !== accountRefreshSequence) return;
         setAccount([]);
         return;
       }
@@ -170,7 +172,7 @@
       if (evmClient) {
         // Force an explicit account-selection/approval request instead of silently
         // reusing an old or incomplete mobile session.
-        const result = await evmClient.connect({
+        await evmClient.connect({
           chainIds: ["0x1", "0x38"],
           forceRequest: true
         });
