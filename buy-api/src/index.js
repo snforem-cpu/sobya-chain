@@ -1,5 +1,3 @@
-import { calculateDynamicPrice } from "./pricing.js";
-
 const json = (body, status = 200, origin = "*") => new Response(JSON.stringify(body), {
   status,
   headers: {
