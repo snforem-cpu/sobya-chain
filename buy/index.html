@@ -77,10 +77,23 @@
     try {
       listenedProviders.add(nextProvider);
       nextProvider.on?.("accountsChanged", accounts => {
-        // MetaMask emits [] when the user disconnects or revokes this dapp.
-        setAccount(accounts);
-        if (!account) say("Wallet disconnected.", "تم فصل المحفظة.");
-        else say("Wallet account updated.", "تم تحديث حساب المحفظة.");
+        // MetaMask Connect sessions can contain multiple permitted accounts.
+        // The first entry is not guaranteed to be the currently selected account.
+        const activeAccount = evmClient?.getAccount?.();
+        if (activeAccount) {
+          setAccount([activeAccount]);
+        } else if (!Array.isArray(accounts) || accounts.length === 0) {
+          setAccount([]);
+        } else {
+          // Keep the last known account rather than replacing it with a stale
+          // first entry from a merged Connect session.
+          refreshAccount();
+        }
+        if (!account && (!Array.isArray(accounts) || accounts.length === 0)) {
+          say("Wallet disconnected.", "تم فصل المحفظة.");
+        } else {
+          say("Wallet account updated.", "تم تحديث حساب المحفظة.");
+        }
       });
       nextProvider.on?.("chainChanged", () => {
         say("Network changed. Purchases are still disabled.", "تم تغيير الشبكة. الشراء لا يزال غير مفعّل.");
@@ -91,15 +104,34 @@
   }
 
   async function refreshAccount() {
-    // Prefer the MetaMask Connect provider used for this dapp session.
-    // Only fall back to the injected provider if the Connect provider cannot be queried.
+    // MetaMask Connect exposes the selected account separately from the
+    // session's permitted-account list. Do not infer selection from accounts[0].
+    try {
+      const activeAccount = evmClient?.getAccount?.();
+      if (activeAccount) {
+        setAccount([activeAccount]);
+        return;
+      }
+    } catch (_) {
+      // Fall back to provider state during initialization.
+    }
+
+    const selectedAccount = provider?.selectedAccount;
+    if (typeof selectedAccount === "string" && selectedAccount) {
+      setAccount([selectedAccount]);
+      return;
+    }
+
+    // Use the Connect provider first; only use injected providers as a fallback.
     const sources = provider ? [provider, ...providerSources.filter(item => item !== provider)] : providerSources;
     for (const source of sources) {
       if (!source?.request) continue;
       try {
         const accounts = await source.request({ method: "eth_accounts" });
-        setAccount(accounts);
-        return;
+        if (Array.isArray(accounts) && accounts.length) {
+          setAccount(accounts);
+          return;
+        }
       } catch (_) {
         // Try the next available provider.
       }
@@ -125,10 +157,16 @@
           forceRequest: true
         });
         attachProvider(evmClient.getProvider());
-        const connectedAccounts = Array.isArray(result?.accounts) && result.accounts.length
-          ? result.accounts
-          : await provider.request({ method: "eth_accounts" });
-        setAccount(connectedAccounts);
+        // getAccount() returns the selected account; result.accounts can
+        // include older permitted accounts retained by the Connect session.
+        const activeAccount = evmClient.getAccount?.();
+        if (activeAccount) {
+          setAccount([activeAccount]);
+        } else if (Array.isArray(result?.accounts) && result.accounts.length) {
+          setAccount(result.accounts);
+        } else {
+          await refreshAccount();
+        }
       } else {
         const accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
         setAccount(accounts);
