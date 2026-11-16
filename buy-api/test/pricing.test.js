@@ -14,7 +14,6 @@ const policy = {
   upwardSmoothing: 0.5,
   downwardSmoothing: 0.1,
   floorPriceUsd: 0.0025,
-  ceilingPriceUsd: 0.02,
 };
 
 test("returns the opening reference price at neutral baseline", () => {
@@ -22,8 +21,17 @@ test("returns the opening reference price at neutral baseline", () => {
 });
 
 test("inventory depletion increases the target price", () => {
-  const next = calculateDynamicPrice({ ...policy, previousPriceUsd: 0.005, availableInventory: 500_000 });
+  const next = calculateDynamicPrice({ ...policy, availableInventory: 500_000 });
   assert.ok(next > 0.005);
+});
+
+test("strong verified demand can raise price without an artificial ceiling", () => {
+  const next = calculateDynamicPrice({
+    ...policy,
+    verifiedDemand24h: 100_000,
+    previousPriceUsd: 10,
+  });
+  assert.ok(next > 10);
 });
 
 test("a demand decline reduces price gradually, not abruptly", () => {
@@ -38,10 +46,27 @@ test("a demand decline reduces price gradually, not abruptly", () => {
   assert.ok(next > 0.005);
 });
 
+test("enforces the minimum price without imposing a maximum", () => {
+  const low = calculateDynamicPrice({
+    ...policy,
+    previousPriceUsd: 0.003,
+    verifiedDemand24h: 0,
+    floorPriceUsd: 0.0025,
+  });
+  assert.ok(low >= 0.0025);
+
+  const high = calculateDynamicPrice({
+    ...policy,
+    previousPriceUsd: 100,
+    verifiedDemand24h: 100_000,
+  });
+  assert.ok(high > 100);
+});
+
 test("rejects inventory values outside configured range", () => {
   assert.throws(() => calculateDynamicPrice({ ...policy, availableInventory: 1_000_001 }), RangeError);
 });
 
-test("rejects invalid bounds", () => {
-  assert.throws(() => calculateDynamicPrice({ ...policy, floorPriceUsd: 0.03, ceilingPriceUsd: 0.02 }), RangeError);
+test("rejects non-positive minimum price", () => {
+  assert.throws(() => calculateDynamicPrice({ ...policy, floorPriceUsd: 0 }), RangeError);
 });
