@@ -5,8 +5,9 @@ A separate purchase portal for buying native SOBY. Initial intended payment choi
 - USDT on Ethereum mainnet
 - ETH on Ethereum mainnet
 - BNB on BNB Smart Chain
+- Native SOL on Solana mainnet (MetaMask Connect Solana wallet)
 
-The current page supports MetaMask connection and network selection. The purchase action is deliberately disabled until the payment verifier and secure SOBY payout service are configured and tested.
+The current page supports MetaMask EVM connection and a separate MetaMask Connect Solana payment-wallet connection. The Solana payment address is distinct from the EVM SOBYA receiving address. The purchase action is deliberately disabled until the payment verifier and secure SOBY payout service are configured and tested.
 
 ## Approved opening price policy
 
@@ -50,7 +51,7 @@ This is the UI and wallet-connect scaffold only. The public configuration contai
 - Implement and test the asymmetric dynamic quote policy and enforce the 10-minute quote expiry server-side.
 - Set up a server-side API and secure SOBYA payout signer, with its key stored only in a secure hosting secret store or isolated signing system.
 - Keep sufficient native SOBY in the reserve wallet for network fees, separately accounting for sale inventory.
-- Verify official chain RPCs and payment token contracts; start with USDT on Ethereum, ETH on Ethereum, and native BNB on BNB Smart Chain.
+- Verify official chain RPCs and payment token contracts; start with USDT on Ethereum, ETH on Ethereum, native BNB on BNB Smart Chain, and native SOL on Solana mainnet. Solana signature verification, finalized commitment handling, and SOL/USD conversion must be implemented and tested before enabling that payment rail.
 - Add order limits, minimum confirmations, duplicate-payment protection, audit logs, and an operator pause switch.
 - Test in a controlled environment before enabling production payments.
 
