@@ -107,9 +107,17 @@
     $("connectBtn").disabled = true;
     try {
       if (evmClient) {
-        const result = await evmClient.connect({ chainIds: ["0x1", "0x38"] });
+        // Force an explicit account-selection/approval request instead of silently
+        // reusing an old or incomplete mobile session.
+        const result = await evmClient.connect({
+          chainIds: ["0x1", "0x38"],
+          forceRequest: true
+        });
         attachProvider(evmClient.getProvider());
-        setAccount(result.accounts || []);
+        const connectedAccounts = Array.isArray(result?.accounts) && result.accounts.length
+          ? result.accounts
+          : await provider.request({ method: "eth_accounts" });
+        setAccount(connectedAccounts);
       } else {
         const accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
         setAccount(accounts);
