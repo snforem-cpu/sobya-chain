@@ -41,6 +41,7 @@
   let provider = window.ethereum || null;
   let evmClient = null;
   let walletError = null;
+  const listenedProviders = new WeakSet();
   const chainHex = { 1: "0x1", 56: "0x38" };
   const short = value => value ? value.slice(0, 6) + "…" + value.slice(-4) : "Not connected";
 
@@ -69,10 +70,10 @@
   }
 
   function attachProvider(nextProvider) {
-    if (!nextProvider || provider === nextProvider && provider.__sobyaListenersAttached) return;
+    if (!nextProvider || listenedProviders.has(nextProvider)) return;
     provider = nextProvider;
     try {
-      provider.__sobyaListenersAttached = true;
+      listenedProviders.add(provider);
       provider.on?.("accountsChanged", accounts => {
         setAccount(accounts);
         if (!account) say("Wallet disconnected.", "تم فصل المحفظة.");
