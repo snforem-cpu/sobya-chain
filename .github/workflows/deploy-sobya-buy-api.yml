@@ -3,6 +3,7 @@ name: Deploy SOBYA BUY API
 on:
   push:
     branches:
+      - main
       - feature/sobya-buy-portal
     paths:
       - 'buy-api/**'

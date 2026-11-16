@@ -82,8 +82,20 @@
       );
     } catch (error) {
       console.error("SOBYA live price request failed:", error);
-      $("sobyPrice").textContent = lang === "en" ? "Unavailable" : "غير متاح";
-      setPriceMeta("Could not load a verified price from the SOBYA API", "تعذر تحميل سعر موثوق من واجهة SOBYA");
+      // Sales are fail-closed. While payments are disabled, the approved
+      // opening reference price remains safe to display if the API is offline.
+      // Never use this fallback as a quote or enable checkout from the browser.
+      const openingPrice = Number(config.salePriceUsd);
+      if (config.paymentsEnabled !== true && Number.isFinite(openingPrice) && openingPrice > 0) {
+        $("sobyPrice").textContent = "$" + openingPrice.toFixed(3);
+        setPriceMeta(
+          "Opening reference price · live pricing API is reconnecting; purchases remain disabled",
+          "سعر البداية المرجعي · يجري إعادة الاتصال بواجهة التسعير؛ الشراء لا يزال متوقفاً"
+        );
+      } else {
+        $("sobyPrice").textContent = lang === "en" ? "Unavailable" : "غير متاح";
+        setPriceMeta("Could not load a verified live quote from the SOBYA API", "تعذر تحميل عرض سعر مباشر موثوق من واجهة SOBYA");
+      }
     }
   }
 
