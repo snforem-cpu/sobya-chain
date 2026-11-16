@@ -42,6 +42,7 @@
   let evmClient = null;
   let walletError = null;
   let connectManagedProvider = false;
+  let accountRefreshSequence = 0;
   const listenedProviders = new WeakSet();
   const chainHex = { 1: "0x1", 56: "0x38" };
   const short = value => value ? value.slice(0, 6) + "…" + value.slice(-4) : "Not connected";
@@ -83,6 +84,7 @@
         // not guaranteed to be the selected account. Resolve selection from
         // the active Connect client/provider instead.
         if (!Array.isArray(accounts) || accounts.length === 0) {
+          accountRefreshSequence += 1;
           setAccount([]);
           say("Wallet disconnected.", "تم فصل المحفظة.");
           return;
@@ -111,6 +113,7 @@
   }
 
   async function refreshAccount() {
+    const refreshId = ++accountRefreshSequence;
     if (evmClient && connectManagedProvider && provider?.request) {
       // getAccount() is the Connect client's selected-account API. eth_coinbase
       // is the SDK provider's single-address selected-account RPC fallback.
@@ -125,6 +128,7 @@
       }
       try {
         const selectedAccount = await provider.request({ method: "eth_coinbase" });
+        if (refreshId !== accountRefreshSequence) return;
         if (typeof selectedAccount === "string" && selectedAccount) {
           setAccount(selectedAccount);
           return;
@@ -141,6 +145,7 @@
     if (provider?.request) {
       try {
         const accounts = await provider.request({ method: "eth_accounts", params: [] });
+        if (refreshId !== accountRefreshSequence) return;
         setAccount(Array.isArray(accounts) ? accounts : []);
         return;
       } catch (_) {
