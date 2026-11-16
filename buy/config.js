@@ -1,7 +1,7 @@
 // Public browser settings only. Never put private keys or API secrets here.
 window.SOBYA_BUY_CONFIG = Object.freeze({
   paymentsEnabled: false,
-  apiBaseUrl: "",
+  apiBaseUrl: "https://sobya-chain.snforem.workers.dev",
   sobyaChainId: 357812033857,
   sobyaRpcUrl: "https://sobya-evm-rpc.nodesafe-app.xyz",
   sobyaExplorerUrl: "https://explorer.nodesafe-app.xyz/sobya",
