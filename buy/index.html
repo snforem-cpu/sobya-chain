@@ -18,13 +18,13 @@
 <p class="lead" data-en="Connect your wallet, choose a supported payment asset and receive native SOBY directly in your SOBYA wallet after your payment is verified." data-ar="اربط محفظتك، واختر وسيلة دفع مدعومة، واستلم عملة SOBY الأصلية مباشرة في محفظتك على شبكة SOBYA بعد التحقق من دفعتك.">Connect your wallet, choose a supported payment asset and receive native SOBY directly in your SOBYA wallet after your payment is verified.</p>
 <div class="points"><span class="pill" data-en="Wallet-to-wallet" data-ar="من محفظتك إلى محفظتك">Wallet-to-wallet</span><span class="pill" data-en="No liquidity pool" data-ar="دون مجمع سيولة">No liquidity pool</span><span class="pill" data-en="Native SOBY payout" data-ar="استلام SOBY الأصلية">Native SOBY payout</span></div>
 </div>
-<section class="card" aria-label="Buy SOBY"><div class="card-head"><h2 data-en="Buy SOBY" data-ar="شراء SOBY">Buy SOBY</h2><span class="tag" data-en="EARLY ACCESS" data-ar="تجهيز أولي">EARLY ACCESS</span></div>
-<div class="price-panel" aria-live="polite"><div class="price-label" data-en="Current SOBY price" data-ar="سعر SOBY الحالي">Current SOBY price</div><div class="price-value" id="sobyPrice">$0.005</div><div class="price-meta" id="priceMeta" data-en="Opening reference price · live pricing connection pending" data-ar="سعر البداية المرجعي · ربط التسعير المباشر قيد الإعداد">Opening reference price · live pricing connection pending</div></div>
+<section class="card" aria-label="Buy SOBY"><div class="card-head"><h2 data-en="Buy SOBY" data-ar="شراء SOBY">Buy SOBY</h2><span class="tag" data-en="PRE-LAUNCH" data-ar="قبل الإطلاق">PRE-LAUNCH</span></div>
+<div class="price-panel" aria-live="polite"><div class="price-label" data-en="Current SOBY price" data-ar="سعر SOBY الحالي">Current SOBY price</div><div class="price-value" id="sobyPrice">$0.005</div><div class="price-meta" id="priceMeta" data-en="Opening price" data-ar="السعر الافتتاحي">Opening price</div></div>
 <div class="field"><label for="payAmount" data-en="You pay" data-ar="أنت تدفع">You pay</label><div class="control"><input id="payAmount" type="number" min="0" step="any" placeholder="0.00" inputmode="decimal" disabled><select id="asset" aria-label="Payment asset"><option value="USDT_ETH">USDT · Ethereum</option><option value="ETH">ETH · Ethereum</option><option value="BNB">BNB · BNB Chain</option><option value="SOL_SOLANA">SOL · Solana</option></select></div></div><button class="solana-connect" id="connectSolanaBtn" type="button" data-en="Connect MetaMask Solana wallet" data-ar="ربط محفظة Solana في MetaMask">Connect MetaMask Solana wallet</button><div class="payment-wallet" id="solanaPaymentWallet"><span data-en="SOL payment wallet" data-ar="محفظة دفع SOL">SOL payment wallet</span><strong id="solanaWalletAddress">Not connected</strong></div>
 <div class="receive"><small data-en="You receive" data-ar="ستحصل على">You receive</small><strong id="receiveAmount">— SOBY</strong></div>
 <div class="walletline"><span data-en="Receiving wallet" data-ar="محفظة الاستلام">Receiving wallet</span><span class="wallet-address" id="walletAddress">Not connected</span></div>
-<button class="buybtn" id="buyBtn" type="button" disabled data-en="Purchases are not enabled yet" data-ar="الشراء غير مفعّل بعد">Purchases are not enabled yet</button>
-<div class="notice" data-en="Purchases are temporarily disabled while the payment verifier and secure SOBY payout service are being configured. Do not send funds to any address displayed outside this official page." data-ar="الشراء متوقف مؤقتاً إلى حين إعداد خدمة التحقق من المدفوعات وإرسال SOBY الآمنة. لا ترسل أموالاً إلى أي عنوان يظهر خارج هذه الصفحة الرسمية.">Purchases are temporarily disabled while the payment verifier and secure SOBY payout service are being configured. Do not send funds to any address displayed outside this official page.</div>
+<button class="buybtn" id="buyBtn" type="button" disabled data-en="Sales opening soon" data-ar="سيبدأ البيع قريباً">Sales opening soon</button>
+<div class="notice" data-en="SOBY sales are not open yet. No payment is being accepted at this time. Please do not send funds." data-ar="لم يبدأ بيع SOBY بعد. لا نقبل أي مدفوعات في الوقت الحالي. يرجى عدم إرسال أي أموال.">SOBY sales are not open yet. No payment is being accepted at this time. Please do not send funds.</div>
 <div class="status" id="status" role="status" aria-live="polite">Connect MetaMask to preview wallet connectivity.</div></section></section>
 <section class="how"><h2 data-en="A simple purchase flow" data-ar="خطوات شراء بسيطة">A simple purchase flow</h2><div class="steps">
 <article class="step"><div class="num">01</div><h3 data-en="Connect your wallet" data-ar="اربط محفظتك">Connect your wallet</h3><p data-en="Use MetaMask to connect your EVM wallet. You remain in control of your keys." data-ar="استخدم MetaMask لربط محفظتك، وتبقى مفاتيحك تحت سيطرتك.">Use MetaMask to connect your EVM wallet. You remain in control of your keys.</p></article>
@@ -77,8 +77,8 @@
       const live = data.dynamicPricingEnabled === true;
       const demand = Number(data.verifiedDemand24hSoby || 0).toLocaleString();
       setPriceMeta(
-        live ? `Live calculation · ${demand} SOBY in verified purchases over 24h` : "Opening reference price · production pricing policy is not configured",
-        live ? `حساب مباشر · ${demand} SOBY من مشتريات مؤكدة خلال 24 ساعة` : "سعر البداية المرجعي · سياسة التسعير الإنتاجية لم تُضبط بعد"
+        live ? `Live calculation · ${demand} SOBY in verified purchases over 24h` : "Opening price",
+        live ? `حساب مباشر · ${demand} SOBY من مشتريات مؤكدة خلال 24 ساعة` : "السعر الافتتاحي"
       );
     } catch (error) {
       console.error("SOBYA live price request failed:", error);
@@ -89,8 +89,8 @@
       if (config.paymentsEnabled !== true && Number.isFinite(openingPrice) && openingPrice > 0) {
         $("sobyPrice").textContent = "$" + openingPrice.toFixed(3);
         setPriceMeta(
-          "Opening reference price · live pricing API is reconnecting; purchases remain disabled",
-          "سعر البداية المرجعي · يجري إعادة الاتصال بواجهة التسعير؛ الشراء لا يزال متوقفاً"
+          "Opening price",
+          "السعر الافتتاحي"
         );
       } else {
         $("sobyPrice").textContent = lang === "en" ? "Unavailable" : "غير متاح";
