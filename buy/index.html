@@ -54,14 +54,18 @@
     $("status").textContent = lang === "en" ? en : ar;
   }
 
+  function setPriceMeta(en, ar) {
+    $("priceMeta").dataset.en = en;
+    $("priceMeta").dataset.ar = ar;
+    $("priceMeta").textContent = lang === "en" ? en : ar;
+  }
+
   async function loadPrice() {
     const config = window.SOBYA_BUY_CONFIG || {};
-    const base = typeof config.apiBaseUrl === "string" ? config.apiBaseUrl.trim().replace(/\\/$/, "") : "";
+    const base = typeof config.apiBaseUrl === "string" ? config.apiBaseUrl.trim().replace(/\/$/, "") : "";
     if (!base) {
       $("sobyPrice").textContent = "$0.005";
-      $("priceMeta").textContent = lang === "en"
-        ? "Opening reference price · live pricing API is not connected yet"
-        : "سعر البداية المرجعي · لم يتم ربط واجهة التسعير المباشر بعد";
+      setPriceMeta("Opening reference price · live pricing API is not connected yet", "سعر البداية المرجعي · لم يتم ربط واجهة التسعير المباشر بعد");
       return;
     }
     try {
@@ -71,14 +75,15 @@
       if (!Number.isFinite(data.priceUsd) || data.priceUsd <= 0) throw new Error("Invalid price response");
       $("sobyPrice").textContent = "$" + data.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 8 });
       const live = data.dynamicPricingEnabled === true;
-      const demand = Number(data.verifiedDemand24hSoby || 0);
-      $("priceMeta").textContent = live
-        ? (lang === "en" ? `Live calculation · ${demand.toLocaleString()} SOBY in verified purchases over 24h` : `حساب مباشر · ${demand.toLocaleString()} SOBY من مشتريات مؤكدة خلال 24 ساعة`)
-        : (lang === "en" ? "Opening reference price · production pricing policy is not configured" : "سعر البداية المرجعي · سياسة التسعير الإنتاجية لم تُضبط بعد");
+      const demand = Number(data.verifiedDemand24hSoby || 0).toLocaleString();
+      setPriceMeta(
+        live ? `Live calculation · ${demand} SOBY in verified purchases over 24h` : "Opening reference price · production pricing policy is not configured",
+        live ? `حساب مباشر · ${demand} SOBY من مشتريات مؤكدة خلال 24 ساعة` : "سعر البداية المرجعي · سياسة التسعير الإنتاجية لم تُضبط بعد"
+      );
     } catch (error) {
       console.error("SOBYA live price request failed:", error);
       $("sobyPrice").textContent = lang === "en" ? "Unavailable" : "غير متاح";
-      $("priceMeta").textContent = lang === "en" ? "Could not load a verified price from the SOBYA API" : "تعذر تحميل سعر موثوق من واجهة SOBYA";
+      setPriceMeta("Could not load a verified price from the SOBYA API", "تعذر تحميل سعر موثوق من واجهة SOBYA");
     }
   }
 
