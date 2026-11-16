@@ -210,7 +210,8 @@
       },
       analytics: { enabled: false }
     });
-    attachProvider(evmClient.getProvider());
+    provider = evmClient.getProvider();
+    attachProvider(provider);
     if (window.ethereum?.request) attachProvider(window.ethereum);
     await refreshAccount();
     if (!account) say("Connect MetaMask to preview wallet connectivity.", "اربط MetaMask لمعاينة اتصال المحفظة.");
