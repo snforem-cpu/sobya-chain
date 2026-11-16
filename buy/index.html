@@ -38,11 +38,11 @@
   const $ = id => document.getElementById(id);
   let account = null;
   let lang = "en";
-  let provider = window.ethereum || null;
+  let provider = null;
   let evmClient = null;
   let walletError = null;
+  let connectManagedProvider = false;
   const listenedProviders = new WeakSet();
-  const providerSources = [];
   const chainHex = { 1: "0x1", 56: "0x38" };
   const short = value => value ? value.slice(0, 6) + "…" + value.slice(-4) : "Not connected";
 
@@ -63,36 +63,43 @@
       : (lang === "en" ? "Connect MetaMask" : "ربط MetaMask");
   }
 
-  function setAccount(accounts) {
-    account = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  function setAccount(value) {
+    const candidate = Array.isArray(value) ? value[0] : value;
+    account = typeof candidate === "string" && /^0x[a-fA-F0-9]{40}$/.test(candidate)
+      ? candidate
+      : null;
     $("walletAddress").textContent = short(account);
     $("walletAddress").title = account || "";
     translate();
   }
 
-  function attachProvider(nextProvider) {
+  function attachProvider(nextProvider, managedByConnect = false) {
     if (!nextProvider || typeof nextProvider !== "object") return;
-    if (!providerSources.includes(nextProvider)) providerSources.push(nextProvider);
     if (listenedProviders.has(nextProvider)) return;
     try {
       listenedProviders.add(nextProvider);
-      nextProvider.on?.("accountsChanged", accounts => {
-        // MetaMask Connect sessions can contain multiple permitted accounts.
-        // The first entry is not guaranteed to be the currently selected account.
-        const activeAccount = evmClient?.getAccount?.();
-        if (activeAccount) {
-          setAccount([activeAccount]);
-        } else if (!Array.isArray(accounts) || accounts.length === 0) {
+      nextProvider.on?.("accountsChanged", async accounts => {
+        // Connect sessions may merge permitted accounts; their first entry is
+        // not guaranteed to be the selected account. Resolve selection from
+        // the active Connect client/provider instead.
+        if (!Array.isArray(accounts) || accounts.length === 0) {
           setAccount([]);
-        } else {
-          // Keep the last known account rather than replacing it with a stale
-          // first entry from a merged Connect session.
-          refreshAccount();
-        }
-        if (!account && (!Array.isArray(accounts) || accounts.length === 0)) {
           say("Wallet disconnected.", "تم فصل المحفظة.");
+          return;
+        }
+
+        if (managedByConnect) {
+          await refreshAccount();
         } else {
+          // A conventional injected EIP-1193 provider exposes its selected
+          // account first in eth_accounts / accountsChanged.
+          setAccount(accounts);
+        }
+
+        if (account) {
           say("Wallet account updated.", "تم تحديث حساب المحفظة.");
+        } else {
+          say("Could not confirm the selected wallet account. Reconnect your wallet.", "تعذر تأكيد الحساب المحدد. أعد ربط المحفظة.");
         }
       });
       nextProvider.on?.("chainChanged", () => {
@@ -104,38 +111,44 @@
   }
 
   async function refreshAccount() {
-    // MetaMask Connect exposes the selected account separately from the
-    // session's permitted-account list. Do not infer selection from accounts[0].
-    try {
-      const activeAccount = evmClient?.getAccount?.();
-      if (activeAccount) {
-        setAccount([activeAccount]);
-        return;
-      }
-    } catch (_) {
-      // Fall back to provider state during initialization.
-    }
-
-    const selectedAccount = provider?.selectedAccount;
-    if (typeof selectedAccount === "string" && selectedAccount) {
-      setAccount([selectedAccount]);
-      return;
-    }
-
-    // Use the Connect provider first; only use injected providers as a fallback.
-    const sources = provider ? [provider, ...providerSources.filter(item => item !== provider)] : providerSources;
-    for (const source of sources) {
-      if (!source?.request) continue;
+    if (evmClient && connectManagedProvider && provider?.request) {
+      // getAccount() is the Connect client's selected-account API. eth_coinbase
+      // is the SDK provider's single-address selected-account RPC fallback.
       try {
-        const accounts = await source.request({ method: "eth_accounts" });
-        if (Array.isArray(accounts) && accounts.length) {
-          setAccount(accounts);
+        const activeAccount = evmClient.getAccount?.();
+        if (typeof activeAccount === "string" && activeAccount) {
+          setAccount(activeAccount);
           return;
         }
       } catch (_) {
-        // Try the next available provider.
+        // Try the provider's selected-account RPC.
+      }
+      try {
+        const selectedAccount = await provider.request({ method: "eth_coinbase" });
+        if (typeof selectedAccount === "string" && selectedAccount) {
+          setAccount(selectedAccount);
+          return;
+        }
+      } catch (_) {
+        // Do not fall back to a potentially stale injected provider.
+      }
+      setAccount([]);
+      return;
+    }
+
+    // Legacy injected-provider fallback is used only when Connect initialization
+    // failed; there is never a second provider competing with an active session.
+    if (provider?.request) {
+      try {
+        const accounts = await provider.request({ method: "eth_accounts", params: [] });
+        setAccount(Array.isArray(accounts) ? accounts : []);
+        return;
+      } catch (_) {
+        setAccount([]);
+        return;
       }
     }
+    setAccount([]);
   }
 
   async function connect() {
@@ -156,17 +169,12 @@
           chainIds: ["0x1", "0x38"],
           forceRequest: true
         });
-        attachProvider(evmClient.getProvider());
-        // getAccount() returns the selected account; result.accounts can
-        // include older permitted accounts retained by the Connect session.
-        const activeAccount = evmClient.getAccount?.();
-        if (activeAccount) {
-          setAccount([activeAccount]);
-        } else if (Array.isArray(result?.accounts) && result.accounts.length) {
-          setAccount(result.accounts);
-        } else {
-          await refreshAccount();
-        }
+        provider = evmClient.getProvider();
+        connectManagedProvider = true;
+        attachProvider(provider, true);
+        // Never use result.accounts[0]: Connect sessions may return merged
+        // permitted accounts rather than selection-first ordering.
+        await refreshAccount();
       } else {
         const accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
         setAccount(accounts);
@@ -249,15 +257,17 @@
       analytics: { enabled: false }
     });
     provider = evmClient.getProvider();
-    attachProvider(provider);
-    if (window.ethereum?.request) attachProvider(window.ethereum);
+    connectManagedProvider = true;
+    attachProvider(provider, true);
     await refreshAccount();
     if (!account) say("Connect MetaMask to preview wallet connectivity.", "اربط MetaMask لمعاينة اتصال المحفظة.");
   } catch (error) {
     console.error("SOBYA MetaMask Connect initialization failed:", error);
     walletError = "Wallet connector could not load. Check your internet connection and reload the page.";
     if (window.ethereum?.request) {
-      attachProvider(window.ethereum);
+      provider = window.ethereum;
+      connectManagedProvider = false;
+      attachProvider(provider, false);
       await refreshAccount();
       if (!account) say("Connect MetaMask to preview wallet connectivity.", "اربط MetaMask لمعاينة اتصال المحفظة.");
     } else {
