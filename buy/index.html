@@ -32,17 +32,177 @@
 </div></section></main>
 <footer class="foot"><span>© SOBYA Network · SOBYA BUY</span><span><a href="../index.html" data-en="Official website" data-ar="الموقع الرسمي">Official website</a> · <a href="https://explorer.nodesafe-app.xyz/sobya" target="_blank" rel="noopener">Explorer</a> · <a href="https://t.me/SOBYAOfficial" target="_blank" rel="noopener">Telegram</a></span></footer>
 </div>
-<script src="./config.js"></script><script>
-(() => {
- const $=id=>document.getElementById(id); let account=null,lang="en";
- const chainHex={1:"0x1",56:"0x38"};
- const short=v=>v?v.slice(0,6)+"…"+v.slice(-4):"Not connected";
- function say(en,ar){$("status").textContent=lang==="en"?en:ar}
- function translate(){document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";$("app").classList.toggle("rtl",lang==="ar");document.querySelectorAll("[data-en][data-ar]").forEach(e=>e.textContent=e.dataset[lang]);$("langBtn").textContent=lang==="en"?"العربية":"English";$("connectBtn").textContent=account?short(account):(lang==="en"?"Connect MetaMask":"ربط MetaMask")}
- async function connect(){if(!window.ethereum){say("MetaMask was not detected. Open this page in a browser with MetaMask enabled.","لم يتم العثور على MetaMask. افتح الصفحة في متصفح يدعم المحفظة.");return}try{const a=await window.ethereum.request({method:"eth_requestAccounts"});account=a[0]||null;$("walletAddress").textContent=short(account);$("walletAddress").title=account||"";translate();say("Wallet connected. Purchases remain disabled until the secure payment service is deployed.","تم ربط المحفظة. الشراء متوقف حتى نشر خدمة الدفع الآمنة.")}catch(e){say(e&&e.code===4001?"Connection request was rejected.":"Could not connect to MetaMask.",e&&e.code===4001?"تم رفض طلب ربط المحفظة.":"تعذر الاتصال بـ MetaMask.")}}
- async function switchNetwork(){if(!window.ethereum){say("Connect MetaMask first.","اربط MetaMask أولاً.");return}const id=$("asset").value==="BNB"?56:1;try{await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:chainHex[id]}]});say("Wallet network selected. Purchases are not active yet.","تم اختيار شبكة الدفع. الشراء غير مفعّل بعد.")}catch(e){if(e&&e.code===4902)say("Add the selected network to MetaMask using its official details first.","أضف الشبكة المختارة إلى MetaMask ببياناتها الرسمية أولاً.");else if(e&&e.code===4001)say("Network switch was rejected.","تم رفض تغيير الشبكة.");else say("Could not switch network.","تعذر تغيير الشبكة.")}}
- $("connectBtn").addEventListener("click",connect);$("langBtn").addEventListener("click",()=>{lang=lang==="en"?"ar":"en";translate()});$("asset").addEventListener("change",switchNetwork);
- if(window.ethereum){window.ethereum.on?.("accountsChanged",a=>{account=a[0]||null;$("walletAddress").textContent=short(account);translate();if(!account)say("Wallet disconnected.","تم فصل المحفظة.")});window.ethereum.on?.("chainChanged",()=>say("Network changed. Purchases are still disabled.","تم تغيير الشبكة. الشراء لا يزال غير مفعّل."))}
- translate();if(!(window.SOBYA_BUY_CONFIG&&window.SOBYA_BUY_CONFIG.paymentsEnabled))$("buyBtn").disabled=true;
+<script src="./config.js"></script>
+<script type="module">
+(async () => {
+  const $ = id => document.getElementById(id);
+  let account = null;
+  let lang = "en";
+  let provider = window.ethereum || null;
+  let evmClient = null;
+  let walletError = null;
+  const chainHex = { 1: "0x1", 56: "0x38" };
+  const short = value => value ? value.slice(0, 6) + "…" + value.slice(-4) : "Not connected";
+
+  function say(en, ar) {
+    $("status").textContent = lang === "en" ? en : ar;
+  }
+
+  function translate() {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    $("app").classList.toggle("rtl", lang === "ar");
+    document.querySelectorAll("[data-en][data-ar]").forEach(element => {
+      element.textContent = element.dataset[lang];
+    });
+    $("langBtn").textContent = lang === "en" ? "العربية" : "English";
+    $("connectBtn").textContent = account
+      ? short(account)
+      : (lang === "en" ? "Connect MetaMask" : "ربط MetaMask");
+  }
+
+  function setAccount(accounts) {
+    account = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+    $("walletAddress").textContent = short(account);
+    $("walletAddress").title = account || "";
+    translate();
+  }
+
+  function attachProvider(nextProvider) {
+    if (!nextProvider || provider === nextProvider && provider.__sobyaListenersAttached) return;
+    provider = nextProvider;
+    try {
+      provider.__sobyaListenersAttached = true;
+      provider.on?.("accountsChanged", accounts => {
+        setAccount(accounts);
+        if (!account) say("Wallet disconnected.", "تم فصل المحفظة.");
+      });
+      provider.on?.("chainChanged", () => {
+        say("Network changed. Purchases are still disabled.", "تم تغيير الشبكة. الشراء لا يزال غير مفعّل.");
+      });
+    } catch (_) {
+      // Some wallet providers expose read-only event interfaces.
+    }
+  }
+
+  async function refreshAccount() {
+    if (!provider?.request) return;
+    try {
+      setAccount(await provider.request({ method: "eth_accounts" }));
+    } catch (_) {
+      // A wallet may not have an active session yet.
+    }
+  }
+
+  async function connect() {
+    if (!evmClient && !provider) {
+      say(
+        walletError || "The secure wallet connector is still loading. Please try again shortly.",
+        walletError || "موصل المحفظة الآمن ما زال قيد التحميل. حاول مرة أخرى بعد قليل."
+      );
+      return;
+    }
+
+    $("connectBtn").disabled = true;
+    try {
+      if (evmClient) {
+        const result = await evmClient.connect({ chainIds: ["0x1", "0x38"] });
+        attachProvider(evmClient.getProvider());
+        setAccount(result.accounts || []);
+      } else {
+        const accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
+        setAccount(accounts);
+      }
+
+      if (account) {
+        say(
+          "Wallet connected. Purchases remain disabled until the secure payment service is deployed.",
+          "تم ربط المحفظة. الشراء متوقف حتى نشر خدمة الدفع الآمنة."
+        );
+      } else {
+        say("No wallet account was returned. Please try again.", "لم يتم إرجاع حساب من المحفظة. حاول مرة أخرى.");
+      }
+    } catch (error) {
+      if (error?.code === 4001) {
+        say("Connection request was rejected.", "تم رفض طلب ربط المحفظة.");
+      } else if (error?.code === -32002) {
+        say("A wallet connection request is already pending. Check MetaMask.", "يوجد طلب اتصال معلّق بالفعل. تحقق من MetaMask.");
+      } else {
+        console.error("SOBYA wallet connection failed:", error);
+        say("Could not connect. Please unlock MetaMask and try again.", "تعذر الاتصال. افتح قفل MetaMask ثم حاول مرة أخرى.");
+      }
+    } finally {
+      $("connectBtn").disabled = false;
+    }
+  }
+
+  async function switchNetwork() {
+    if (!account || !provider?.request) {
+      say("Connect your wallet first.", "اربط محفظتك أولاً.");
+      return;
+    }
+    const id = $("asset").value === "BNB" ? 56 : 1;
+    try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainHex[id] }]
+      });
+      say("Wallet network selected. Purchases are not active yet.", "تم اختيار شبكة الدفع. الشراء غير مفعّل بعد.");
+    } catch (error) {
+      if (error?.code === 4902) {
+        say("Add the selected network to MetaMask using its official details first.", "أضف الشبكة المختارة إلى MetaMask ببياناتها الرسمية أولاً.");
+      } else if (error?.code === 4001) {
+        say("Network switch was rejected.", "تم رفض تغيير الشبكة.");
+      } else {
+        say("Could not switch network.", "تعذر تغيير الشبكة.");
+      }
+    }
+  }
+
+  $("connectBtn").addEventListener("click", connect);
+  $("langBtn").addEventListener("click", () => {
+    lang = lang === "en" ? "ar" : "en";
+    translate();
+  });
+  $("asset").addEventListener("change", switchNetwork);
+  window.addEventListener("pageshow", refreshAccount);
+
+  translate();
+  say("Preparing secure wallet connection…", "جارٍ تجهيز الاتصال الآمن بالمحفظة…");
+
+  try {
+    const { createEVMClient } = await import("https://esm.sh/@metamask/connect-evm@2.1.1?bundle");
+    evmClient = await createEVMClient({
+      dapp: {
+        name: "SOBYA BUY",
+        url: window.location.href,
+        iconUrl: new URL("../assets/logo/sobya-coin-128.png", window.location.href).href
+      },
+      api: {
+        supportedNetworks: {
+          "0x1": "https://ethereum-rpc.publicnode.com",
+          "0x38": "https://bsc-rpc.publicnode.com"
+        }
+      },
+      analytics: { enabled: false }
+    });
+    attachProvider(evmClient.getProvider());
+    await refreshAccount();
+    if (!account) say("Connect MetaMask to preview wallet connectivity.", "اربط MetaMask لمعاينة اتصال المحفظة.");
+  } catch (error) {
+    console.error("SOBYA MetaMask Connect initialization failed:", error);
+    walletError = "Wallet connector could not load. Check your internet connection and reload the page.";
+    if (window.ethereum?.request) {
+      attachProvider(window.ethereum);
+      await refreshAccount();
+      if (!account) say("Connect MetaMask to preview wallet connectivity.", "اربط MetaMask لمعاينة اتصال المحفظة.");
+    } else {
+      say(walletError, "تعذر تحميل موصل المحفظة. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
+    }
+  }
+
+  if (!(window.SOBYA_BUY_CONFIG && window.SOBYA_BUY_CONFIG.paymentsEnabled)) {
+    $("buyBtn").disabled = true;
+  }
 })();
 </script></body></html>
