@@ -34,7 +34,7 @@ test("strong verified demand can raise price without an artificial ceiling", () 
   assert.ok(next > 10);
 });
 
-test("a demand decline never lowers the last reached price", () => {
+test("a demand decline lowers price slowly using the downward smoothing factor", () => {
   const next = calculateDynamicPrice({
     ...policy,
     previousPriceUsd: 0.006,
@@ -42,7 +42,8 @@ test("a demand decline never lowers the last reached price", () => {
     upwardSmoothing: 0.5,
     downwardSmoothing: 0.1,
   });
-  assert.equal(next, 0.006);
+  assert.ok(next < 0.006);
+  assert.ok(next > 0.005);
 });
 
 test("enforces the minimum price without imposing a maximum", () => {
