@@ -6,6 +6,13 @@ window.SOBYA_BUY_CONFIG = Object.freeze({
   sobyaRpcUrl: "https://sobya-evm-rpc.nodesafe-app.xyz",
   sobyaExplorerUrl: "https://explorer.nodesafe-app.xyz/sobya",
   projectReceivingAddress: "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f",
+  // Owner-confirmed customer payment destinations; distinct from the SOBY inventory wallet.
+  paymentReceivingAddresses: Object.freeze({
+    ETH_ETHEREUM: "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f",
+    USDT_ETHEREUM: "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f",
+    BNB_BSC: "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f",
+    SOL_SOLANA: "ACTkwKD9ZhHYgRSEoM7QWvp5ig1cUxDo3gMzB55rocdk"
+  }),
   inventoryWalletAddress: "0xebdb899fFE84a89e1d576964b640491c135651AD",
   // Approved opening reference price; not an active quote until the backend is deployed.
   salePriceUsd: 0.005,

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/sobya-buy-portal
+      - feature/sobya-buy-manual-payout
     paths:
       - 'buy-api/**'
       - '.github/workflows/deploy-sobya-buy-api.yml'
@@ -31,6 +32,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Install API dependencies
+        run: npm install --no-audit --no-fund
 
       - name: Run API and pricing tests
         run: npm test

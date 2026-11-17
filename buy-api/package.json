@@ -5,5 +5,8 @@
   "scripts": {
     "test": "node --test"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "dependencies": {
+    "viem": "^2.38.5"
+  }
 }
