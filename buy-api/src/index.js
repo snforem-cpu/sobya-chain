@@ -59,8 +59,9 @@ async function getPriceSnapshot(db) {
     WHERE o.status = 'paid' AND o.updated_at >= ?
   `).bind(now - 86400, now - 604800, now - 86400, now - 604800).first();
   const reservations = await db.prepare(`
-    SELECT COALESCE(SUM(CAST(soby_amount_wei AS REAL) / 1000000000000000000), 0) AS reserved
-    FROM quotes WHERE status='issued' AND expires_at > ?
+    SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL) / 1000000000000000000), 0) AS reserved
+    FROM quotes q LEFT JOIN orders o ON o.quote_id=q.id
+    WHERE (q.status='issued' AND q.expires_at > ?) OR o.status IN ('verified','payout_pending')
   `).bind(now).first();
   const reservedInventorySoby = Number(reservations?.reserved || 0);
   const policy = await db.prepare("SELECT * FROM pricing_policy WHERE id=1").first();
@@ -119,8 +120,9 @@ async function createQuote(request, env, origin) {
         payment_asset,payment_chain_id,payment_amount_base_units,expires_at,status,created_at)
       SELECT ?,?,?,?,?,?,?,?,?,?,'issued',?
       WHERE (SELECT available_inventory_soby - COALESCE((
-        SELECT SUM(CAST(soby_amount_wei AS REAL) / 1000000000000000000)
-        FROM quotes WHERE status='issued' AND expires_at > ?
+        SELECT SUM(CAST(q.soby_amount_wei AS REAL) / 1000000000000000000)
+        FROM quotes q LEFT JOIN orders o ON o.quote_id=q.id
+        WHERE (q.status='issued' AND q.expires_at > ?) OR o.status IN ('verified','payout_pending')
       ),0) FROM pricing_state WHERE id=1) >= ?
     `).bind(id, body.buyerAddress.toLowerCase(), payerAddress, sobyWei.toString(), Number(priceMicros),
       Number(totalUsdMicros), body.paymentAsset, asset.chainId, paymentBaseUnits.toString(), expiresAt, now,
