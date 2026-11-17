@@ -159,7 +159,7 @@ async function verifyOrder(request, env, origin) {
     return json({ error: "quote_and_payment_reference_required" }, 400, origin);
   }
   const quote = await env.DB.prepare("SELECT * FROM quotes WHERE id = ?").bind(body.quoteId).first();
-  if (!quote || !quote.payer_address || quote.status !== "issued" || quote.expires_at < Math.floor(Date.now() / 1000)) {
+  if (!quote || !quote.payer_address || quote.status !== "issued") {
     return json({ error: "quote_expired_or_unavailable" }, 409, origin);
   }
   const asset = ASSETS[quote.payment_asset];
@@ -180,6 +180,9 @@ async function verifyOrder(request, env, origin) {
           expectedAmount: quote.payment_amount_base_units,
           expectedSender: quote.payer_address,
         });
+    if (!Number.isFinite(result.blockTimestamp) || result.blockTimestamp > Number(quote.expires_at)) {
+      throw new Error("quote_expired_before_payment");
+    }
     const orderId = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
     await env.DB.prepare(`
