@@ -262,6 +262,34 @@ export default {
       } catch (error) { return json({ error: error?.message || "owner_auth_failed" }, 403, allowed); }
     }
 
+    if (url.pathname === "/api/admin/pricing-policy" && request.method === "POST") {
+      if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
+      try {
+        await consumeOwnerChallenge(env.DB, body.auth);
+        const p = body.policy || {};
+        const values = [p.baselineDemand24h,p.inventoryWeight,p.demandWeight,p.upwardSmoothing,p.downwardSmoothing,p.floorPriceUsd].map(Number);
+        if (values.some(v => !Number.isFinite(v)) || values[0] < 0 || values[1] < 0 || values[2] < 0 ||
+            values[3] <= 0 || values[3] > 1 || values[4] <= 0 || values[4] > 1 || values[5] <= 0) {
+          return json({ error: "invalid_pricing_policy" }, 400, allowed);
+        }
+        const now = Math.floor(Date.now()/1000);
+        await env.DB.prepare(`
+          INSERT INTO pricing_policy (id,baseline_demand_24h,inventory_weight,demand_weight,
+            upward_smoothing,downward_smoothing,floor_price_usd,updated_at)
+          VALUES (1,?,?,?,?,?,?,?)
+          ON CONFLICT(id) DO UPDATE SET baseline_demand_24h=excluded.baseline_demand_24h,
+            inventory_weight=excluded.inventory_weight,demand_weight=excluded.demand_weight,
+            upward_smoothing=excluded.upward_smoothing,downward_smoothing=excluded.downward_smoothing,
+            floor_price_usd=excluded.floor_price_usd,updated_at=excluded.updated_at
+        `).bind(...values,now).run();
+        await env.DB.prepare(
+          "INSERT INTO audit_events (order_id,event_type,details_json,created_at) VALUES (NULL,?,?,?)"
+        ).bind("pricing_policy_updated",JSON.stringify(p),now).run();
+        return json({ saved: true, policy: p },200,allowed);
+      } catch(error) { return json({ error:error?.message || "pricing_policy_update_failed" },403,allowed); }
+    }
+
     if (url.pathname === "/api/admin/payout" && request.method === "POST") {
       if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
       let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
