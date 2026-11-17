@@ -411,7 +411,7 @@ export default {
       const paid=String(b?.paymentAmount ?? "").trim();
       const tx=String(b?.paymentTx ?? "").trim();
       const buyer=String(b?.buyerAddress ?? "").trim();
-      if (!/^\\d+(?:\\.\\d{1,18})?$/.test(amount) || Number(amount)<=0 || Number(amount)>1000000000 ||
+      if (!/^\d+(?:\.\d{1,18})?$/.test(amount) || Number(amount)<=0 || Number(amount)>1000000000 ||
           !network || network.length>80 || !asset || asset.length>40 || !paid || paid.length>80 ||
           !tx || tx.length>180 || !/^0x[0-9a-fA-F]{40}$/.test(buyer)) {
         return json({error:"invalid_order_details"},400,allowed);
