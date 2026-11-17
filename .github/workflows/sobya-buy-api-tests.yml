@@ -37,5 +37,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install API dependencies
+        run: npm install --no-audit --no-fund
       - name: Run API, pricing, and safety tests
         run: npm test
