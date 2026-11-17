@@ -1,5 +1,3 @@
-import { calculateDynamicPrice } from "./pricing.js";
-
 const json = (body, status = 200, origin = "*") => new Response(JSON.stringify(body), {
   status,
   headers: {
@@ -22,13 +20,9 @@ async function getPriceSnapshot(db) {
   ).first();
   if (!state) throw new Error("pricing_state_missing");
 
-  const policy = await db.prepare(
-    "SELECT baseline_demand_24h, inventory_weight, demand_weight, upward_smoothing, downward_smoothing, floor_price_usd FROM pricing_policy WHERE id = 1"
-  ).first();
-
-  // Only orders whose full payout lifecycle is complete count as purchases.
-  // Pending, confirming, verified-but-not-paid, failed and refunded orders
-  // are deliberately excluded from demand.
+  // Pricing is a persisted state, not a time-dependent calculation.
+  // In particular, rolling 24-hour demand is telemetry only: an old purchase
+  // leaving that window must never lower the price without a new purchase.
   const now = Math.floor(Date.now() / 1000);
   const demand = await db.prepare(`
     SELECT
@@ -40,30 +34,7 @@ async function getPriceSnapshot(db) {
     WHERE o.status = 'paid' AND o.updated_at >= ?
   `).bind(now - 86400, now - 604800, now - 86400, now - 604800).first();
 
-  const completePolicy = policy && [
-    policy.baseline_demand_24h, policy.inventory_weight, policy.demand_weight,
-    policy.upward_smoothing, policy.downward_smoothing, policy.floor_price_usd,
-  ].every(value => value !== null && value !== undefined && Number.isFinite(Number(value)));
-
-  let priceUsd = Number(state.current_price_usd);
-  let dynamicPricingEnabled = false;
-  if (completePolicy) {
-    priceUsd = calculateDynamicPrice({
-      referencePriceUsd: Number(state.reference_price_usd),
-      previousPriceUsd: Number(state.current_price_usd),
-      availableInventory: Number(state.available_inventory_soby),
-      initialInventory: Number(state.initial_inventory_soby),
-      verifiedDemand24h: Number(demand?.demand_24h || 0),
-      baselineDemand24h: Number(policy.baseline_demand_24h),
-      inventoryWeight: Number(policy.inventory_weight),
-      demandWeight: Number(policy.demand_weight),
-      upwardSmoothing: Number(policy.upward_smoothing),
-      downwardSmoothing: Number(policy.downward_smoothing),
-      floorPriceUsd: Number(policy.floor_price_usd),
-    });
-    dynamicPricingEnabled = true;
-  }
-
+  const priceUsd = Number(state.current_price_usd);
   if (!Number.isFinite(priceUsd) || priceUsd <= 0) throw new Error("invalid_price_state");
   return {
     priceUsd,
@@ -75,8 +46,8 @@ async function getPriceSnapshot(db) {
     verifiedDemand24hSoby: Number(demand?.demand_24h || 0),
     verifiedDemand7dSoby: Number(demand?.demand_7d || 0),
     verifiedPurchases24h: Number(demand?.purchases_24h || 0),
-    dynamicPricingEnabled,
-    priceStatus: dynamicPricingEnabled ? "live_calculated" : "opening_price_policy_pending",
+    dynamicPricingEnabled: false,
+    priceStatus: "stored_price_waiting_for_purchase_engine",
     updatedAt: Number(state.updated_at),
   };
 }
