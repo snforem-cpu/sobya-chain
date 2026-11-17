@@ -89,7 +89,7 @@ async function savePolicy(){
   };
   if(Object.values(policy).some(v=>!Number.isFinite(v)))throw new Error("Enter valid policy values.");
   $("policyStatus").textContent="Requesting owner signature…";
-  const auth=await authorize();
+  const auth=await authorize("pricing:update",JSON.stringify(policy));
   await api("/api/admin/pricing-policy",{auth,policy});
   $("policyStatus").textContent="Pricing policy saved and activated. Changes apply after the next verified SOBY payout.";
   say("Pricing policy activated.");
