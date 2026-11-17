@@ -7,6 +7,11 @@
 </style></head><body><main class="wrap">
 <h1>SOBYA BUY — Owner Desk</h1><p>Private payout control. Only the inventory wallet can authorize order review and completion.</p>
 <section class="card"><div class="row"><button id="connect">Connect inventory wallet</button><span id="wallet" class="muted">Not connected</span></div><p class="small">Required owner wallet: 0xebdb899fFE84a89e1d576964b640491c135651AD</p><button id="refresh" disabled>Load verified orders</button><div id="status" class="status">Connect the inventory wallet to begin.</div></section>
+<section class="card"><h2>Dynamic price policy</h2>
+<p class="small">Suggested starting values only. They are not active until the inventory wallet signs and saves them. Price changes occur only after a verified SOBY payout, never merely because time passes.</p>
+<div class="row"><label>Baseline demand / 24h (SOBY)<input id="baseline" type="number" min="0" step="any" value="100"></label><label>Inventory weight<input id="inventoryWeight" type="number" min="0" step="any" value="0.25"></label><label>Demand weight<input id="demandWeight" type="number" min="0" step="any" value="0.1"></label></div>
+<div class="row"><label>Upward smoothing (faster)<input id="upSmooth" type="number" min="0.01" max="1" step="any" value="0.5"></label><label>Downward smoothing (slower)<input id="downSmooth" type="number" min="0.01" max="1" step="any" value="0.1"></label><label>Minimum price USD<input id="floorPrice" type="number" min="0.00000001" step="any" value="0.0025"></label></div>
+<button id="savePolicy" disabled>Sign &amp; activate pricing policy</button><div id="policyStatus" class="small muted">Not configured.</div></section>
 <section class="card"><h2>Verified orders awaiting SOBY payout</h2><div id="orders" class="orders muted">No orders loaded.</div></section>
 </main>
 <script>
@@ -32,7 +37,7 @@ async function connect(){
   owner=accounts?.[0];
   if(!owner||owner.toLowerCase()!==OWNER.toLowerCase())throw new Error("Connect the SOBY inventory wallet shown above.");
   await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN}]});
-  $("wallet").textContent=owner;$("refresh").disabled=false;say("Inventory wallet connected. Owner signature is required for each admin action.");
+  $("wallet").textContent=owner;$("refresh").disabled=false;$("savePolicy").disabled=false;say("Inventory wallet connected. Owner signature is required for each admin action.");
  }catch(e){say(e.message||"Wallet connection failed.");}
 }
 async function loadOrders(){
@@ -72,6 +77,24 @@ async function loadOrders(){
   say("Loaded "+data.orders.length+" verified order(s).");
  }catch(e){say(e.message||"Could not load orders.");}
 }
-$("connect").onclick=connect;$("refresh").onclick=loadOrders;
+async function savePolicy(){
+ try{
+  const policy={
+   baselineDemand24h:Number($("baseline").value),
+   inventoryWeight:Number($("inventoryWeight").value),
+   demandWeight:Number($("demandWeight").value),
+   upwardSmoothing:Number($("upSmooth").value),
+   downwardSmoothing:Number($("downSmooth").value),
+   floorPriceUsd:Number($("floorPrice").value)
+  };
+  if(Object.values(policy).some(v=>!Number.isFinite(v)))throw new Error("Enter valid policy values.");
+  $("policyStatus").textContent="Requesting owner signature…";
+  const auth=await authorize();
+  await api("/api/admin/pricing-policy",{auth,policy});
+  $("policyStatus").textContent="Pricing policy saved and activated. Changes apply after the next verified SOBY payout.";
+  say("Pricing policy activated.");
+ }catch(e){$("policyStatus").textContent=e.message||"Could not activate pricing policy.";say("Pricing policy was not changed.");}
+}
+$("connect").onclick=connect;$("refresh").onclick=loadOrders;$("savePolicy").onclick=savePolicy;
 })();
 </script></body></html>
