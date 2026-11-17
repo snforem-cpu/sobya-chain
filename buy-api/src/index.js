@@ -243,7 +243,7 @@ export default {
     if (url.pathname === "/api/admin/challenge" && request.method === "POST") {
       if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
       let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
-      try { return json(await issueOwnerChallenge(env.DB, body?.address), 200, allowed); }
+      try { return json(await issueOwnerChallenge(env.DB, body?.address, body?.action, body?.context), 200, allowed); }
       catch (error) { return json({ error: error?.message || "owner_challenge_failed" }, 403, allowed); }
     }
 
@@ -251,7 +251,7 @@ export default {
       if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
       let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
       try {
-        await consumeOwnerChallenge(env.DB, body.auth);
+        await consumeOwnerChallenge(env.DB, body.auth, "orders:list", "verified-orders");
         const result = await env.DB.prepare(`
           SELECT o.id,o.status,o.payment_asset,o.payment_tx_hash,o.created_at,o.updated_at,
             q.buyer_address,q.soby_amount_wei,q.price_usd_micros,q.total_usd_micros
@@ -266,7 +266,7 @@ export default {
       if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
       let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
       try {
-        await consumeOwnerChallenge(env.DB, body.auth);
+        await consumeOwnerChallenge(env.DB, body.auth, "pricing:update", JSON.stringify(body.policy || {}));
         const p = body.policy || {};
         const values = [p.baselineDemand24h,p.inventoryWeight,p.demandWeight,p.upwardSmoothing,p.downwardSmoothing,p.floorPriceUsd].map(Number);
         if (values.some(v => !Number.isFinite(v)) || values[0] < 0 || values[1] < 0 || values[2] < 0 ||
@@ -294,7 +294,7 @@ export default {
       if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
       let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
       try {
-        await consumeOwnerChallenge(env.DB, body.auth);
+        await consumeOwnerChallenge(env.DB, body.auth, "order:payout", body.orderId + "|" + body.payoutTxHash);
         if (typeof body.orderId !== "string" || typeof body.payoutTxHash !== "string") {
           return json({ error: "order_and_payout_reference_required" }, 400, allowed);
         }
