@@ -33,6 +33,10 @@ Do not replace this address, create a second inventory wallet, or request anothe
 - Reject expired quotes and payments with mismatched asset, chain, recipient, amount, or buyer.
 - Do not allow the client to submit arbitrary payout token contracts, amounts, destinations, or chain IDs.
 
+## Customer processing-time notice
+
+Display this notice before checkout in English and Arabic: “Manual review and SOBY transfer usually take a few minutes after your payment is confirmed. In exceptional cases, such as unusually high order volume, processing may take up to 48 hours.” The estimate starts only after payment confirmation; it is an estimate, not a guarantee. Keep the separate pre-launch warning visible while sales remain disabled.
+
 ## Notifications
 
 The owner console may show pending-order alerts while open. Browser notifications require explicit permission and may not arrive when the page is closed. Background push or Telegram/email alerts require a separately configured delivery integration; do not claim those exist until tested.
