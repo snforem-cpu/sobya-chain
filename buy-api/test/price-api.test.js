@@ -12,6 +12,8 @@ function fakeDb({ state, demand = {} }) {
         bind() { return this; },
         async first() {
           if (sql.includes("FROM pricing_state")) return state;
+          if (sql.includes("FROM quotes WHERE status='issued'")) return { reserved: 0 };
+          if (sql.includes("FROM pricing_policy")) return null;
           if (sql.includes("FROM orders o")) return {
             demand_24h: 0,
             demand_7d: 0,
@@ -38,12 +40,14 @@ test("price snapshot keeps the persisted opening price; rolling demand is teleme
   const result = await getPriceSnapshot(db);
   assert.equal(result.priceUsd, 0.005);
   assert.equal(result.dynamicPricingEnabled, false);
-  assert.equal(result.priceStatus, "stored_price_waiting_for_purchase_engine");
+  assert.equal(result.priceStatus, "awaiting_owner_approved_pricing_parameters");
   assert.equal(result.verifiedDemand24hSoby, 12);
   assert.equal(result.verifiedDemand7dSoby, 40);
   assert.equal(result.verifiedPurchases24h, 3);
-  assert.equal(db.seen.length, 2);
+  assert.equal(db.seen.length, 4);
   assert.ok(db.seen[1].includes("WHERE o.status = 'paid'"));
+  assert.equal(result.reservedInventorySoby, 0);
+  assert.equal(result.availableForQuoteSoby, 1_000_000);
 });
 
 test("elapsed time and changes in rolling demand never alter the stored price", async () => {
