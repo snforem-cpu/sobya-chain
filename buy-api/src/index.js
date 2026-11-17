@@ -79,6 +79,11 @@ async function createQuote(request, env, origin) {
   if (!validAddress(body?.buyerAddress)) return json({ error: "invalid_buyer_address" }, 400, origin);
   const asset = ASSETS[body?.paymentAsset];
   if (!asset) return json({ error: "unsupported_payment_asset" }, 400, origin);
+  const payerAddress = body?.paymentSenderAddress || body?.buyerAddress;
+  const validSolanaAddress = value => typeof value === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+  if (body.paymentAsset === "SOL_SOLANA" ? !validSolanaAddress(payerAddress) : !validAddress(payerAddress)) {
+    return json({ error: "invalid_payment_sender_address" }, 400, origin);
+  }
 
   try {
     const sobyWei = decimalToScaled(String(body.sobyAmount ?? ""), 18);
@@ -87,7 +92,7 @@ async function createQuote(request, env, origin) {
     const priceMicros = BigInt(Math.round(snapshot.priceUsd * 1_000_000));
     const totalUsdMicros = (sobyWei * priceMicros + 10n ** 18n - 1n) / (10n ** 18n);
     const paymentRateMicros = rateToMicros(market.rates[asset.rate]);
-    const numerator = totalUsdMicros * (10n ** BigInt(asset.decimals)) * 1_000_000n;
+    const numerator = totalUsdMicros * (10n ** BigInt(asset.decimals));
     const paymentBaseUnits = (numerator + paymentRateMicros - 1n) / paymentRateMicros;
     if (paymentBaseUnits <= 0n) throw new Error("invalid_payment_quote");
     if (Number(body.sobyAmount) > snapshot.availableInventorySoby) return json({ error: "insufficient_inventory" }, 409, origin);
@@ -96,10 +101,10 @@ async function createQuote(request, env, origin) {
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + 600;
     await env.DB.prepare(`
-      INSERT INTO quotes (id,buyer_address,soby_amount_wei,price_usd_micros,total_usd_micros,
+      INSERT INTO quotes (id,buyer_address,payer_address,soby_amount_wei,price_usd_micros,total_usd_micros,
         payment_asset,payment_chain_id,payment_amount_base_units,expires_at,status,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,'issued',?)
-    `).bind(id, body.buyerAddress.toLowerCase(), sobyWei.toString(), Number(priceMicros),
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,'issued',?)
+    `).bind(id, body.buyerAddress.toLowerCase(), payerAddress, sobyWei.toString(), Number(priceMicros),
       Number(totalUsdMicros), body.paymentAsset, asset.chainId, paymentBaseUnits.toString(), expiresAt, now).run();
 
     return json({
@@ -134,7 +139,7 @@ async function verifyOrder(request, env, origin) {
   const quote = await env.DB.prepare(
     "SELECT * FROM quotes WHERE id = ?"
   ).bind(body.quoteId).first();
-  if (!quote || quote.status !== "issued" || quote.expires_at < Math.floor(Date.now() / 1000)) {
+  if (!quote || !quote.payer_address || quote.status !== "issued" || quote.expires_at < Math.floor(Date.now() / 1000)) {
     return json({ error: "quote_expired_or_unavailable" }, 409, origin);
   }
   const asset = ASSETS[quote.payment_asset];
@@ -158,13 +163,13 @@ async function verifyOrder(request, env, origin) {
       ? await verifySolPayment({
           signature: body.paymentReference,
           expectedAmount: quote.payment_amount_base_units,
-          expectedSender: quote.buyer_address,
+          expectedSender: quote.payer_address,
         })
       : await verifyEvmPayment({
           asset: asset.verifier,
           txHash: body.paymentReference,
           expectedAmount: quote.payment_amount_base_units,
-          expectedSender: quote.buyer_address,
+          expectedSender: quote.payer_address,
         });
     await env.DB.prepare("UPDATE orders SET status='verified', updated_at=? WHERE id=?")
       .bind(Math.floor(Date.now() / 1000), orderId).run();
