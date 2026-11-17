@@ -66,7 +66,7 @@ test("verifies the exact USDT Transfer log and token contract", async () => {
   assert.equal(result.amountBaseUnits, "2500000");
 });
 
-test("rejects Solana payments unless the exact finalized transfer is present", async () => {
+test("verifies the exact finalized native SOL transfer", async () => {
   const fetchImpl = async () => new Response(JSON.stringify({ result: {
     slot: 99, meta: { err: null, confirmationStatus: "finalized" },
     transaction: { message: { instructions: [{
@@ -77,8 +77,10 @@ test("rejects Solana payments unless the exact finalized transfer is present", a
       }},
     }] }},
   }}), { status: 200 });
-  await assert.rejects(() => verifySolPayment({
+  const result = await verifySolPayment({
     signature: "5".repeat(88), expectedAmount: "1000000000",
     expectedSender: "11111111111111111111111111111111", fetchImpl,
-  }), /payment_not_final|payment_transfer_not_found/);
+  });
+  assert.equal(result.verified, true);
+  assert.equal(result.commitment, "finalized");
 });
