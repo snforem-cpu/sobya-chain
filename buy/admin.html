@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071326"><title>SOBYA BUY — Owner Desk</title>
+<style>
+:root{color-scheme:dark;--bg:#061225;--panel:#102541;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--cyan:#66e0e8;--green:#6ee7b7;--gold:#e8c77b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#153967,transparent 40%),var(--bg);color:var(--text);font:15px/1.6 system-ui,sans-serif}.wrap{max-width:1000px;margin:30px auto;padding:0 16px}.card{background:#0d1d36;border:1px solid var(--line);border-radius:18px;padding:20px;margin:16px 0}h1{margin:0 0 6px}p,.muted{color:var(--muted)}button,input{font:inherit;border-radius:10px;padding:11px 14px}button{border:0;background:linear-gradient(110deg,#397fe0,#4aa8d8);font-weight:800;color:#061225;cursor:pointer}button:disabled{opacity:.5;cursor:wait}input{background:#07172c;color:var(--text);border:1px solid var(--line);width:100%}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row button{flex:0 0 auto}.orders{display:grid;gap:12px}.order{border:1px solid var(--line);border-radius:14px;padding:16px}.order strong{color:var(--green)}.small{font-size:12px;overflow-wrap:anywhere}.status{margin-top:12px;color:var(--gold);min-height:24px}.hidden{display:none}.danger{color:#ffb7b7}
+</style></head><body><main class="wrap">
+<h1>SOBYA BUY — Owner Desk</h1><p>Private payout control. Only the inventory wallet can authorize order review and completion.</p>
+<section class="card"><div class="row"><button id="connect">Connect inventory wallet</button><span id="wallet" class="muted">Not connected</span></div><p class="small">Required owner wallet: 0xebdb899fFE84a89e1d576964b640491c135651AD</p><button id="refresh" disabled>Load verified orders</button><div id="status" class="status">Connect the inventory wallet to begin.</div></section>
+<section class="card"><h2>Verified orders awaiting SOBY payout</h2><div id="orders" class="orders muted">No orders loaded.</div></section>
+</main>
+<script>
+(() => {
+const API="https://sobya-chain.snforem.workers.dev";
+const OWNER="0xebdb899fFE84a89e1d576964b640491c135651AD";
+const CHAIN="0x534f425941";
+let provider=null, owner=null;
+const $=id=>document.getElementById(id);
+function say(s){$("status").textContent=s}
+function units(v){const n=BigInt(v), whole=n/10n**18n, frac=(n%10n**18n).toString().padStart(18,"0").replace(/0+$/,"");return whole.toString()+(frac?"."+frac:"")}
+async function api(path,body){const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||"api_request_failed");return d}
+async function authorize(){
+ const challenge=await api("/api/admin/challenge",{address:owner});
+ const signature=await provider.request({method:"personal_sign",params:[challenge.message,owner]});
+ return {address:owner,nonce:challenge.nonce,signature};
+}
+async function connect(){
+ if(!window.ethereum?.request){say("MetaMask was not detected.");return}
+ provider=window.ethereum;
+ try{
+  const accounts=await provider.request({method:"eth_requestAccounts"});
+  owner=accounts?.[0];
+  if(!owner||owner.toLowerCase()!==OWNER.toLowerCase())throw new Error("Connect the SOBY inventory wallet shown above.");
+  await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN}]});
+  $("wallet").textContent=owner;$("refresh").disabled=false;say("Inventory wallet connected. Owner signature is required for each admin action.");
+ }catch(e){say(e.message||"Wallet connection failed.");}
+}
+async function loadOrders(){
+ try{
+  say("Requesting owner signature…");
+  const auth=await authorize();
+  const data=await api("/api/admin/orders",{auth});
+  const root=$("orders");root.innerHTML="";
+  if(!data.orders.length){root.textContent="No verified orders are waiting for payout.";say("Order list refreshed.");return}
+  for(const o of data.orders){
+   const el=document.createElement("article");el.className="order";
+   const title=document.createElement("div");title.innerHTML="<strong>"+units(o.soby_amount_wei)+" SOBY</strong> — "+o.payment_asset;
+   const buyer=document.createElement("div");buyer.className="small muted";buyer.textContent="Buyer: "+o.buyer_address;
+   const id=document.createElement("div");id.className="small muted";id.textContent="Order: "+o.id;
+   const tx=document.createElement("input");tx.placeholder="SOBYA payout transaction hash (0x…)";tx.autocomplete="off";
+   const send=document.createElement("button");send.textContent="Send SOBY from MetaMask";
+   send.onclick=async()=>{
+    try{
+     if((await provider.request({method:"eth_chainId"})).toLowerCase()!==CHAIN.toLowerCase())await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN}]});
+     const hash=await provider.request({method:"eth_sendTransaction",params:[{from:owner,to:o.buyer_address,value:"0x"+BigInt(o.soby_amount_wei).toString(16)}]});
+     tx.value=hash;say("SOBY transaction sent. Wait for 12 SOBYA confirmations, then press Verify payout.");
+    }catch(e){say(e.message||"SOBY transfer was not sent.");}
+   };
+   const verify=document.createElement("button");verify.textContent="Verify payout & complete";
+   verify.onclick=async()=>{
+    try{
+     if(!/^0x[0-9a-fA-F]{64}$/.test(tx.value.trim()))throw new Error("Enter the SOBYA transaction hash first.");
+     say("Requesting owner signature and verifying the SOBYA transfer…");
+     const auth=await authorize();
+     await api("/api/admin/payout",{auth,orderId:o.id,payoutTxHash:tx.value.trim()});
+     say("Payout verified. Order completed and inventory/price updated.");
+     await loadOrders();
+    }catch(e){say(e.message||"Payout verification failed. The order remains pending.");}
+   };
+   el.append(title,buyer,id,tx,document.createElement("br"),send,verify);root.append(el);
+  }
+  say("Loaded "+data.orders.length+" verified order(s).");
+ }catch(e){say(e.message||"Could not load orders.");}
+}
+$("connect").onclick=connect;$("refresh").onclick=loadOrders;
+})();
+</script></body></html>
