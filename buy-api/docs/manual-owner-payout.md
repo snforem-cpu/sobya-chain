@@ -10,6 +10,17 @@ The owner-approved SOBYA inventory wallet is:
 
 `0xebdb899fFE84a89e1d576964b640491c135651AD`
 
+## Customer payment receiving addresses
+
+The owner has confirmed control of these public receiving addresses:
+
+- ETH on Ethereum: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`
+- USDT on Ethereum: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`
+- BNB on BNB Smart Chain: `0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f`
+- SOL on Solana: `ACTkwKD9ZhHYgRSEoM7QWvp5ig1cUxDo3gMzB55rocdk`
+
+These are payment-receiving destinations only; they are not the SOBY inventory wallet. The EVM address is reused on Ethereum and BNB Smart Chain, but payment verification must remain chain-specific. The SOL destination is a Solana address and must be verified on Solana. These public addresses do not prove transaction monitoring or payment acceptance is operational. Keep payments disabled until all verification and payout gates below pass.
+
 Do not replace this address, create a second inventory wallet, or request another inventory deposit. Never put its private key or recovery phrase in GitHub, Cloudflare Worker variables, browser code, logs, or support messages.
 
 ## Required customer flow
