@@ -1,100 +1,10 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#071326"><title>SOBYA BUY — Owner Desk</title>
-<style>
-:root{color-scheme:dark;--bg:#061225;--panel:#102541;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--cyan:#66e0e8;--green:#6ee7b7;--gold:#e8c77b}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#153967,transparent 40%),var(--bg);color:var(--text);font:15px/1.6 system-ui,sans-serif}.wrap{max-width:1000px;margin:30px auto;padding:0 16px}.card{background:#0d1d36;border:1px solid var(--line);border-radius:18px;padding:20px;margin:16px 0}h1{margin:0 0 6px}p,.muted{color:var(--muted)}button,input{font:inherit;border-radius:10px;padding:11px 14px}button{border:0;background:linear-gradient(110deg,#397fe0,#4aa8d8);font-weight:800;color:#061225;cursor:pointer}button:disabled{opacity:.5;cursor:wait}input{background:#07172c;color:var(--text);border:1px solid var(--line);width:100%}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row button{flex:0 0 auto}.orders{display:grid;gap:12px}.order{border:1px solid var(--line);border-radius:14px;padding:16px}.order strong{color:var(--green)}.small{font-size:12px;overflow-wrap:anywhere}.status{margin-top:12px;color:var(--gold);min-height:24px}.hidden{display:none}.danger{color:#ffb7b7}
-</style></head><body><main class="wrap">
-<h1>SOBYA BUY — Owner Desk</h1><p>Private payout control. Only the inventory wallet can authorize order review and completion.</p>
-<section class="card"><div class="row"><button id="connect">Connect inventory wallet</button><span id="wallet" class="muted">Not connected</span></div><p class="small">Required owner wallet: 0xebdb899fFE84a89e1d576964b640491c135651AD</p><button id="refresh" disabled>Load verified orders</button><div id="status" class="status">Connect the inventory wallet to begin.</div></section>
-<section class="card"><h2>Dynamic price policy</h2>
-<p class="small">Suggested starting values only. They are not active until the inventory wallet signs and saves them. Price changes occur only after a verified SOBY payout, never merely because time passes.</p>
-<div class="row"><label>Baseline demand / 24h (SOBY)<input id="baseline" type="number" min="0" step="any" value="100"></label><label>Inventory weight<input id="inventoryWeight" type="number" min="0" step="any" value="0.25"></label><label>Demand weight<input id="demandWeight" type="number" min="0" step="any" value="0.1"></label></div>
-<div class="row"><label>Upward smoothing (faster)<input id="upSmooth" type="number" min="0.01" max="1" step="any" value="0.5"></label><label>Downward smoothing (slower)<input id="downSmooth" type="number" min="0.01" max="1" step="any" value="0.1"></label><label>Minimum price USD<input id="floorPrice" type="number" min="0.00000001" step="any" value="0.0025"></label></div>
-<button id="savePolicy" disabled>Sign &amp; activate pricing policy</button><div id="policyStatus" class="small muted">Not configured.</div></section>
-<section class="card"><h2>Verified orders awaiting SOBY payout</h2><div id="orders" class="orders muted">No orders loaded.</div></section>
-</main>
-<script>
-(() => {
-const API="https://sobya-chain.snforem.workers.dev";
-const OWNER="0xebdb899fFE84a89e1d576964b640491c135651AD";
-const CHAIN="0x534f425941";
-let provider=null, owner=null;
-const $=id=>document.getElementById(id);
-function say(s){$("status").textContent=s}
-function units(v){const n=BigInt(v), whole=n/10n**18n, frac=(n%10n**18n).toString().padStart(18,"0").replace(/0+$/,"");return whole.toString()+(frac?"."+frac:"")}
-async function api(path,body){const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||"api_request_failed");return d}
-async function authorize(action,context){
- const challenge=await api("/api/admin/challenge",{address:owner,action,context});
- const signature=await provider.request({method:"personal_sign",params:[challenge.message,owner]});
- return {address:owner,nonce:challenge.nonce,signature,action,context};
-}
-async function connect(){
- if(!window.ethereum?.request){say("MetaMask was not detected.");return}
- provider=window.ethereum;
- try{
-  const accounts=await provider.request({method:"eth_requestAccounts"});
-  owner=accounts?.[0];
-  if(!owner||owner.toLowerCase()!==OWNER.toLowerCase())throw new Error("Connect the SOBY inventory wallet shown above.");
-  await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN}]});
-  $("wallet").textContent=owner;$("refresh").disabled=false;$("savePolicy").disabled=false;say("Inventory wallet connected. Owner signature is required for each admin action.");
- }catch(e){say(e.message||"Wallet connection failed.");}
-}
-async function loadOrders(){
- try{
-  say("Requesting owner signature…");
-  const auth=await authorize("orders:list","verified-orders");
-  const data=await api("/api/admin/orders",{auth});
-  const root=$("orders");root.innerHTML="";
-  if(!data.orders.length){root.textContent="No verified orders are waiting for payout.";say("Order list refreshed.");return}
-  for(const o of data.orders){
-   const el=document.createElement("article");el.className="order";
-   const title=document.createElement("div");title.innerHTML="<strong>"+units(o.soby_amount_wei)+" SOBY</strong> — "+o.payment_asset;
-   const buyer=document.createElement("div");buyer.className="small muted";buyer.textContent="Buyer: "+o.buyer_address;
-   const id=document.createElement("div");id.className="small muted";id.textContent="Order: "+o.id;
-   const tx=document.createElement("input");tx.placeholder="SOBYA payout transaction hash (0x…)";tx.autocomplete="off";
-   const send=document.createElement("button");send.textContent="Send SOBY from MetaMask";
-   send.onclick=async()=>{
-    try{
-     if((await provider.request({method:"eth_chainId"})).toLowerCase()!==CHAIN.toLowerCase())await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN}]});
-     const hash=await provider.request({method:"eth_sendTransaction",params:[{from:owner,to:o.buyer_address,value:"0x"+BigInt(o.soby_amount_wei).toString(16)}]});
-     tx.value=hash;say("SOBY transaction sent. Wait for 12 SOBYA confirmations, then press Verify payout.");
-    }catch(e){say(e.message||"SOBY transfer was not sent.");}
-   };
-   const verify=document.createElement("button");verify.textContent="Verify payout & complete";
-   verify.onclick=async()=>{
-    try{
-     if(!/^0x[0-9a-fA-F]{64}$/.test(tx.value.trim()))throw new Error("Enter the SOBYA transaction hash first.");
-     say("Requesting owner signature and verifying the SOBYA transfer…");
-     const auth=await authorize("order:payout",o.id+"|"+tx.value.trim());
-     await api("/api/admin/payout",{auth,orderId:o.id,payoutTxHash:tx.value.trim()});
-     say("Payout verified. Order completed and inventory/price updated.");
-     await loadOrders();
-    }catch(e){say(e.message||"Payout verification failed. The order remains pending.");}
-   };
-   el.append(title,buyer,id,tx,document.createElement("br"),send,verify);root.append(el);
-  }
-  say("Loaded "+data.orders.length+" verified order(s).");
- }catch(e){say(e.message||"Could not load orders.");}
-}
-async function savePolicy(){
- try{
-  const policy={
-   baselineDemand24h:Number($("baseline").value),
-   inventoryWeight:Number($("inventoryWeight").value),
-   demandWeight:Number($("demandWeight").value),
-   upwardSmoothing:Number($("upSmooth").value),
-   downwardSmoothing:Number($("downSmooth").value),
-   floorPriceUsd:Number($("floorPrice").value)
-  };
-  if(Object.values(policy).some(v=>!Number.isFinite(v)))throw new Error("Enter valid policy values.");
-  $("policyStatus").textContent="Requesting owner signature…";
-  const auth=await authorize("pricing:update",JSON.stringify(policy));
-  await api("/api/admin/pricing-policy",{auth,policy});
-  $("policyStatus").textContent="Pricing policy saved and activated. Changes apply after the next verified SOBY payout.";
-  say("Pricing policy activated.");
- }catch(e){$("policyStatus").textContent=e.message||"Could not activate pricing policy.";say("Pricing policy was not changed.");}
-}
-$("connect").onclick=connect;$("refresh").onclick=loadOrders;$("savePolicy").onclick=savePolicy;
-})();
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SOBYA BUY — Owner Desk</title><style>
+:root{color-scheme:dark;--bg:#061225;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--green:#6ee7b7}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,sans-serif}.wrap{max-width:1000px;margin:24px auto;padding:0 16px}.card,.order{background:#0d1d36;border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0}input{padding:11px;background:#07172c;border:1px solid var(--line);border-radius:9px;color:white;font:inherit;max-width:100%}button{padding:11px 14px;border:0;border-radius:9px;background:#55b5dc;color:#061225;font-weight:800;font:inherit;cursor:pointer;margin:4px}button:disabled{opacity:.5}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.small{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.green{color:var(--green)}.status{color:#e8c77b;min-height:24px}.order{margin:10px 0}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}label{display:block;color:var(--muted);font-size:12px}label input{display:block;width:100%;margin-top:5px}</style></head><body><main class="wrap"><h1>SOBYA BUY — Owner Desk</h1><p class="small">Manual order review and manual price control. Connect the inventory wallet to authorize each action.</p><section class="card"><div class="row"><button id="connect">Connect owner wallet</button><span id="wallet" class="small">Not connected</span></div><p class="small">Required: 0xebdb899fFE84a89e1d576964b640491c135651AD</p><button id="refresh" disabled>Load orders</button><div id="status" class="status"></div></section><section class="card"><h2>Manual SOBY price</h2><div class="row"><label>Price per SOBY (USD)<input id="price" type="number" min="0.00000001" step="any" value="0.005"></label><button id="savePrice" disabled>Save price</button></div><div id="priceStatus" class="small"></div></section><section class="card"><h2>Purchase requests</h2><div id="orders" class="small">Connect and load orders.</div></section></main><script>
+const API="https://sobya-chain.snforem.workers.dev",OWNER="0xebdb899fFE84a89e1d576964b640491c135651AD",CHAIN="0x534f425941";const $=id=>document.getElementById(id);let provider,owner;
+const api=async(path,body)=>{const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error||"API request failed");return d};
+async function auth(action,context){const c=await api("/api/admin/challenge",{address:owner,action,context});const signature=await provider.request({method:"personal_sign",params:[c.message,owner]});return {address:owner,nonce:c.nonce,signature,action,context}}
+async function connect(){try{provider=window.ethereum;if(!provider?.request)throw Error("Open this page in MetaMask.");const a=await provider.request({method:"eth_requestAccounts"});owner=a[0];if(owner.toLowerCase()!==OWNER.toLowerCase())throw Error("Wrong wallet. Connect the inventory wallet.");await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN}]});$("wallet").textContent=owner;$("refresh").disabled=false;$("savePrice").disabled=false;$("status").textContent="Owner wallet connected."}catch(e){$("status").textContent=e.message}}
+async function load(){try{$("status").textContent="Requesting owner signature…";const a=await auth("orders:list","manual-orders");const d=await api("/api/admin/manual/orders",{auth:a});$("orders").innerHTML="";if(!d.orders.length){$("orders").textContent="No requests yet.";return}for(const o of d.orders){const el=document.createElement("article");el.className="order";const lines=[["Order",o.id],["Quantity",o.soby_amount+" SOBY"],["Unit price","$"+o.unit_price_usd],["Total","$"+o.total_usd],["Payment network",o.payment_network],["Asset",o.payment_asset],["Amount sent",o.payment_amount],["Transaction",o.payment_tx],["Buyer EVM address",o.buyer_address],["Status",o.status],["Created",new Date(o.created_at*1000).toLocaleString()]];for(const [k,v] of lines){const p=document.createElement("div");p.className="small";p.textContent=k+": "+v;el.append(p)}const tx=document.createElement("input");tx.placeholder="Your SOBYA payout transaction hash (optional)";tx.value=o.payout_tx||"";const sel=document.createElement("select");sel.innerHTML='<option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="paid_confirmed">Payment confirmed</option><option value="completed">SOBY sent — completed</option><option value="rejected">Rejected</option>';sel.value=o.status;const save=document.createElement("button");save.textContent="Save status";save.onclick=async()=>{try{const context=o.id+"|"+sel.value+"|"+tx.value.trim();const a=await auth("order:payout",context);await api("/api/admin/manual/order-status",{auth:a,orderId:o.id,status:sel.value,payoutTx:tx.value.trim()});$("status").textContent="Order updated.";await load()}catch(e){$("status").textContent=e.message}};el.append(sel,tx,save);$("orders").append(el)}$("status").textContent="Loaded "+d.orders.length+" order(s)."}catch(e){$("status").textContent=e.message}}
+async function savePrice(){try{const p=Number($("price").value);if(!Number.isFinite(p)||p<=0)throw Error("Enter a positive USD price.");const a=await auth("pricing:update",String(p));await api("/api/admin/manual/price",{auth:a,priceUsd:p});$("priceStatus").textContent="Price saved: $"+p;$("status").textContent="Manual price updated."}catch(e){$("priceStatus").textContent=e.message}}
+$("connect").onclick=connect;$("refresh").onclick=load;$("savePrice").onclick=savePrice;
 </script></body></html>
