@@ -1,3 +1,5 @@
+import { getPaymentRates } from "./market-data.js";
+
 const json = (body, status = 200, origin = "*") => new Response(JSON.stringify(body), {
   status,
   headers: {
@@ -77,6 +79,18 @@ export default {
         commerceReady: false,
         message: "Payment verification and payout are not enabled.",
       }, 200, allowed);
+    }
+
+    if (url.pathname === "/api/payment-rates" && request.method === "GET") {
+      try {
+        const rates = await getPaymentRates();
+        return json(rates, 200, allowed);
+      } catch (_) {
+        return json({
+          error: "market_data_unavailable",
+          message: "Payment exchange rates are temporarily unavailable. Do not send funds; retry later.",
+        }, 503, allowed);
+      }
     }
 
     if (url.pathname === "/api/price" && request.method === "GET") {
