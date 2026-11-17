@@ -354,6 +354,69 @@ export default {
       }
     }
 
+
+    // Manual-only SOBYA BUY: buyers submit details; the owner verifies payment and sends SOBY offline.
+    if (url.pathname === "/api/manual/price" && request.method === "GET") {
+      if (!env.DB) return json({error:"database_not_configured"},503,allowed);
+      const row = await env.DB.prepare("SELECT price_usd FROM manual_sale_settings WHERE id=1").first();
+      return json({priceUsd:Number(row?.price_usd || 0.005),currency:"USD",mode:"manual"},200,allowed);
+    }
+    if (url.pathname === "/api/manual/orders" && request.method === "POST") {
+      if (!env.DB) return json({error:"database_not_configured"},503,allowed);
+      let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
+      const amount=String(b?.sobyAmount ?? "");
+      const network=String(b?.paymentNetwork ?? "").trim();
+      const asset=String(b?.paymentAsset ?? "").trim();
+      const paid=String(b?.paymentAmount ?? "").trim();
+      const tx=String(b?.paymentTx ?? "").trim();
+      const buyer=String(b?.buyerAddress ?? "").trim();
+      if (!/^\\d+(?:\\.\\d{1,18})?$/.test(amount) || Number(amount)<=0 || Number(amount)>1000000000 ||
+          !network || network.length>80 || !asset || asset.length>40 || !paid || paid.length>80 ||
+          !tx || tx.length>180 || !/^0x[0-9a-fA-F]{40}$/.test(buyer)) {
+        return json({error:"invalid_order_details"},400,allowed);
+      }
+      const settings=await env.DB.prepare("SELECT price_usd FROM manual_sale_settings WHERE id=1").first();
+      const price=Number(settings?.price_usd || 0.005);
+      const total=Number((Number(amount)*price).toFixed(8));
+      const id=crypto.randomUUID();
+      const now=Math.floor(Date.now()/1000);
+      await env.DB.prepare("INSERT INTO manual_orders (id,soby_amount,unit_price_usd,total_usd,payment_network,payment_asset,payment_amount,payment_tx,buyer_address,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,'submitted',?,?)")
+        .bind(id,amount,price,total,network,asset,paid,tx,buyer.toLowerCase(),now,now).run();
+      return json({orderId:id,status:"submitted",unitPriceUsd:price,totalUsd:total},201,allowed);
+    }
+    if (url.pathname === "/api/admin/manual/orders" && request.method === "POST") {
+      if (!env.DB) return json({error:"database_not_configured"},503,allowed);
+      let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
+      try {
+        await consumeOwnerChallenge(env.DB,b.auth,"orders:list","manual-orders");
+        const result=await env.DB.prepare("SELECT * FROM manual_orders ORDER BY created_at DESC LIMIT 200").all();
+        return json({orders:result.results||[]},200,allowed);
+      } catch(e) { return json({error:e?.message||"owner_auth_failed"},403,allowed); }
+    }
+    if (url.pathname === "/api/admin/manual/price" && request.method === "POST") {
+      if (!env.DB) return json({error:"database_not_configured"},503,allowed);
+      let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
+      try {
+        const price=Number(b.priceUsd);
+        await consumeOwnerChallenge(env.DB,b.auth,"pricing:update",String(b.priceUsd));
+        if (!Number.isFinite(price)||price<=0||price>1000000) return json({error:"invalid_price"},400,allowed);
+        await env.DB.prepare("UPDATE manual_sale_settings SET price_usd=?,updated_at=? WHERE id=1").bind(price,Math.floor(Date.now()/1000)).run();
+        return json({saved:true,priceUsd:price},200,allowed);
+      } catch(e) { return json({error:e?.message||"price_update_failed"},403,allowed); }
+    }
+    if (url.pathname === "/api/admin/manual/order-status" && request.method === "POST") {
+      if (!env.DB) return json({error:"database_not_configured"},503,allowed);
+      let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
+      try {
+        const context=String(b.orderId)+"|"+String(b.status)+"|"+String(b.payoutTx||"");
+        await consumeOwnerChallenge(env.DB,b.auth,"order:payout",context);
+        if (!["under_review","paid_confirmed","completed","rejected"].includes(b.status)) return json({error:"invalid_status"},400,allowed);
+        await env.DB.prepare("UPDATE manual_orders SET status=?,payout_tx=?,updated_at=? WHERE id=?")
+          .bind(b.status,String(b.payoutTx||"").slice(0,180),Math.floor(Date.now()/1000),String(b.orderId)).run();
+        return json({saved:true},200,allowed);
+      } catch(e) { return json({error:e?.message||"order_update_failed"},403,allowed); }
+    }
+
     if (url.pathname === "/api/payment-rates" && request.method === "GET") {
       try { return json(await getPaymentRates(), 200, allowed); }
       catch { return json({ error: "market_data_unavailable", message: "Rates unavailable. Do not send funds." }, 503, allowed); }
