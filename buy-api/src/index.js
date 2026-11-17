@@ -1,5 +1,5 @@
 import { getPaymentRates } from "./market-data.js";
-import { verifyEvmPayment, verifySolPayment } from "./payment-verification.js";
+import { verifyEvmPayment, verifySolPayment, verifyNativeSobyPayout } from "./payment-verification.js";
 
 const json = (body, status = 200, origin = "*") => new Response(JSON.stringify(body), {
   status, headers: {
