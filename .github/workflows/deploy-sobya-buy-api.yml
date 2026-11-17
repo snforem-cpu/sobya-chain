@@ -48,9 +48,9 @@ jobs:
       - name: Configure SOBYA owner password secret
         run: printf "%s" "$SOBYA_ADMIN_PASSWORD" | npx --yes wrangler@4 secret put SOBYA_ADMIN_PASSWORD --config wrangler.toml
         env:
-          SOBYA_ADMIN_PASSWORD: \${{ secrets.SOBYA_ADMIN_PASSWORD }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SOBYA_ADMIN_PASSWORD: ${{ secrets.SOBYA_ADMIN_PASSWORD }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy fail-closed API Worker
         run: npx --yes wrangler@4 deploy --config wrangler.toml
