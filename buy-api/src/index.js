@@ -1,5 +1,6 @@
 import { getPaymentRates } from "./market-data.js";
 import { verifyEvmPayment, verifySolPayment, verifyNativeSobyPayout } from "./payment-verification.js";
+import { issueOwnerChallenge, consumeOwnerChallenge } from "./owner-auth.js";
 
 const json = (body, status = 200, origin = "*") => new Response(JSON.stringify(body), {
   status, headers: {
@@ -226,8 +227,78 @@ export default {
         databaseConfigured: Boolean(env.DB),
         salesEnabled: env.SALE_ENABLED === "true",
         commerceReady: false,
-        message: "Manual owner-approved SOBY payout is not enabled; do not treat verified payment as a completed purchase.",
+        ownerApproval: "wallet_signature_required",
+        payoutVerification: "native_sobya_transfer_12_confirmations",
+        message: "Owner-approved payout endpoints are installed; buyer checkout remains fail-closed pending frontend and end-to-end verification.",
       }, 200, allowed);
+    }
+
+    if (url.pathname === "/api/admin/challenge" && request.method === "POST") {
+      if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
+      try { return json(await issueOwnerChallenge(env.DB, body?.address), 200, allowed); }
+      catch (error) { return json({ error: error?.message || "owner_challenge_failed" }, 403, allowed); }
+    }
+
+    if (url.pathname === "/api/admin/orders" && request.method === "POST") {
+      if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
+      try {
+        await consumeOwnerChallenge(env.DB, body.auth);
+        const result = await env.DB.prepare(`
+          SELECT o.id,o.status,o.payment_asset,o.payment_tx_hash,o.created_at,o.updated_at,
+            q.buyer_address,q.soby_amount_wei,q.price_usd_micros,q.total_usd_micros
+          FROM orders o JOIN quotes q ON q.id=o.quote_id
+          WHERE o.status IN ('verified','payout_pending') ORDER BY o.created_at ASC LIMIT 100
+        `).all();
+        return json({ orders: result.results || [] }, 200, allowed);
+      } catch (error) { return json({ error: error?.message || "owner_auth_failed" }, 403, allowed); }
+    }
+
+    if (url.pathname === "/api/admin/payout" && request.method === "POST") {
+      if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
+      try {
+        await consumeOwnerChallenge(env.DB, body.auth);
+        if (typeof body.orderId !== "string" || typeof body.payoutTxHash !== "string") {
+          return json({ error: "order_and_payout_reference_required" }, 400, allowed);
+        }
+        const order = await env.DB.prepare(`
+          SELECT o.id,o.status,q.buyer_address,q.soby_amount_wei
+          FROM orders o JOIN quotes q ON q.id=o.quote_id WHERE o.id=?
+        `).bind(body.orderId).first();
+        if (!order || order.status !== "verified") return json({ error: "order_not_awaiting_payout" }, 409, allowed);
+        const payout = await verifyNativeSobyPayout({
+          txHash: body.payoutTxHash,
+          expectedAmount: order.soby_amount_wei,
+          expectedBuyer: order.buyer_address
+        });
+        const now = Math.floor(Date.now() / 1000);
+        const changed = await env.DB.prepare(
+          "UPDATE orders SET status='paid',payout_tx_hash=?,updated_at=? WHERE id=? AND status='verified'"
+        ).bind(body.payoutTxHash, now, order.id).run();
+        if (!changed.meta?.changes) return json({ error: "order_already_processed" }, 409, allowed);
+        await env.DB.prepare(`
+          UPDATE pricing_state SET
+            available_inventory_soby=MAX(0,initial_inventory_soby - (
+              SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL)/1000000000000000000),0)
+              FROM orders o JOIN quotes q ON q.id=o.quote_id WHERE o.status='paid'
+            )),
+            current_price_usd=reference_price_usd*initial_inventory_soby/MAX(
+              initial_inventory_soby - (
+                SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL)/1000000000000000000),0)
+                FROM orders o JOIN quotes q ON q.id=o.quote_id WHERE o.status='paid'
+              ), 0.000000000000000001
+            ),
+            updated_at=? WHERE id=1
+        `).bind(now).run();
+        await env.DB.prepare(
+          "INSERT INTO audit_events (order_id,event_type,details_json,created_at) VALUES (?,?,?,?)"
+        ).bind(order.id, "soby_payout_confirmed", JSON.stringify(payout), now).run();
+        return json({ orderId: order.id, status: "paid", payout }, 200, allowed);
+      } catch (error) {
+        return json({ error: error?.message || "payout_verification_failed" }, 422, allowed);
+      }
     }
 
     if (url.pathname === "/api/payment-rates" && request.method === "GET") {
