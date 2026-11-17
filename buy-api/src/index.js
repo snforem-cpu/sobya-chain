@@ -103,7 +103,7 @@ async function createQuote(request, env, origin) {
     await env.DB.prepare(`
       INSERT INTO quotes (id,buyer_address,payer_address,soby_amount_wei,price_usd_micros,total_usd_micros,
         payment_asset,payment_chain_id,payment_amount_base_units,expires_at,status,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,'issued',?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,'issued',?)
     `).bind(id, body.buyerAddress.toLowerCase(), payerAddress, sobyWei.toString(), Number(priceMicros),
       Number(totalUsdMicros), body.paymentAsset, asset.chainId, paymentBaseUnits.toString(), expiresAt, now).run();
 
