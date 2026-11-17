@@ -24,10 +24,10 @@ const $=id=>document.getElementById(id);
 function say(s){$("status").textContent=s}
 function units(v){const n=BigInt(v), whole=n/10n**18n, frac=(n%10n**18n).toString().padStart(18,"0").replace(/0+$/,"");return whole.toString()+(frac?"."+frac:"")}
 async function api(path,body){const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||"api_request_failed");return d}
-async function authorize(){
- const challenge=await api("/api/admin/challenge",{address:owner});
+async function authorize(action,context){
+ const challenge=await api("/api/admin/challenge",{address:owner,action,context});
  const signature=await provider.request({method:"personal_sign",params:[challenge.message,owner]});
- return {address:owner,nonce:challenge.nonce,signature};
+ return {address:owner,nonce:challenge.nonce,signature,action,context};
 }
 async function connect(){
  if(!window.ethereum?.request){say("MetaMask was not detected.");return}
@@ -43,7 +43,7 @@ async function connect(){
 async function loadOrders(){
  try{
   say("Requesting owner signature…");
-  const auth=await authorize();
+  const auth=await authorize("orders:list","verified-orders");
   const data=await api("/api/admin/orders",{auth});
   const root=$("orders");root.innerHTML="";
   if(!data.orders.length){root.textContent="No verified orders are waiting for payout.";say("Order list refreshed.");return}
@@ -66,7 +66,7 @@ async function loadOrders(){
     try{
      if(!/^0x[0-9a-fA-F]{64}$/.test(tx.value.trim()))throw new Error("Enter the SOBYA transaction hash first.");
      say("Requesting owner signature and verifying the SOBYA transfer…");
-     const auth=await authorize();
+     const auth=await authorize("order:payout",o.id+"|"+tx.value.trim());
      await api("/api/admin/payout",{auth,orderId:o.id,payoutTxHash:tx.value.trim()});
      say("Payout verified. Order completed and inventory/price updated.");
      await loadOrders();
