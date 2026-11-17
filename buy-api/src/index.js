@@ -56,18 +56,25 @@ async function getPriceSnapshot(db) {
     FROM orders o INNER JOIN quotes q ON q.id = o.quote_id
     WHERE o.status = 'paid' AND o.updated_at >= ?
   `).bind(now - 86400, now - 604800, now - 86400, now - 604800).first();
+  const reservations = await db.prepare(`
+    SELECT COALESCE(SUM(CAST(soby_amount_wei AS REAL) / 1000000000000000000), 0) AS reserved
+    FROM quotes WHERE status='issued' AND expires_at > ?
+  `).bind(now).first();
+  const reservedInventorySoby = Number(reservations?.reserved || 0);
   const priceUsd = Number(state.current_price_usd);
   if (!Number.isFinite(priceUsd) || priceUsd <= 0) throw new Error("invalid_price_state");
   return {
     priceUsd, currency: "USD", unit: "SOBY",
     referencePriceUsd: Number(state.reference_price_usd),
     availableInventorySoby: Number(state.available_inventory_soby),
+    reservedInventorySoby,
+    availableForQuoteSoby: Math.max(0, Number(state.available_inventory_soby) - reservedInventorySoby),
     initialInventorySoby: Number(state.initial_inventory_soby),
     verifiedDemand24hSoby: Number(demand?.demand_24h || 0),
     verifiedDemand7dSoby: Number(demand?.demand_7d || 0),
     verifiedPurchases24h: Number(demand?.purchases_24h || 0),
-    dynamicPricingEnabled: false,
-    priceStatus: "stored_price_waiting_for_purchase_engine",
+    dynamicPricingEnabled: true,
+    priceStatus: "inventory_curve_active_after_owner_confirmed_payout",
     updatedAt: Number(state.updated_at),
   };
 }
@@ -95,17 +102,26 @@ async function createQuote(request, env, origin) {
     const numerator = totalUsdMicros * (10n ** BigInt(asset.decimals));
     const paymentBaseUnits = (numerator + paymentRateMicros - 1n) / paymentRateMicros;
     if (paymentBaseUnits <= 0n) throw new Error("invalid_payment_quote");
-    if (Number(body.sobyAmount) > snapshot.availableInventorySoby) return json({ error: "insufficient_inventory" }, 409, origin);
+    const amountSoby = Number(sobyWei) / 1e18;
+    if (!Number.isFinite(amountSoby) || amountSoby <= 0 || amountSoby > snapshot.availableForQuoteSoby) {
+      return json({ error: "insufficient_inventory" }, 409, origin);
+    }
 
     const id = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + 600;
-    await env.DB.prepare(`
+    const reservation = await env.DB.prepare(`
       INSERT INTO quotes (id,buyer_address,payer_address,soby_amount_wei,price_usd_micros,total_usd_micros,
         payment_asset,payment_chain_id,payment_amount_base_units,expires_at,status,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,'issued',?)
+      SELECT ?,?,?,?,?,?,?,?,?,?,'issued',?
+      WHERE (SELECT available_inventory_soby - COALESCE((
+        SELECT SUM(CAST(soby_amount_wei AS REAL) / 1000000000000000000)
+        FROM quotes WHERE status='issued' AND expires_at > ?
+      ),0) FROM pricing_state WHERE id=1) >= ?
     `).bind(id, body.buyerAddress.toLowerCase(), payerAddress, sobyWei.toString(), Number(priceMicros),
-      Number(totalUsdMicros), body.paymentAsset, asset.chainId, paymentBaseUnits.toString(), expiresAt, now).run();
+      Number(totalUsdMicros), body.paymentAsset, asset.chainId, paymentBaseUnits.toString(), expiresAt, now,
+      now, amountSoby).run();
+    if (!reservation.meta?.changes) return json({ error: "insufficient_inventory" }, 409, origin);
 
     return json({
       quoteId: id,
