@@ -1,6 +1,7 @@
 import { getPaymentRates } from "./market-data.js";
 import { verifyEvmPayment, verifySolPayment, verifyNativeSobyPayout } from "./payment-verification.js";
 import { issueOwnerChallenge, consumeOwnerChallenge } from "./owner-auth.js";
+import { calculateDynamicPrice } from "./pricing.js";
 
 const json = (body, status = 200, origin = "*") => new Response(JSON.stringify(body), {
   status, headers: {
@@ -62,6 +63,8 @@ async function getPriceSnapshot(db) {
     FROM quotes WHERE status='issued' AND expires_at > ?
   `).bind(now).first();
   const reservedInventorySoby = Number(reservations?.reserved || 0);
+  const policy = await db.prepare("SELECT * FROM pricing_policy WHERE id=1").first();
+  const policyReady = Boolean(policy && [policy.baseline_demand_24h,policy.inventory_weight,policy.demand_weight,policy.upward_smoothing,policy.downward_smoothing,policy.floor_price_usd].every(v => v !== null && v !== undefined));
   const priceUsd = Number(state.current_price_usd);
   if (!Number.isFinite(priceUsd) || priceUsd <= 0) throw new Error("invalid_price_state");
   return {
@@ -74,8 +77,8 @@ async function getPriceSnapshot(db) {
     verifiedDemand24hSoby: Number(demand?.demand_24h || 0),
     verifiedDemand7dSoby: Number(demand?.demand_7d || 0),
     verifiedPurchases24h: Number(demand?.purchases_24h || 0),
-    dynamicPricingEnabled: true,
-    priceStatus: "inventory_curve_active_after_owner_confirmed_payout",
+    dynamicPricingEnabled: policyReady,
+    priceStatus: policyReady ? "demand_inventory_policy_active" : "awaiting_owner_approved_pricing_parameters",
     updatedAt: Number(state.updated_at),
   };
 }
@@ -277,20 +280,38 @@ export default {
           "UPDATE orders SET status='paid',payout_tx_hash=?,updated_at=? WHERE id=? AND status='verified'"
         ).bind(body.payoutTxHash, now, order.id).run();
         if (!changed.meta?.changes) return json({ error: "order_already_processed" }, 409, allowed);
-        await env.DB.prepare(`
-          UPDATE pricing_state SET
-            available_inventory_soby=MAX(0,initial_inventory_soby - (
-              SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL)/1000000000000000000),0)
-              FROM orders o JOIN quotes q ON q.id=o.quote_id WHERE o.status='paid'
-            )),
-            current_price_usd=reference_price_usd*initial_inventory_soby/MAX(
-              initial_inventory_soby - (
-                SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL)/1000000000000000000),0)
-                FROM orders o JOIN quotes q ON q.id=o.quote_id WHERE o.status='paid'
-              ), 0.000000000000000001
-            ),
-            updated_at=? WHERE id=1
-        `).bind(now).run();
+        const state = await env.DB.prepare("SELECT * FROM pricing_state WHERE id=1").first();
+        const sold = await env.DB.prepare(`
+          SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL)/1000000000000000000),0) AS total
+          FROM orders o JOIN quotes q ON q.id=o.quote_id WHERE o.status='paid'
+        `).first();
+        const remaining = Math.max(0, Number(state.initial_inventory_soby) - Number(sold?.total || 0));
+        const policy = await env.DB.prepare("SELECT * FROM pricing_policy WHERE id=1").first();
+        const policyReady = Boolean(policy && [policy.baseline_demand_24h,policy.inventory_weight,policy.demand_weight,policy.upward_smoothing,policy.downward_smoothing,policy.floor_price_usd].every(v => v !== null && v !== undefined));
+        let nextPrice = Number(state.current_price_usd);
+        if (policyReady) {
+          const demand = await env.DB.prepare(`
+            SELECT COALESCE(SUM(CAST(q.soby_amount_wei AS REAL)/1000000000000000000),0) AS total
+            FROM orders o JOIN quotes q ON q.id=o.quote_id
+            WHERE o.status='paid' AND o.updated_at>=?
+          `).bind(now - 86400).first();
+          nextPrice = calculateDynamicPrice({
+            referencePriceUsd: Number(state.reference_price_usd),
+            previousPriceUsd: Number(state.current_price_usd),
+            availableInventory: remaining,
+            initialInventory: Number(state.initial_inventory_soby),
+            verifiedDemand24h: Number(demand?.total || 0),
+            baselineDemand24h: Number(policy.baseline_demand_24h),
+            inventoryWeight: Number(policy.inventory_weight),
+            demandWeight: Number(policy.demand_weight),
+            upwardSmoothing: Number(policy.upward_smoothing),
+            downwardSmoothing: Number(policy.downward_smoothing),
+            floorPriceUsd: Number(policy.floor_price_usd)
+          });
+        }
+        await env.DB.prepare(
+          "UPDATE pricing_state SET available_inventory_soby=?,current_price_usd=?,updated_at=? WHERE id=1"
+        ).bind(remaining, nextPrice, now).run();
         await env.DB.prepare(
           "INSERT INTO audit_events (order_id,event_type,details_json,created_at) VALUES (?,?,?,?)"
         ).bind(order.id, "soby_payout_confirmed", JSON.stringify(payout), now).run();
