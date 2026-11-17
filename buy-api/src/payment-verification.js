@@ -86,12 +86,12 @@ export async function verifyEvmPayment({
 
   let actualAmount;
   if (network.kind === "native") {
-    if (normalizeHexAddress(tx.to) !== network.recipient) throw new Error("wrong_payment_recipient");
+    if (normalizeHexAddress(tx.to) !== normalizeHexAddress(network.recipient)) throw new Error("wrong_payment_recipient");
     actualAmount = BigInt(tx.value || "0x0");
   } else {
-    if (normalizeHexAddress(tx.to) !== network.token) throw new Error("wrong_payment_asset");
+    if (normalizeHexAddress(tx.to) !== normalizeHexAddress(network.token)) throw new Error("wrong_payment_asset");
     const matching = (receipt.logs || []).filter(log =>
-      normalizeHexAddress(log.address) === network.token &&
+      normalizeHexAddress(log.address) === normalizeHexAddress(network.token) &&
       log.topics?.[0]?.toLowerCase() === TRANSFER_TOPIC &&
       log.topics?.[1]?.slice(-40).toLowerCase() === sender.slice(2) &&
       log.topics?.[2]?.slice(-40).toLowerCase() === network.recipient.slice(2)
