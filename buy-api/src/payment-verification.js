@@ -178,7 +178,7 @@ export async function verifyNativeSobyPayout({
   if (typeof txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
     throw new Error("invalid_payout_reference");
   }
-  if (!/^\\d+$/.test(String(expectedAmount)) || BigInt(expectedAmount) <= 0n) {
+  if (!/^[0-9]+$/.test(String(expectedAmount)) || BigInt(expectedAmount) <= 0n) {
     throw new Error("invalid_payout_amount");
   }
   const buyer = normalizeHexAddress(expectedBuyer);
