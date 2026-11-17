@@ -12,7 +12,7 @@ function fakeDb({ state, demand = {} }) {
         bind() { return this; },
         async first() {
           if (sql.includes("FROM pricing_state")) return state;
-          if (sql.includes("FROM quotes WHERE status='issued'")) return { reserved: 0 };
+          if (sql.includes("FROM quotes q LEFT JOIN orders o")) return { reserved: 0 };
           if (sql.includes("FROM pricing_policy")) return null;
           if (sql.includes("FROM orders o")) return {
             demand_24h: 0,
