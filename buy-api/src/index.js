@@ -153,28 +153,15 @@ async function verifyOrder(request, env, origin) {
   if (typeof body?.quoteId !== "string" || typeof body?.paymentReference !== "string") {
     return json({ error: "quote_and_payment_reference_required" }, 400, origin);
   }
-  const quote = await env.DB.prepare(
-    "SELECT * FROM quotes WHERE id = ?"
-  ).bind(body.quoteId).first();
+  const quote = await env.DB.prepare("SELECT * FROM quotes WHERE id = ?").bind(body.quoteId).first();
   if (!quote || !quote.payer_address || quote.status !== "issued" || quote.expires_at < Math.floor(Date.now() / 1000)) {
     return json({ error: "quote_expired_or_unavailable" }, 409, origin);
   }
   const asset = ASSETS[quote.payment_asset];
   if (!asset) return json({ error: "unsupported_payment_asset" }, 400, origin);
 
-  const orderId = crypto.randomUUID();
-  const now = Math.floor(Date.now() / 1000);
-  try {
-    await env.DB.prepare(`
-      INSERT INTO orders (id,quote_id,buyer_address,payment_chain_id,payment_tx_hash,
-        payment_amount_base_units,payment_asset,status,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,'confirming',?,?)
-    `).bind(orderId, quote.id, quote.buyer_address, quote.payment_chain_id,
-      body.paymentReference, quote.payment_amount_base_units, quote.payment_asset, now, now).run();
-  } catch (_) {
-    return json({ error: "payment_reference_already_used" }, 409, origin);
-  }
-
+  // Verify first; a transaction submitted before its confirmation threshold can
+  // be checked again later without permanently consuming its transaction hash.
   try {
     const result = quote.payment_asset === "SOL_SOLANA"
       ? await verifySolPayment({
@@ -188,20 +175,32 @@ async function verifyOrder(request, env, origin) {
           expectedAmount: quote.payment_amount_base_units,
           expectedSender: quote.payer_address,
         });
-    await env.DB.prepare("UPDATE orders SET status='verified', updated_at=? WHERE id=?")
-      .bind(Math.floor(Date.now() / 1000), orderId).run();
-    await env.DB.prepare("UPDATE quotes SET status='paid' WHERE id=?").bind(quote.id).run();
+    const orderId = crypto.randomUUID();
+    const now = Math.floor(Date.now() / 1000);
+    await env.DB.prepare(`
+      INSERT INTO orders (id,quote_id,buyer_address,payment_chain_id,payment_tx_hash,
+        payment_amount_base_units,payment_asset,status,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,'verified',?,?)
+    `).bind(orderId, quote.id, quote.buyer_address, quote.payment_chain_id,
+      body.paymentReference, quote.payment_amount_base_units, quote.payment_asset, now, now).run();
+    const marked = await env.DB.prepare("UPDATE quotes SET status='paid' WHERE id=? AND status='issued'")
+      .bind(quote.id).run();
+    if (!marked.meta?.changes) return json({ error: "quote_already_consumed" }, 409, origin);
     await env.DB.prepare(
       "INSERT INTO audit_events (order_id,event_type,details_json,created_at) VALUES (?,?,?,?)"
     ).bind(orderId, "payment_verified", JSON.stringify({
       paymentReference: body.paymentReference, asset: quote.payment_asset,
       amountBaseUnits: result.amountBaseUnits, confirmations: result.confirmations ?? null,
-    }), Math.floor(Date.now() / 1000)).run();
+    }), now).run();
     return json({ orderId, status: "verified", payment: result, nextStep: "owner_manual_review_required" }, 200, origin);
   } catch (error) {
-    await env.DB.prepare("UPDATE orders SET status='failed', failure_code=?, updated_at=? WHERE id=?")
-      .bind(String(error?.message || "verification_failed").slice(0, 80), Math.floor(Date.now() / 1000), orderId).run();
-    return json({ error: "payment_not_verified", reason: String(error?.message || "verification_failed") }, 422, origin);
+    const reason = String(error?.message || "verification_failed");
+    const status = reason === "payment_not_final" || reason === "rpc_unavailable" ? 202 : 422;
+    return json({
+      error: status === 202 ? "payment_confirmation_pending" : "payment_not_verified",
+      reason,
+      retryable: status === 202
+    }, status, origin);
   }
 }
 
