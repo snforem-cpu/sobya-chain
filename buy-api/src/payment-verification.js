@@ -79,6 +79,8 @@ export async function verifyEvmPayment({
   }
   if (normalizeHexAddress(tx.from) !== sender) throw new Error("payment_sender_mismatch");
 
+  const block = await rpcCall(network.rpc, "eth_getBlockByNumber", [receipt.blockNumber, false], fetchImpl);
+  const blockTimestamp = block?.timestamp ? Number(BigInt(block.timestamp)) : null;
   const confirmations = Number(BigInt(headHex) - BigInt(receipt.blockNumber) + 1n);
   if (!Number.isSafeInteger(confirmations) || confirmations < network.confirmations) {
     throw new Error("payment_not_final");
@@ -110,6 +112,7 @@ export async function verifyEvmPayment({
     amountBaseUnits: actualAmount.toString(),
     confirmations,
     blockNumber: Number(BigInt(receipt.blockNumber)),
+    blockTimestamp,
   };
 }
 
@@ -153,6 +156,7 @@ export async function verifySolPayment({
     recipient: SOLANA_RECIPIENT,
     amountBaseUnits: lamports.toString(),
     slot: result.slot,
+    blockTimestamp: Number.isFinite(result.blockTime) ? result.blockTime : null,
     commitment: "finalized",
   };
 }
