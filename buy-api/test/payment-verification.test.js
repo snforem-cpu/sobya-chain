@@ -60,7 +60,7 @@ test("verifies the exact USDT Transfer log and token contract", async () => {
   const tx = { chainId: "0x1", from: sender, to: token, value: "0x0" };
   const result = await verifyEvmPayment({
     asset: "USDT_ETHEREUM", txHash: hash, expectedAmount: "2500000",
-    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x80"]),
+    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x80", { timestamp: "0x6553f100" }]),
   });
   assert.equal(result.verified, true);
   assert.equal(result.amountBaseUnits, "2500000");
@@ -112,6 +112,6 @@ test("rejects native SOBY payout signed by a wallet other than the inventory wal
   };
   await assert.rejects(() => verifyNativeSobyPayout({
     txHash: hash, expectedAmount: "1000000000000000000",
-    expectedBuyer: tx.to, fetchImpl: mockFetch([receipt, tx, "0x80"]),
+    expectedBuyer: tx.to, fetchImpl: mockFetch([receipt, tx, "0x80", { timestamp: "0x6553f100" }]),
   }), /wrong_payout_sender/);
 });
