@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifyEvmPayment, verifySolPayment, paymentNetworkConfig } from "../src/payment-verification.js";
+import { verifyEvmPayment, verifySolPayment, verifyNativeSobyPayout, paymentNetworkConfig } from "../src/payment-verification.js";
 
 const hash = "0x" + "a".repeat(64);
 const sender = "0x1111111111111111111111111111111111111111";
@@ -83,4 +83,35 @@ test("verifies the exact finalized native SOL transfer", async () => {
   });
   assert.equal(result.verified, true);
   assert.equal(result.commitment, "finalized");
+});
+
+
+test("verifies exact native SOBY payout from the inventory wallet on SOBYA Mainnet", async () => {
+  const inventory = "0xebdb899fFE84a89e1d576964b640491c135651AD";
+  const buyer = "0x2222222222222222222222222222222222222222";
+  const receipt = { status: "0x1", blockNumber: "0x64", logs: [] };
+  const tx = {
+    chainId: "0x534f425941", from: inventory, to: buyer,
+    value: "0xde0b6b3a7640000",
+  };
+  const result = await verifyNativeSobyPayout({
+    txHash: hash, expectedAmount: "1000000000000000000",
+    expectedBuyer: buyer, fetchImpl: mockFetch([receipt, tx, "0x6f"]),
+  });
+  assert.equal(result.verified, true);
+  assert.equal(result.confirmations, 12);
+  assert.equal(result.amountBaseUnits, "1000000000000000000");
+});
+
+test("rejects native SOBY payout signed by a wallet other than the inventory wallet", async () => {
+  const receipt = { status: "0x1", blockNumber: "0x64", logs: [] };
+  const tx = {
+    chainId: "0x534f425941", from: sender,
+    to: "0x2222222222222222222222222222222222222222",
+    value: "0xde0b6b3a7640000",
+  };
+  await assert.rejects(() => verifyNativeSobyPayout({
+    txHash: hash, expectedAmount: "1000000000000000000",
+    expectedBuyer: tx.to, fetchImpl: mockFetch([receipt, tx, "0x80"]),
+  }), /wrong_payout_sender/);
 });
