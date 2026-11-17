@@ -28,7 +28,7 @@ test("verifies an exact confirmed native ETH transfer", async () => {
   const tx = { chainId: "0x1", from: sender, to: recipient, value: "0xde0b6b3a7640000" };
   const result = await verifyEvmPayment({
     asset: "ETH_ETHEREUM", txHash: hash, expectedAmount: "1000000000000000000",
-    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x6f"]),
+    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x6f", { timestamp: "0x6553f100" }]),
   });
   assert.equal(result.verified, true);
   assert.equal(result.confirmations, 12);
@@ -39,7 +39,7 @@ test("rejects an EVM payment with insufficient confirmations", async () => {
   const tx = { chainId: "0x1", from: sender, to: recipient, value: "0xde0b6b3a7640000" };
   await assert.rejects(() => verifyEvmPayment({
     asset: "ETH_ETHEREUM", txHash: hash, expectedAmount: "1000000000000000000",
-    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x6e"]),
+    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x6e", { timestamp: "0x6553f100" }]),
   }), /payment_not_final/);
 });
 
@@ -48,7 +48,7 @@ test("rejects an EVM payment to a different recipient", async () => {
   const tx = { chainId: "0x1", from: sender, to: "0x2222222222222222222222222222222222222222", value: "0xde0b6b3a7640000" };
   await assert.rejects(() => verifyEvmPayment({
     asset: "ETH_ETHEREUM", txHash: hash, expectedAmount: "1000000000000000000",
-    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x80"]),
+    expectedSender: sender, fetchImpl: mockFetch([receipt, tx, "0x80", { timestamp: "0x6553f100" }]),
   }), /wrong_payment_recipient/);
 });
 
