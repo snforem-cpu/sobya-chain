@@ -1,31 +1,36 @@
 import { verifyMessage } from "viem";
 
 export const OWNER_WALLET = "0xebdb899fFE84a89e1d576964b640491c135651AD";
+const ALLOWED_ACTIONS = new Set(["orders:list","order:payout","pricing:update"]);
 
-export async function issueOwnerChallenge(db, address) {
+export async function issueOwnerChallenge(db, address, action, context) {
   if (!db) throw new Error("database_not_configured");
   if (typeof address !== "string" || address.toLowerCase() !== OWNER_WALLET.toLowerCase()) {
     throw new Error("owner_wallet_required");
+  }
+  if (!ALLOWED_ACTIONS.has(action) || typeof context !== "string" || context.length < 1 || context.length > 512) {
+    throw new Error("invalid_owner_action");
   }
   const nonce = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + 300;
   const message = [
     "SOBYA BUY OWNER AUTHORIZATION",
-    "Action: one-time dashboard request",
+    "Action: " + action,
+    "Context: " + context,
     "Wallet: " + OWNER_WALLET,
     "Nonce: " + nonce,
     "Issued At: " + now,
     "Expires At: " + expiresAt,
-    "Do not sign this message if you did not initiate a SOBYA BUY admin action."
+    "Only sign if these exact details match the action you intend to approve."
   ].join("\n");
   await db.prepare(
-    "INSERT INTO owner_auth_challenges (nonce,owner_address,message,expires_at,created_at) VALUES (?,?,?,?,?)"
-  ).bind(nonce, OWNER_WALLET.toLowerCase(), message, expiresAt, now).run();
-  return { nonce, message, expiresAt };
+    "INSERT INTO owner_auth_challenges (nonce,owner_address,action,context,message,expires_at,created_at) VALUES (?,?,?,?,?,?,?)"
+  ).bind(nonce, OWNER_WALLET.toLowerCase(), action, context, message, expiresAt, now).run();
+  return { nonce, message, expiresAt, action, context };
 }
 
-export async function consumeOwnerChallenge(db, auth) {
+export async function consumeOwnerChallenge(db, auth, expectedAction, expectedContext) {
   if (!db || !auth || typeof auth.nonce !== "string" || typeof auth.signature !== "string" ||
       typeof auth.address !== "string" || auth.address.toLowerCase() !== OWNER_WALLET.toLowerCase()) {
     throw new Error("owner_auth_required");
@@ -35,6 +40,10 @@ export async function consumeOwnerChallenge(db, auth) {
   ).bind(auth.nonce, OWNER_WALLET.toLowerCase()).first();
   const now = Math.floor(Date.now() / 1000);
   if (!row || row.expires_at < now) throw new Error("owner_challenge_expired");
+  if (row.action !== expectedAction || row.context !== expectedContext ||
+      auth.action !== expectedAction || auth.context !== expectedContext) {
+    throw new Error("owner_action_mismatch");
+  }
   const valid = await verifyMessage({
     address: OWNER_WALLET,
     message: row.message,
