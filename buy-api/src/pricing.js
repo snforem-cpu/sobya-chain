@@ -38,8 +38,11 @@ export function calculateDynamicPrice({
   const target = referencePriceUsd * Math.exp(exponent);
   if (!Number.isFinite(target)) throw new RangeError("Calculated price exceeds the supported numeric range");
 
-  const smoothing = target >= previousPriceUsd ? upwardSmoothing : downwardSmoothing;
+  // SOBY's sale price is monotonic: demand contraction never reverses a
+  // previously reached price. This function is called only after a verified
+  // purchase, not from price reads, polling, or quote creation.
+  const smoothing = target >= previousPriceUsd ? upwardSmoothing : 0;
   const next = previousPriceUsd + (target - previousPriceUsd) * smoothing;
   if (!Number.isFinite(next)) throw new RangeError("Calculated price exceeds the supported numeric range");
-  return Math.max(floorPriceUsd, next);
+  return Math.max(previousPriceUsd, floorPriceUsd, next);
 }
