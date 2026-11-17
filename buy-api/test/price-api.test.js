@@ -43,7 +43,7 @@ test("price snapshot keeps the persisted opening price; rolling demand is teleme
   assert.equal(result.verifiedDemand7dSoby, 40);
   assert.equal(result.verifiedPurchases24h, 3);
   assert.equal(db.seen.length, 2);
-  assert.match(db.seen[1], /o\\.status = 'paid'/);
+  assert.ok(db.seen[1].includes("WHERE o.status = 'paid'"));
 });
 
 test("elapsed time and changes in rolling demand never alter the stored price", async () => {
