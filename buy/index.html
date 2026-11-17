@@ -20,7 +20,7 @@
 </div>
 <section class="card" aria-label="Buy SOBY"><div class="card-head"><h2 data-en="Buy SOBY" data-ar="شراء SOBY">Buy SOBY</h2><span class="tag" data-en="PRE-LAUNCH" data-ar="قبل الإطلاق">PRE-LAUNCH</span></div>
 <div class="price-panel" aria-live="polite"><div class="price-label" data-en="Current SOBY price" data-ar="سعر SOBY الحالي">Current SOBY price</div><div class="price-value" id="sobyPrice">$0.005</div><div class="price-meta" id="priceMeta" data-en="Opening price" data-ar="السعر الافتتاحي">Opening price</div></div>
-<div class="field"><label for="payAmount" data-en="You pay" data-ar="أنت تدفع">You pay</label><div class="control"><input id="payAmount" type="number" min="0" step="any" placeholder="0.00" inputmode="decimal" disabled><select id="asset" aria-label="Payment asset"><option value="USDT_ETH">USDT · Ethereum</option><option value="ETH">ETH · Ethereum</option><option value="BNB">BNB · BNB Chain</option><option value="SOL_SOLANA">SOL · Solana</option></select></div></div><button class="solana-connect" id="connectSolanaBtn" type="button" data-en="Connect MetaMask Solana wallet" data-ar="ربط محفظة Solana في MetaMask">Connect MetaMask Solana wallet</button><div class="payment-wallet" id="solanaPaymentWallet"><span data-en="SOL payment wallet" data-ar="محفظة دفع SOL">SOL payment wallet</span><strong id="solanaWalletAddress">Not connected</strong></div>
+<div class="field"><label for="payAmount" data-en="SOBY amount" data-ar="كمية SOBY">SOBY amount</label><div class="control"><input id="payAmount" type="number" min="0" step="any" placeholder="0.00" inputmode="decimal"><select id="asset" aria-label="Payment asset"><option value="USDT_ETH">USDT · Ethereum</option><option value="ETH">ETH · Ethereum</option><option value="BNB">BNB · BNB Chain</option><option value="SOL_SOLANA">SOL · Solana</option></select></div></div><button class="solana-connect" id="connectSolanaBtn" type="button" data-en="Connect MetaMask Solana wallet" data-ar="ربط محفظة Solana في MetaMask">Connect MetaMask Solana wallet</button><div class="payment-wallet" id="solanaPaymentWallet"><span data-en="SOL payment wallet" data-ar="محفظة دفع SOL">SOL payment wallet</span><strong id="solanaWalletAddress">Not connected</strong></div>
 <div class="receive"><small data-en="You receive" data-ar="ستحصل على">You receive</small><strong id="receiveAmount">— SOBY</strong></div>
 <div class="walletline"><span data-en="Receiving wallet" data-ar="محفظة الاستلام">Receiving wallet</span><span class="wallet-address" id="walletAddress">Not connected</span></div>
 <button class="buybtn" id="buyBtn" type="button" disabled data-en="Sales opening soon" data-ar="سيبدأ البيع قريباً">Sales opening soon</button>
@@ -330,6 +330,134 @@
     await switchNetwork();
   });
   $("connectSolanaBtn").addEventListener("click", connectSolana);
+
+  const apiBase = (window.SOBYA_BUY_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
+  $("payAmount").addEventListener("input", () => {
+    const amount = Number($("payAmount").value);
+    $("receiveAmount").textContent = Number.isFinite(amount) && amount > 0
+      ? amount.toLocaleString(undefined, {maximumFractionDigits: 8}) + " SOBY" : "— SOBY";
+  });
+
+  function base58(bytes) {
+    const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let digits = [0];
+    for (const byte of bytes) {
+      let carry = byte;
+      for (let i = 0; i < digits.length; i++) {
+        carry += digits[i] << 8;
+        digits[i] = carry % 58;
+        carry = Math.floor(carry / 58);
+      }
+      while (carry) { digits.push(carry % 58); carry = Math.floor(carry / 58); }
+    }
+    let zeros = 0;
+    while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+    return "1".repeat(zeros) + digits.reverse().map(d => alphabet[d]).join("").replace(/^1+/, "");
+  }
+
+  async function postApi(path, body) {
+    const response = await fetch(apiBase + path, {
+      method: "POST", headers: {"content-type":"application/json", accept:"application/json"},
+      body: JSON.stringify(body), cache: "no-store"
+    });
+    const data = await response.json().catch(() => ({}));
+    return {response, data};
+  }
+
+  async function sendEvmPayment(quote, asset) {
+    const chainId = asset === "BNB" ? 56 : 1;
+    const expectedChain = chainHex[chainId];
+    const actualChain = await provider.request({method:"eth_chainId"});
+    if (actualChain.toLowerCase() !== expectedChain.toLowerCase()) {
+      await provider.request({method:"wallet_switchEthereumChain",params:[{chainId:expectedChain}]});
+    }
+    const to = quote.paymentRecipient;
+    let tx;
+    if (asset === "USDT_ETH") {
+      const amountHex = BigInt(quote.paymentAmountBaseUnits).toString(16).padStart(64,"0");
+      const recipientHex = to.slice(2).toLowerCase().padStart(64,"0");
+      tx = {from:account,to:window.SOBYA_BUY_CONFIG.assets.USDT_ETH.contract,
+        data:"0xa9059cbb"+recipientHex+amountHex,value:"0x0"};
+    } else {
+      tx = {from:account,to,value:"0x"+BigInt(quote.paymentAmountBaseUnits).toString(16)};
+    }
+    return await provider.request({method:"eth_sendTransaction",params:[tx]});
+  }
+
+  async function sendSolPayment(quote) {
+    if (!solanaClient || !solanaAccount) throw new Error("Connect your MetaMask Solana wallet first.");
+    const wallet = solanaClient.getWallet();
+    const feature = wallet?.features?.["solana:signAndSendTransaction"];
+    if (!feature?.signAndSendTransaction) throw new Error("This MetaMask version does not expose Solana transaction signing.");
+    const {Connection,PublicKey,SystemProgram,Transaction} = await import("https://esm.sh/@solana/web3.js@1.98.4?bundle");
+    const connection = new Connection("https://api.mainnet-beta.solana.com","confirmed");
+    const latest = await connection.getLatestBlockhash("confirmed");
+    const transaction = new Transaction({
+      feePayer:new PublicKey(solanaAccount.address),
+      recentBlockhash:latest.blockhash,
+      lastValidBlockHeight:latest.lastValidBlockHeight
+    }).add(SystemProgram.transfer({
+      fromPubkey:new PublicKey(solanaAccount.address),
+      toPubkey:new PublicKey(quote.paymentRecipient),
+      lamports:Number(BigInt(quote.paymentAmountBaseUnits))
+    }));
+    const signed = await feature.signAndSendTransaction({
+      account:solanaAccount,
+      transaction:transaction.serialize({requireAllSignatures:false,verifySignatures:false}),
+      chain:"solana:mainnet"
+    });
+    const signature = signed?.signature;
+    if (!signature) throw new Error("MetaMask did not return a Solana transaction signature.");
+    return typeof signature === "string" ? signature : base58(signature);
+  }
+
+  async function verifyPaymentUntilFinal(quoteId, paymentReference) {
+    for (let attempt=0; attempt<20; attempt++) {
+      const {response,data}=await postApi("/api/orders/verify-payment",{quoteId,paymentReference});
+      if (response.ok) return data;
+      if (response.status !== 202 || data.retryable !== true) throw new Error(data.reason || data.error || "Payment verification failed.");
+      say("Payment detected; waiting for network confirmations…","تم رصد الدفع؛ ننتظر تأكيدات الشبكة…");
+      await new Promise(resolve=>setTimeout(resolve,15000));
+    }
+    throw new Error("Payment was sent but has not reached the required finality yet. Keep the transaction hash and retry verification later.");
+  }
+
+  async function buySoby() {
+    const config=window.SOBYA_BUY_CONFIG||{};
+    if (config.paymentsEnabled !== true) {
+      say("Sales are not open yet. No payment has been requested.","لم يبدأ البيع بعد. لم يتم طلب أي دفعة.");
+      return;
+    }
+    const amount=$("payAmount").value.trim();
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount)<=0) {
+      say("Enter a valid SOBY amount.","أدخل كمية SOBY صحيحة."); return;
+    }
+    if (!account) { say("Connect your SOBYA receiving wallet first.","اربط محفظة استلام SOBY أولاً."); return; }
+    const asset=$("asset").value;
+    if (asset==="SOL_SOLANA" && !solanaAccount) { say("Connect your Solana payment wallet first.","اربط محفظة دفع Solana أولاً."); return; }
+    $("buyBtn").disabled=true;
+    try {
+      say("Creating a 10-minute verified quote…","جارٍ إنشاء عرض سعر موثّق لمدة 10 دقائق…");
+      const payer=asset==="SOL_SOLANA"?solanaAccount.address:account;
+      const {response,data:quote}=await postApi("/api/quote",{
+        buyerAddress:account,paymentSenderAddress:payer,sobyAmount:amount,paymentAsset:asset
+      });
+      if(!response.ok) throw new Error(quote.message||quote.error||"Could not create a verified quote.");
+      say("Quote: pay "+quote.paymentAmount+" "+asset+". Confirm the payment in your wallet.","عرض السعر: ادفع "+quote.paymentAmount+" "+asset+". أكّد الدفع في محفظتك.");
+      const paymentReference=asset==="SOL_SOLANA"
+        ? await sendSolPayment(quote)
+        : await sendEvmPayment(quote,asset);
+      say("Payment sent. Verifying it on the network…","تم إرسال الدفع. جارٍ التحقق منه على الشبكة…");
+      const order=await verifyPaymentUntilFinal(quote.quoteId,paymentReference);
+      say("Payment verified. Order "+order.orderId+" is awaiting manual SOBY payout from the project owner.","تم تأكيد الدفع. الطلب "+order.orderId+" بانتظار تحويل SOBY يدوياً من مالك المشروع.");
+    } catch(error) {
+      console.error("SOBYA BUY checkout:",error);
+      say(error?.message||"Purchase could not be completed.","تعذر إكمال عملية الشراء.");
+    } finally {
+      $("buyBtn").disabled=!(config.paymentsEnabled===true);
+    }
+  }
+  $("buyBtn").addEventListener("click",buySoby);
   window.addEventListener("pageshow", refreshAccount);
   window.addEventListener("focus", refreshAccount);
   document.addEventListener("visibilitychange", () => {
@@ -375,8 +503,7 @@
     }
   }
 
-  if (!(window.SOBYA_BUY_CONFIG && window.SOBYA_BUY_CONFIG.paymentsEnabled)) {
-    $("buyBtn").disabled = true;
-  }
+  $("payAmount").disabled = false;
+  $("buyBtn").disabled = !(window.SOBYA_BUY_CONFIG && window.SOBYA_BUY_CONFIG.paymentsEnabled === true);
 })();
 </script></body></html>
