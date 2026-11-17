@@ -164,3 +164,52 @@ export const paymentNetworkConfig = Object.freeze({
   }])),
   SOL_SOLANA: { chain: "solana-mainnet", decimals: 9, commitment: "finalized" },
 });
+
+
+// SOBY is the native asset on SOBYA Mainnet (chain ID 357812033857),
+// not an ERC-20 contract. The owner signs this transfer in MetaMask.
+const SOBYA_RPC = "https://sobya-evm-rpc.nodesafe-app.xyz";
+const SOBYA_CHAIN_ID = 357812033857;
+const SOBYA_INVENTORY_WALLET = "0xebdb899fFE84a89e1d576964b640491c135651AD";
+
+export async function verifyNativeSobyPayout({
+  txHash, expectedAmount, expectedBuyer, fetchImpl = fetch,
+}) {
+  if (typeof txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    throw new Error("invalid_payout_reference");
+  }
+  if (!/^\\d+$/.test(String(expectedAmount)) || BigInt(expectedAmount) <= 0n) {
+    throw new Error("invalid_payout_amount");
+  }
+  const buyer = normalizeHexAddress(expectedBuyer);
+  if (!buyer) throw new Error("invalid_payout_buyer");
+
+  const [receipt, tx, headHex] = await Promise.all([
+    rpcCall(SOBYA_RPC, "eth_getTransactionReceipt", [txHash], fetchImpl),
+    rpcCall(SOBYA_RPC, "eth_getTransactionByHash", [txHash], fetchImpl),
+    rpcCall(SOBYA_RPC, "eth_blockNumber", [], fetchImpl),
+  ]);
+  if (!receipt || !tx || receipt.status !== "0x1" || !receipt.blockNumber) {
+    throw new Error("payout_not_successful");
+  }
+  if (Number(BigInt(tx.chainId || "0x0")) !== SOBYA_CHAIN_ID) {
+    throw new Error("wrong_payout_chain");
+  }
+  if (normalizeHexAddress(tx.from) !== normalizeHexAddress(SOBYA_INVENTORY_WALLET)) {
+    throw new Error("wrong_payout_sender");
+  }
+  if (normalizeHexAddress(tx.to) !== buyer) throw new Error("wrong_payout_recipient");
+  if (BigInt(tx.value || "0x0") !== BigInt(expectedAmount)) {
+    throw new Error("payout_amount_mismatch");
+  }
+  const confirmations = Number(BigInt(headHex) - BigInt(receipt.blockNumber) + 1n);
+  if (!Number.isSafeInteger(confirmations) || confirmations < 12) {
+    throw new Error("payout_not_final");
+  }
+  return {
+    verified: true, chainId: SOBYA_CHAIN_ID, txHash,
+    sender: SOBYA_INVENTORY_WALLET, recipient: buyer,
+    amountBaseUnits: BigInt(tx.value).toString(), confirmations,
+    blockNumber: Number(BigInt(receipt.blockNumber)),
+  };
+}
