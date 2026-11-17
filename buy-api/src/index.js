@@ -212,6 +212,25 @@ async function verifyOrder(request, env, origin) {
   }
 }
 
+
+async function adminHash(v) {
+  const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+function adminEqual(a,b) {
+  const x=new TextEncoder().encode(String(a)),y=new TextEncoder().encode(String(b));let d=x.length^y.length;
+  for(let i=0;i<Math.max(x.length,y.length);i++)d|=(x[i]||0)^(y[i]||0);
+  return d===0;
+}
+async function adminSession(req,env) {
+  const t=(req.headers.get("Authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!/^[a-f0-9]{64}$/.test(t)||!env.DB)throw new Error("admin_session_required");
+  const hash=await adminHash(t),r=await env.DB.prepare("SELECT expires_at FROM admin_sessions WHERE token_hash=?").bind(hash).first();
+  const now=Math.floor(Date.now()/1000);
+  if(!r||Number(r.expires_at)<=now){if(r)await env.DB.prepare("DELETE FROM admin_sessions WHERE token_hash=?").bind(hash).run();throw new Error("admin_session_expired");}
+  return hash;
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
@@ -355,6 +374,28 @@ export default {
     }
 
 
+
+    if(url.pathname==="/api/admin/login"&&request.method==="POST"){
+      if(!env.DB)return json({error:"database_not_configured"},503,allowed);
+      if(!env.SOBYA_ADMIN_PASSWORD)return json({error:"admin_password_not_configured"},503,allowed);
+      let b;try{b=await request.json();}catch{return json({error:"invalid_json"},400,allowed);}
+      const ipHash=await adminHash(request.headers.get("CF-Connecting-IP")||"unknown"),now=Math.floor(Date.now()/1000);
+      await env.DB.prepare("DELETE FROM admin_login_attempts WHERE attempted_at < ?").bind(now-900).run();
+      const a=await env.DB.prepare("SELECT COUNT(*) AS total FROM admin_login_attempts WHERE ip_hash=? AND attempted_at>=?").bind(ipHash,now-900).first();
+      if(Number(a?.total||0)>=5)return json({error:"login_rate_limited"},429,allowed);
+      await env.DB.prepare("INSERT INTO admin_login_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(ipHash,now).run();
+      if(!adminEqual(typeof b?.password==="string"?b.password:"",env.SOBYA_ADMIN_PASSWORD))return json({error:"invalid_admin_password"},401,allowed);
+      await env.DB.prepare("DELETE FROM admin_login_attempts WHERE ip_hash=?").bind(ipHash).run();
+      const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+      const token=[...bytes].map(x=>x.toString(16).padStart(2,"0")).join(""),hash=await adminHash(token),expires=now+28800;
+      await env.DB.prepare("INSERT INTO admin_sessions(token_hash,expires_at,created_at) VALUES(?,?,?)").bind(hash,expires,now).run();
+      return json({token,expiresAt:expires},200,allowed);
+    }
+    if(url.pathname==="/api/admin/logout"&&request.method==="POST"){
+      try{const hash=await adminSession(request,env);await env.DB.prepare("DELETE FROM admin_sessions WHERE token_hash=?").bind(hash).run();return json({loggedOut:true},200,allowed);}
+      catch(e){return json({error:e?.message||"admin_session_required"},401,allowed);}
+    }
+
     // Manual-only SOBYA BUY: buyers submit details; the owner verifies payment and sends SOBY offline.
     if (url.pathname === "/api/manual/price" && request.method === "GET") {
       if (!env.DB) return json({error:"database_not_configured"},503,allowed);
@@ -388,7 +429,7 @@ export default {
       if (!env.DB) return json({error:"database_not_configured"},503,allowed);
       let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
       try {
-        await consumeOwnerChallenge(env.DB,b.auth,"orders:list","manual-orders");
+        await adminSession(request,env);
         const result=await env.DB.prepare("SELECT * FROM manual_orders ORDER BY created_at DESC LIMIT 200").all();
         return json({orders:result.results||[]},200,allowed);
       } catch(e) { return json({error:e?.message||"owner_auth_failed"},403,allowed); }
@@ -398,7 +439,7 @@ export default {
       let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
       try {
         const price=Number(b.priceUsd);
-        await consumeOwnerChallenge(env.DB,b.auth,"pricing:update",String(b.priceUsd));
+        await adminSession(request,env);
         if (!Number.isFinite(price)||price<=0||price>1000000) return json({error:"invalid_price"},400,allowed);
         await env.DB.prepare("UPDATE manual_sale_settings SET price_usd=?,updated_at=? WHERE id=1").bind(price,Math.floor(Date.now()/1000)).run();
         return json({saved:true,priceUsd:price},200,allowed);
@@ -408,8 +449,7 @@ export default {
       if (!env.DB) return json({error:"database_not_configured"},503,allowed);
       let b; try { b=await request.json(); } catch { return json({error:"invalid_json"},400,allowed); }
       try {
-        const context=String(b.orderId)+"|"+String(b.status)+"|"+String(b.payoutTx||"");
-        await consumeOwnerChallenge(env.DB,b.auth,"order:payout",context);
+        await adminSession(request,env);
         if (!["under_review","paid_confirmed","completed","rejected"].includes(b.status)) return json({error:"invalid_status"},400,allowed);
         await env.DB.prepare("UPDATE manual_orders SET status=?,payout_tx=?,updated_at=? WHERE id=?")
           .bind(b.status,String(b.payoutTx||"").slice(0,180),Math.floor(Date.now()/1000),String(b.orderId)).run();
