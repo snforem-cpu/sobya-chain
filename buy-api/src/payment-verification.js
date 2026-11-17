@@ -94,7 +94,7 @@ export async function verifyEvmPayment({
       normalizeHexAddress(log.address) === normalizeHexAddress(network.token) &&
       log.topics?.[0]?.toLowerCase() === TRANSFER_TOPIC &&
       log.topics?.[1]?.slice(-40).toLowerCase() === sender.slice(2) &&
-      log.topics?.[2]?.slice(-40).toLowerCase() === network.recipient.slice(2)
+      log.topics?.[2]?.slice(-40).toLowerCase() === normalizeHexAddress(network.recipient).slice(2)
     );
     if (matching.length !== 1) throw new Error("payment_transfer_not_found");
     actualAmount = BigInt(matching[0].data || "0x0");
