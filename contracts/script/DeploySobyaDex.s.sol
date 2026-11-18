@@ -6,8 +6,7 @@ import "../src/SobyaV2Factory.sol";
 import "../src/SobyaV2Router.sol";
 
 interface VmDeploy {
-    function envUint(string calldata key) external returns (uint256);
-    function startBroadcast(uint256 privateKey) external;
+    function startBroadcast() external;
     function stopBroadcast() external;
 }
 
@@ -20,8 +19,7 @@ contract DeploySobyaDex {
 
     function run() external {
         require(block.chainid == 357812033857, "SOBYA DEX: WRONG_CHAIN_ID");
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(deployerKey);
+        vm.startBroadcast();
 
         WSOBY wrapped = new WSOBY();
         SobyaV2Factory factory = new SobyaV2Factory();
