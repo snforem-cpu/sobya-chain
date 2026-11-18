@@ -95,6 +95,20 @@ contract SobyaV2Test {
         require(tokenA.balanceOf(address(this))>beforeA&&tokenB.balanceOf(address(this))>beforeB,"BALANCES_NOT_RESTORED");
     }
 
+    function testFuzzSwapPreservesConstantProduct(uint96 rawAmount) public {
+        _addInitialLiquidity();
+        address[] memory path=new address[](2);
+        path[0]=address(tokenA); path[1]=address(tokenB);
+        SobyaV2Pair p=SobyaV2Pair(pair);
+        (uint112 r0Before,uint112 r1Before,)=p.getReserves();
+        uint256 kBefore=uint256(r0Before)*uint256(r1Before);
+        uint256 amountIn=1 ether+(uint256(rawAmount)%1 ether);
+        router.swapExactTokensForTokens(amountIn,1,path,address(this),block.timestamp+1 hours);
+        (uint112 r0After,uint112 r1After,)=p.getReserves();
+        uint256 kAfter=uint256(r0After)*uint256(r1After);
+        require(kAfter>=kBefore,"CONSTANT_PRODUCT_DECREASED");
+    }
+
     function testExpiredDeadlineReverts() public {
         _addInitialLiquidity();
         address[] memory path=new address[](2);
