@@ -26,6 +26,10 @@ A passing build or local CI network does not establish public consensus, continu
 
 A browser-only tokenomics planning tool is available at [SOBYA Tokenomics Studio](https://snforem-cpu.github.io/sobya-chain/tokenomics-studio/). It supports allocation design, TGE/cliff/linear vesting schedules, unlock forecasts, scenario comparison, JSON/CSV export, and print-to-PDF reports. Calculations run locally; it does not connect to wallets, RPC endpoints, external APIs, or a server. See [the tool documentation](tokenomics-studio/README.md) for formulas and limitations. The planned individual perpetual license is priced at 100 SOBY (one user, one-time payment). The pricing page currently keeps sales paused until the receiving address and live payment network are independently verified. Payment collection and in-app SOBY license verification are not enabled yet; see [sales and licensing status](tokenomics-studio/LICENSING.md).
 
+## SOBYA DEX
+
+A self-custody decentralized exchange interface and AMM contracts are included in the repository. The [SOBYA DEX interface](https://snforem-cpu.github.io/sobya-chain/dex/) is published as a static GitHub Pages site. **Trading is not enabled yet**: Factory, Router, and WSOBY contract addresses remain intentionally blank until deployment receipts are verified. Independent smart-contract security review is required before public liquidity is added. See the [DEX deployment and safety guide](contracts/DEPLOYMENT.md). No official USDT contract is currently provided or claimed.
+
 ## Validator participation
 
 Independent operators may submit a no-fee expression of interest through the [public GitHub validator application form](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml). Intake is manual: submitting an issue does not call the separate Go support service, approve a grant, or create a validator.
