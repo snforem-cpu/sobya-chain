@@ -121,6 +121,14 @@ jobs:
               raise SystemExit("Payment verifier is missing required checks: " + ", ".join(missing_issuer))
           if 'https://sobya-evm-rpc.nodesafe-dapp.xyz' not in issuer:
               raise SystemExit("Payment verifier is missing the current SOBYA RPC endpoint.")
+          key_check = issuer.find('const matches=await crypto.subtle.verify')
+          reservation_call = issuer.find('const reservation=await fetch(API_BASE+"/api/admin/license-reservations"')
+          download_call = issuer.find('download(id+".sobya-license.json"')
+          if min(key_check, reservation_call, download_call) < 0 or not key_check < reservation_call < download_call:
+              raise SystemExit("Issuer must verify the Ed25519 key before reservation and download only after reservation.")
+          for required in ['PRIVATE KEY MISMATCH', 'SnNnCzbbKVUeuH3wM8npDxJcLh8R50hImPPnc1cQw9Q=', 'crypto.subtle.sign', 'crypto.subtle.verify']:
+              if required not in issuer:
+                  raise SystemExit("Issuer missing signing-key safety check: " + required)
           app = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
           import base64
           match = re.search(r'const LICENSE_PUBLIC_KEY="([^"]+)"', app)
