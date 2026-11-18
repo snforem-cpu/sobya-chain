@@ -81,6 +81,20 @@ jobs:
               raise SystemExit("Unexpected external network API usage detected")
           print("Required UI elements found; app remains browser-local.")
           PY
+      - name: Validate shared license issuance ledger and duplicate checks
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          ledger = json.loads(Path("tokenomics-studio/used-transactions.json").read_text(encoding="utf-8"))
+          if ledger.get("version") != 1 or ledger.get("network") != "SOBYA Mainnet" or ledger.get("chainId") != 357812033857 or not isinstance(ledger.get("transactions"), list):
+              raise SystemExit("Shared used-transaction ledger schema is invalid.")
+          issuer = Path("tokenomics-studio/license-issuer.html").read_text(encoding="utf-8")
+          for required in ["LEDGER_URL", "loadUsedLedger", "ledgerHasTx", "currentLedger", "Central GitHub ledger unavailable"]:
+              if required not in issuer:
+                  raise SystemExit("Issuer missing central ledger protection: " + required)
+          print("Shared issuance ledger schema and issuer duplicate checks passed.")
+          PY
       - name: Validate sales page and payment-verification license issuer
         run: |
           python3 - <<'PY'
