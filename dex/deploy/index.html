@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
 </head>
 <body><main class="wrap">
-<header class="top"><a class="brand" href="../">SOBYA<small>SECURE DEPLOYMENT</small></a><button class="btn secondary" style="width:auto" id="connect">Connect MetaMask</button></header>
+<header class="top"><a class="brand" href="../">SOBYA<small>SECURE DEPLOYMENT</small></a><button class="btn secondary" style="width:auto" id="connect" onclick="document.getElementById('status').textContent='Button is responding; checking MetaMask connection…'">Connect MetaMask</button></header>
 <div class="tag">SOBYA MAINNET · CHAIN 357812033857</div>
 <h1>Mobile DEX deployment</h1>
 <p class="muted">This page sends deployment transactions directly from your MetaMask wallet. No private key is collected or transmitted. Each contract deployment requires a separate wallet approval.</p>
@@ -126,7 +126,7 @@ async function runDeploy(){
  }catch(e){say("Deployment stopped: "+short(e)+". Any earlier confirmed deployments remain on-chain; do not repeat them. Save the results already shown and request verification.");}
  finally{busy=false;$("deploy").disabled=!ready}
 }
-$("connect").onclick=connect;
+$("connect").addEventListener("click",connect);
 $("deploy").onclick=runDeploy;
 (async()=>{try{await loadBuild()}catch(e){$("build").textContent=short(e);say("Build artifacts are not ready. Do not use a third-party deployer or paste private keys.")}})();
 if(window.ethereum){window.ethereum.on("chainChanged",()=>location.reload());window.ethereum.on("accountsChanged",()=>location.reload())}
