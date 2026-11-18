@@ -42,7 +42,7 @@ jobs:
           from pathlib import Path
           import re
           html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
-          match = re.search(r"function unlockedForSupply\\(a,m,supply\\)\\{[^}]+\\}", html)
+          match = re.search(r"function unlockedForSupply\(a,m,supply\)\{[^}]+\}", html)
           if not match:
               raise SystemExit("Could not locate the production vesting calculation")
           test = """
