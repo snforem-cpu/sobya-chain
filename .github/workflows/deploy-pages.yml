@@ -9,6 +9,7 @@ on:
       - 'sitemap.xml'
       - 'buy/**'
       - 'tokenomics-studio/**'
+      - 'dex/**'
       - 'assets/logo/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
