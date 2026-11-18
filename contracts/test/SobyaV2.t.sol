@@ -4,9 +4,11 @@ pragma solidity ^0.8.24;
 import "../src/SobyaV2Factory.sol";
 import "../src/SobyaV2Router.sol";
 import "../src/SobyaV2Pair.sol";
+import "../src/WSOBY.sol";
 
 interface VmDex {
     function warp(uint256) external;
+    function deal(address account,uint256 newBalance) external;
 }
 
 contract SobyaMockERC20 {
@@ -93,6 +95,23 @@ contract SobyaV2Test {
         (uint256 amountA,uint256 amountB)=router.removeLiquidity(address(tokenA),address(tokenB),lp,1,1,address(this),block.timestamp+1 hours);
         require(amountA>0&&amountB>0,"NO_ASSETS_RETURNED");
         require(tokenA.balanceOf(address(this))>beforeA&&tokenB.balanceOf(address(this))>beforeB,"BALANCES_NOT_RESTORED");
+    }
+
+    function testWrappedNativeSobyCanBeUsedInAnAmmPool() public {
+        vm.deal(address(this),20 ether);
+        WSOBY wrapped=new WSOBY();
+        wrapped.deposit{value:10 ether}();
+        SobyaV2Router wrappedRouter=new SobyaV2Router(address(factory),address(wrapped));
+        wrapped.approve(address(wrappedRouter),type(uint256).max);
+        tokenB.approve(address(wrappedRouter),type(uint256).max);
+        wrappedRouter.addLiquidity(address(wrapped),address(tokenB),5 ether,5 ether,5 ether,5 ether,address(this),block.timestamp+1 hours);
+        address wrappedPair=factory.getPair(address(wrapped),address(tokenB));
+        require(wrappedPair!=address(0),"WSOBY_PAIR_NOT_CREATED");
+        address[] memory path=new address[](2);
+        path[0]=address(tokenB); path[1]=address(wrapped);
+        uint256[] memory amounts=wrappedRouter.swapExactTokensForTokens(1 ether,1,path,address(this),block.timestamp+1 hours);
+        require(amounts[1]>0,"WSOBY_SWAP_FAILED");
+        require(wrapped.balanceOf(address(this))>5 ether,"WSOBY_NOT_RECEIVED");
     }
 
     function testFuzzSwapPreservesConstantProduct(uint96 rawAmount) public {
