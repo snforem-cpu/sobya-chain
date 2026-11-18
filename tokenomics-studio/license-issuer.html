@@ -48,7 +48,7 @@ if(!tx.to||tx.to.toLowerCase()!==RECEIVER)throw new Error("Recipient does not ma
 if(BigInt(tx.value||"0x0")!==REQUIRED_VALUE)throw new Error("Transaction value is not exactly 100 SOBY.");
 if(String(receipt.status).toLowerCase()!=="0x1")throw new Error("Transaction execution did not succeed.");
 if(tx.chainId&&String(tx.chainId).toLowerCase()!==CHAIN_ID)throw new Error("Transaction chain ID mismatch.");
-if(tx.input&&tx.input!=="0x")throw new Error("This is not a plain native SOBY transfer.");
+if(String(tx.input||"").toLowerCase()!=="0x")throw new Error("This is not a plain native SOBY transfer.");
 const head=BigInt(await rpc(endpoint,"eth_blockNumber"));
 const block=BigInt(receipt.blockNumber);
 const confirmations=head>=block?head-block+1n:0n;
