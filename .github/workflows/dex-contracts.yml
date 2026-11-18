@@ -24,6 +24,9 @@ jobs:
       - name: Format Solidity sources
         working-directory: contracts
         run: forge fmt
+      - name: Compile contracts and deployment script
+        working-directory: contracts
+        run: forge build
       - name: Run unit and fuzz tests
         working-directory: contracts
         run: forge test -vvv
