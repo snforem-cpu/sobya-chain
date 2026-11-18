@@ -128,6 +128,23 @@ contract SobyaV2Test {
         require(kAfter>=kBefore,"CONSTANT_PRODUCT_DECREASED");
     }
 
+    function testRejectsOneSidedSyncedReserves() public {
+        address p=factory.createPair(address(tokenA),address(tokenB));
+        tokenA.transfer(p,1 ether);
+        SobyaV2Pair(p).sync();
+        (bool ok,)=address(router).call(abi.encodeCall(router.addLiquidity,(
+            address(tokenA),address(tokenB),10 ether,10 ether,0,0,address(this),block.timestamp+1 hours
+        )));
+        require(!ok,"ONE_SIDED_POOL_ACCEPTED");
+    }
+
+    function testRejectsZeroLiquidityRecipient() public {
+        (bool ok,)=address(router).call(abi.encodeCall(router.addLiquidity,(
+            address(tokenA),address(tokenB),100 ether,100 ether,100 ether,100 ether,address(0),block.timestamp+1 hours
+        )));
+        require(!ok,"ZERO_LP_RECIPIENT_ACCEPTED");
+    }
+
     function testExpiredDeadlineReverts() public {
         _addInitialLiquidity();
         address[] memory path=new address[](2);
