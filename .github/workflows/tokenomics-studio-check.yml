@@ -102,8 +102,11 @@ jobs:
           import re
           buy = Path("tokenomics-studio/buy/index.html").read_text(encoding="utf-8")
           issuer = Path("tokenomics-studio/license-issuer.html").read_text(encoding="utf-8")
-          if "100" not in buy or "SOBY" not in buy or "Sales are not open yet" not in buy:
-              raise SystemExit("Pricing page must show the agreed price and keep sales paused.")
+          if "100" not in buy or "SOBY" not in buy or "Sales are not open yet" in buy or "Sales are open" not in buy:
+              raise SystemExit("Pricing page must show the agreed price and published payment instructions.") 
+           for required in ["357812033857", "0xd316993423fc6268038f4ee3ea7c0c5038513c18", "sobya-evm-rpc.nodesafe-app.xyz", "sobya-coin@outlook.com"]:
+              if required not in buy:
+                  raise SystemExit("Open sales page is missing payment instruction: " + required)
           if "357812033857" not in issuer or "individual-perpetual" not in issuer or "Ed25519" not in issuer:
               raise SystemExit("License issuer is missing required signed license fields.")
           required_issuer = [
