@@ -153,7 +153,7 @@ contract SobyaV2Pair {
         require(amount0Out > 0 || amount1Out > 0, "SOBYA: INSUFFICIENT_OUTPUT");
         (uint112 r0, uint112 r1,) = (reserve0, reserve1, blockTimestampLast);
         require(amount0Out < r0 && amount1Out < r1, "SOBYA: INSUFFICIENT_LIQUIDITY");
-        require(to != token0 && to != token1, "SOBYA: INVALID_TO");
+        require(to != address(0) && to != address(this) && to != token0 && to != token1, "SOBYA: INVALID_TO");
         if (amount0Out > 0) _safeTransfer(token0, to, amount0Out);
         if (amount1Out > 0) _safeTransfer(token1, to, amount1Out);
         uint256 b0 = ISobyaV2ERC20(token0).balanceOf(address(this));
