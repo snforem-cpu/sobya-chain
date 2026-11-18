@@ -31,3 +31,9 @@ Risk indicators are simplified transparent heuristics, not security audits, lega
 
 ## Payments
 This early-access build does not collect payments or verify SOBY transactions. Do not treat a local unlock or browser setting as proof of payment. A payment and license system must be designed separately with a verifiable manual or on-chain verification process before paid access is enabled.
+
+## License verification
+
+The public studio includes an offline Ed25519 signature verifier. Import a `.sobya-license.json` file from the **License verification** workspace view. The verifier checks the configured issuer public key, signed canonical payload, product, perpetual individual plan, one-user limit, 100 SOBY price, EVM chain ID `357812033857`, denomination `asobya`, 18 decimals, license ID and transaction-hash format.
+
+The issuer's private key must remain offline and must never be committed or uploaded. The app contains only the public key. A valid signature proves that the file was signed by the matching private key; it does **not** independently verify that a payment occurred, that a transaction hash exists, or that a transaction has not already been used. Payment verification and duplicate-issuance prevention remain manual owner responsibilities. Sales must remain paused until the receiving address and live network/payment procedure are independently confirmed.
