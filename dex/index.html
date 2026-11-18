@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071326"><title>SOBYA Swap</title>
+<style>
+:root{color-scheme:dark;--bg:#061225;--panel:#102541;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--cyan:#66e0e8;--gold:#e8c77b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#173967,transparent 38%),var(--bg);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}.wrap{max-width:760px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:8px 0 18px}.brand{font-weight:900;letter-spacing:.16em}.brand small{display:block;font-size:10px;color:var(--muted);letter-spacing:.12em}.btn{border:1px solid var(--line);background:#173454;color:white;padding:11px 15px;border-radius:11px;font-weight:750;cursor:pointer}.btn.primary{background:linear-gradient(110deg,#397fe0,#4aa8d8);color:#061225;border:0}.btn:disabled{opacity:.45;cursor:not-allowed}.tabs{display:flex;gap:8px;margin:24px 0 12px}.tab{flex:1}.tab.active{border-color:var(--cyan);color:var(--cyan)}.panel{background:linear-gradient(145deg,#102541,#0b1b30);border:1px solid var(--line);border-radius:20px;padding:22px;margin:12px 0}.field{display:block;margin:14px 0}.field span{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.field input{width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#07182b;color:white;font:inherit}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.muted{color:var(--muted);font-size:13px}.status{padding:12px;border-radius:10px;background:#0b1b30;border:1px solid var(--line);margin:12px 0;overflow-wrap:anywhere}.warn{color:var(--gold)}.hidden{display:none}.foot{color:var(--muted);font-size:12px;text-align:center;margin:25px 0}.link{color:var(--cyan)}h1{font-size:34px;letter-spacing:-.04em;margin:34px 0 4px}.tag{font-size:11px;color:var(--cyan);letter-spacing:.15em;font-weight:800}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+</head>
+<body><main class="wrap">
+<header class="top"><a class="brand" href="../" style="color:inherit;text-decoration:none">SOBYA<small>DECENTRALIZED EXCHANGE</small></a><button class="btn primary" id="connect">Connect wallet</button></header>
+<div class="tag">SOBYA MAINNET · EVM</div><h1>Swap tokens.<br><span style="color:var(--cyan)">Keep control.</span></h1><p class="muted">A self-custody exchange interface. Trades are sent directly from your wallet to on-chain contracts.</p>
+<div class="status" id="network">Checking network configuration…</div>
+<nav class="tabs"><button class="btn tab active" data-tab="swap">Swap</button><button class="btn tab" data-tab="pool">Liquidity</button><button class="btn tab" data-tab="wrap">Wrap SOBY</button></nav>
+<section class="panel" id="swap">
+<label class="field"><span>From token address</span><input id="fromToken" placeholder="0x…"></label>
+<label class="field"><span>Amount</span><input id="amountIn" type="number" min="0" step="any" placeholder="0.0"></label>
+<label class="field"><span>To token address</span><input id="toToken" placeholder="0x…"></label>
+<label class="field"><span>Minimum received (slippage protected)</span><input id="minOut" type="number" min="0" step="any" placeholder="Enter minimum output amount"></label>
+<button class="btn primary" id="swapBtn" disabled>Swap tokens</button>
+<p class="muted">You must enter verified token contract addresses and a minimum output. Never trust a token symbol alone.</p>
+</section>
+<section class="panel hidden" id="pool">
+<div class="tag">CREATE A POOL</div>
+<label class="field"><span>Token A address</span><input id="tokenA" placeholder="0x…"></label>
+<label class="field"><span>Token B address</span><input id="tokenB" placeholder="0x…"></label>
+<div class="row"><label class="field"><span>Amount A</span><input id="liqA" type="number" min="0" step="any"></label><label class="field"><span>Amount B</span><input id="liqB" type="number" min="0" step="any"></label></div>
+<button class="btn primary" id="poolBtn" disabled>Create pool / add liquidity</button>
+<p class="muted">Pool creation and liquidity addition require the DEX Factory and Router to be deployed and configured.</p>
+</section>
+<section class="panel hidden" id="wrap">
+<div class="tag">NATIVE SOBY ↔ WSOBY</div>
+<label class="field"><span>Amount of native SOBY</span><input id="wrapAmount" type="number" min="0" step="any" placeholder="0.0"></label>
+<div class="row"><button class="btn primary" id="wrapBtn" disabled>Wrap SOBY</button><button class="btn" id="unwrapBtn" disabled>Unwrap WSOBY</button></div>
+<p class="muted">Wrapping converts native SOBY into a redeemable 1:1 ERC-20 representation. This does not create additional SOBY supply.</p>
+</section>
+<div class="status" id="status" aria-live="polite">Connect your wallet to begin.</div>
+<p class="foot">SOBYA DEX · Non-custodial · No account or subscription required<br><a class="link" href="../">Official SOBYA website</a></p>
+</main>
+<script>
+const CHAIN_ID=357812033857n;
+const CONFIG_URL='./config.json';
+let config=null,provider=null,signer=null;
+const $=id=>document.getElementById(id);
+const say=m=>$('status').textContent=m;
+const erc20=['function decimals() view returns(uint8)','function approve(address,uint256) returns(bool)','function allowance(address,address) view returns(uint256)'];
+const routerAbi=['function swapExactTokensForTokens(uint256,uint256,address[],address,uint256) returns(uint256[])','function addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256) returns(uint256,uint256,uint256)'];
+const factoryAbi=['function getPair(address,address) view returns(address)','function createPair(address,address) returns(address)'];
+const wrappedAbi=['function deposit() payable','function withdraw(uint256)','function decimals() view returns(uint8)'];
+function valid(a){return /^0x[0-9a-fA-F]{40}$/.test(a)}
+async function init(){try{config=await fetch(CONFIG_URL,{cache:'no-store'}).then(r=>r.json());const ready=config.chainId===Number(CHAIN_ID)&&valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby);$('network').textContent=ready?'Contract configuration loaded.':'Deployment pending: verified Factory, Router and WSOBY addresses have not all been published.';if(!ready)$('network').classList.add('warn');}catch(e){$('network').textContent='Configuration unavailable. DEX is not ready for transactions.'}}
+async function connect(){if(!window.ethereum){say('MetaMask or another EVM wallet is required.');return}try{provider=new ethers.BrowserProvider(window.ethereum);await provider.send('eth_requestAccounts',[]);const net=await provider.getNetwork();if(net.chainId!==CHAIN_ID){say('Please switch MetaMask to SOBYA Mainnet (Chain ID 357812033857).');return}signer=await provider.getSigner();$('connect').textContent=(await signer.getAddress()).slice(0,6)+'…'+(await signer.getAddress()).slice(-4);const enabled=!!config&&valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby);for(const id of ['swapBtn','poolBtn','wrapBtn','unwrapBtn'])$(id).disabled=!enabled;say('Wallet connected to SOBYA Mainnet.');}catch(e){say(e.shortMessage||e.message||String(e))}}
+async function tokenDecimals(address){if(!valid(address))throw Error('Enter a valid token contract address.');return Number(await new ethers.Contract(address,erc20,provider).decimals())}
+async function approve(token,spender,amount){const c=new ethers.Contract(token,erc20,signer);const allowance=await c.allowance(await signer.getAddress(),spender);if(allowance<amount){const tx=await c.approve(spender,amount);say('Approve token spending: '+tx.hash);await tx.wait()}}
+$('connect').onclick=connect;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));['swap','pool','wrap'].forEach(x=>$(x).classList.toggle('hidden',x!==b.dataset.tab))});
+$('swapBtn').onclick=async()=>{try{const a=$('fromToken').value.trim(),b=$('toToken').value.trim();const da=await tokenDecimals(a),db=await tokenDecimals(b);const amount=ethers.parseUnits($('amountIn').value,da),min=ethers.parseUnits($('minOut').value,db);if(amount<=0n||min<=0n)throw Error('Amount and minimum received must be greater than zero.');if(a.toLowerCase()===b.toLowerCase())throw Error('Choose two different tokens.');await approve(a,config.router,amount);const r=new ethers.Contract(config.router,routerAbi,signer);const tx=await r.swapExactTokensForTokens(amount,min,[a,b],await signer.getAddress(),Math.floor(Date.now()/1000)+600);say('Swap submitted: '+tx.hash);await tx.wait();say('Swap confirmed: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
+$('poolBtn').onclick=async()=>{try{const a=$('tokenA').value.trim(),b=$('tokenB').value.trim();if(!valid(a)||!valid(b)||a.toLowerCase()===b.toLowerCase())throw Error('Enter two different valid token addresses.');const [da,db]=await Promise.all([tokenDecimals(a),tokenDecimals(b)]);const aa=ethers.parseUnits($('liqA').value,da),bb=ethers.parseUnits($('liqB').value,db);if(aa<=0n||bb<=0n)throw Error('Liquidity amounts must be greater than zero.');const f=new ethers.Contract(config.factory,factoryAbi,signer);let pair=await f.getPair(a,b);if(pair===ethers.ZeroAddress){const create=await f.createPair(a,b);say('Creating pool: '+create.hash);await create.wait();pair=await f.getPair(a,b)}await approve(a,config.router,aa);await approve(b,config.router,bb);const r=new ethers.Contract(config.router,routerAbi,signer);const tx=await r.addLiquidity(a,b,aa,bb,aa*98n/100n,bb*98n/100n,await signer.getAddress(),Math.floor(Date.now()/1000)+600);say('Adding liquidity to '+pair+': '+tx.hash);await tx.wait();say('Liquidity added. Pair: '+pair)}catch(e){say(e.shortMessage||e.message||String(e))}};
+$('wrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive SOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.deposit({value:amount});say('Wrapping SOBY: '+tx.hash);await tx.wait();say('WSOBY minted 1:1. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
+$('unwrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive WSOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.withdraw(amount);say('Unwrapping WSOBY: '+tx.hash);await tx.wait();say('Native SOBY returned. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
+if(window.ethereum)window.ethereum.on('chainChanged',()=>location.reload());
+init();
+</script></body></html>
