@@ -86,6 +86,7 @@ contract SobyaV2Router {
         address pair = ISobyaRouterFactory(factory).getPair(a,b);
         if (pair == address(0)) pair = ISobyaRouterFactory(factory).createPair(a,b);
         (uint256 reserveA, uint256 reserveB) = _reservesForExisting(a,b,pair);
+        require((reserveA == 0 && reserveB == 0) || (reserveA > 0 && reserveB > 0), "SOBYA: INVALID_RESERVES");
         if (reserveA == 0 && reserveB == 0) { (amountA, amountB) = (desiredA, desiredB); }
         else {
             uint256 optimalB = quote(desiredA, reserveA, reserveB);
