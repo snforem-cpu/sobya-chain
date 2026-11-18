@@ -1,0 +1,11 @@
+{
+  "chainId": 357812033857,
+  "chainName": "SOBYA Mainnet",
+  "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
+  "explorerUrl": "https://explorer.nodesafe-app.xyz/sobya",
+  "factory": "",
+  "router": "",
+  "wrappedSoby": "",
+  "deploymentStatus": "pending",
+  "notice": "Addresses must be filled only from verified SOBYA mainnet deployment receipts. Never substitute mock or testnet addresses."
+}
