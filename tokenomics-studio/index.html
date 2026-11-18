@@ -141,7 +141,7 @@ function readInputs(){model.projectName=$("projectName").value.trim().slice(0,70
 function writeInputs(){ $("projectName").value=model.projectName;$("tokenName").value=model.tokenName;$("symbol").value=model.symbol;$("supply").value=model.supply;$("startDate").value=model.startDate;$("horizon").value=model.horizon}
 function sumShare(){return model.allocations.reduce((a,x)=>a+(Number(x.share)||0),0)}
 function amount(a){return model.supply*(Number(a.share)||0)/100}
-function unlockedForSupply(a,m,supply){const total=supply*(Number(a.share)||0)/100;const tge=total*(Math.max(0,Math.min(100,Number(a.tge)||0))/100);const rest=total-tge;const cliff=Math.max(0,Number(a.cliff)||0);const duration=Math.max(0,Number(a.vesting)||0);if(m<=0)return tge;if(duration===0)return rest+tge;if(m<=cliff)return tge;return tge+rest*Math.min(1,(m-cliff)/duration)}
+function unlockedForSupply(a,m,supply){const total=supply*(Number(a.share)||0)/100;const tge=total*(Math.max(0,Math.min(100,Number(a.tge)||0))/100);const rest=total-tge;const cliff=Math.max(0,Number(a.cliff)||0);const duration=Math.max(0,Number(a.vesting)||0);if(duration===0)return rest+tge;if(m<=0||m<=cliff)return tge;return tge+rest*Math.min(1,(m-cliff)/duration)}
 function unlockedFor(a,m){return unlockedForSupply(a,m,model.supply)}
 function unlockedAt(m){return model.allocations.reduce((s,a)=>s+unlockedFor(a,m),0)}
 function calcSchedule(){const h=Math.max(1,Math.min(120,model.horizon));schedule=[];let prev=0;for(let m=0;m<=h;m++){const cum=unlockedAt(m);schedule.push({month:m,newUnlock:m===0?cum:Math.max(0,cum-prev),cumulative:cum,locked:Math.max(0,model.supply-cum),pct:model.supply?cum/model.supply*100:0});prev=cum}}
