@@ -145,6 +145,15 @@ contract SobyaV2Test {
         require(!ok,"ZERO_LP_RECIPIENT_ACCEPTED");
     }
 
+    function testPairRejectsZeroAndSelfSwapRecipients() public {
+        _addInitialLiquidity();
+        SobyaV2Pair p=SobyaV2Pair(pair);
+        (bool zeroOk,)=address(p).call(abi.encodeCall(p.swap,(1 ether,0,address(0))));
+        require(!zeroOk,"ZERO_SWAP_RECIPIENT_ACCEPTED");
+        (bool selfOk,)=address(p).call(abi.encodeCall(p.swap,(1 ether,0,address(p))));
+        require(!selfOk,"PAIR_SELF_SWAP_RECIPIENT_ACCEPTED");
+    }
+
     function testExpiredDeadlineReverts() public {
         _addInitialLiquidity();
         address[] memory path=new address[](2);
