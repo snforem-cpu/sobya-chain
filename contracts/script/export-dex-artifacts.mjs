@@ -13,8 +13,10 @@ const contracts = {};
 for (const name of names) {
   const artifactPath = new URL(`${name}.sol/${name}.json`, contractsDir);
   const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-  const bytecode = artifact.bytecode?.object;
-  const deployedBytecode = artifact.deployedBytecode?.object;
+  const rawBytecode = artifact.bytecode?.object;
+  const rawDeployedBytecode = artifact.deployedBytecode?.object;
+  const bytecode = typeof rawBytecode === "string" ? (rawBytecode.startsWith("0x") ? rawBytecode : "0x" + rawBytecode) : rawBytecode;
+  const deployedBytecode = typeof rawDeployedBytecode === "string" ? (rawDeployedBytecode.startsWith("0x") ? rawDeployedBytecode : "0x" + rawDeployedBytecode) : rawDeployedBytecode;
   if (!Array.isArray(artifact.abi) || typeof bytecode !== "string" ||
       !/^0x[0-9a-f]+$/i.test(bytecode) || typeof deployedBytecode !== "string" ||
       !/^0x[0-9a-f]+$/i.test(deployedBytecode)) {
