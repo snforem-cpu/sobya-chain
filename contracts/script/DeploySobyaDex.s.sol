@@ -19,6 +19,7 @@ contract DeploySobyaDex {
     event DeploymentAddresses(address indexed wrappedSoby, address indexed factory, address indexed router);
 
     function run() external {
+        require(block.chainid == 357812033857, "SOBYA DEX: WRONG_CHAIN_ID");
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerKey);
 
