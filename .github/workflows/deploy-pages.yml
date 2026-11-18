@@ -8,6 +8,7 @@ on:
       - 'robots.txt'
       - 'sitemap.xml'
       - 'buy/**'
+      - 'tokenomics-studio/**'
       - 'assets/logo/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
