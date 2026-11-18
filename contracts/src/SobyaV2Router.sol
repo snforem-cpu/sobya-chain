@@ -69,6 +69,16 @@ contract SobyaV2Router {
         amountIn = reserveIn * amountOut * 1000 / ((reserveOut - amountOut) * 997) + 1;
     }
 
+    function getAmountsOut(uint256 amountIn,address[] calldata path) external view returns(uint256[] memory amounts) {
+        require(path.length >= 2, "SOBYA: INVALID_PATH");
+        amounts = new uint256[](path.length);
+        amounts[0] = amountIn;
+        for (uint256 i=0;i<path.length-1;i++) {
+            (uint256 reserveIn,uint256 reserveOut) = _reserves(path[i],path[i+1]);
+            amounts[i+1] = getAmountOut(amounts[i],reserveIn,reserveOut);
+        }
+    }
+
     function addLiquidity(address a, address b, uint256 desiredA, uint256 desiredB, uint256 minA, uint256 minB, address to, uint256 deadline)
         external ensure(deadline) returns (uint256 amountA, uint256 amountB, uint256 liquidity)
     {
