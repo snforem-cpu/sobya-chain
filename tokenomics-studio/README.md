@@ -30,17 +30,18 @@ All calculations run in the browser. The current project and saved scenarios use
 Risk indicators are simplified transparent heuristics, not security audits, legal/tax advice, market forecasts, or investment recommendations.
 
 ## Payments and owner license issuance
-The public pricing page remains paused until the owner completes a live end-to-end payment test and explicitly opens sales. The owner-only license issuer now checks a submitted transaction against SOBYA Mainnet RPC before signing a license. It verifies:
+The public pricing page remains paused until the owner completes a live end-to-end payment test and explicitly opens sales. The owner-only license issuer now checks a submitted transaction against SOBYA Mainnet RPC before signing a license. The private key is used locally in the browser and is never sent to the RPC. It verifies:
 - EVM chain ID 357812033857
 - transaction and successful receipt exist and match the submitted hash
 - native transfer recipient is the configured owner address
 - exact transfer value is 100 SOBY (100000000000000000000 asobya)
 - plain native transfer (not a contract call)
-- at least 3 block confirmations
+- receipt recipient and transaction/receipt block consistency
+- canonical block hash and at least 3 block confirmations
 
 The RPC query is read-only; it does not connect a wallet, request a signature, or send funds. The issuer signs locally in the browser and the private key is never sent to the RPC. If the browser cannot reach the RPC due to network/CORS restrictions, the issuer must fail closed: do not issue a license until payment is independently verified.
 
-The issuer records transaction hashes and license IDs in that browser's local storage to warn about reuse on that device. This is not a shared or tamper-proof global registry and can be cleared; keep a separate private offline issuance register. The owner must manually reconcile the hash against that register before each issuance.
+The issuer records transaction hashes and license IDs in that browser's local storage to warn about reuse on that device. This is not a shared or tamper-proof global registry and can be cleared. Global duplicate prevention requires a trusted server-side registry, which is not deployed in this static GitHub Pages version; keep a separate private offline issuance register and manually reconcile each hash before issuing.
 
 ## License verification
 
