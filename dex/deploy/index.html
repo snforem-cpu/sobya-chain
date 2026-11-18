@@ -45,7 +45,7 @@
 const CHAIN_ID=357812033857n;
 const RPC="https://sobya-evm-rpc.nodesafe-app.xyz";
 const $=id=>document.getElementById(id);
-let provider,signer,account,bundle,ready=false,busy=false;
+let provider,signer,account,bundle,buildReady=false,ready=false,busy=false;
 const say=m=>$("status").textContent=m;
 const short=e=>e?.shortMessage||e?.reason||e?.message||String(e);
 async function sha256(value){const bytes=new TextEncoder().encode(value.toLowerCase());const hash=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")}
@@ -59,7 +59,7 @@ async function loadBuild(){
     if(!c||!Array.isArray(c.abi)||!/^0x[0-9a-f]+$/i.test(c.bytecode||"")||!/^0x[0-9a-f]+$/i.test(c.deployedBytecode||""))throw Error("Missing or malformed "+name+" artifact.");
     if(await sha256(c.bytecode)!==c.bytecodeSha256||await sha256(c.deployedBytecode)!==c.deployedBytecodeSha256)throw Error(name+" artifact checksum mismatch.");
   }
-  $("commit").textContent=bundle.sourceCommit;
+  buildReady=true;\n  $("commit").textContent=bundle.sourceCommit;
   $("build").textContent="3 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
 }
 async function connect(){
@@ -77,7 +77,7 @@ async function connect(){
   const rpcProvider=new ethers.JsonRpcProvider(RPC);
   const rpcNetwork=await rpcProvider.getNetwork();
   if(rpcNetwork.chainId!==CHAIN_ID)throw Error("Configured SOBYA RPC returned an unexpected chain ID.");
-  ready=true;$("deploy").disabled=false;
+  ready=buildReady;if(!ready)throw Error("Verified build artifacts are unavailable; deployment is disabled.");$("deploy").disabled=false;
   say("Preflight passed: wallet and public RPC both report SOBYA Mainnet. Review the risk notice before deploying.");
   $("estimate").textContent="Will estimate each deployment immediately before sending.";
  }catch(e){ready=false;$("deploy").disabled=true;say(short(e))}
