@@ -31,7 +31,7 @@ jobs:
           for (const key of ['factory', 'router', 'wrappedSoby']) {
             if (config[key] !== '') throw new Error(`Unexpected unreviewed address in ${key}`);
           }
-          if (!html.includes("config.deploymentStatus==='ready'&&valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby)")) {
+          if (!html.includes("config.deploymentStatus==='ready'") || !html.includes('valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby)')) {
             throw new Error('Wallet transaction controls are not deployment-gated');
           }
           if (!html.includes('CHAIN_ID=357812033857n')) throw new Error('Wallet chain guard missing');
