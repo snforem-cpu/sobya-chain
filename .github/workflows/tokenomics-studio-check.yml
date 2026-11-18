@@ -36,6 +36,33 @@ jobs:
           Path("/tmp/tokenomics-studio.js").write_text(scripts[0], encoding="utf-8")
           PY
           node --check /tmp/tokenomics-studio.js
+      - name: Test vesting calculation edge cases
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
+          match = re.search(r"function unlockedForSupply\\(a,m,supply\\)\\{[^}]+\\}", html)
+          if not match:
+              raise SystemExit("Could not locate the production vesting calculation")
+          test = """
+          const assert = require('node:assert/strict');
+          %s
+          const linear = {share:100,tge:20,cliff:0,vesting:12};
+          assert.equal(unlockedForSupply(linear,0,1000),200);
+          assert.equal(unlockedForSupply(linear,6,1000),600);
+          assert.equal(unlockedForSupply(linear,12,1000),1000);
+          const immediate = {share:10,tge:0,cliff:0,vesting:0};
+          assert.equal(unlockedForSupply(immediate,0,1000),100);
+          const cliff = {share:100,tge:0,cliff:3,vesting:9};
+          assert.equal(unlockedForSupply(cliff,3,900),0);
+          assert.equal(unlockedForSupply(cliff,6,900),300);
+          assert.equal(unlockedForSupply(cliff,12,900),900);
+          console.log('Vesting model edge cases passed.');
+          """ % match.group(0)
+          Path("/tmp/tokenomics-model-test.js").write_text(test, encoding="utf-8")
+          PY
+          node /tmp/tokenomics-model-test.js
       - name: Validate required application elements
         run: |
           python3 - <<'PY'
