@@ -81,3 +81,23 @@ jobs:
               raise SystemExit("Unexpected external network API usage detected")
           print("Required UI elements found; app remains browser-local.")
           PY
+      - name: Validate sales page and offline license issuer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          buy = Path("tokenomics-studio/buy/index.html").read_text(encoding="utf-8")
+          issuer = Path("tokenomics-studio/license-issuer.html").read_text(encoding="utf-8")
+          if "100" not in buy or "SOBY" not in buy or "Sales are not open yet" not in buy:
+              raise SystemExit("Pricing page must show the agreed price and keep sales paused.")
+          if "357812033857" not in issuer or "individual-perpetual" not in issuer or "Ed25519" not in issuer:
+              raise SystemExit("License issuer is missing required signed license fields.")
+          if "fetch(" in issuer or "XMLHttpRequest" in issuer or "WebSocket(" in issuer:
+              raise SystemExit("Offline issuer must not make network requests.")
+          scripts = re.findall(r"<script>(.*?)</script>", issuer, flags=re.S | re.I)
+          if len(scripts) != 1:
+              raise SystemExit("Expected one inline issuer script.")
+          Path("/tmp/license-issuer.js").write_text(scripts[0], encoding="utf-8")
+          print("Pricing and offline issuer checks passed.")
+          PY
+          node --check /tmp/license-issuer.js
