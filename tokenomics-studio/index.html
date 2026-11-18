@@ -24,11 +24,11 @@
 <div class="top-actions">
 <button class="btn ghost" id="newBtn">New project</button>
 <button class="btn" id="importBtn">Import JSON</button><button class="btn" id="exportBtn">Export JSON</button>
-<a class="btn" id="pricingLink" href="buy/">Pricing · 100 SOBY</a><button class="btn primary" id="saveBtn">Save project</button>
+<span class="pill good">FREE · SOBYA COMMUNITY TOOL</span><button class="btn primary" id="saveBtn">Save project</button>
 </div>
 </header>
 <section class="hero">
-<div><div class="eyebrow">TOKEN DESIGN WORKSPACE · EARLY ACCESS</div><h1>Build tokenomics<br><span style="color:var(--cyan)">with confidence.</span></h1><p>Design allocations, model vesting schedules, forecast circulating supply and produce a clear tokenomics brief. Your project data stays in this browser.</p></div>
+<div><div class="eyebrow">FREE TOKEN DESIGN WORKSPACE</div><h1>Build tokenomics<br><span style="color:var(--cyan)">with confidence.</span></h1><p>Design allocations, model vesting schedules, forecast circulating supply and produce a clear tokenomics brief. Your project data stays in this browser.</p></div>
 <div class="hero-note"><strong>PRIVATE BY DESIGN</strong>No wallet connection, no RPC, no external API and no server-side storage. Calculations run locally on this device.</div>
 </section>
 <div class="workspace">
@@ -40,7 +40,6 @@
 <button class="navbtn" data-view="analysis"><span>⌁</span> Risk analysis</button>
 <button class="navbtn" data-view="scenarios"><span>⇄</span> Scenarios</button>
 <button class="navbtn" data-view="report"><span>▤</span> Report</button>
-<button class="navbtn" data-view="license"><span>✓</span> License verification</button>
 <div class="side-foot">STUDIO VERSION 1.0<br>Local-first token planning tool</div>
 </aside>
 <main class="main">
@@ -106,16 +105,7 @@
 <article class="card"><h3 class="section-title">Compare selected scenarios</h3><div id="scenarioCompare" class="empty">Save at least one scenario to see a comparison.</div></article>
 </div>
 </section>
-<section class="view" id="license">
-<div class="view-head"><div><h2>License verification</h2><p>Verify a signed SOBYA Tokenomics Studio license file on this device.</p></div><span class="pill">Ed25519 · Offline verification</span></div>
-<article class="card">
-<h3 class="section-title">Import your license file</h3>
-<p class="muted">Choose the <code>.sobya-license.json</code> file supplied after manual payment review. The app checks the issuer's cryptographic signature and the fixed license terms. No file is uploaded.</p>
-<div class="table-actions"><button class="btn primary" id="chooseLicense">Choose license file</button><input class="file-input" id="licenseFile" type="file" accept=".json,application/json"></div>
-<div id="licenseResult" class="notice info" role="status" aria-live="polite" style="margin-top:14px">No license file selected.</div>
-<div class="small" style="margin-top:12px">A valid signature proves the license was signed by the configured issuer key. It does not independently prove that the referenced payment was received or that a transaction hash is genuine.</div>
-</article>
-</section>
+<!-- License and payment features intentionally removed: this tool is free. -->
 <section class="view" id="report">
 <div class="view-head"><div><h2>Tokenomics report</h2><p>Prepare a clean summary to share with your team or community.</p></div><div class="inline-fields"><button class="btn" id="reportJson">Export project JSON</button><button class="btn gold" id="printReport">Print / Save PDF</button></div></div>
 <div id="reportContent" class="card"></div>
@@ -123,7 +113,7 @@
 </section>
 </main>
 </div>
-<footer class="footer"><div><strong style="color:#e8f1ff">SOBYA TOKENOMICS STUDIO</strong><br>Independent token planning workspace.</div><div class="footer-note">Calculations are estimates based on the inputs you provide. Unlocking does not necessarily mean tokens are sold or economically circulating. No wallet connection or payment is processed by this early-access version.</div><div><a href="../">SOBYA Home</a> · <a href="https://github.com/snforem-cpu/sobya-chain" target="_blank" rel="noopener">Source code</a></div></footer>
+<footer class="footer"><div><strong style="color:#e8f1ff">SOBYA TOKENOMICS STUDIO</strong><br>A free public-good tool provided by the SOBYA network.</div><div class="footer-note">Calculations are estimates based on the inputs you provide. Unlocking does not necessarily mean tokens are sold or economically circulating. Free for everyone. No payment, subscription, wallet connection or license is required.</div><div><a href="../">SOBYA Home</a> · <a href="https://github.com/snforem-cpu/sobya-chain" target="_blank" rel="noopener">Source code</a></div></footer>
 </div>
 <input class="file-input" id="importFile" type="file" accept=".json,application/json">
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -165,38 +155,7 @@ function renderRows(){$("allocationRows").innerHTML=model.allocations.map((a,i)=
 function render(){calcSchedule();const v=valid();$("supplyStat").textContent=compact(model.supply);$("symbolStat").textContent=model.symbol+" · "+model.tokenName;$("allocatedStat").textContent=fmt(v.share,2)+"%";$("tgeStat").textContent=compact(unlockedAt(0));$("yearStat").textContent=compact(unlockedAt(12));$("allocationBars").innerHTML=model.allocations.map(a=>barHtml(a.name,a.share,amount(a))).join("")||'<div class="empty">Add an allocation to begin.</div>';$("supplyChart").innerHTML=chartHtml();$("validationList").innerHTML=riskHtml([{ok:v.supply,title:"Total supply",text:v.supply?"A positive total supply is defined.":"Enter a total supply greater than zero."},{ok:Math.abs(v.share-100)<.001,title:"Allocation balance",text:"Current total: "+fmt(v.share,2)+"%. Target: 100%."},{ok:!v.over,title:"Schedule inputs",text:v.over?"Review negative values and TGE percentages above 100%.":"No invalid unlock inputs detected."},{ok:model.allocations.length>0,title:"Allocation detail",text:model.allocations.length+" allocation categories configured."}]);$("healthPill").textContent=Math.abs(v.share-100)<.001&&!v.over&&v.supply?"● Model balanced":"● Review model";$("healthPill").className="pill "+(Math.abs(v.share-100)<.001&&!v.over&&v.supply?"good":"warn");renderRows();renderVesting();renderAnalysis();renderScenarios();renderReport()}
 function renderVesting(){const at=m=>unlockedAt(m);$("vestTge").textContent=compact(at(0));$("vest12").textContent=compact(at(12));$("vest24").textContent=compact(at(24));$("vestEnd").textContent=compact(at(model.horizon));$("vestingRows").innerHTML=schedule.map(p=>'<tr><td>Month '+p.month+'</td><td>'+money(p.newUnlock)+'</td><td>'+money(p.cumulative)+'</td><td>'+money(p.locked)+'</td><td>'+fmt(p.pct,2)+'%</td></tr>').join("")}
 function renderAnalysis(){const sorted=[...model.allocations].sort((a,b)=>b.share-a.share);const top=sorted.slice(0,3).reduce((s,a)=>s+a.share,0);const team=sorted.filter(a=>/team|founder|advisor|investor/i.test(a.name)).reduce((s,a)=>s+a.share,0);$("concentration").innerHTML=riskHtml([{ok:(sorted[0]?.share||0)<=25,title:"Largest allocation",text:(sorted[0]?.name||"None")+" represents "+fmt(sorted[0]?.share||0,2)+"% of supply. Large single allocations deserve clear governance and disclosure."},{ok:top<=60,title:"Top-three concentration",text:"The three largest categories represent "+fmt(top,2)+"% of supply."},{ok:team<=40,title:"Insider-labelled allocations",text:"Categories matching team, founder, advisor or investor represent "+fmt(team,2)+"%. Review category names and vesting terms."}]);const m12= model.supply?atPct(unlockedAt(12),model.supply):0;const m24=model.supply?atPct(unlockedAt(24),model.supply):0;const delta=m24-m12;$("unlockRisks").innerHTML=riskHtml([{ok:m12<=30,title:"First-year unlock",text:fmt(m12,2)+"% of total supply is unlocked by month 12."},{ok:delta<=20,title:"Months 13–24 unlock",text:fmt(delta,2)+" percentage points of total supply unlock between months 12 and 24."},{ok:Math.abs(sumShare()-100)<.001,title:"Supply accounting",text:"Locked plus unlocked amounts should reconcile to total supply."}]);$("reviewChecklist").innerHTML=riskHtml([{ok:model.allocations.every(a=>a.vesting===0||a.cliff>=0),title:"Vesting terms documented",text:"Confirm cliff, duration, TGE unlock and beneficiary for every allocation."},{ok:model.allocations.some(a=>/liquidity/i.test(a.name)),title:"Liquidity allocation reviewed",text:"If a liquidity allocation exists, document custody, lock-up and release controls."},{ok:model.allocations.some(a=>/treasury/i.test(a.name)),title:"Treasury controls documented",text:"Specify who controls treasury assets and under what governance process."},{ok:!!model.startDate,title:"Generation date provided",text:"Use a confirmed TGE date before publishing a dated unlock calendar."}])}
-const LICENSE_PUBLIC_KEY="SnNnCzbbKVUeuH3wM8npDxJcLh8R50hImPPnc1cQw9Q=";
-async function verifyLicenseFile(file){
- if(!file||file.size>65536)throw new Error("Choose a license JSON file smaller than 64 KB.");
- if(!crypto.subtle||!crypto.subtle.importKey)throw new Error("This browser does not support secure license verification.");
- const doc=JSON.parse(await file.text());
- if(!doc||typeof doc!=="object"||!doc.payload||typeof doc.payload!=="object"||doc.signatureAlgorithm!=="Ed25519"||typeof doc.signature!=="string")throw new Error("Invalid license file structure.");
- const p=doc.payload;
- const required={product:"SOBYA Tokenomics Studio",plan:"individual-perpetual",users:1,price:"100 SOBY",chainId:357812033857,denom:"asobya",decimals:18};
- for(const [k,v] of Object.entries(required))if(p[k]!==v)throw new Error("License terms are invalid ("+k+").");
- if(typeof p.licenseId!=="string"||!p.licenseId.trim()||p.licenseId.length>80)throw new Error("Invalid license ID.");
- if(typeof p.transactionHash!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(p.transactionHash))throw new Error("Invalid transaction hash format.");
- if(typeof p.issuedAt!=="string"||!Number.isFinite(Date.parse(p.issuedAt)))throw new Error("Invalid issue date.");
- if(typeof p.buyerLabel!=="string"||p.buyerLabel.length>80)throw new Error("Invalid buyer label.");
- const canonical={product:p.product,licenseId:p.licenseId,plan:p.plan,users:p.users,price:p.price,chainId:p.chainId,denom:p.denom,decimals:p.decimals,transactionHash:p.transactionHash,buyerLabel:p.buyerLabel,issuedAt:p.issuedAt};
- const decode=b64=>{if(!/^[A-Za-z0-9+/]+={0,2}$/.test(b64))throw new Error("Invalid signature encoding.");const raw=atob(b64);return Uint8Array.from(raw,c=>c.charCodeAt(0));};
- const pub=decode(LICENSE_PUBLIC_KEY),sig=decode(doc.signature);
- if(pub.length!==32||sig.length!==64)throw new Error("Invalid Ed25519 key or signature length.");
- const key=await crypto.subtle.importKey("raw",pub,{name:"Ed25519"},false,["verify"]);
- const valid=await crypto.subtle.verify({name:"Ed25519"},key,sig,new TextEncoder().encode(JSON.stringify(canonical)));
- if(!valid)throw new Error("Signature verification failed. The file may be altered or was not issued by SOBYA.");
- return {licenseId:p.licenseId,transactionHash:p.transactionHash,issuedAt:p.issuedAt};
-}
-$("chooseLicense").addEventListener("click",()=> $("licenseFile").click());
-$("licenseFile").addEventListener("change",async e=>{
- const file=e.target.files&&e.target.files[0],box=$("licenseResult");
- if(!file)return;
- box.className="notice info";box.textContent="Checking signature and license terms…";
- try{const result=await verifyLicenseFile(file);box.className="notice success";box.textContent="Valid SOBYA license signature. License ID: "+result.licenseId+". Issued: "+result.issuedAt+". Payment reference: "+result.transactionHash+". Payment itself must still be independently verified.";toast("License signature verified.");}
- catch(err){box.className="notice";box.textContent="License rejected: "+(err&&err.message?err.message:"Invalid file.");}
- e.target.value="";
-});
-
+// No license, payment, or wallet checks: all studio features are free.
 function atPct(n,s){return s?n/s*100:0}
 function renderScenarios(){const box=$("scenarioList");if(!model.scenarios.length){box.innerHTML='<div class="empty">No scenarios saved yet. Save your current model to begin comparing.</div>';$("scenarioCompare").textContent="Save at least one scenario to see a comparison.";return}box.innerHTML=model.scenarios.map((s,i)=>'<div class="scenario"><div><strong>'+esc(s.name)+'</strong><small>'+esc(s.symbol)+' · '+compact(s.supply)+' supply · '+fmt(s.totalShare,1)+'% allocated</small></div><div class="inline-fields"><span class="pill">'+compact(s.tge)+' TGE</span><button class="btn" data-load-scenario="'+i+'">Load</button><button class="btn danger" data-delete-scenario="'+i+'">×</button></div></div>').join("");const rows=model.scenarios.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+fmt(s.totalShare,2)+'%</td><td>'+fmt(atPct(s.tge,s.supply),2)+'%</td><td>'+fmt(atPct(s.m12,s.supply),2)+'%</td><td>'+fmt(atPct(s.m24,s.supply),2)+'%</td></tr>').join("");$("scenarioCompare").innerHTML='<div class="table-wrap"><table style="min-width:440px"><thead><tr><th>Scenario</th><th>Allocated</th><th>TGE unlocked</th><th>Month 12</th><th>Month 24</th></tr></thead><tbody>'+rows+'</tbody></table></div>'}
 function renderReport(){const v=valid();$("reportContent").innerHTML='<div style="display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:15px"><div><div class="eyebrow">TOKENOMICS OVERVIEW</div><h2 style="font-size:27px;margin:5px 0">'+esc(model.projectName)+'</h2><div class="muted">'+esc(model.tokenName)+' ('+esc(model.symbol)+')</div></div><div class="pill">'+esc(model.startDate||"TGE date not set")+'</div></div><div class="grid three" style="margin:18px 0"><div><div class="small">TOTAL SUPPLY</div><div class="kpi">'+fmt(model.supply,0)+' '+esc(model.symbol)+'</div></div><div><div class="small">ALLOCATED</div><div class="kpi">'+fmt(v.share,2)+'%</div></div><div><div class="small">UNLOCKED AT TGE</div><div class="kpi">'+fmt(atPct(unlockedAt(0),model.supply),2)+'%</div></div></div><h3 class="section-title">Allocation breakdown</h3><div class="table-wrap"><table style="min-width:480px"><thead><tr><th>Category</th><th>Share</th><th>Tokens</th><th>TGE unlock</th><th>Cliff</th><th>Vesting</th></tr></thead><tbody>'+model.allocations.map(a=>'<tr><td>'+esc(a.name)+'</td><td>'+fmt(a.share,2)+'%</td><td>'+fmt(amount(a),0)+'</td><td>'+fmt(a.tge,1)+'%</td><td>'+a.cliff+' mo.</td><td>'+a.vesting+' mo.</td></tr>').join("")+'</tbody></table></div><h3 class="section-title" style="margin-top:22px">Supply milestones</h3><div class="table-wrap"><table style="min-width:440px"><thead><tr><th>Milestone</th><th>Unlocked tokens</th><th>Unlocked share</th><th>Locked tokens</th></tr></thead><tbody>'+[0,3,6,12,24,36,model.horizon].filter((m,i,a)=>m<=model.horizon&&a.indexOf(m)===i).map(m=>'<tr><td>Month '+m+'</td><td>'+fmt(unlockedAt(m),0)+'</td><td>'+fmt(atPct(unlockedAt(m),model.supply),2)+'%</td><td>'+fmt(Math.max(0,model.supply-unlockedAt(m)),0)+'</td></tr>').join("")+'</tbody></table></div><p class="small" style="margin-top:20px">Methodology: TGE unlock is applied immediately. The remaining allocation unlocks linearly after the cliff over the specified vesting duration. A zero-month vesting duration releases the entire remaining allocation at TGE. Unlocked supply is a mathematical estimate and does not prove that tokens are sold, transferred or economically circulating.</p><div class="notice info" style="margin-top:14px">This report is an operational planning document, not legal, tax, investment, market or security advice. Validate all allocations, contracts, custody arrangements and disclosures independently.</div>'}
