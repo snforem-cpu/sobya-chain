@@ -1,4 +1,4 @@
-name: Tokenomics Studio and payment verification checks
+name: SOBYA Tokenomics Studio free-tool checks
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate embedded JavaScript syntax
+      - name: Validate application JavaScript syntax
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -32,7 +32,7 @@ jobs:
           html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
           scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S | re.I)
           if len(scripts) != 1:
-              raise SystemExit(f"Expected exactly one inline application script; found {len(scripts)}")
+              raise SystemExit(f"Expected one inline app script; found {len(scripts)}")
           Path("/tmp/tokenomics-studio.js").write_text(scripts[0], encoding="utf-8")
           PY
           node --check /tmp/tokenomics-studio.js
@@ -44,7 +44,7 @@ jobs:
           html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
           match = re.search(r"function unlockedForSupply\(a,m,supply\)\{[^}]+\}", html)
           if not match:
-              raise SystemExit("Could not locate the production vesting calculation")
+              raise SystemExit("Could not locate production vesting calculation")
           test = """
           const assert = require('node:assert/strict');
           %s
@@ -63,90 +63,34 @@ jobs:
           Path("/tmp/tokenomics-model-test.js").write_text(test, encoding="utf-8")
           PY
           node /tmp/tokenomics-model-test.js
-      - name: Validate required application elements
+      - name: Validate free public tool and required features
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
+          app = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
+          page = Path("tokenomics-studio/buy/index.html").read_text(encoding="utf-8")
           required = [
               'id="overview"', 'id="allocations"', 'id="vesting"',
               'id="analysis"', 'id="scenarios"', 'id="report"',
               'id="allocationRows"', 'id="importBtn"', 'id="exportBtn"',
               'id="downloadCsv"', 'id="printReport"', 'id="importFile"'
           ]
-          missing = [item for item in required if item not in html]
+          missing = [item for item in required if item not in app]
           if missing:
-              raise SystemExit("Missing required UI elements: " + ", ".join(missing))
-          if "fetch(" in html or "XMLHttpRequest" in html or "WebSocket(" in html:
-              raise SystemExit("Unexpected external network API usage detected")
-          print("Required UI elements found; app remains browser-local.")
-          PY
-      - name: Validate shared license issuance ledger and duplicate checks
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          ledger = json.loads(Path("tokenomics-studio/used-transactions.json").read_text(encoding="utf-8"))
-          if ledger.get("version") != 1 or ledger.get("network") != "SOBYA Mainnet" or ledger.get("chainId") != 357812033857 or not isinstance(ledger.get("transactions"), list):
-              raise SystemExit("Shared used-transaction ledger schema is invalid.")
-          issuer = Path("tokenomics-studio/license-issuer.html").read_text(encoding="utf-8")
-          for required in ["LEDGER_URL", "loadUsedLedger", "ledgerHasTx", "currentLedger", "Central GitHub ledger unavailable"]:
-              if required not in issuer:
-                  raise SystemExit("Issuer missing central ledger protection: " + required)
-          print("Shared issuance ledger schema and issuer duplicate checks passed.")
-          PY
-      - name: Validate sales page and payment-verification license issuer
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          buy = Path("tokenomics-studio/buy/index.html").read_text(encoding="utf-8")
-          issuer = Path("tokenomics-studio/license-issuer.html").read_text(encoding="utf-8")
-          if "100" not in buy or "SOBY" not in buy or "Sales are not open yet" in buy or "Sales are open" not in buy:
-              raise SystemExit("Pricing page must show the agreed price and published payment instructions.") 
-           for required in ["357812033857", "0xd316993423fc6268038f4ee3ea7c0c5038513c18", "sobya-evm-rpc.nodesafe-app.xyz", "sobya-coin@outlook.com"]:
-              if required not in buy:
-                  raise SystemExit("Open sales page is missing payment instruction: " + required)
-          if "357812033857" not in issuer or "individual-perpetual" not in issuer or "Ed25519" not in issuer:
-              raise SystemExit("License issuer is missing required signed license fields.")
-          required_issuer = [
-              'const CHAIN_ID="0x534f425941"',
-              'const RECEIVER="0xd316993423fc6268038f4ee3ea7c0c5038513c18"',
-              'const REQUIRED_VALUE=100n*10n**18n',
-              'eth_chainId', 'eth_getTransactionByHash',
-              'eth_getTransactionReceipt', 'eth_blockNumber', 'eth_getBlockByNumber',
-              'receipt.status', 'receipt.to', 'receipt.blockHash', 'confirmations<3n',
-              'Verify this payment on SOBYA Mainnet before signing',
-              'sobya-license-used-tx:', 'sobya-license-used-id:'
+              raise SystemExit("Missing app features: " + ", ".join(missing))
+          forbidden = [
+              "LICENSE_PUBLIC_KEY", "verifyLicenseFile", "license-issuer",
+              "100 SOBY", "Payment instructions", "OWNER API PASSWORD",
+              "Choose license file", "Sales are open"
           ]
-          missing_issuer = [item for item in required_issuer if item not in issuer]
-          if missing_issuer:
-              raise SystemExit("Payment verifier is missing required checks: " + ", ".join(missing_issuer))
-          if 'https://sobya-evm-rpc.nodesafe-dapp.xyz' not in issuer:
-              raise SystemExit("Payment verifier is missing the current SOBYA RPC endpoint.")
-          key_check = issuer.find('const matches=await crypto.subtle.verify')
-          reservation_call = issuer.find('const reservation=await fetch(API_BASE+"/api/admin/license-reservations"')
-          download_call = issuer.find('download(id+".sobya-license.json"')
-          if min(key_check, reservation_call, download_call) < 0 or not key_check < reservation_call < download_call:
-              raise SystemExit("Issuer must verify the Ed25519 key before reservation and download only after reservation.")
-          for required in ['PRIVATE KEY MISMATCH', 'SnNnCzbbKVUeuH3wM8npDxJcLh8R50hImPPnc1cQw9Q=', 'crypto.subtle.sign', 'crypto.subtle.verify']:
-              if required not in issuer:
-                  raise SystemExit("Issuer missing signing-key safety check: " + required)
-          app = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
-          import base64
-          match = re.search(r'const LICENSE_PUBLIC_KEY="([^"]+)"', app)
-          if not match or len(base64.b64decode(match.group(1), validate=True)) != 32:
-              raise SystemExit("App must contain a valid 32-byte Ed25519 public key.")
-          required_app = ['id="license"', 'id="chooseLicense"', 'id="licenseFile"', 'id="licenseResult"', 'crypto.subtle.verify', 'individual-perpetual', '357812033857', 'asobya']
-          missing_app = [item for item in required_app if item not in app]
-          if missing_app:
-              raise SystemExit("License verifier is missing required controls or checks: " + ", ".join(missing_app))
-          if "PRIVATE KEY" in app or "privateKey" in app:
-              raise SystemExit("A private key must never be embedded in the public app.")
-          scripts = re.findall(r"<script>(.*?)</script>", issuer, flags=re.S | re.I)
-          if len(scripts) != 1:
-              raise SystemExit("Expected one inline issuer script.")
-          Path("/tmp/license-issuer.js").write_text(scripts[0], encoding="utf-8")
-          print("Pricing, payment-verifier and license-signing checks passed.")
+          found = [item for item in forbidden if item in app or item in page]
+          if found:
+              raise SystemExit("Retired payment/licensing content remains: " + ", ".join(found))
+          if "FREE · SOBYA COMMUNITY TOOL" not in app:
+              raise SystemExit("Main app must identify itself as a free SOBYA community tool.")
+          if "Completely free" not in page or "No payment is accepted" not in page:
+              raise SystemExit("Public information page must clearly state the tool is free and accepts no payment.")
+          if "fetch(" in app or "XMLHttpRequest" in app or "WebSocket(" in app:
+              raise SystemExit("Unexpected external network API usage detected")
+          print("Free-tool status and core features validated.")
           PY
-          node --check /tmp/license-issuer.js
