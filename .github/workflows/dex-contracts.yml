@@ -1,0 +1,29 @@
+name: SOBYA DEX contracts tests
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/dex-contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/dex-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  foundry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Check formatting
+        working-directory: contracts
+        run: forge fmt --check
+      - name: Run unit and fuzz tests
+        working-directory: contracts
+        run: forge test -vvv
