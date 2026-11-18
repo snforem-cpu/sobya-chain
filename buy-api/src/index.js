@@ -375,6 +375,35 @@ export default {
 
 
 
+    if (url.pathname === "/api/admin/license-reservations" && request.method === "POST") {
+      if (!env.DB) return json({ error: "database_not_configured" }, 503, allowed);
+      try {
+        await adminSession(request, env);
+        let body; try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, allowed); }
+        const tx = String(body?.transactionHash || "").toLowerCase();
+        const licenseId = String(body?.licenseId || "").trim();
+        if (!/^0x[0-9a-f]{64}$/.test(tx) || !/^[A-Za-z0-9_-]{1,80}$/.test(licenseId)) {
+          return json({ error: "invalid_reservation" }, 400, allowed);
+        }
+        const now = Math.floor(Date.now() / 1000);
+        try {
+          await env.DB.prepare(
+            "INSERT INTO license_issuance_reservations (transaction_hash, license_id, created_at) VALUES (?, ?, ?)"
+          ).bind(tx, licenseId, now).run();
+        } catch (error) {
+          const existing = await env.DB.prepare(
+            "SELECT transaction_hash, license_id FROM license_issuance_reservations WHERE transaction_hash=? OR license_id=? LIMIT 1"
+          ).bind(tx, licenseId).first();
+          if (existing) return json({ error: "transaction_or_license_already_reserved" }, 409, allowed);
+          throw error;
+        }
+        return json({ reserved: true, transactionHash: tx, licenseId, createdAt: now }, 201, allowed);
+      } catch (error) {
+        const status = error?.message === "admin_session_required" || error?.message === "admin_session_expired" ? 401 : 503;
+        return json({ error: error?.message || "reservation_failed" }, status, allowed);
+      }
+    }
+
     if(url.pathname==="/api/admin/login"&&request.method==="POST"){
       if(!env.DB)return json({error:"database_not_configured"},503,allowed);
       if(!env.SOBYA_ADMIN_PASSWORD)return json({error:"admin_password_not_configured"},503,allowed);
