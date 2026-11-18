@@ -22,6 +22,10 @@ The repository contains Cosmos SDK transaction-processing code, native 18-decima
 
 A passing build or local CI network does not establish public consensus, continuous hosting, or full wallet compatibility. See [EVM integration status](docs/COSMOS_EVM_INTEGRATION.md) and the current [GitHub Actions runs](https://github.com/snforem-cpu/sobya-chain/actions).
 
+## SOBYA Tokenomics Studio
+
+A browser-only tokenomics planning tool is available at [SOBYA Tokenomics Studio](https://snforem-cpu.github.io/sobya-chain/tokenomics-studio/). It supports allocation design, TGE/cliff/linear vesting schedules, unlock forecasts, scenario comparison, JSON/CSV export, and print-to-PDF reports. Calculations run locally; it does not connect to wallets, RPC endpoints, external APIs, or a server. See [the tool documentation](tokenomics-studio/README.md) for formulas and limitations. Payment collection and SOBY license verification are not enabled in the early-access build.
+
 ## Validator participation
 
 Independent operators may submit a no-fee expression of interest through the [public GitHub validator application form](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml). Intake is manual: submitting an issue does not call the separate Go support service, approve a grant, or create a validator.
