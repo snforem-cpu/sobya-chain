@@ -1,0 +1,39 @@
+name: SOBYA DEX frontend safety checks
+
+on:
+  pull_request:
+    paths:
+      - "dex/**"
+      - ".github/workflows/dex-frontend-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "dex/**"
+      - ".github/workflows/dex-frontend-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  config-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate SOBYA DEX configuration and deployment gate
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('dex/config.json', 'utf8'));
+          const html = fs.readFileSync('dex/index.html', 'utf8');
+          if (config.chainId !== 357812033857) throw new Error('Unexpected EVM chain ID');
+          if (config.chainName !== 'SOBYA Mainnet') throw new Error('Unexpected network name');
+          if (config.deploymentStatus !== 'pending') throw new Error('Do not mark deployment ready without verified receipts');
+          for (const key of ['factory', 'router', 'wrappedSoby']) {
+            if (config[key] !== '') throw new Error(`Unexpected unreviewed address in ${key}`);
+          }
+          if (!html.includes('const enabled=!!config&&valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby)')) {
+            throw new Error('Wallet transaction controls are not deployment-gated');
+          }
+          if (!html.includes('CHAIN_ID=357812033857n')) throw new Error('Wallet chain guard missing');
+          console.log('DEX configuration is deployment-pending and transaction-gated.');
+          NODE
