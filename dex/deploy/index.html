@@ -59,7 +59,8 @@ async function loadBuild(){
     if(!c||!Array.isArray(c.abi)||!/^0x[0-9a-f]+$/i.test(c.bytecode||"")||!/^0x[0-9a-f]+$/i.test(c.deployedBytecode||""))throw Error("Missing or malformed "+name+" artifact.");
     if(await sha256(c.bytecode)!==c.bytecodeSha256||await sha256(c.deployedBytecode)!==c.deployedBytecodeSha256)throw Error(name+" artifact checksum mismatch.");
   }
-  buildReady=true;\n  $("commit").textContent=bundle.sourceCommit;
+  buildReady=true;
+  $("commit").textContent=bundle.sourceCommit;
   $("build").textContent="3 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
 }
 async function connect(){
