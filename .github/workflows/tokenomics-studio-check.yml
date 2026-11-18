@@ -97,8 +97,8 @@ jobs:
               'const RECEIVER="0xd316993423fc6268038f4ee3ea7c0c5038513c18"',
               'const REQUIRED_VALUE=100n*10n**18n',
               'eth_chainId', 'eth_getTransactionByHash',
-              'eth_getTransactionReceipt', 'eth_blockNumber',
-              'receipt.status', 'confirmations<3n',
+              'eth_getTransactionReceipt', 'eth_blockNumber', 'eth_getBlockByNumber',
+              'receipt.status', 'receipt.to', 'receipt.blockHash', 'confirmations<3n',
               'Verify this payment on SOBYA Mainnet before signing',
               'sobya-license-used-tx:', 'sobya-license-used-id:'
           ]
