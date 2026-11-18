@@ -2,7 +2,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 
 const root = new URL("../../", import.meta.url);
-const contractsDir = new URL("out/", root);
+const contractsDir = new URL("../out/", import.meta.url);
 const outputDir = new URL("../../dex/deploy/", import.meta.url);
 const names = ["WSOBY", "SobyaV2Factory", "SobyaV2Router"];
 const sourceCommit = process.env.GITHUB_SHA;
