@@ -99,8 +99,9 @@ contract SobyaV2Test {
         _addInitialLiquidity();
         address[] memory path=new address[](2);
         path[0]=address(tokenA); path[1]=address(tokenB);
-        vm.warp(block.timestamp+2 hours);
-        (bool ok,)=address(router).call(abi.encodeCall(router.swapExactTokensForTokens,(1 ether,0,path,address(this),block.timestamp+1 hours)));
+        uint256 expiredDeadline=block.timestamp+1 hours;
+        vm.warp(expiredDeadline+1);
+        (bool ok,)=address(router).call(abi.encodeCall(router.swapExactTokensForTokens,(1 ether,0,path,address(this),expiredDeadline)));
         require(!ok,"EXPIRED_SWAP_ALLOWED");
     }
 }
