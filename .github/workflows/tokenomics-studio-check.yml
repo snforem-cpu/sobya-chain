@@ -81,7 +81,7 @@ jobs:
               raise SystemExit("Unexpected external network API usage detected")
           print("Required UI elements found; app remains browser-local.")
           PY
-      - name: Validate sales page and offline license issuer
+      - name: Validate sales page and payment-verification license issuer
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -99,7 +99,7 @@ jobs:
               'eth_chainId', 'eth_getTransactionByHash',
               'eth_getTransactionReceipt', 'eth_blockNumber',
               'receipt.status', 'confirmations<3n',
-              'Verify payment on SOBYA Mainnet before signing',
+              'Verify this payment on SOBYA Mainnet before signing',
               'sobya-license-used-tx:', 'sobya-license-used-id:'
           ]
           missing_issuer = [item for item in required_issuer if item not in issuer]
