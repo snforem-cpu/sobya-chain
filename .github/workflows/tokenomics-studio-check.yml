@@ -94,6 +94,17 @@ jobs:
               raise SystemExit("License issuer is missing required signed license fields.")
           if "fetch(" in issuer or "XMLHttpRequest" in issuer or "WebSocket(" in issuer:
               raise SystemExit("Offline issuer must not make network requests.")
+          app = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
+          import base64
+          match = re.search(r'const LICENSE_PUBLIC_KEY="([^"]+)"', app)
+          if not match or len(base64.b64decode(match.group(1), validate=True)) != 32:
+              raise SystemExit("App must contain a valid 32-byte Ed25519 public key.")
+          required_app = ['id="license"', 'id="chooseLicense"', 'id="licenseFile"', 'id="licenseResult"', 'crypto.subtle.verify', 'individual-perpetual', '357812033857', 'asobya']
+          missing_app = [item for item in required_app if item not in app]
+          if missing_app:
+              raise SystemExit("License verifier is missing required controls or checks: " + ", ".join(missing_app))
+          if "PRIVATE KEY" in app or "privateKey" in app:
+              raise SystemExit("A private key must never be embedded in the public app.")
           scripts = re.findall(r"<script>(.*?)</script>", issuer, flags=re.S | re.I)
           if len(scripts) != 1:
               raise SystemExit("Expected one inline issuer script.")
