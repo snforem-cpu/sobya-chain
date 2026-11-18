@@ -114,6 +114,19 @@ contract SobyaV2Test {
         require(wrapped.balanceOf(address(this))>5 ether,"WSOBY_NOT_RECEIVED");
     }
 
+    function testMultiHopSwapAcrossTwoPools() public {
+        _addInitialLiquidity();
+        SobyaMockERC20 tokenC=new SobyaMockERC20("Token C","TKC");
+        tokenC.mint(address(this),1_000_000 ether);
+        tokenC.approve(address(router),type(uint256).max);
+        router.addLiquidity(address(tokenB),address(tokenC),100 ether,100 ether,100 ether,100 ether,address(this),block.timestamp+1 hours);
+        address[] memory path=new address[](3);
+        path[0]=address(tokenA); path[1]=address(tokenB); path[2]=address(tokenC);
+        uint256 beforeC=tokenC.balanceOf(address(this));
+        uint256[] memory amounts=router.swapExactTokensForTokens(1 ether,1,path,address(this),block.timestamp+1 hours);
+        require(amounts[2]>0&&tokenC.balanceOf(address(this))==beforeC+amounts[2],"MULTIHOP_OUTPUT_NOT_RECEIVED");
+    }
+
     function testFuzzSwapPreservesConstantProduct(uint96 rawAmount) public {
         _addInitialLiquidity();
         address[] memory path=new address[](2);
