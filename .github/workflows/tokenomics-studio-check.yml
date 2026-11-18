@@ -1,0 +1,56 @@
+name: Tokenomics Studio checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tokenomics-studio/**"
+      - ".github/workflows/tokenomics-studio-check.yml"
+  pull_request:
+    paths:
+      - "tokenomics-studio/**"
+      - ".github/workflows/tokenomics-studio-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate embedded JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
+          scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S | re.I)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected exactly one inline application script; found {len(scripts)}")
+          Path("/tmp/tokenomics-studio.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/tokenomics-studio.js
+      - name: Validate required application elements
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path("tokenomics-studio/index.html").read_text(encoding="utf-8")
+          required = [
+              'id="overview"', 'id="allocations"', 'id="vesting"',
+              'id="analysis"', 'id="scenarios"', 'id="report"',
+              'id="allocationRows"', 'id="importBtn"', 'id="exportBtn"',
+              'id="downloadCsv"', 'id="printReport"', 'id="importFile"'
+          ]
+          missing = [item for item in required if item not in html]
+          if missing:
+              raise SystemExit("Missing required UI elements: " + ", ".join(missing))
+          if "fetch(" in html or "XMLHttpRequest" in html or "WebSocket(" in html:
+              raise SystemExit("Unexpected external network API usage detected")
+          print("Required UI elements found; app remains browser-local.")
+          PY
