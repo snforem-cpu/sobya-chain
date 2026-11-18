@@ -10,6 +10,7 @@ on:
       - 'buy/**'
       - 'tokenomics-studio/**'
       - 'dex/**'
+      - 'contracts/**'
       - 'assets/logo/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
@@ -32,6 +33,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Build DEX contracts
+        working-directory: contracts
+        run: forge build
+      - name: Export browser deployment artifacts
+        run: node contracts/script/export-dex-artifacts.mjs
+        env:
+          GITHUB_SHA: ${{ github.sha }}
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site artifact

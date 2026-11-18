@@ -27,6 +27,10 @@ jobs:
       - name: Compile contracts and deployment script
         working-directory: contracts
         run: forge build
+      - name: Export and validate mobile deployment artifacts
+        run: node contracts/script/export-dex-artifacts.mjs
+        env:
+          GITHUB_SHA: ${{ github.sha }}
       - name: Run unit and fuzz tests
         working-directory: contracts
         run: forge test -vvv

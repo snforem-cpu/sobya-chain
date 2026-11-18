@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071326"><title>SOBYA DEX Mobile Deployer</title>
+<style>
+:root{color-scheme:dark;--bg:#061225;--panel:#102541;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--cyan:#66e0e8;--gold:#e8c77b;--red:#ff9d9d}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#173967,transparent 38%),var(--bg);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}.wrap{max-width:720px;margin:auto;padding:20px}.top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:8px 0 18px}.brand{font-weight:900;letter-spacing:.16em;color:inherit;text-decoration:none}.brand small{display:block;font-size:10px;color:var(--muted);letter-spacing:.12em}.tag{font-size:11px;color:var(--cyan);letter-spacing:.15em;font-weight:800;margin-top:24px}.panel{background:linear-gradient(145deg,#102541,#0b1b30);border:1px solid var(--line);border-radius:18px;padding:19px;margin:14px 0}.btn{border:0;background:linear-gradient(110deg,#397fe0,#4aa8d8);color:#061225;padding:13px 16px;border-radius:11px;font-weight:800;width:100%;cursor:pointer}.btn:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#173454;color:white;border:1px solid var(--line)}.muted{color:var(--muted);font-size:13px}.warn{color:var(--gold)}.danger{color:var(--red)}.status{padding:12px;border-radius:10px;background:#07182b;border:1px solid var(--line);margin:12px 0;overflow-wrap:anywhere}.item{padding:12px 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}.label{font-size:12px;color:var(--muted)}.value{overflow-wrap:anywhere;font-family:ui-monospace,monospace;font-size:12px}.hidden{display:none}h1{font-size:30px;line-height:1.15;margin:10px 0}a{color:var(--cyan)}ol{padding-left:22px}.foot{text-align:center;color:var(--muted);font-size:12px;margin:25px 0}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+</head>
+<body><main class="wrap">
+<header class="top"><a class="brand" href="../">SOBYA<small>SECURE DEPLOYMENT</small></a><button class="btn secondary" style="width:auto" id="connect">Connect MetaMask</button></header>
+<div class="tag">SOBYA MAINNET · CHAIN 357812033857</div>
+<h1>Mobile DEX deployment</h1>
+<p class="muted">This page sends deployment transactions directly from your MetaMask wallet. No private key is collected or transmitted. Each contract deployment requires a separate wallet approval.</p>
+<section class="panel">
+<strong class="warn">Mainnet risk notice</strong>
+<p class="muted">Deploying these contracts costs real SOBY and cannot be undone. The contracts have passed the repository's automated tests, but they have not received an independent security audit. Do not deploy or fund pools with assets you cannot afford to lose. This tool does not constitute an audit.</p>
+<p class="muted">Never enter or share your Secret Recovery Phrase or private key on this page.</p>
+</section>
+<section class="panel">
+<div class="item"><div class="label">Wallet</div><div class="value" id="wallet">Not connected</div></div>
+<div class="item"><div class="label">Network</div><div class="value" id="network">Not checked</div></div>
+<div class="item"><div class="label">Native SOBY balance</div><div class="value" id="balance">—</div></div>
+<div class="item"><div class="label">Build source commit</div><div class="value" id="commit">Loading build…</div></div>
+<div class="item"><div class="label">Build verification</div><div class="value" id="build">Not checked</div></div>
+<div class="item"><div class="label">Estimated deployment gas</div><div class="value" id="estimate">Connect wallet to estimate</div></div>
+</section>
+<section class="panel">
+<strong>Deployment order</strong>
+<ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Router — trading and liquidity router</li></ol>
+<p class="muted">The Router constructor is encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
+<button class="btn" id="deploy" disabled>Deploy contracts (3 wallet approvals)</button>
+<div class="status" id="status" aria-live="polite">Connect MetaMask from its in-app browser to begin preflight checks.</div>
+</section>
+<section class="panel hidden" id="results">
+<strong>Deployment results — save these addresses and transaction hashes</strong>
+<div id="addresses"></div>
+<p class="muted">Do not consider the DEX live until these receipts and bytecode are independently verified and the official configuration is updated.</p>
+</section>
+<p class="foot"><a href="../">Back to SOBYA DEX</a> · <a href="../../">Official website</a></p>
+</main>
+<script>
+const CHAIN_ID=357812033857n;
+const RPC="https://sobya-evm-rpc.nodesafe-app.xyz";
+const $=id=>document.getElementById(id);
+let provider,signer,account,bundle,buildReady=false,ready=false,busy=false;
+const say=m=>$("status").textContent=m;
+const short=e=>e?.shortMessage||e?.reason||e?.message||String(e);
+async function sha256(value){const bytes=new TextEncoder().encode(value.toLowerCase());const hash=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+async function loadBuild(){
+  const response=await fetch("./artifacts.json",{cache:"no-store"});
+  if(!response.ok)throw Error("Build artifact is not published yet.");
+  bundle=await response.json();
+  if(bundle.schemaVersion!==1||bundle.chainId!==Number(CHAIN_ID)||!/^([0-9a-f]{40})$/i.test(bundle.sourceCommit||""))throw Error("Build manifest or target chain is invalid.");
+  for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Router"]){
+    const c=bundle.contracts?.[name];
+    if(!c||!Array.isArray(c.abi)||!/^0x[0-9a-f]+$/i.test(c.bytecode||"")||!/^0x[0-9a-f]+$/i.test(c.deployedBytecode||""))throw Error("Missing or malformed "+name+" artifact.");
+    if(await sha256(c.bytecode)!==c.bytecodeSha256||await sha256(c.deployedBytecode)!==c.deployedBytecodeSha256)throw Error(name+" artifact checksum mismatch.");
+  }
+  buildReady=true;\n  $("commit").textContent=bundle.sourceCommit;
+  $("build").textContent="3 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
+}
+async function connect(){
+ if(!window.ethereum){say("Open this page inside the MetaMask mobile browser (Explore). No injected wallet was detected.");return}
+ try{
+  provider=new ethers.BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts",[]);
+  signer=await provider.getSigner();account=await signer.getAddress();
+  const network=await provider.getNetwork();
+  $("wallet").textContent=account;
+  $("network").textContent=network.name+" · "+network.chainId.toString();
+  if(network.chainId!==CHAIN_ID){ready=false;$("deploy").disabled=true;say("Wrong network. Switch MetaMask manually to SOBYA Mainnet (357812033857), then reconnect.");return}
+  const balance=await provider.getBalance(account);
+  $("balance").textContent=ethers.formatEther(balance)+" SOBY";
+  const rpcProvider=new ethers.JsonRpcProvider(RPC);
+  const rpcNetwork=await rpcProvider.getNetwork();
+  if(rpcNetwork.chainId!==CHAIN_ID)throw Error("Configured SOBYA RPC returned an unexpected chain ID.");
+  ready=buildReady;if(!ready)throw Error("Verified build artifacts are unavailable; deployment is disabled.");$("deploy").disabled=false;
+  say("Preflight passed: wallet and public RPC both report SOBYA Mainnet. Review the risk notice before deploying.");
+  $("estimate").textContent="Will estimate each deployment immediately before sending.";
+ }catch(e){ready=false;$("deploy").disabled=true;say(short(e))}
+}
+async function deployOne(name,args=[]){
+ const c=bundle.contracts[name];
+ const factory=new ethers.ContractFactory(c.abi,c.bytecode,signer);
+ const request=await factory.getDeployTransaction(...args);
+ const gas=await provider.estimateGas({...request,from:account});
+ const fee=await provider.getFeeData();
+ const price=fee.maxFeePerGas??fee.gasPrice;
+ if(!price)throw Error("Could not estimate SOBYA gas price.");
+ const cost=gas*price;
+ const bal=await provider.getBalance(account);
+ if(bal<cost)throw Error("Insufficient SOBY for estimated deployment gas of "+ethers.formatEther(cost)+" SOBY (before safety margin).");
+ $("estimate").textContent=name+": about "+ethers.formatEther(cost)+" SOBY gas.";
+ say("Review the "+name+" deployment request in MetaMask and approve it only if the contract creation details look correct.");
+ const contract=await factory.deploy(...args);
+ const tx=contract.deploymentTransaction();
+ if(!tx)throw Error("Wallet did not return a deployment transaction.");
+ say(name+" submitted. Waiting for confirmation: "+tx.hash);
+ const receipt=await tx.wait();
+ if(!receipt||receipt.status!==1||!receipt.contractAddress)throw Error(name+" deployment receipt failed or has no contract address.");
+ const code=await provider.getCode(receipt.contractAddress);
+ if(code==="0x")throw Error(name+" receipt succeeded but no contract bytecode is present at the address.");
+ return {address:receipt.contractAddress,hash:tx.hash,gasUsed:receipt.gasUsed.toString()};
+}
+function showResult(name,result){
+ const row=document.createElement("div");row.className="item";
+ const label=document.createElement("div");label.className="label";label.textContent=name;
+ const address=document.createElement("div");address.className="value";address.textContent="Address: "+result.address;
+ const tx=document.createElement("div");tx.className="value";tx.textContent="Transaction: "+result.hash;
+ row.append(label,address,tx);$("addresses").append(row);$("results").classList.remove("hidden");
+}
+async function runDeploy(){
+ if(!ready||busy)return;
+ if(!confirm("This will deploy three permanent contracts on SOBYA Mainnet and spend real SOBY on gas. The contracts have not been independently audited. Continue?"))return;
+ busy=true;$("deploy").disabled=true;
+ try{
+  const w=await deployOne("WSOBY");showResult("WSOBY",w);
+  const f=await deployOne("SobyaV2Factory");showResult("Factory",f);
+  const r=await deployOne("SobyaV2Router",[f.address,w.address]);showResult("Router",r);
+  say("All three deployments have confirmed and code is present. Save every address and transaction hash shown below. Trading remains disabled until independent verification and configuration update.");
+  $("estimate").textContent="Deployment receipts confirmed; verify all three on the explorer.";
+ }catch(e){say("Deployment stopped: "+short(e)+". Any earlier confirmed deployments remain on-chain; do not repeat them. Save the results already shown and request verification.");}
+ finally{busy=false;$("deploy").disabled=!ready}
+}
+$("connect").onclick=connect;
+$("deploy").onclick=runDeploy;
+(async()=>{try{await loadBuild()}catch(e){$("build").textContent=short(e);say("Build artifacts are not ready. Do not use a third-party deployer or paste private keys.")}})();
+if(window.ethereum){window.ethereum.on("chainChanged",()=>location.reload());window.ethereum.on("accountsChanged",()=>location.reload())}
+</script></body></html>
