@@ -113,6 +113,7 @@ contract SobyaV2Pair {
     }
 
     function mint(address to) external lock returns (uint256 liquidity) {
+        require(to != address(0), "SOBYA: ZERO_TO");
         (uint112 r0, uint112 r1,) = (reserve0, reserve1, blockTimestampLast);
         uint256 b0 = ISobyaV2ERC20(token0).balanceOf(address(this));
         uint256 b1 = ISobyaV2ERC20(token1).balanceOf(address(this));
@@ -131,6 +132,7 @@ contract SobyaV2Pair {
     }
 
     function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
+        require(to != address(0), "SOBYA: ZERO_TO");
         address a = token0;
         address b = token1;
         uint256 liquidity = balanceOf[address(this)];
