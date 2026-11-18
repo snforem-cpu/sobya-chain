@@ -10,33 +10,34 @@ This deployment is deliberately not run by GitHub Actions. It uses a local walle
 - SOBYA EVM RPC: `https://sobya-evm-rpc.nodesafe-app.xyz`.
 - Expected EVM chain ID: `357812033857`.
 
-## 1. Prepare a local environment
-From the repository's `contracts` directory, set the variables in your terminal session only:
+## 1. Prepare a local Foundry keystore
+From the repository's `contracts` directory, import the owner's wallet into Foundry's encrypted local keystore:
 
 ```sh
-export SOBYA_RPC="https://sobya-evm-rpc.nodesafe-app.xyz"
-export PRIVATE_KEY="YOUR_PRIVATE_KEY_IN_YOUR_LOCAL_TERMINAL_ONLY"
+cast wallet import sobya-owner --interactive
+cast wallet address --account sobya-owner
 ```
 
-Do not save the key in `.env` inside the repository and do not upload terminal screenshots showing it.
+Enter the private key only into Foundry's local interactive prompt. Choose a strong keystore password. Do not put the key in a shell command, environment variable, `.env` file, GitHub, a website, or this chat. Keep the keystore and password on your own device.
 
 ## 2. Confirm the network before broadcasting
 ```sh
+export SOBYA_RPC="https://sobya-evm-rpc.nodesafe-app.xyz"
 cast chain-id --rpc-url "$SOBYA_RPC"
 ```
-The result must be exactly `357812033857`. Stop if it differs.
+The result must be exactly `357812033857`. Stop if it differs. Check that `cast wallet address --account sobya-owner` is the intended owner wallet and that it has enough native SOBY for three contract deployments.
 
 ## 3. Simulate first
 ```sh
-forge script script/DeploySobyaDex.s.sol:DeploySobyaDex --rpc-url "$SOBYA_RPC"
+forge script script/DeploySobyaDex.s.sol:DeploySobyaDex --rpc-url "$SOBYA_RPC" --account sobya-owner
 ```
-Review the simulation output and estimated gas. Do not broadcast if any network or address is unexpected.
+Review the simulation output, deployer address, predicted contract creations and estimated gas. The script itself also hard-reverts unless `block.chainid == 357812033857`.
 
 ## 4. Deploy after checking the simulation
 ```sh
-forge script script/DeploySobyaDex.s.sol:DeploySobyaDex --rpc-url "$SOBYA_RPC" --broadcast
+forge script script/DeploySobyaDex.s.sol:DeploySobyaDex --rpc-url "$SOBYA_RPC" --account sobya-owner --broadcast
 ```
-Keep the terminal output and the broadcast transaction records private until you have confirmed each transaction on the SOBYA explorer.
+Foundry will request the local keystore password when needed. Confirm each wallet transaction only after checking the destination network and estimated gas. Keep transaction records private until you have confirmed each transaction on the SOBYA explorer.
 
 ## 5. Verify the deployments
 For each address printed by the script:
