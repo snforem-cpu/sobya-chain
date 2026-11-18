@@ -48,11 +48,10 @@ contract SobyaV2Test {
         tokenB.mint(address(this),1_000_000 ether);
         tokenA.approve(address(router),type(uint256).max);
         tokenB.approve(address(router),type(uint256).max);
-        (,,)= (0,0,0);
     }
 
     function _addInitialLiquidity() private {
-        (, , ) = router.addLiquidity(address(tokenA),address(tokenB),100 ether,100 ether,100 ether,100 ether,address(this),block.timestamp+1 hours);
+        router.addLiquidity(address(tokenA),address(tokenB),100 ether,100 ether,100 ether,100 ether,address(this),block.timestamp+1 hours);
         pair=factory.getPair(address(tokenA),address(tokenB));
         require(pair!=address(0),"PAIR_NOT_CREATED");
     }
