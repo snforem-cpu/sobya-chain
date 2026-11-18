@@ -24,7 +24,7 @@ A passing build or local CI network does not establish public consensus, continu
 
 ## SOBYA Tokenomics Studio
 
-A browser-only tokenomics planning tool is available at [SOBYA Tokenomics Studio](https://snforem-cpu.github.io/sobya-chain/tokenomics-studio/). It supports allocation design, TGE/cliff/linear vesting schedules, unlock forecasts, scenario comparison, JSON/CSV export, and print-to-PDF reports. Calculations run locally; it does not connect to wallets, RPC endpoints, external APIs, or a server. See [the tool documentation](tokenomics-studio/README.md) for formulas and limitations. Payment collection and SOBY license verification are not enabled in the early-access build.
+A browser-only tokenomics planning tool is available at [SOBYA Tokenomics Studio](https://snforem-cpu.github.io/sobya-chain/tokenomics-studio/). It supports allocation design, TGE/cliff/linear vesting schedules, unlock forecasts, scenario comparison, JSON/CSV export, and print-to-PDF reports. Calculations run locally; it does not connect to wallets, RPC endpoints, external APIs, or a server. See [the tool documentation](tokenomics-studio/README.md) for formulas and limitations. The planned individual perpetual license is priced at 100 SOBY (one user, one-time payment). The pricing page currently keeps sales paused until the receiving address and live payment network are independently verified. Payment collection and in-app SOBY license verification are not enabled yet; see [sales and licensing status](tokenomics-studio/LICENSING.md).
 
 ## Validator participation
 
