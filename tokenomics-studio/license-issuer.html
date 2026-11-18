@@ -23,8 +23,8 @@ Native denomination: asobya (18 decimals)</div></section>
 (()=>{"use strict";
 const $=id=>document.getElementById(id);let generatedPrivate=null,publicText="";
 const b64=b=>{let s="";new Uint8Array(b).forEach(x=>s+=String.fromCharCode(x));return btoa(s)};
-const unb64=s=>Uint8Array.from(atob(s.replace(/-----[^-]+-----|\\s/g,"")),c=>c.charCodeAt(0));
-const pem=(label,bytes)=>"-----BEGIN "+label+"-----\\n"+b64(bytes).match(/.{1,64}/g).join("\\n")+"\\n-----END "+label+"-----";
+const unb64=s=>Uint8Array.from(atob(s.replace(/-----[^-]+-----|\s/g,"")),c=>c.charCodeAt(0));
+const pem=(label,bytes)=>"-----BEGIN "+label+"-----\n"+b64(bytes).match(/.{1,64}/g).join("\n")+"\n-----END "+label+"-----";
 const download=(name,content,type)=>{const u=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)};
 $("generate").onclick=async()=>{try{const pair=await crypto.subtle.generateKey({name:"Ed25519"},true,["sign","verify"]);const priv=await crypto.subtle.exportKey("pkcs8",pair.privateKey);const pub=await crypto.subtle.exportKey("raw",pair.publicKey);generatedPrivate=pem("PRIVATE KEY",priv);publicText=b64(pub);$("pub").textContent=publicText;$("keys").classList.remove("hidden");$("status").textContent="";}catch(e){$("status").textContent="Key generation failed: "+e.message}};
 $("copyPub").onclick=async()=>{try{await navigator.clipboard.writeText(publicText);$("status").textContent="Public key copied."}catch(e){$("status").textContent="Select and copy the public key text manually."}};
