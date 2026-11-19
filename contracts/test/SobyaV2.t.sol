@@ -18,7 +18,9 @@ contract SobyaMockERC20 {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+    uint256 public feeBps;
     constructor(string memory n,string memory s) { name=n; symbol=s; }
+    function setFeeBps(uint256 bps) external { require(bps <= 1000, "MOCK: FEE_TOO_HIGH"); feeBps = bps; }
     function mint(address to,uint256 amount) external { balanceOf[to]+=amount; totalSupply+=amount; }
     function approve(address spender,uint256 amount) external returns(bool) { allowance[msg.sender][spender]=amount; return true; }
     function transfer(address to,uint256 amount) external returns(bool) { _transfer(msg.sender,to,amount); return true; }
@@ -29,7 +31,10 @@ contract SobyaMockERC20 {
     }
     function _transfer(address from,address to,uint256 amount) private {
         require(to!=address(0)&&balanceOf[from]>=amount,"MOCK: TRANSFER");
-        balanceOf[from]-=amount; balanceOf[to]+=amount;
+        balanceOf[from]-=amount;
+        uint256 fee = amount * feeBps / 10_000;
+        balanceOf[to] += amount - fee;
+        totalSupply -= fee;
     }
 }
 
@@ -165,6 +170,69 @@ contract SobyaV2Test {
         require(!zeroOk,"ZERO_SWAP_RECIPIENT_ACCEPTED");
         (bool selfOk,)=address(p).call(abi.encodeCall(p.swap,(1 ether,0,address(p))));
         require(!selfOk,"PAIR_SELF_SWAP_RECIPIENT_ACCEPTED");
+    }
+
+
+    function testFeeOnTransferLiquidityUsesActualReceivedAmounts() public {
+        tokenA.setFeeBps(100);
+        (uint256 amountA, uint256 amountB,) = router.addLiquidity(
+            address(tokenA), address(tokenB), 100 ether, 100 ether,
+            99 ether, 100 ether, address(this), block.timestamp + 1 hours
+        );
+        require(amountA == 99 ether && amountB == 100 ether, "FOT_DEPOSIT_NOT_MEASURED");
+    }
+
+    function testFeeOnTransferSwapUsesActualPairInput() public {
+        _addInitialLiquidity();
+        tokenA.setFeeBps(100);
+        address[] memory path = new address[](2);
+        path[0] = address(tokenA);
+        path[1] = address(tokenB);
+        uint256 beforeB = tokenB.balanceOf(address(this));
+        router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            1 ether, 1, path, address(this), block.timestamp + 1 hours
+        );
+        require(tokenB.balanceOf(address(this)) > beforeB, "FOT_SWAP_NO_OUTPUT");
+    }
+
+    function testNativeSobyLiquidityAndBothSwapDirections() public {
+        vm.deal(address(this), 30 ether);
+        WSOBY wrapped = new WSOBY();
+        SobyaV2Router nativeRouter = new SobyaV2Router(address(factory), address(wrapped));
+        tokenB.approve(address(nativeRouter), type(uint256).max);
+
+        nativeRouter.addLiquiditySOBY{value: 5 ether}(
+            address(tokenB), 5 ether, 5 ether, 5 ether,
+            address(this), block.timestamp + 1 hours
+        );
+
+        address[] memory buyPath = new address[](2);
+        buyPath[0] = address(wrapped);
+        buyPath[1] = address(tokenB);
+        uint256 beforeB = tokenB.balanceOf(address(this));
+        nativeRouter.swapExactSOBYForTokens{value: 1 ether}(
+            1, buyPath, address(this), block.timestamp + 1 hours
+        );
+        require(tokenB.balanceOf(address(this)) > beforeB, "NATIVE_TO_TOKEN_FAILED");
+
+        address[] memory sellPath = new address[](2);
+        sellPath[0] = address(tokenB);
+        sellPath[1] = address(wrapped);
+        uint256 beforeNative = address(this).balance;
+        nativeRouter.swapExactTokensForSOBY(
+            1 ether, 1, sellPath, address(this), block.timestamp + 1 hours
+        );
+        require(address(this).balance > beforeNative, "TOKEN_TO_NATIVE_FAILED");
+
+        address pairAddress = factory.getPair(address(tokenB), address(wrapped));
+        SobyaV2Pair p = SobyaV2Pair(pairAddress);
+        uint256 lp = p.balanceOf(address(this));
+        p.approve(address(nativeRouter), lp);
+        uint256 beforeRemove = address(this).balance;
+        nativeRouter.removeLiquiditySOBY(
+            address(tokenB), lp, 1, 1, address(this), block.timestamp + 1 hours
+        );
+        require(address(this).balance > beforeRemove, "NATIVE_LIQUIDITY_REMOVE_FAILED");
     }
 
     function testExpiredDeadlineReverts() public {
