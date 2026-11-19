@@ -74,7 +74,6 @@ contract SobyaV2OracleTest {
         vm.warp(block.timestamp + 15 minutes);
 
         address token0 = pair.token0();
-        address token1 = pair.token1();
         OracleMockToken input = token0 == address(tokenA) ? tokenA : tokenB;
 
         input.transfer(address(pair), 10 ether);
