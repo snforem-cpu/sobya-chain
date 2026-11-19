@@ -218,6 +218,24 @@ contract SobyaV2Router {
         require(amountA >= minA && amountB >= minB, "SOBYA: SLIPPAGE");
     }
 
+    function removeLiquiditySupportingFeeOnTransferTokens(
+        address a, address b, uint256 liquidity, uint256 minA, uint256 minB,
+        address to, uint256 deadline
+    ) external ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+        require(to != address(0), "SOBYA: ZERO_TO");
+        address pair = _pairFor(a, b);
+        uint256 beforeA = ISobyaRouterToken(a).balanceOf(to);
+        uint256 beforeB = ISobyaRouterToken(b).balanceOf(to);
+        require(
+            ISobyaRouterPair(pair).transferFrom(msg.sender, pair, liquidity),
+            "SOBYA: LP_TRANSFER_FAILED"
+        );
+        ISobyaRouterPair(pair).burn(to);
+        amountA = ISobyaRouterToken(a).balanceOf(to) - beforeA;
+        amountB = ISobyaRouterToken(b).balanceOf(to) - beforeB;
+        require(amountA >= minA && amountB >= minB, "SOBYA: SLIPPAGE");
+    }
+
     function removeLiquiditySOBY(
         address token, uint256 liquidity, uint256 minToken, uint256 minSoby,
         address to, uint256 deadline
