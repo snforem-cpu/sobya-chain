@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface ISobyaV2Factory {
-    function getFeeTo() external view returns (address);
-}
-
 interface ISobyaV2ERC20 {
     function totalSupply() external view returns (uint256);
     function balanceOf(address) external view returns (uint256);
@@ -202,6 +198,17 @@ contract SobyaV2Pair {
         require(adjusted0 * adjusted1 >= uint256(r0) * uint256(r1) * FEE_DENOMINATOR**2, "SOBYA: K");
         _update(b0, b1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
+    }
+
+    /// @notice Transfers token balances above recorded reserves without changing reserves.
+    /// @dev Reverts if a token balance is below its reserve (e.g. unsupported rebasing behavior).
+    function skim(address to) external lock {
+        require(to != address(0) && to != address(this), "SOBYA: INVALID_TO");
+        uint256 balance0 = ISobyaV2ERC20(token0).balanceOf(address(this));
+        uint256 balance1 = ISobyaV2ERC20(token1).balanceOf(address(this));
+        require(balance0 >= reserve0 && balance1 >= reserve1, "SOBYA: BALANCE_BELOW_RESERVE");
+        _safeTransfer(token0, to, balance0 - reserve0);
+        _safeTransfer(token1, to, balance1 - reserve1);
     }
 
     function sync() external lock {
