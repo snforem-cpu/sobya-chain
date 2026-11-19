@@ -25,6 +25,8 @@ contract SobyaV2Pair {
     uint112 private reserve0;
     uint112 private reserve1;
     uint32 private blockTimestampLast;
+    uint256 public price0CumulativeLast;
+    uint256 public price1CumulativeLast;
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -55,6 +57,27 @@ contract SobyaV2Pair {
 
     function getReserves() external view returns (uint112, uint112, uint32) {
         return (reserve0, reserve1, blockTimestampLast);
+    }
+
+    /// @notice Returns cumulative prices including the current, not-yet-synced block interval.
+    /// @dev Timestamps intentionally wrap at uint32, matching the Uniswap V2 oracle model.
+    function currentCumulativePrices() external view returns (
+        uint256 price0Cumulative,
+        uint256 price1Cumulative,
+        uint32 timestamp
+    ) {
+        timestamp = uint32(block.timestamp);
+        price0Cumulative = price0CumulativeLast;
+        price1Cumulative = price1CumulativeLast;
+
+        uint32 timeElapsed;
+        unchecked { timeElapsed = timestamp - blockTimestampLast; }
+        if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
+            unchecked {
+                price0Cumulative += ((uint256(reserve1) << 112) / reserve0) * timeElapsed;
+                price1Cumulative += ((uint256(reserve0) << 112) / reserve1) * timeElapsed;
+            }
+        }
     }
 
     function approve(address spender, uint256 value) external returns (bool) {
@@ -106,9 +129,22 @@ contract SobyaV2Pair {
 
     function _update(uint256 balance0, uint256 balance1) private {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "SOBYA: RESERVE_OVERFLOW");
+
+        uint32 timestamp = uint32(block.timestamp);
+        uint32 timeElapsed;
+        unchecked { timeElapsed = timestamp - blockTimestampLast; }
+
+        // Accumulate the previous block's reserve price before changing reserves.
+        if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
+            unchecked {
+                price0CumulativeLast += ((uint256(reserve1) << 112) / reserve0) * timeElapsed;
+                price1CumulativeLast += ((uint256(reserve0) << 112) / reserve1) * timeElapsed;
+            }
+        }
+
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
-        blockTimestampLast = uint32(block.timestamp);
+        blockTimestampLast = timestamp;
         emit Sync(reserve0, reserve1);
     }
 
