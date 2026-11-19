@@ -30,7 +30,7 @@ contract SobyaMainnetForkTest {
         require(address(router).code.length > 0, "ROUTER_NOT_DEPLOYED");
         require(oracle.factory() == address(factory), "ORACLE_FACTORY_MISMATCH");
         require(router.factory() == address(factory), "ROUTER_FACTORY_MISMATCH");
-        require(router.WSOBY() == address(wrapped), "ROUTER_WRAPPED_MISMATCH");
+        require(router.wrappedSoby() == address(wrapped), "ROUTER_WRAPPED_MISMATCH");
 
         address pair = factory.createPair(address(0x1001), address(0x1002));
         require(pair.code.length > 0, "PAIR_NOT_DEPLOYED");
