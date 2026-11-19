@@ -2,7 +2,7 @@
 # Read-only SOBYA Mainnet preflight. This script sends no transactions.
 set -eu
 
-RPC_URL="${SOBYA_RPC:-https://sobya-rpc.nodesafe-dapp.xyz}"
+RPC_URL="${SOBYA_RPC:-https://sobya-evm-rpc.nodesafe-dapp.xyz}"
 EXPECTED_CHAIN_ID="357812033857"
 
 if ! command -v cast >/dev/null 2>&1; then
