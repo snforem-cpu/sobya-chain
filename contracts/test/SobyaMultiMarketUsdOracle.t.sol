@@ -68,7 +68,7 @@ contract SobyaMultiMarketUsdOracleTest {
         require(!ok, "INVALID_WINDOW_ACCEPTED");
     }
 
-    function testFailsClosedIfAnySourceUnavailable() public {
+    function testUnavailableSourceReverts() public {
         b.set(102e8, 45 minutes, true);
         (bool ok,) = address(oracle).staticcall(
             abi.encodeCall(oracle.sobyUsdPrice, ())
