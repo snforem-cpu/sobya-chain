@@ -50,7 +50,7 @@ const CHAIN_ID_HEX="0x534f425941";
 const RPC="https://sobya-evm-rpc.nodesafe-dapp.xyz";
 const $=id=>document.getElementById(id);
 const DEPLOYMENT_LOCKED = false; // Independent audit completed; current SOBYA mainnet fork integration passed.
-let provider,signer,account,bundle,buildReady=false,ready=false,busy=false,evmClient=null,connectError=null,preflightStage="initialization";
+let provider,signer,account,bundle,buildReady=false,ready=false,busy=false,evmClient=null,connectError=null,preflightStage="initialization",savedDeployments={};
 const say=m=>$("status").textContent=m;
 const connectSay=m=>$("connectStatus").textContent=m;
 const short=e=>(e&&e.shortMessage)||(e&&e.reason)||(e&&e.message)||String(e);
@@ -138,6 +138,7 @@ async function connect(){
    say("Wallet is connected and the SOBYA RPC is verified. Verified build artifacts are unavailable, so deployment remains disabled.");
    return;
   }
+  await restoreSavedDeployments();
   ready=true;
   $("deploy").disabled=DEPLOYMENT_LOCKED;
   connectSay("Connected: "+account+" · SOBYA Mainnet");
@@ -156,20 +157,95 @@ async function connect(){
   button.disabled=false;
  }
 }
+async function resolveFeeOverrides(){
+ const overrides={};
+ let fee={};
+ try{fee=await provider.getFeeData()}catch(_){}
+ if(fee.maxFeePerGas && fee.maxPriorityFeePerGas){
+  overrides.maxFeePerGas=fee.maxFeePerGas;
+  overrides.maxPriorityFeePerGas=fee.maxPriorityFeePerGas;
+  return {overrides,price:fee.maxFeePerGas,source:"wallet provider EIP-1559 fee data"};
+ }
+ if(fee.gasPrice && fee.gasPrice>0n){
+  overrides.gasPrice=fee.gasPrice;
+  return {overrides,price:fee.gasPrice,source:"wallet provider legacy gas price"};
+ }
+ // Some SOBYA RPC/provider combinations omit ethers fee fields. Query the
+ // standard JSON-RPC method directly before falling back to MetaMask's own
+ // transaction fee estimator.
+ try{
+  const raw=await provider.send("eth_gasPrice",[]);
+  const gasPrice=BigInt(raw);
+  if(gasPrice>0n){
+   overrides.gasPrice=gasPrice;
+   return {overrides,price:gasPrice,source:"eth_gasPrice"};
+  }
+ }catch(_){}
+ // If the chain exposes EIP-1559 base fee and priority fee, construct a
+ // bounded max fee. Never invent a fee when the node supplies no fee data.
+ try{
+  const block=await provider.getBlock("latest");
+  if(block && block.baseFeePerGas!=null){
+   let priority=0n;
+   try{priority=BigInt(await provider.send("eth_maxPriorityFeePerGas",[]))}catch(_){}
+   if(priority>0n){
+    const maxFee=block.baseFeePerGas*2n+priority;
+    overrides.maxFeePerGas=maxFee;
+    overrides.maxPriorityFeePerGas=priority;
+    return {overrides,price:maxFee,source:"latest block base fee and eth_maxPriorityFeePerGas"};
+   }
+  }
+ }catch(_){}
+ return {overrides,price:null,source:"MetaMask transaction fee estimator"};
+}
+async function restoreSavedDeployments(){
+ savedDeployments={};
+ try{
+  const key="sobya.dex.deployments."+CHAIN_ID+"."+account.toLowerCase();
+  const parsed=JSON.parse(localStorage.getItem(key)||"{}");
+  for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"]){
+   const item=parsed[name];
+   if(!item||!/^0x[a-fA-F0-9]{64}$/.test(item.hash||"")||!/^0x[a-fA-F0-9]{40}$/.test(item.address||""))continue;
+   try{
+    const receipt=await provider.getTransactionReceipt(item.hash);
+    if(!receipt||receipt.status!==1||!receipt.contractAddress||receipt.contractAddress.toLowerCase()!==item.address.toLowerCase()||!receipt.from||receipt.from.toLowerCase()!==account.toLowerCase())continue;
+    const code=await provider.getCode(item.address);
+    if(code==="0x")continue;
+    savedDeployments[name]={address:item.address,hash:item.hash,gasUsed:receipt.gasUsed.toString()};
+    showResult(name,savedDeployments[name]);
+   }catch(_){}
+  }
+ }catch(e){console.warn("Could not restore local deployment history:",e)}
+}
+function persistDeployment(name,result){
+ savedDeployments[name]=result;
+ try{
+  const key="sobya.dex.deployments."+CHAIN_ID+"."+account.toLowerCase();
+  const current=JSON.parse(localStorage.getItem(key)||"{}");
+  current[name]={address:result.address,hash:result.hash};
+  localStorage.setItem(key,JSON.stringify(current));
+ }catch(e){console.warn("Could not persist deployment history:",e)}
+}
 async function deployOne(name,args=[]){
  const c=bundle.contracts[name];
  const factory=new ethers.ContractFactory(c.abi,c.bytecode,signer);
  const request=await factory.getDeployTransaction(...args);
  const gas=await provider.estimateGas(Object.assign({},request,{from:account}));
- const fee=await provider.getFeeData();
- const price=fee.maxFeePerGas||fee.gasPrice;
- if(!price)throw Error("Could not estimate SOBYA gas price.");
- const cost=gas*price;
- const bal=await provider.getBalance(account);
- if(bal<cost)throw Error("Insufficient SOBY for estimated deployment gas of "+ethers.formatEther(cost)+" SOBY (before safety margin).");
- $("estimate").textContent=name+": about "+ethers.formatEther(cost)+" SOBY gas.";
- say("Review the "+name+" deployment request in MetaMask and approve it only if the contract creation details look correct.");
- const contract=await factory.deploy(...args);
+ const fee=await resolveFeeOverrides();
+ const gasLimit=gas*120n/100n;
+ const txOverrides=Object.assign({gasLimit},fee.overrides);
+ if(fee.price){
+  const cost=gasLimit*fee.price;
+  const bal=await provider.getBalance(account);
+  if(bal<cost)throw Error("Insufficient SOBY for estimated deployment gas of "+ethers.formatEther(cost)+" SOBY (includes 20% gas-limit margin).");
+  $("estimate").textContent=name+": estimated maximum "+ethers.formatEther(cost)+" SOBY gas ("+fee.source+").";
+ }else{
+  $("estimate").textContent=name+": fee fields unavailable from RPC; MetaMask must calculate and display the fee before approval.";
+ }
+ say("Review the "+name+" deployment request and the gas fee shown by MetaMask. Approve only if the network, contract and fee are correct.");
+ // When the RPC omits fee fields, intentionally leave them unset so MetaMask
+ // can populate its own fee estimate instead of aborting before wallet review.
+ const contract=Object.keys(txOverrides).length?await factory.deploy(...args,txOverrides):await factory.deploy(...args);
  const tx=contract.deploymentTransaction();
  if(!tx)throw Error("Wallet did not return a deployment transaction.");
  say(name+" submitted. Waiting for confirmation: "+tx.hash);
@@ -192,11 +268,18 @@ async function runDeploy(){
  if(!confirm("This will deploy four permanent contracts on SOBYA Mainnet and spend real SOBY on gas. The independent review is complete, but each transaction is permanent. Continue only if you have checked the wallet, network, contract order and gas estimate. Continue?"))return;
  busy=true;$("deploy").disabled=true;
  try{
-  const w=await deployOne("WSOBY");showResult("WSOBY",w);
-  const f=await deployOne("SobyaV2Factory");showResult("Factory",f);
-  const o=await deployOne("SobyaV2Oracle",[f.address]);showResult("TWAP Oracle",o);
-  const r=await deployOne("SobyaV2Router",[f.address,w.address]);showResult("Router",r);
-  say("All four deployments have confirmed and code is present. Save every address and transaction hash shown below. The oracle reports a pool TWAP only; it is not a global USD price feed. Trading remains disabled until independent verification and configuration update.");
+  const obtain=async(name,args,label)=>{
+   if(savedDeployments[name]){say(name+" was already confirmed in this wallet session and its receipt/bytecode were re-verified. Skipping duplicate deployment.");return savedDeployments[name]}
+   const result=await deployOne(name,args);
+   persistDeployment(name,result);
+   showResult(label,result);
+   return result;
+  };
+  const w=await obtain("WSOBY",[],"WSOBY");
+  const f=await obtain("SobyaV2Factory",[],"Factory");
+  const o=await obtain("SobyaV2Oracle",[f.address],"TWAP Oracle");
+  const r=await obtain("SobyaV2Router",[f.address,w.address],"Router");
+  say("All four deployments have confirmed and code is present. Save every address and transaction hash shown below. Confirmed deployments are saved locally and will be verified and skipped on a later retry. The oracle reports a pool TWAP only; it is not a global USD price feed. Trading remains disabled until independent verification and configuration update.");
   $("estimate").textContent="Deployment receipts confirmed; verify all four on the explorer.";
  }catch(e){say("Deployment stopped: "+short(e)+". Any earlier confirmed deployments remain on-chain; do not repeat them. Save the results already shown and request verification.");}
  finally{busy=false;$("deploy").disabled=!ready||DEPLOYMENT_LOCKED}
