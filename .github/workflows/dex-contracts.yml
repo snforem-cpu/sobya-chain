@@ -43,3 +43,33 @@ jobs:
       - name: Run unit and fuzz tests
         working-directory: contracts
         run: forge test -vvv
+
+  sobya-mainnet-fork:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Verify public SOBYA RPC without sending transactions
+        env:
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-app.xyz
+        run: |
+          set -euo pipefail
+          CHAIN_ID="$(cast chain-id --rpc-url "$SOBYA_EVM_RPC_URL")"
+          test "$CHAIN_ID" = "357812033857"
+          BLOCK_NUMBER="$(cast block-number --rpc-url "$SOBYA_EVM_RPC_URL")"
+          GAS_PRICE="$(cast gas-price --rpc-url "$SOBYA_EVM_RPC_URL")"
+          echo "SOBYA EVM chain ID: $CHAIN_ID"
+          echo "Latest block: $BLOCK_NUMBER"
+          echo "RPC gas price (wei): $GAS_PRICE"
+      - name: Simulate deployment and contract wiring on disposable SOBYA mainnet fork
+        working-directory: contracts
+        env:
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-app.xyz
+        run: |
+          forge test --fork-url "$SOBYA_EVM_RPC_URL" --match-path test/SobyaMainnetFork.t.sol -vvv
+      - name: Confirm production deployment remains locked
+        run: |
+          grep -F 'DEPLOYMENT_APPROVED = false' contracts/script/DeploySobyaDex.s.sol
+          grep -F 'SOBYA DEX: AUDIT_GATE_LOCKED' contracts/script/DeploySobyaDex.s.sol
+          grep -F 'const DEPLOYMENT_LOCKED = true' dex/deploy/index.html
