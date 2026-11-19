@@ -2,6 +2,7 @@ name: SOBYA DEX contracts tests
 # Keep this workflow scoped to all contract, Router, Oracle, and deployment changes.
 # Regression suite includes native-coin recipient handling and fee-on-transfer accounting.
 # USD adapter tests cover decimal scaling, feed validity, and pool-depth guards.
+# Keep CI current with the latest Solidity regression tests.
 
 on:
   pull_request:
