@@ -30,6 +30,7 @@ interface ISobyaWrappedNative is ISobyaRouterToken {
 contract SobyaV2Router {
     address public immutable factory;
     address public immutable wrappedSoby;
+    uint256 private unlocked = 1;
 
     struct LiquidityRequest {
         address tokenA;
@@ -40,6 +41,13 @@ contract SobyaV2Router {
         uint256 nominalB;
         uint256 minA;
         uint256 minB;
+    }
+
+    modifier nonReentrant() {
+        require(unlocked == 1, "SOBYA: LOCKED");
+        unlocked = 0;
+        _;
+        unlocked = 1;
     }
 
     modifier ensure(uint256 deadline) {
@@ -160,7 +168,7 @@ contract SobyaV2Router {
     function addLiquidity(
         address a, address b, uint256 desiredA, uint256 desiredB,
         uint256 minA, uint256 minB, address to, uint256 deadline
-    ) external ensure(deadline) returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
+    ) external nonReentrant ensure(deadline) returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
         require(to != address(0), "SOBYA: ZERO_TO");
         LiquidityRequest memory request;
         request.tokenA = a;
@@ -190,7 +198,7 @@ contract SobyaV2Router {
     function addLiquiditySOBY(
         address token, uint256 desiredToken, uint256 minToken, uint256 minSoby,
         address to, uint256 deadline
-    ) external payable ensure(deadline) returns (uint256 amountToken, uint256 amountSoby, uint256 liquidity) {
+    ) external payable nonReentrant ensure(deadline) returns (uint256 amountToken, uint256 amountSoby, uint256 liquidity) {
         require(msg.value > 0 && to != address(0), "SOBYA: INVALID_VALUE_OR_TO");
         address pair = _getOrCreatePair(token, wrappedSoby);
         (uint256 nominalToken, uint256 nominalSoby) =
@@ -198,8 +206,16 @@ contract SobyaV2Router {
         uint256 beforeToken = ISobyaRouterToken(token).balanceOf(pair);
         _safeTransferFrom(token, msg.sender, pair, nominalToken);
         amountToken = ISobyaRouterToken(token).balanceOf(pair) - beforeToken;
-        amountSoby = nominalSoby;
+        (uint256 reserveToken, uint256 reserveSoby) = _reservesFor(token, wrappedSoby, pair);
+        if (reserveToken == 0 && reserveSoby == 0) {
+            // The initial price is established by the first LP; no prior ratio exists.
+            amountSoby = nominalSoby;
+        } else {
+            require(reserveToken > 0 && reserveSoby > 0, "SOBYA: INVALID_RESERVES");
+            amountSoby = quote(amountToken, reserveToken, reserveSoby);
+        }
         require(amountToken >= minToken && amountSoby >= minSoby, "SOBYA: SLIPPAGE");
+        require(amountSoby > 0 && amountSoby <= msg.value, "SOBYA: INSUFFICIENT_SOBY");
         ISobyaWrappedNative(wrappedSoby).deposit{value: amountSoby}();
         _safeTransfer(wrappedSoby, pair, amountSoby);
         liquidity = ISobyaRouterPair(pair).mint(to);
@@ -209,7 +225,7 @@ contract SobyaV2Router {
     function removeLiquidity(
         address a, address b, uint256 liquidity, uint256 minA, uint256 minB,
         address to, uint256 deadline
-    ) external ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+    ) external nonReentrant ensure(deadline) returns (uint256 amountA, uint256 amountB) {
         require(to != address(0), "SOBYA: ZERO_TO");
         address pair = _pairFor(a, b);
         require(ISobyaRouterPair(pair).transferFrom(msg.sender, pair, liquidity), "SOBYA: LP_TRANSFER_FAILED");
@@ -221,7 +237,7 @@ contract SobyaV2Router {
     function removeLiquiditySupportingFeeOnTransferTokens(
         address a, address b, uint256 liquidity, uint256 minA, uint256 minB,
         address to, uint256 deadline
-    ) external ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+    ) external nonReentrant ensure(deadline) returns (uint256 amountA, uint256 amountB) {
         require(to != address(0), "SOBYA: ZERO_TO");
         address pair = _pairFor(a, b);
         uint256 beforeA = ISobyaRouterToken(a).balanceOf(to);
@@ -239,7 +255,7 @@ contract SobyaV2Router {
     function removeLiquiditySOBY(
         address token, uint256 liquidity, uint256 minToken, uint256 minSoby,
         address to, uint256 deadline
-    ) external ensure(deadline) returns (uint256 amountToken, uint256 amountSoby) {
+    ) external nonReentrant ensure(deadline) returns (uint256 amountToken, uint256 amountSoby) {
         require(to != address(0), "SOBYA: ZERO_TO");
         address pair = _pairFor(token, wrappedSoby);
         require(ISobyaRouterPair(pair).transferFrom(msg.sender, pair, liquidity), "SOBYA: LP_TRANSFER_FAILED");
@@ -272,7 +288,7 @@ contract SobyaV2Router {
     function swapExactTokensForTokens(
         uint256 amountIn, uint256 amountOutMin, address[] calldata path,
         address to, uint256 deadline
-    ) external ensure(deadline) returns (uint256[] memory amounts) {
+    ) external nonReentrant ensure(deadline) returns (uint256[] memory amounts) {
         require(path.length >= 2 && to != address(0), "SOBYA: INVALID_PATH_OR_TO");
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
@@ -288,7 +304,7 @@ contract SobyaV2Router {
     function swapExactTokensForTokensSupportingFeeOnTransferTokens(
         uint256 amountIn, uint256 amountOutMin, address[] calldata path,
         address to, uint256 deadline
-    ) external ensure(deadline) {
+    ) external nonReentrant ensure(deadline) {
         require(path.length >= 2 && to != address(0), "SOBYA: INVALID_PATH_OR_TO");
         uint256 beforeOut = ISobyaRouterToken(path[path.length - 1]).balanceOf(to);
         _safeTransferFrom(path[0], msg.sender, _pairFor(path[0], path[1]), amountIn);
@@ -318,7 +334,7 @@ contract SobyaV2Router {
 
     function swapExactSOBYForTokens(
         uint256 amountOutMin, address[] calldata path, address to, uint256 deadline
-    ) external payable ensure(deadline) returns (uint256[] memory amounts) {
+    ) external payable nonReentrant ensure(deadline) returns (uint256[] memory amounts) {
         require(path.length >= 2 && path[0] == wrappedSoby && msg.value > 0 && to != address(0),
             "SOBYA: INVALID_NATIVE_PATH");
         amounts = new uint256[](path.length);
@@ -335,7 +351,7 @@ contract SobyaV2Router {
 
     function swapExactSOBYForTokensSupportingFeeOnTransferTokens(
         uint256 amountOutMin, address[] calldata path, address to, uint256 deadline
-    ) external payable ensure(deadline) {
+    ) external payable nonReentrant ensure(deadline) {
         require(path.length >= 2 && path[0] == wrappedSoby && msg.value > 0 && to != address(0),
             "SOBYA: INVALID_NATIVE_PATH");
         uint256 beforeOut = ISobyaRouterToken(path[path.length - 1]).balanceOf(to);
@@ -349,7 +365,7 @@ contract SobyaV2Router {
     function swapExactTokensForSOBY(
         uint256 amountIn, uint256 amountOutMin, address[] calldata path,
         address to, uint256 deadline
-    ) external ensure(deadline) returns (uint256 amountOut) {
+    ) external nonReentrant ensure(deadline) returns (uint256 amountOut) {
         require(path.length >= 2 && path[path.length - 1] == wrappedSoby && to != address(0),
             "SOBYA: INVALID_NATIVE_PATH");
         uint256[] memory amounts = new uint256[](path.length);
@@ -369,7 +385,7 @@ contract SobyaV2Router {
     function swapExactTokensForSOBYSupportingFeeOnTransferTokens(
         uint256 amountIn, uint256 amountOutMin, address[] calldata path,
         address to, uint256 deadline
-    ) external ensure(deadline) {
+    ) external nonReentrant ensure(deadline) {
         require(path.length >= 2 && path[path.length - 1] == wrappedSoby && to != address(0),
             "SOBYA: INVALID_NATIVE_PATH");
         uint256 beforeWrapped = ISobyaRouterToken(wrappedSoby).balanceOf(address(this));
