@@ -59,6 +59,7 @@ contract MockPoolOracle {
         elapsed = elapsed_;
     }
     function consult(address, address, uint256) external view returns (uint256, uint32) {
+        require(elapsed >= 30 minutes && elapsed <= 2 hours, "MOCK: INVALID_TWAP_WINDOW");
         return (quoteAmount, elapsed);
     }
 }
