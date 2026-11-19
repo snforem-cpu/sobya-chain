@@ -85,6 +85,33 @@ contract SobyaV2OracleTest {
         require(averagePrice > (2 ** 112) / 2, "TWAP_OUT_OF_EXPECTED_RANGE");
     }
 
+    function testPublicUpdateCannotKeepResettingConsultWindow() public {
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + oracle.MIN_PERIOD());
+        oracle.update(address(pair));
+
+        // The earlier checkpoint must remain usable after a public update.
+        (uint256 firstPrice, uint32 firstElapsed) =
+            oracle.consultPriceX112(address(pair), pair.token0());
+        require(firstPrice == 2 ** 112, "FIRST_CHECKPOINT_PRICE");
+        require(firstElapsed == oracle.MIN_PERIOD(), "FIRST_CHECKPOINT_WINDOW");
+
+        vm.warp(block.timestamp + oracle.MIN_PERIOD());
+        oracle.update(address(pair));
+        (uint256 nextPrice, uint32 nextElapsed) =
+            oracle.consultPriceX112(address(pair), pair.token0());
+        require(nextPrice == 2 ** 112, "NEXT_CHECKPOINT_PRICE");
+        require(nextElapsed == oracle.MIN_PERIOD(), "NEXT_CHECKPOINT_WINDOW");
+    }
+
+    function testRejectsInvalidToken() public {
+        address unknownToken = address(0x1234);
+        (bool ok,) = address(oracle).staticcall(
+            abi.encodeCall(oracle.consultPriceX112, (address(pair), unknownToken))
+        );
+        require(!ok, "INVALID_TOKEN_ACCEPTED");
+    }
+
     function testRejectsStaleObservation() public {
         oracle.update(address(pair));
         vm.warp(block.timestamp + oracle.MAX_PERIOD() + 1);
