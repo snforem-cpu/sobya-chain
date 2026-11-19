@@ -6,6 +6,7 @@
   "factory": "",
   "router": "",
   "wrappedSoby": "",
+  "oracle": "",
   "deploymentStatus": "pending",
-  "notice": "Addresses must be filled only from verified SOBYA mainnet deployment receipts. Never substitute mock or testnet addresses."
+  "notice": "Addresses must be filled only from verified SOBYA mainnet deployment receipts. Never substitute mock or testnet addresses. The TWAP oracle is a pool-specific reference, not a global USD price feed."
 }
