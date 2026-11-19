@@ -30,8 +30,6 @@ contract SobyaV2Oracle {
         bool initialized;
     }
 
-    // Latest checkpoint and the preceding checkpoint are retained so a public update cannot
-    // continually reset the only usable TWAP window and deny consumers a valid quote.
     mapping(address => Observation) public observations;
     mapping(address => Observation) public previousObservations;
 
@@ -44,7 +42,7 @@ contract SobyaV2Oracle {
     }
 
     /// @notice Starts or rolls the observation window. Anyone may call this.
-    /// @dev Checkpoints are separated by at least MIN_PERIOD; the prior checkpoint is retained.
+    /// @dev A fresh checkpoint requires nonzero reserves; prior checkpoints remain available.
     function update(address pair) external {
         _validatePair(pair);
         (uint112 reserve0, uint112 reserve1,) = ISobyaOraclePair(pair).getReserves();
@@ -90,7 +88,9 @@ contract SobyaV2Oracle {
     }
 
     /// @notice Returns the average price in UQ112x112 form and the observation window.
-    /// @dev tokenIn must be token0 or token1 of a registered pair.
+    /// @dev A historical TWAP remains readable after reserves reach zero because the pair's
+    ///      cumulative-price function freezes (does not divide by zero) when reserves are empty.
+    ///      This does not permit a new observation until liquidity is restored.
     function consultPriceX112(address pair, address tokenIn)
         public view returns (uint256 averagePriceX112, uint32 elapsed)
     {
@@ -98,9 +98,6 @@ contract SobyaV2Oracle {
         address token0 = ISobyaOraclePair(pair).token0();
         address token1 = ISobyaOraclePair(pair).token1();
         require(tokenIn == token0 || tokenIn == token1, "SOBYA_ORACLE: INVALID_TOKEN");
-
-        (uint112 reserve0, uint112 reserve1,) = ISobyaOraclePair(pair).getReserves();
-        require(reserve0 > 0 && reserve1 > 0, "SOBYA_ORACLE: NO_LIQUIDITY");
 
         (uint256 cumulative0, uint256 cumulative1, uint32 timestamp) =
             ISobyaOraclePair(pair).currentCumulativePrices();
@@ -110,7 +107,6 @@ contract SobyaV2Oracle {
         else {
             uint32 previousAge;
             unchecked { previousAge = timestamp - observation.timestamp; }
-            // If the older checkpoint has expired, use the latest checkpoint instead.
             if (previousAge > MAX_PERIOD) observation = observations[pair];
         }
         require(observation.initialized, "SOBYA_ORACLE: NOT_INITIALIZED");
