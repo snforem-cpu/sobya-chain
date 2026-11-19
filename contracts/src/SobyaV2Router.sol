@@ -201,13 +201,13 @@ contract SobyaV2Router {
         require(ISobyaRouterPair(pair).transferFrom(msg.sender, pair, liquidity), "SOBYA: LP_TRANSFER_FAILED");
         uint256 beforeToken = ISobyaRouterToken(token).balanceOf(address(this));
         uint256 beforeWrapped = ISobyaRouterToken(wrappedSoby).balanceOf(address(this));
+        uint256 beforeRecipient = ISobyaRouterToken(token).balanceOf(to);
         ISobyaRouterPair(pair).burn(address(this));
         uint256 receivedToken = ISobyaRouterToken(token).balanceOf(address(this)) - beforeToken;
         uint256 receivedWrapped = ISobyaRouterToken(wrappedSoby).balanceOf(address(this)) - beforeWrapped;
         _safeTransfer(token, to, receivedToken);
-        amountToken = ISobyaRouterToken(token).balanceOf(to);
-        // Return the net amount received by the recipient for fee-on-transfer tokens.
-        amountToken = amountToken >= beforeToken ? amountToken - beforeToken : amountToken;
+        // Enforce slippage against the recipient's net balance delta, including transfer tax.
+        amountToken = ISobyaRouterToken(token).balanceOf(to) - beforeRecipient;
         ISobyaWrappedNative(wrappedSoby).withdraw(receivedWrapped);
         amountSoby = receivedWrapped;
         require(amountToken >= minToken && amountSoby >= minSoby, "SOBYA: SLIPPAGE");
