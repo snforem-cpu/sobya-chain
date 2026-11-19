@@ -162,11 +162,15 @@ contract SobyaV2Router {
         uint256 minA, uint256 minB, address to, uint256 deadline
     ) external ensure(deadline) returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
         require(to != address(0), "SOBYA: ZERO_TO");
-        address pair = _getOrCreatePair(a, b);
-        (uint256 nominalA, uint256 nominalB) = _optimalLiquidity(a, b, desiredA, desiredB, pair);
-        LiquidityRequest memory request = LiquidityRequest(
-            a, b, pair, to, nominalA, nominalB, minA, minB
-        );
+        LiquidityRequest memory request;
+        request.tokenA = a;
+        request.tokenB = b;
+        request.recipient = to;
+        request.minA = minA;
+        request.minB = minB;
+        request.pair = _getOrCreatePair(a, b);
+        (request.nominalA, request.nominalB) =
+            _optimalLiquidity(a, b, desiredA, desiredB, request.pair);
         return _addLiquidityMeasured(request);
     }
 
