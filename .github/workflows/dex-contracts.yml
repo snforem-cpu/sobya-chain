@@ -27,6 +27,15 @@ jobs:
       - name: Compile contracts and deployment script
         working-directory: contracts
         run: forge build
+      - name: Verify deployment approval gate is locked
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const script = fs.readFileSync('contracts/script/DeploySobyaDex.s.sol', 'utf8');
+          if (!script.includes('DEPLOYMENT_APPROVED = false')) throw new Error('Mainnet deployment approval gate must remain false before independent audit');
+          if (!script.includes('SOBYA DEX: AUDIT_GATE_LOCKED')) throw new Error('Deployment script must enforce the audit gate');
+          console.log('Mainnet deployment script is locked pending independent audit and live-chain integration.');
+          NODE
       - name: Export and validate mobile deployment artifacts
         run: node contracts/script/export-dex-artifacts.mjs
         env:
