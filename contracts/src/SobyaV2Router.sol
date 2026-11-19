@@ -49,7 +49,9 @@ contract SobyaV2Router {
 
     constructor(address factory_, address wrappedSoby_) {
         require(factory_ != address(0) && factory_.code.length > 0, "SOBYA: INVALID_FACTORY");
-        require(wrappedSoby_ != address(0) && wrappedSoby_.code.length > 0, "SOBYA: INVALID_WRAPPED_SOBY");
+        // Token-only router paths do not need WSOBY to be deployed; native-SOBY paths
+        // will naturally revert if the configured wrapped token has no implementation.
+        require(wrappedSoby_ != address(0), "SOBYA: INVALID_WRAPPED_SOBY");
         factory = factory_;
         wrappedSoby = wrappedSoby_;
     }
