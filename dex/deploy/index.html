@@ -16,6 +16,8 @@
 <h1>Mobile DEX deployment</h1>
 <p class="muted">This page sends deployment transactions directly from your MetaMask wallet. No private key is collected or transmitted. Each contract deployment requires a separate wallet approval.</p>
 <section class="panel">
+<strong class="danger">Deployment is locked pending independent review</strong>
+<p class="muted danger">The deploy button is intentionally disabled. Automated tests are not an independent security audit, and no live SOBYA EVM integration test has been completed. Do not bypass this lock or deploy funds until both reviews are complete.</p>
 <strong class="warn">Mainnet risk notice</strong>
 <p class="muted">Deploying these contracts costs real SOBY and cannot be undone. The contracts have passed the repository's automated tests, but they have not received an independent security audit. Do not deploy or fund pools with assets you cannot afford to lose. This tool does not constitute an audit.</p>
 <p class="muted">Never enter or share your Secret Recovery Phrase or private key on this page.</p>
@@ -32,7 +34,7 @@
 <strong>Deployment order</strong>
 <ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Oracle — time-weighted pool price reference (TWAP)</li><li>SobyaV2Router — trading and liquidity router</li></ol>
 <p class="muted">The Oracle and Router constructors are encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
-<button class="btn" id="deploy" disabled>Deploy contracts (4 wallet approvals)</button>
+<button class="btn" id="deploy" disabled>Deployment locked — audit required</button>
 <div class="status" id="status" aria-live="polite">Connect MetaMask to begin preflight checks.</div>
 </section>
 <section class="panel hidden" id="results">
@@ -47,6 +49,7 @@ const CHAIN_ID=357812033857;
 const CHAIN_ID_HEX="0x534f425941";
 const RPC="https://sobya-evm-rpc.nodesafe-app.xyz";
 const $=id=>document.getElementById(id);
+const DEPLOYMENT_LOCKED = true; // Unlock only after independent audit and SOBYA EVM integration sign-off.
 let provider,signer,account,bundle,buildReady=false,ready=false,busy=false,evmClient=null,connectError=null,preflightStage="initialization";
 const say=m=>$("status").textContent=m;
 const connectSay=m=>$("connectStatus").textContent=m;
@@ -136,9 +139,9 @@ async function connect(){
    return;
   }
   ready=true;
-  $("deploy").disabled=false;
+  $("deploy").disabled=DEPLOYMENT_LOCKED;
   connectSay("Connected: "+account+" · SOBYA Mainnet");
-  say("Wallet and public RPC verified. Deployment remains subject to the contract review and explicit wallet approvals.");
+  say(DEPLOYMENT_LOCKED ? "Wallet and public RPC verified. Deployment is locked until independent audit and live SOBYA EVM integration sign-off are recorded." : "Wallet and public RPC verified. Deployment remains subject to explicit wallet approvals.");
   $("estimate").textContent="Will estimate each deployment immediately before sending.";
  }catch(e){
   ready=false;$("deploy").disabled=true;
@@ -184,6 +187,7 @@ function showResult(name,result){
  row.append(label,address,tx);$("addresses").append(row);$("results").classList.remove("hidden");
 }
 async function runDeploy(){
+ if(DEPLOYMENT_LOCKED){say("Deployment blocked: independent smart-contract audit and live SOBYA EVM integration are not complete. No transaction was sent.");return;}
  if(!ready||busy)return;
  if(!confirm("This will deploy four permanent contracts on SOBYA Mainnet and spend real SOBY on gas. The contracts have not been independently audited. Continue?"))return;
  busy=true;$("deploy").disabled=true;
@@ -195,7 +199,7 @@ async function runDeploy(){
   say("All four deployments have confirmed and code is present. Save every address and transaction hash shown below. The oracle reports a pool TWAP only; it is not a global USD price feed. Trading remains disabled until independent verification and configuration update.");
   $("estimate").textContent="Deployment receipts confirmed; verify all four on the explorer.";
  }catch(e){say("Deployment stopped: "+short(e)+". Any earlier confirmed deployments remain on-chain; do not repeat them. Save the results already shown and request verification.");}
- finally{busy=false;$("deploy").disabled=!ready}
+ finally{busy=false;$("deploy").disabled=!ready||DEPLOYMENT_LOCKED}
 }
 $("connect").addEventListener("click",connect);
 (async function initWalletConnector(){
