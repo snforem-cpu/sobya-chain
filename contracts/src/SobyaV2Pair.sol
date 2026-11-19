@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface ISobyaV2Factory {
-    function getFeeTo() external view returns (address);
-}
-
 interface ISobyaV2ERC20 {
     function totalSupply() external view returns (uint256);
     function balanceOf(address) external view returns (uint256);
@@ -25,6 +21,8 @@ contract SobyaV2Pair {
     uint112 private reserve0;
     uint112 private reserve1;
     uint32 private blockTimestampLast;
+    uint256 public price0CumulativeLast;
+    uint256 public price1CumulativeLast;
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -55,6 +53,27 @@ contract SobyaV2Pair {
 
     function getReserves() external view returns (uint112, uint112, uint32) {
         return (reserve0, reserve1, blockTimestampLast);
+    }
+
+    /// @notice Returns cumulative prices including the current, not-yet-synced block interval.
+    /// @dev Timestamps intentionally wrap at uint32, matching the Uniswap V2 oracle model.
+    function currentCumulativePrices() external view returns (
+        uint256 price0Cumulative,
+        uint256 price1Cumulative,
+        uint32 timestamp
+    ) {
+        timestamp = uint32(block.timestamp);
+        price0Cumulative = price0CumulativeLast;
+        price1Cumulative = price1CumulativeLast;
+
+        uint32 timeElapsed;
+        unchecked { timeElapsed = timestamp - blockTimestampLast; }
+        if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
+            unchecked {
+                price0Cumulative += ((uint256(reserve1) << 112) / reserve0) * timeElapsed;
+                price1Cumulative += ((uint256(reserve0) << 112) / reserve1) * timeElapsed;
+            }
+        }
     }
 
     function approve(address spender, uint256 value) external returns (bool) {
@@ -106,9 +125,22 @@ contract SobyaV2Pair {
 
     function _update(uint256 balance0, uint256 balance1) private {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "SOBYA: RESERVE_OVERFLOW");
+
+        uint32 timestamp = uint32(block.timestamp);
+        uint32 timeElapsed;
+        unchecked { timeElapsed = timestamp - blockTimestampLast; }
+
+        // Accumulate the previous block's reserve price before changing reserves.
+        if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
+            unchecked {
+                price0CumulativeLast += ((uint256(reserve1) << 112) / reserve0) * timeElapsed;
+                price1CumulativeLast += ((uint256(reserve0) << 112) / reserve1) * timeElapsed;
+            }
+        }
+
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
-        blockTimestampLast = uint32(block.timestamp);
+        blockTimestampLast = timestamp;
         emit Sync(reserve0, reserve1);
     }
 
@@ -166,6 +198,17 @@ contract SobyaV2Pair {
         require(adjusted0 * adjusted1 >= uint256(r0) * uint256(r1) * FEE_DENOMINATOR**2, "SOBYA: K");
         _update(b0, b1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
+    }
+
+    /// @notice Transfers token balances above recorded reserves without changing reserves.
+    /// @dev Reverts if a token balance is below its reserve (e.g. unsupported rebasing behavior).
+    function skim(address to) external lock {
+        require(to != address(0) && to != address(this), "SOBYA: INVALID_TO");
+        uint256 balance0 = ISobyaV2ERC20(token0).balanceOf(address(this));
+        uint256 balance1 = ISobyaV2ERC20(token1).balanceOf(address(this));
+        require(balance0 >= reserve0 && balance1 >= reserve1, "SOBYA: BALANCE_BELOW_RESERVE");
+        _safeTransfer(token0, to, balance0 - reserve0);
+        _safeTransfer(token1, to, balance1 - reserve1);
     }
 
     function sync() external lock {

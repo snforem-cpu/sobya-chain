@@ -1,11 +1,12 @@
 {
   "chainId": 357812033857,
   "chainName": "SOBYA Mainnet",
-  "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
+  "rpcUrl": "https://sobya-evm-rpc.nodesafe-dapp.xyz",
   "explorerUrl": "https://explorer.nodesafe-app.xyz/sobya",
   "factory": "",
   "router": "",
   "wrappedSoby": "",
+  "oracle": "",
   "deploymentStatus": "pending",
-  "notice": "Addresses must be filled only from verified SOBYA mainnet deployment receipts. Never substitute mock or testnet addresses."
+  "notice": "Addresses must be filled only from verified SOBYA mainnet deployment receipts. Never substitute mock or testnet addresses. The TWAP oracle is a pool-specific reference, not a global USD price feed."
 }

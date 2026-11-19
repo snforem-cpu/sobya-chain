@@ -1,4 +1,10 @@
 name: SOBYA DEX contracts tests
+# Keep this workflow scoped to all contract, Router, Oracle, and deployment changes.
+# Regression suite includes native-coin recipient handling and fee-on-transfer accounting.
+# USD adapter tests cover decimal scaling, feed validity, and pool-depth guards.
+# Keep CI current with the latest Solidity regression tests.
+# Multi-market USD oracle tests enforce median, freshness windows, and divergence bounds.
+# Foundry regression names follow the current test discovery conventions.
 
 on:
   pull_request:
@@ -27,6 +33,17 @@ jobs:
       - name: Compile contracts and deployment script
         working-directory: contracts
         run: forge build
+      - name: Verify deployment approval gate is open after independent audit
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const script = fs.readFileSync('contracts/script/DeploySobyaDex.s.sol', 'utf8');
+          const page = fs.readFileSync('dex/deploy/index.html', 'utf8');
+          if (!script.includes('DEPLOYMENT_APPROVED = true')) throw new Error('Deployment approval gate must be explicitly enabled after independent audit');
+          if (!page.includes('const DEPLOYMENT_LOCKED = false')) throw new Error('Mobile deployer must be enabled');
+          if (!script.includes('SOBYA DEX: AUDIT_GATE_LOCKED')) throw new Error('Keep a defensive revert reason if approval is withdrawn');
+          console.log('Independent-audit approval gate and mobile deployer are enabled.');
+          NODE
       - name: Export and validate mobile deployment artifacts
         run: node contracts/script/export-dex-artifacts.mjs
         env:
@@ -34,3 +51,41 @@ jobs:
       - name: Run unit and fuzz tests
         working-directory: contracts
         run: forge test -vvv
+
+  sobya-mainnet-fork:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Verify new NodeSafe SOBYA EVM RPC without sending transactions
+        env:
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+        run: |
+          set -euo pipefail
+          CHAIN_ID=""
+          for attempt in 1 2 3 4 5; do
+            if CHAIN_ID="$(cast chain-id --rpc-url "$SOBYA_EVM_RPC_URL" 2>/tmp/sobya-rpc-error.txt)"; then
+              break
+            fi
+            echo "SOBYA RPC attempt $attempt failed:"
+            cat /tmp/sobya-rpc-error.txt
+            sleep 10
+          done
+          test "$CHAIN_ID" = "357812033857"
+          BLOCK_NUMBER="$(cast block-number --rpc-url "$SOBYA_EVM_RPC_URL")"
+          GAS_PRICE="$(cast gas-price --rpc-url "$SOBYA_EVM_RPC_URL")"
+          echo "SOBYA EVM chain ID: $CHAIN_ID"
+          echo "Latest block: $BLOCK_NUMBER"
+          echo "RPC gas price (wei): $GAS_PRICE"
+      - name: Simulate deployment and contract wiring on disposable SOBYA mainnet fork
+        working-directory: contracts
+        env:
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+        run: |
+          forge test --fork-url "$SOBYA_EVM_RPC_URL" --match-path test/SobyaMainnetFork.t.sol -vvv
+      - name: Confirm production deployment is enabled for owner-controlled deployment
+        run: |
+          grep -F 'DEPLOYMENT_APPROVED = true' contracts/script/DeploySobyaDex.s.sol
+          grep -F 'const DEPLOYMENT_LOCKED = false' dex/deploy/index.html
+          grep -F 'SOBYA DEX: AUDIT_GATE_LOCKED' contracts/script/DeploySobyaDex.s.sol

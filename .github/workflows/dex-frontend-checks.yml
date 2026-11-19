@@ -25,15 +25,19 @@ jobs:
           const fs = require('node:fs');
           const config = JSON.parse(fs.readFileSync('dex/config.json', 'utf8'));
           const html = fs.readFileSync('dex/index.html', 'utf8');
+          const deploy = fs.readFileSync('dex/deploy/index.html', 'utf8');
           if (config.chainId !== 357812033857) throw new Error('Unexpected EVM chain ID');
           if (config.chainName !== 'SOBYA Mainnet') throw new Error('Unexpected network name');
           if (config.deploymentStatus !== 'pending') throw new Error('Do not mark deployment ready without verified receipts');
-          for (const key of ['factory', 'router', 'wrappedSoby']) {
+          for (const key of ['factory', 'router', 'wrappedSoby', 'oracle']) {
             if (config[key] !== '') throw new Error(`Unexpected unreviewed address in ${key}`);
           }
           if (!html.includes("config.deploymentStatus==='ready'") || !html.includes('valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby)')) {
             throw new Error('Wallet transaction controls are not deployment-gated');
           }
           if (!html.includes('CHAIN_ID=357812033857n')) throw new Error('Wallet chain guard missing');
-          console.log('DEX configuration is deployment-pending and transaction-gated.');
+          if (!deploy.includes('const DEPLOYMENT_LOCKED = true')) throw new Error('Mobile deployer must stay locked pending independent audit');
+          if (!deploy.includes('if(DEPLOYMENT_LOCKED){')) throw new Error('Mobile deploy handler does not enforce the deployment lock');
+          if (!deploy.includes('Deployment locked — audit required')) throw new Error('Mobile deploy button does not communicate the safety lock');
+          console.log('DEX config and mobile deployment are safely locked pending audit and live integration.');
           NODE
