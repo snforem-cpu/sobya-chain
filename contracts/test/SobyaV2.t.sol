@@ -39,6 +39,8 @@ contract SobyaMockERC20 {
 }
 
 contract SobyaV2Test {
+    receive() external payable {}
+
     VmDex private constant vm = VmDex(address(uint160(uint256(keccak256("hevm cheat code")))));
     SobyaV2Factory private factory;
     SobyaV2Router private router;
