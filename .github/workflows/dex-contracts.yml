@@ -55,7 +55,15 @@ jobs:
           SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-app.xyz
         run: |
           set -euo pipefail
-          CHAIN_ID="$(cast chain-id --rpc-url "$SOBYA_EVM_RPC_URL")"
+          CHAIN_ID=""
+          for attempt in 1 2 3 4 5; do
+            if CHAIN_ID="$(cast chain-id --rpc-url "$SOBYA_EVM_RPC_URL" 2>/tmp/sobya-rpc-error.txt)"; then
+              break
+            fi
+            echo "SOBYA RPC attempt $attempt failed:"
+            cat /tmp/sobya-rpc-error.txt
+            sleep 10
+          done
           test "$CHAIN_ID" = "357812033857"
           BLOCK_NUMBER="$(cast block-number --rpc-url "$SOBYA_EVM_RPC_URL")"
           GAS_PRICE="$(cast gas-price --rpc-url "$SOBYA_EVM_RPC_URL")"
