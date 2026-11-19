@@ -58,7 +58,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
       - name: Verify new NodeSafe SOBYA EVM RPC without sending transactions
         env:
-          SOBYA_EVM_RPC_URL: https://sobya-rpc.nodesafe-dapp.xyz
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
         run: |
           set -euo pipefail
           CHAIN_ID=""
@@ -79,7 +79,7 @@ jobs:
       - name: Simulate deployment and contract wiring on disposable SOBYA mainnet fork
         working-directory: contracts
         env:
-          SOBYA_EVM_RPC_URL: https://sobya-rpc.nodesafe-dapp.xyz
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
         run: |
           forge test --fork-url "$SOBYA_EVM_RPC_URL" --match-path test/SobyaMainnetFork.t.sol -vvv
       - name: Confirm production deployment remains locked
