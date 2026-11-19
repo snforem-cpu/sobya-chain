@@ -41,8 +41,12 @@ Read the [validator onboarding guide](docs/validator-support/ONBOARDING.md) befo
 - Chain ID in the operator launch materials: sobya-1.
 - NodeSafe reported acceptance of the single-validator launch Genesis with SHA-256 35207c189ee5548cb376cb4d5d9dbe4aa0509b3daf85b057e8e59db1c4b0314a, scheduled for 2026-11-10T16:00:00Z. This is an operator-reported launch artifact, not independent proof of current block production.
 - NodeSafe previously supplied P2P endpoint 188.68.36.11:36656. Its current reachability and the current peer set must be checked before distributing connection instructions.
-- No public RPC endpoint is currently published in this repository. NodeSafe's reported RPC address was loopback-only and is not usable by external applicants.
-- Until an independently reachable read-only RPC endpoint and a recent block-height/chain-ID check are published, this repository does not claim that continuous public consensus has been independently verified. Do not send applicants transaction commands, self-delegation amounts, or fee figures based only on old configuration or Genesis files.
+- Public network endpoints currently published by NodeSafe:
+  - EVM JSON-RPC (MetaMask, EVM wallets and EVM applications): `https://sobya-evm-rpc.nodesafe-dapp.xyz` (EVM chain ID `357812033857`).
+  - CometBFT RPC (consensus/node queries): `https://sobya-rpc.nodesafe-dapp.xyz`.
+  - REST API: `https://sobya-api.nodesafe-dapp.xyz`.
+  - Explorer: `https://explorer.nodesafe-app.xyz/sobya`.
+- These endpoints serve different protocols. Do not enter the CometBFT RPC or REST URL as the EVM RPC in MetaMask. Endpoint availability and continuous block production should still be checked independently before issuing validator operating instructions.
 - The earlier two-validator Genesis draft is not the final launch artifact identified above. Do not use its validator list or hash for joining instructions.
 - The EVM chain ID 777777 is development/CI only and must not be reused for a public network.
 - GitHub Actions runners are temporary CI machines, not validator hosting.
