@@ -244,7 +244,7 @@ async function restoreSavedDeployments(){
   }catch(e){console.warn("Could not verify saved deployment "+name,e)}
  }
 }
-async function deploymentErrorDetail(e){
+function deploymentErrorDetail(e){
  const parts=[];
  if(e&&e.code!==undefined)parts.push("code="+String(e.code));
  if(e&&e.shortMessage)parts.push("shortMessage="+String(e.shortMessage));
