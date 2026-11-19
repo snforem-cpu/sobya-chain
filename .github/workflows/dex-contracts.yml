@@ -4,6 +4,7 @@ name: SOBYA DEX contracts tests
 # USD adapter tests cover decimal scaling, feed validity, and pool-depth guards.
 # Keep CI current with the latest Solidity regression tests.
 # Multi-market USD oracle tests enforce median, freshness windows, and divergence bounds.
+# Foundry regression names follow the current test discovery conventions.
 
 on:
   pull_request:
