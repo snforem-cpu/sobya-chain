@@ -408,7 +408,7 @@ async function verifyMainnetDeployments(){
   const verified={};
   for(const item of MAINNET_DEPLOYMENTS){
    out.textContent="Checking receipt and bytecode: "+item.name+"…";
-   const [receipt,tx]=await Promise.all([provider.getTransactionReceipt(item.hash),provider.getTransaction(item.hash)]);
+   const receipt=await provider.getTransactionReceipt(item.hash);
    const receiptOk=!!receipt&&receipt.status===1&&!!receipt.contractAddress&&receipt.contractAddress.toLowerCase()===item.address.toLowerCase();
    record(item.name+" deployment receipt",receiptOk?("status=1; contractAddress matches "+item.address):("Receipt missing/failed or contractAddress mismatch; returned "+(receipt&&receipt.contractAddress||"none")),receiptOk);
    const senderOk=!!receipt&&!!receipt.from&&receipt.from.toLowerCase()===account.toLowerCase();
