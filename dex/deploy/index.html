@@ -214,6 +214,10 @@ function persistPendingDeployment(name,tx){
  const record={hash:tx.hash,from:account,nonce:tx.nonce,submittedAt:Date.now(),status:"pending"};
  store.pending[name]=record;writeDeploymentStore(store);pendingDeployments[name]=record;
 }
+function clearPendingDeployment(name){
+ const store=readDeploymentStore();if(store.pending)delete store.pending[name];
+ writeDeploymentStore(store);delete pendingDeployments[name];
+}
 function persistDeployment(name,result){
  savedDeployments[name]=result;
  const store=readDeploymentStore();store[name]={address:result.address,hash:result.hash,gasUsed:result.gasUsed,codeVerified:!!result.codeVerified};
@@ -264,14 +268,16 @@ async function deployOne(name,args=[]){
  if(!tx||!tx.hash)throw Error("Wallet did not return a deployment transaction hash.");
  // Persist the hash synchronously before waiting for a receipt or making any
  // further RPC call. If storage fails, stop here; do not wait or send another tx.
- persistPendingDeployment(name,tx);
+ try{persistPendingDeployment(name,tx)}catch(storageError){
+  throw Error(name+" was sent and its transaction hash is "+tx.hash+", but browser storage failed. Copy this hash and use Recover Existing Transaction; do not send again. "+short(storageError));
+ }
  say(name+" submitted. Transaction hash saved before confirmation: "+tx.hash+". Waiting for receipt; do not submit again.");
  let receipt;
  try{receipt=await tx.wait()}catch(waitError){
   throw Error(name+" was submitted (hash saved: "+tx.hash+"), but receipt confirmation could not be read. Use Recover Existing Transaction; do not deploy again. RPC detail: "+short(waitError));
  }
  if(!receipt)throw Error(name+" transaction hash "+tx.hash+" is saved, but no receipt is available yet. Recover this transaction; do not deploy again.");
- if(receipt.status!==1)throw Error(name+" transaction "+tx.hash+" was mined but failed (receipt status 0). Verify the receipt before retrying.");
+ if(receipt.status!==1){clearPendingDeployment(name);throw Error(name+" transaction "+tx.hash+" was mined and failed (receipt status 0). The failed attempt is recorded; a new attempt may be considered only after verifying this receipt.");}
  if(!receipt.contractAddress)throw Error(name+" transaction "+tx.hash+" succeeded but RPC omitted contractAddress. The hash is saved; recover the receipt before retrying.");
  const result={address:receipt.contractAddress,hash:tx.hash,gasUsed:receipt.gasUsed.toString(),codeVerified:false};
  // Save the confirmed contract address immediately, before getCode (which may fail).
@@ -310,7 +316,7 @@ async function recoverExistingTransaction(){
   }
   const receipt=await provider.getTransactionReceipt(hash);
   if(!receipt){out.textContent="Transaction not yet mined (or this RPC cannot find it). Hash retained. Do not deploy this contract again; check again later.";return}
-  if(receipt.status!==1){out.textContent="Transaction was mined but failed (receipt status 0). No contract was created by this transaction. Verify the hash and receipt before retrying.";return}
+  if(receipt.status!==1){clearPendingDeployment(name);out.textContent="Transaction was mined but failed (receipt status 0). No contract was created by this transaction. The failed pending lock was cleared; retry only after reviewing the failed receipt.";return}
   if(!receipt.contractAddress){out.textContent="Receipt reports success but does not include a contract address. Keep the hash and request RPC/indexer verification; do not redeploy.";return}
   if(!receipt.from||receipt.from.toLowerCase()!==account.toLowerCase())throw Error("Receipt sender does not match the connected deployer wallet.");
   const result={address:receipt.contractAddress,hash,gasUsed:receipt.gasUsed.toString(),codeVerified:false};
