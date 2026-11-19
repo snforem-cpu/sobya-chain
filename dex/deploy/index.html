@@ -108,10 +108,13 @@ async function connect(){
    say("Wallet is connected. The deployment library did not load, so deployment remains disabled.");
    return;
   }
-  const rpcResponse=await fetch(RPC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_chainId",params:[]})});
-  if(!rpcResponse.ok) throw Error("SOBYA public RPC is unreachable.");
-  const rpcData=await rpcResponse.json();
-  if(!rpcData.result || parseInt(rpcData.result,16)!==CHAIN_ID) throw Error("Configured SOBYA RPC returned an unexpected chain ID.");
+  // Verify the configured SOBYA RPC through the already-approved MetaMask provider.
+  // This avoids a cross-origin browser fetch to the RPC host, which can be blocked by CORS
+  // even when MetaMask itself can reach the same endpoint.
+  const rpcChainHex=await provider.request({method:"eth_chainId",params:[]});
+  if(parseInt(rpcChainHex,16)!==CHAIN_ID) throw Error("MetaMask provider is connected to an unexpected chain.");
+  const rpcBlock=await provider.request({method:"eth_blockNumber",params:[]});
+  if(typeof rpcBlock!=="string" || !/^0x[0-9a-f]+$/i.test(rpcBlock)) throw Error("SOBYA RPC did not return a valid block height through MetaMask.");
   const walletProvider=provider;
   provider=new ethers.BrowserProvider(walletProvider);
   signer=await provider.getSigner();
