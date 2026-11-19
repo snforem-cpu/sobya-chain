@@ -25,7 +25,7 @@ Enter the private key only into Foundry's local interactive prompt. Choose a str
 export SOBYA_RPC="https://sobya-evm-rpc.nodesafe-app.xyz"
 cast chain-id --rpc-url "$SOBYA_RPC"
 ```
-The result must be exactly `357812033857`. Stop if it differs. Check that `cast wallet address --account sobya-owner` is the intended owner wallet and that it has enough native SOBY for three contract deployments.
+The result must be exactly `357812033857`. Stop if it differs. Check that `cast wallet address --account sobya-owner` is the intended owner wallet and that it has enough native SOBY for four contract deployments.
 
 ## 3. Simulate first
 ```sh
@@ -47,7 +47,7 @@ For each of the four addresses printed by the script:
 - Confirm Factory reports no pairs initially.
 - Confirm Oracle's `factory()` matches the Factory, and Router's `factory()` and `wrappedSoby()` match the Factory and WSOBY addresses.
 
-Only after all three are verified should their exact addresses be entered in `dex/config.json` as `wrappedSoby`, `factory`, `oracle`, and `router`; set `deploymentStatus` to `ready` only in the same reviewed change. Then publish the static frontend.
+Only after all four are verified should their exact addresses be entered in `dex/config.json` as `wrappedSoby`, `factory`, `oracle`, and `router`; set `deploymentStatus` to `ready` only in the same reviewed change. Then publish the static frontend.
 
 ## Important
 This is a new WSOBY deployment and will have its own address; do not reuse a guessed or old address. This guide does not claim the contracts are audited. An independent security review and live-runtime integration check are still recommended before inviting public liquidity. The AMM supports ordinary ERC-20 token pairs only; it does not provide an official USDT token. The TWAP Oracle is a pool-specific time-weighted reference with a 30-minute minimum and 2-hour maximum observation window. It is NOT a global price oracle, USD feed, proof of market-wide value, or safe collateral price by itself. Consumers must enforce liquidity/depth requirements and compare independent external markets. The oracle has no admin or emergency pause; a bad pair market or compromised factory remains a source risk.
