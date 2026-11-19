@@ -244,26 +244,64 @@ async function restoreSavedDeployments(){
   }catch(e){console.warn("Could not verify saved deployment "+name,e)}
  }
 }
+async function deploymentErrorDetail(e){
+ const parts=[];
+ if(e&&e.code!==undefined)parts.push("code="+String(e.code));
+ if(e&&e.shortMessage)parts.push("shortMessage="+String(e.shortMessage));
+ if(e&&e.reason)parts.push("reason="+String(e.reason));
+ if(e&&e.message)parts.push("message="+String(e.message));
+ if(e&&e.info&&e.info.error){const x=e.info.error;if(x.code!==undefined)parts.push("rpcCode="+String(x.code));if(x.message)parts.push("rpcMessage="+String(x.message));if(x.data)parts.push("rpcData="+String(x.data).slice(0,500))}
+ if(e&&e.data)parts.push("data="+String(e.data).slice(0,500));
+ return parts.length?parts.join(" | "):short(e);
+}
 async function deployOne(name,args=[]){
  const c=bundle.contracts[name];
  const factory=new ethers.ContractFactory(c.abi,c.bytecode,signer);
+ say("Preparing "+name+" deployment transaction…");
  const request=await factory.getDeployTransaction(...args);
- const gas=await provider.estimateGas(Object.assign({},request,{from:account}));
- const fee=await resolveFeeOverrides();
- const gasLimit=gas*120n/100n;
- const txOverrides=Object.assign({gasLimit},fee.overrides);
- if(fee.price){
-  const cost=gasLimit*fee.price;
-  const bal=await provider.getBalance(account);
-  if(bal<cost)throw Error("Insufficient SOBY for estimated deployment gas of "+ethers.formatEther(cost)+" SOBY (includes 20% gas-limit margin).");
-  $("estimate").textContent=name+": estimated maximum "+ethers.formatEther(cost)+" SOBY gas ("+fee.source+").";
- }else{
-  $("estimate").textContent=name+": fee fields unavailable from RPC; MetaMask must calculate and display the fee before approval.";
+ let gasLimit=null,gasEstimateError=null;
+ // Gas price/fee and gas limit are separate. A failing RPC estimate must not
+ // be mistaken for a zero gas price or silently replaced with a guessed limit.
+ // If the read-only estimate endpoint fails, omit gasLimit and let MetaMask
+ // perform its own pre-signature estimate. A revert/insufficient-funds error
+ // from MetaMask still prevents the user from approving an invalid transaction.
+ say("Estimating "+name+" gas limit from SOBYA RPC…");
+ try{
+  const gas=await provider.estimateGas(Object.assign({},request,{from:account}));
+  gasLimit=gas*120n/100n;
+ }catch(e){
+  gasEstimateError=e;
+  console.warn(name+" eth_estimateGas failed; delegating estimation to MetaMask:",e);
  }
- say("Review the "+name+" deployment request and the gas fee shown by MetaMask. Approve only if the network, contract and fee are correct.");
- // When the RPC omits fee fields, intentionally leave them unset so MetaMask
- // can populate its own fee estimate instead of aborting before wallet review.
- const contract=Object.keys(txOverrides).length?await factory.deploy(...args,txOverrides):await factory.deploy(...args);
+ const fee=await resolveFeeOverrides();
+ const txOverrides=Object.assign({},fee.overrides);
+ if(gasLimit!==null){
+  txOverrides.gasLimit=gasLimit;
+  if(fee.price){
+   const cost=gasLimit*fee.price;
+   const bal=await provider.getBalance(account);
+   if(bal<cost)throw Error("Insufficient SOBY for estimated deployment gas of "+ethers.formatEther(cost)+" SOBY (includes 20% gas-limit margin).");
+   $("estimate").textContent=name+": estimated maximum "+ethers.formatEther(cost)+" SOBY gas ("+fee.source+").";
+  }else{
+   $("estimate").textContent=name+": gas limit estimated; fee fields unavailable, so MetaMask will calculate the fee.";
+  }
+ }else{
+  $("estimate").textContent=name+": RPC gas estimation unavailable; MetaMask will estimate the gas limit and fee before asking for approval.";
+ }
+ if(gasEstimateError){
+  say("RPC could not estimate "+name+" gas limit ("+deploymentErrorDetail(gasEstimateError)+"). Asking MetaMask to estimate it; no transaction has been sent yet.");
+ }else{
+  say("Gas limit estimated for "+name+". Requesting MetaMask review; approve only if the contract and fee are correct.");
+ }
+ // No guessed gas limit is ever supplied. When RPC estimation fails, MetaMask
+ // receives the deployment request without gasLimit and must estimate it before
+ // presenting the signature prompt. Fee overrides are included only when known.
+ let contract;
+ try{
+  contract=Object.keys(txOverrides).length?await factory.deploy(...args,txOverrides):await factory.deploy(...args);
+ }catch(walletError){
+  throw Error(name+" was not submitted. MetaMask/RPC rejected the deployment before returning a transaction hash: "+deploymentErrorDetail(walletError)+(gasEstimateError?" | prior eth_estimateGas failure: "+deploymentErrorDetail(gasEstimateError):""));
+ }
  const tx=contract.deploymentTransaction();
  if(!tx||!tx.hash)throw Error("Wallet did not return a deployment transaction hash.");
  // Persist the hash synchronously before waiting for a receipt or making any
@@ -274,7 +312,7 @@ async function deployOne(name,args=[]){
  say(name+" submitted. Transaction hash saved before confirmation: "+tx.hash+". Waiting for receipt; do not submit again.");
  let receipt;
  try{receipt=await tx.wait()}catch(waitError){
-  throw Error(name+" was submitted (hash saved: "+tx.hash+"), but receipt confirmation could not be read. Use Recover Existing Transaction; do not deploy again. RPC detail: "+short(waitError));
+  throw Error(name+" was submitted (hash saved: "+tx.hash+"), but receipt confirmation could not be read. Use Recover Existing Transaction; do not deploy again. RPC detail: "+deploymentErrorDetail(waitError));
  }
  if(!receipt)throw Error(name+" transaction hash "+tx.hash+" is saved, but no receipt is available yet. Recover this transaction; do not deploy again.");
  if(receipt.status!==1){clearPendingDeployment(name);throw Error(name+" transaction "+tx.hash+" was mined and failed (receipt status 0). The failed attempt is recorded; a new attempt may be considered only after verifying this receipt.");}
@@ -287,7 +325,7 @@ async function deployOne(name,args=[]){
   if(code==="0x")throw Error("empty bytecode");
   result.codeVerified=true;persistDeployment(name,result);
  }catch(codeError){
-  throw Error(name+" receipt is confirmed and contract address "+receipt.contractAddress+" is saved, but bytecode verification is pending. Do not redeploy. Retry recovery/verification. "+short(codeError));
+  throw Error(name+" receipt is confirmed and contract address "+receipt.contractAddress+" is saved, but bytecode verification is pending. Do not redeploy. Retry recovery/verification. "+deploymentErrorDetail(codeError));
  }
  return result;
 }
