@@ -7,7 +7,7 @@ This guide prepares the owner-controlled process; it does not mean the contracts
 
 ## Requirements
 - Foundry installed locally (`cast` and `forge`).
-- SOBYA EVM RPC: `https://sobya-rpc.nodesafe-dapp.xyz`.
+- SOBYA EVM RPC: `https://sobya-evm-rpc.nodesafe-dapp.xyz`.
 - Expected EVM chain ID: `357812033857`.
 - Owner-controlled wallet with enough native SOBY for four contract creations and a safety margin.
 - A local encrypted Foundry keystore. Never paste a private key or seed phrase into ChatGPT, GitHub, a website, or a repository file.
@@ -33,7 +33,7 @@ Enter the private key only into Foundry's local interactive prompt. Choose a str
 
 ## 3. Confirm network and funding
 ```sh
-export SOBYA_RPC="https://sobya-rpc.nodesafe-dapp.xyz"
+export SOBYA_RPC="https://sobya-evm-rpc.nodesafe-dapp.xyz"
 cast chain-id --rpc-url "$SOBYA_RPC"
 cast block-number --rpc-url "$SOBYA_RPC"
 cast balance <OWNER_ADDRESS> --rpc-url "$SOBYA_RPC"
