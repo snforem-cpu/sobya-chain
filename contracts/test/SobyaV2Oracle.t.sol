@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "../src/SobyaV2Factory.sol";
+import "../src/SobyaV2Pair.sol";
+import "../src/SobyaV2Oracle.sol";
+
+interface VmOracle {
+    function warp(uint256) external;
+}
+
+contract OracleMockToken {
+    mapping(address => uint256) public balanceOf;
+    function mint(address to, uint256 amount) external { balanceOf[to] += amount; }
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "MOCK: BALANCE");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
+contract SobyaV2OracleTest {
+    VmOracle private constant vm = VmOracle(address(uint160(uint256(keccak256("hevm cheat code")))));
+    SobyaV2Factory private factory;
+    SobyaV2Oracle private oracle;
+    OracleMockToken private tokenA;
+    OracleMockToken private tokenB;
+    SobyaV2Pair private pair;
+
+    function setUp() public {
+        vm.warp(1_000_000);
+        factory = new SobyaV2Factory();
+        oracle = new SobyaV2Oracle(address(factory));
+        tokenA = new OracleMockToken();
+        tokenB = new OracleMockToken();
+        address pairAddress = factory.createPair(address(tokenA), address(tokenB));
+        pair = SobyaV2Pair(pairAddress);
+        tokenA.mint(address(this), 1_000 ether);
+        tokenB.mint(address(this), 1_000 ether);
+        tokenA.transfer(pairAddress, 100 ether);
+        tokenB.transfer(pairAddress, 100 ether);
+        pair.mint(address(this));
+    }
+
+    function testRequiresInitialObservationAndMinimumWindow() public {
+        address token0 = pair.token0();
+        (bool uninitialized,) = address(oracle).staticcall(
+            abi.encodeCall(oracle.consultPriceX112, (address(pair), token0))
+        );
+        require(!uninitialized, "UNINITIALIZED_ORACLE_ACCEPTED");
+
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + oracle.MIN_PERIOD() - 1);
+        (bool tooSoon,) = address(oracle).staticcall(
+            abi.encodeCall(oracle.consultPriceX112, (address(pair), token0))
+        );
+        require(!tooSoon, "SHORT_WINDOW_ACCEPTED");
+    }
+
+    function testEqualReservePoolReturnsOneToOneTwap() public {
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + oracle.MIN_PERIOD());
+        address token0 = pair.token0();
+        (uint256 averagePrice, uint32 elapsed) = oracle.consultPriceX112(address(pair), token0);
+        require(elapsed == oracle.MIN_PERIOD(), "WRONG_WINDOW");
+        require(averagePrice == 2 ** 112, "WRONG_ONE_TO_ONE_PRICE");
+        (uint256 amountOut,) = oracle.consult(address(pair), token0, 1 ether);
+        require(amountOut == 1 ether, "WRONG_ONE_TO_ONE_QUOTE");
+    }
+
+    function testTwapAveragesAcrossReserveChangeRatherThanSpot() public {
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + 15 minutes);
+
+        address token0 = pair.token0();
+        address token1 = pair.token1();
+        OracleMockToken input = token0 == address(tokenA) ? tokenA : tokenB;
+        OracleMockToken output = token1 == address(tokenA) ? tokenA : tokenB;
+
+        input.transfer(address(pair), 10 ether);
+        pair.swap(0, 9 ether, address(this));
+
+        vm.warp(block.timestamp + 15 minutes);
+        (uint256 averagePrice,) = oracle.consultPriceX112(address(pair), token0);
+        require(averagePrice < 2 ** 112, "TWAP_IGNORED_PRICE_CHANGE");
+        require(averagePrice > (2 ** 112) / 2, "TWAP_OUT_OF_EXPECTED_RANGE");
+        require(output.balanceOf(address(this)) >= 0, "UNREACHABLE");
+    }
+
+    function testRejectsStaleObservation() public {
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + oracle.MAX_PERIOD() + 1);
+        (bool ok,) = address(oracle).staticcall(
+            abi.encodeCall(oracle.consultPriceX112, (address(pair), pair.token0()))
+        );
+        require(!ok, "STALE_PRICE_ACCEPTED");
+    }
+
+    function testRejectsUnregisteredPair() public {
+        (bool ok,) = address(oracle).staticcall(
+            abi.encodeCall(oracle.update, (address(this)))
+        );
+        require(!ok, "UNREGISTERED_PAIR_ACCEPTED");
+    }
+}
