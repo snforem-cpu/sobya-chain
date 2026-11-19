@@ -1,7 +1,7 @@
 {
   "chainId": 357812033857,
   "chainName": "SOBYA Mainnet",
-  "rpcUrl": "https://sobya-rpc.nodesafe-dapp.xyz",
+  "rpcUrl": "https://sobya-evm-rpc.nodesafe-dapp.xyz",
   "explorerUrl": "https://explorer.nodesafe-app.xyz/sobya",
   "factory": "",
   "router": "",
