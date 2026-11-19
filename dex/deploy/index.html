@@ -7,7 +7,7 @@
 :root{color-scheme:dark;--bg:#061225;--panel:#102541;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--cyan:#66e0e8;--gold:#e8c77b;--red:#ff9d9d}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#173967,transparent 38%),var(--bg);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}.wrap{max-width:720px;margin:auto;padding:20px}.top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:8px 0 18px}.brand{font-weight:900;letter-spacing:.16em;color:inherit;text-decoration:none}.brand small{display:block;font-size:10px;color:var(--muted);letter-spacing:.12em}.tag{font-size:11px;color:var(--cyan);letter-spacing:.15em;font-weight:800;margin-top:24px}.panel{background:linear-gradient(145deg,#102541,#0b1b30);border:1px solid var(--line);border-radius:18px;padding:19px;margin:14px 0}.btn{border:0;background:linear-gradient(110deg,#397fe0,#4aa8d8);color:#061225;padding:13px 16px;border-radius:11px;font-weight:800;width:100%;cursor:pointer}.btn:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#173454;color:white;border:1px solid var(--line)}.muted{color:var(--muted);font-size:13px}.warn{color:var(--gold)}.danger{color:var(--red)}.status{padding:12px;border-radius:10px;background:#07182b;border:1px solid var(--line);margin:12px 0;overflow-wrap:anywhere}.item{padding:12px 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}.label{font-size:12px;color:var(--muted)}.value{overflow-wrap:anywhere;font-family:ui-monospace,monospace;font-size:12px}.hidden{display:none}h1{font-size:30px;line-height:1.15;margin:10px 0}a{color:var(--cyan)}ol{padding-left:22px}.foot{text-align:center;color:var(--muted);font-size:12px;margin:25px 0}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
 </head>
 <body><main class="wrap">
 <header class="top"><a class="brand" href="../">SOBYA<small>SECURE DEPLOYMENT</small></a><button class="btn secondary" style="width:auto" id="connect" onclick="document.getElementById('status').textContent='Button is responding; checking MetaMask connection…'">Connect MetaMask</button></header>
@@ -42,12 +42,12 @@
 <p class="foot"><a href="../">Back to SOBYA DEX</a> · <a href="../../">Official website</a></p>
 </main>
 <script>
-const CHAIN_ID=357812033857n;
+const CHAIN_ID=357812033857;
 const RPC="https://sobya-evm-rpc.nodesafe-app.xyz";
 const $=id=>document.getElementById(id);
 let provider,signer,account,bundle,buildReady=false,ready=false,busy=false;
 const say=m=>$("status").textContent=m;
-const short=e=>e?.shortMessage||e?.reason||e?.message||String(e);
+const short=e=>(e&&e.shortMessage)||(e&&e.reason)||(e&&e.message)||String(e);
 async function sha256(value){const bytes=new TextEncoder().encode(value.toLowerCase());const hash=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 async function loadBuild(){
   const response=await fetch("./artifacts.json",{cache:"no-store"});
@@ -55,7 +55,7 @@ async function loadBuild(){
   bundle=await response.json();
   if(bundle.schemaVersion!==1||bundle.chainId!==Number(CHAIN_ID)||!/^([0-9a-f]{40})$/i.test(bundle.sourceCommit||""))throw Error("Build manifest or target chain is invalid.");
   for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Router"]){
-    const c=bundle.contracts?.[name];
+    const c=bundle.contracts && bundle.contracts[name];
     if(!c||!Array.isArray(c.abi)||!/^0x[0-9a-f]+$/i.test(c.bytecode||"")||!/^0x[0-9a-f]+$/i.test(c.deployedBytecode||""))throw Error("Missing or malformed "+name+" artifact.");
     if(await sha256(c.bytecode)!==c.bytecodeSha256||await sha256(c.deployedBytecode)!==c.deployedBytecodeSha256)throw Error(name+" artifact checksum mismatch.");
   }
@@ -72,7 +72,7 @@ async function connect(){
   const network=await provider.getNetwork();
   $("wallet").textContent=account;
   $("network").textContent=network.name+" · "+network.chainId.toString();
-  if(network.chainId!==CHAIN_ID){ready=false;$("deploy").disabled=true;say("Wrong network. Switch MetaMask manually to SOBYA Mainnet (357812033857), then reconnect.");return}
+  if(Number(network.chainId)!==CHAIN_ID){ready=false;$("deploy").disabled=true;say("Wrong network. Switch MetaMask manually to SOBYA Mainnet (357812033857), then reconnect.");return}
   const balance=await provider.getBalance(account);
   $("balance").textContent=ethers.formatEther(balance)+" SOBY";
   const rpcProvider=new ethers.JsonRpcProvider(RPC);
@@ -87,9 +87,9 @@ async function deployOne(name,args=[]){
  const c=bundle.contracts[name];
  const factory=new ethers.ContractFactory(c.abi,c.bytecode,signer);
  const request=await factory.getDeployTransaction(...args);
- const gas=await provider.estimateGas({...request,from:account});
+ const gas=await provider.estimateGas(Object.assign({},request,{from:account}));
  const fee=await provider.getFeeData();
- const price=fee.maxFeePerGas??fee.gasPrice;
+ const price=fee.maxFeePerGas||fee.gasPrice;
  if(!price)throw Error("Could not estimate SOBYA gas price.");
  const cost=gas*price;
  const bal=await provider.getBalance(account);
@@ -129,5 +129,5 @@ async function runDeploy(){
 $("connect").addEventListener("click",connect);
 $("deploy").onclick=runDeploy;
 (async()=>{try{await loadBuild()}catch(e){$("build").textContent=short(e);say("Build artifacts are not ready. Do not use a third-party deployer or paste private keys.")}})();
-if(window.ethereum){window.ethereum.on("chainChanged",()=>location.reload());window.ethereum.on("accountsChanged",()=>location.reload())}
+if(window.ethereum && typeof window.ethereum.on==="function"){window.ethereum.on("chainChanged",()=>location.reload());window.ethereum.on("accountsChanged",()=>location.reload())}
 </script></body></html>
