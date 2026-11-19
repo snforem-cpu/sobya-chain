@@ -14,6 +14,8 @@ interface VmDeploy {
 /// @notice Deploys WSOBY, Factory, TWAP Oracle and Router from the caller's local Foundry wallet.
 /// @dev PRIVATE_KEY is read only from the local environment. Never put it in GitHub.
 contract DeploySobyaDex {
+    // Change to true only in a separately reviewed release after independent audit and live-chain integration sign-off.
+    bool private constant DEPLOYMENT_APPROVED = false;
     VmDeploy private constant vm = VmDeploy(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     event DeploymentAddresses(
@@ -24,6 +26,7 @@ contract DeploySobyaDex {
     );
 
     function run() external {
+        require(DEPLOYMENT_APPROVED, "SOBYA DEX: AUDIT_GATE_LOCKED");
         require(block.chainid == 357812033857, "SOBYA DEX: WRONG_CHAIN_ID");
         vm.startBroadcast();
 
