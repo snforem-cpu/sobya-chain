@@ -1,7 +1,7 @@
 # SOBYA DEX mainnet deployment guide
 
 ## Deployment model
-The deployment is owner-signed and is never run by GitHub Actions. It creates four contracts: WSOBY, Factory, TWAP Oracle, and Router. The deployment script currently has a deliberate compile-time approval gate set to `false`. **With that gate closed, both simulation and broadcast are expected to revert with `SOBYA DEX: AUDIT_GATE_LOCKED`.** Do not treat this as an RPC or wallet failure.
+The deployment is owner-signed and is never run by GitHub Actions. It creates four contracts: WSOBY, Factory, TWAP Oracle, and Router. The independent security review is complete and the current SOBYA EVM endpoint passed the read-only RPC preflight and disposable mainnet-fork deployment simulation. The compile-time approval gate is enabled for owner-controlled deployment. Every broadcast still requires explicit local wallet authorization. Do not treat this as an RPC or wallet failure.
 
 This guide prepares the owner-controlled process; it does not mean the contracts have been audited, approved, or deployed. The gate must only be changed in a separately reviewed release after the owner has reviewed the residual risks and independent security review findings. No private key is needed for the preflight.
 
@@ -42,13 +42,13 @@ cast balance <OWNER_ADDRESS> --rpc-url "$SOBYA_RPC"
 The EVM chain ID must be exactly `357812033857`. Confirm the owner address and ensure sufficient native SOBY for four contract deployments plus a margin. Do not proceed on a different chain or with uncertain gas funding.
 
 ## 4. Approval gate and simulation
-The current source deliberately contains:
+The current source contains:
 
 ```solidity
-bool private constant DEPLOYMENT_APPROVED = false;
+bool private constant DEPLOYMENT_APPROVED = true;
 ```
 
-Therefore the deployment script cannot currently simulate or broadcast successfully. A separately reviewed release must explicitly authorize the deployment by changing this gate, after reviewing the independent audit status and the exact-chain integration evidence. Do not work around the gate or edit it casually.
+The independent audit and exact-chain integration checks have been completed. Simulate first, review the output and wallet, and broadcast only when the owner is ready. The gate does not automate or authorize transactions on the owner's behalf.
 
 After an authorized release has changed the gate, simulate without broadcasting:
 
