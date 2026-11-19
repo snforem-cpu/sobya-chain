@@ -30,7 +30,10 @@ contract SobyaV2Oracle {
         bool initialized;
     }
 
+    // Latest checkpoint and the preceding checkpoint are retained so a public update cannot
+    // continually reset the only usable TWAP window and deny consumers a valid quote.
     mapping(address => Observation) public observations;
+    mapping(address => Observation) public previousObservations;
 
     event ObservationInitialized(address indexed pair, uint32 timestamp);
     event ObservationUpdated(address indexed pair, uint32 timestamp, uint32 elapsed);
@@ -41,7 +44,7 @@ contract SobyaV2Oracle {
     }
 
     /// @notice Starts or rolls the observation window. Anyone may call this.
-    /// @dev A new observation can only replace the old one after MIN_PERIOD.
+    /// @dev Checkpoints are separated by at least MIN_PERIOD; the prior checkpoint is retained.
     function update(address pair) external {
         _validatePair(pair);
         (uint112 reserve0, uint112 reserve1,) = ISobyaOraclePair(pair).getReserves();
@@ -50,23 +53,24 @@ contract SobyaV2Oracle {
         (uint256 cumulative0, uint256 cumulative1, uint32 timestamp) =
             ISobyaOraclePair(pair).currentCumulativePrices();
 
-        Observation storage observation = observations[pair];
-        if (!observation.initialized) {
-            observation.price0Cumulative = cumulative0;
-            observation.price1Cumulative = cumulative1;
-            observation.timestamp = timestamp;
-            observation.initialized = true;
+        Observation storage latest = observations[pair];
+        if (!latest.initialized) {
+            latest.price0Cumulative = cumulative0;
+            latest.price1Cumulative = cumulative1;
+            latest.timestamp = timestamp;
+            latest.initialized = true;
             emit ObservationInitialized(pair, timestamp);
             return;
         }
 
         uint32 elapsed;
-        unchecked { elapsed = timestamp - observation.timestamp; }
+        unchecked { elapsed = timestamp - latest.timestamp; }
         require(elapsed >= MIN_PERIOD, "SOBYA_ORACLE: PERIOD_TOO_SHORT");
 
-        observation.price0Cumulative = cumulative0;
-        observation.price1Cumulative = cumulative1;
-        observation.timestamp = timestamp;
+        previousObservations[pair] = latest;
+        latest.price0Cumulative = cumulative0;
+        latest.price1Cumulative = cumulative1;
+        latest.timestamp = timestamp;
         emit ObservationUpdated(pair, timestamp, elapsed);
     }
 
@@ -79,7 +83,7 @@ contract SobyaV2Oracle {
         require(amountIn > 0, "SOBYA_ORACLE: ZERO_AMOUNT");
         uint256 averagePriceX112;
         (averagePriceX112, elapsed) = consultPriceX112(pair, tokenIn);
-        require(averagePriceX112 == 0 || amountIn <= type(uint256).max / averagePriceX112,
+        require(amountIn <= type(uint256).max / averagePriceX112,
             "SOBYA_ORACLE: AMOUNT_OVERFLOW");
         amountOut = amountIn * averagePriceX112 / Q112;
         require(amountOut > 0, "SOBYA_ORACLE: ZERO_QUOTE");
@@ -98,11 +102,19 @@ contract SobyaV2Oracle {
         (uint112 reserve0, uint112 reserve1,) = ISobyaOraclePair(pair).getReserves();
         require(reserve0 > 0 && reserve1 > 0, "SOBYA_ORACLE: NO_LIQUIDITY");
 
-        Observation memory observation = observations[pair];
-        require(observation.initialized, "SOBYA_ORACLE: NOT_INITIALIZED");
-
         (uint256 cumulative0, uint256 cumulative1, uint32 timestamp) =
             ISobyaOraclePair(pair).currentCumulativePrices();
+
+        Observation memory observation = previousObservations[pair];
+        if (!observation.initialized) observation = observations[pair];
+        else {
+            uint32 previousAge;
+            unchecked { previousAge = timestamp - observation.timestamp; }
+            // If the older checkpoint has expired, use the latest checkpoint instead.
+            if (previousAge > MAX_PERIOD) observation = observations[pair];
+        }
+        require(observation.initialized, "SOBYA_ORACLE: NOT_INITIALIZED");
+
         unchecked { elapsed = timestamp - observation.timestamp; }
         require(elapsed >= MIN_PERIOD, "SOBYA_ORACLE: PERIOD_TOO_SHORT");
         require(elapsed <= MAX_PERIOD, "SOBYA_ORACLE: STALE_OBSERVATION");
