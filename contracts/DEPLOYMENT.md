@@ -1,7 +1,7 @@
 # SOBYA DEX deployment guide
 
 ## Deployment is owner-signed
-This deployment is deliberately not run by GitHub Actions. It uses a local wallet key through Foundry and sends three transactions: WSOBY, Factory, and Router. Never paste a private key or seed phrase into ChatGPT, GitHub, a website, or a repository file.
+This deployment is deliberately not run by GitHub Actions. It uses a local wallet key through Foundry and sends four transactions: WSOBY, Factory, TWAP Oracle, and Router. Never paste a private key or seed phrase into ChatGPT, GitHub, a website, or a repository file.
 
 ## Requirements
 - Foundry installed locally.
@@ -40,14 +40,14 @@ forge script script/DeploySobyaDex.s.sol:DeploySobyaDex --rpc-url "$SOBYA_RPC" -
 Foundry will request the local keystore password when needed. Confirm each wallet transaction only after checking the destination network and estimated gas. Keep transaction records private until you have confirmed each transaction on the SOBYA explorer.
 
 ## 5. Verify the deployments
-For each address printed by the script:
+For each of the four addresses printed by the script:
 - Open the corresponding transaction in the SOBYA explorer.
 - Confirm successful status, sender address, contract-creation receipt and deployed contract address.
 - Confirm WSOBY has name `Wrapped SOBYA`, symbol `WSOBY`, 18 decimals and no premint.
 - Confirm Factory reports no pairs initially.
-- Confirm Router's `factory()` and `wrappedSoby()` match the two addresses from this deployment.
+- Confirm Oracle's `factory()` matches the Factory, and Router's `factory()` and `wrappedSoby()` match the Factory and WSOBY addresses.
 
-Only after all three are verified should their exact addresses be entered in `dex/config.json` as `wrappedSoby`, `factory`, and `router`; set `deploymentStatus` to `ready` only in the same reviewed change. Then publish the static frontend.
+Only after all three are verified should their exact addresses be entered in `dex/config.json` as `wrappedSoby`, `factory`, `oracle`, and `router`; set `deploymentStatus` to `ready` only in the same reviewed change. Then publish the static frontend.
 
 ## Important
-This is a new WSOBY deployment and will have its own address; do not reuse a guessed or old address. This guide does not claim the contracts are audited. An independent security review and live-runtime integration check are still recommended before inviting public liquidity. The contracts currently support ordinary ERC-20 token pairs only; they do not provide an official USDT token.
+This is a new WSOBY deployment and will have its own address; do not reuse a guessed or old address. This guide does not claim the contracts are audited. An independent security review and live-runtime integration check are still recommended before inviting public liquidity. The AMM supports ordinary ERC-20 token pairs only; it does not provide an official USDT token. The TWAP Oracle is a pool-specific time-weighted reference with a 30-minute minimum and 2-hour maximum observation window. It is NOT a global price oracle, USD feed, proof of market-wide value, or safe collateral price by itself. Consumers must enforce liquidity/depth requirements and compare independent external markets. The oracle has no admin or emergency pause; a bad pair market or compromised factory remains a source risk.
