@@ -15,9 +15,12 @@ Run from this directory:
 
 These tests execute in Foundry's local EVM. They do not replace integration tests against the exact SOBYA Cosmos EVM runtime or an independent smart-contract audit. Do not deploy the wrapper or fund a DEX pool based on these tests alone.
 
-
 ## AMM TWAP oracle coverage
 
-The V2 pair now accumulates UQ112x112 reserve prices over elapsed time, and `SobyaV2Oracle` exposes permissionless observations for factory-registered pairs. The oracle enforces a minimum 30-minute observation window and rejects observations older than 2 hours. Tests cover initialization, minimum-window enforcement, equal-reserve quotes, averaging across a reserve-price change, stale observations, and unregistered-pair rejection.
+The V2 pair accumulates UQ112x112 reserve prices over elapsed time. `SobyaV2Oracle` exposes permissionless observations for factory-registered pairs. It enforces a minimum 30-minute averaging window and rejects observations older than 2 hours.
 
-This is only a manipulation-resistant **pool TWAP primitive**. It is not a global market price, a USD feed, or proof that a pool has sufficient liquidity. It must not be used alone for lending collateral, liquidations, minting, or other value-secured actions. Those use cases require independent market sources, liquidity/depth policy, freshness and deviation checks, and fail-closed behavior. No independent smart-contract audit or live SOBYA EVM integration test is claimed.
+The oracle retains the latest and preceding checkpoints. This prevents a caller from repeatedly resetting the sole checkpoint and indefinitely denying consumers a usable observation. Tests cover initialization, minimum-window enforcement, equal-reserve quotes, averaging across a reserve-price change, repeated public updates, both quote directions, uint32 timestamp wrap, stale observations, invalid tokens, and unregistered-pair rejection.
+
+This is only a **pool-specific TWAP primitive**. It is not a global market price, a USD feed, or proof that a pool has sufficient liquidity. It must not be used alone for lending collateral, liquidations, minting, or other value-secured actions. Those use cases require independent market sources, liquidity/depth policy, freshness and deviation checks, and fail-closed behavior.
+
+No independent smart-contract audit or live SOBYA EVM integration test is claimed. Mainnet deployment must remain blocked until those independent checks are completed.
