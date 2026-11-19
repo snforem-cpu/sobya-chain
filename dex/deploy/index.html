@@ -39,6 +39,13 @@
 <div class="status" id="recoverStatus" aria-live="polite">No recovery check has been run.</div>
 </section>
 <section class="panel">
+<section class="panel" id="mainnetVerifyPanel">
+<strong>Read-only SOBYA Mainnet deployment verification</strong>
+<p class="muted">Checks the four recorded deployment receipts, deployed runtime bytecode, and Oracle/Router constructor links using the connected SOBYA wallet provider. This sends no transaction and does not enable trading.</p>
+<button class="btn secondary" id="verifyMainnet" type="button" disabled>Verify four deployed contracts</button>
+<div class="status" id="verifyMainnetStatus" aria-live="polite">Connect MetaMask to SOBYA Mainnet first. This verifier is read-only.</div>
+<div id="verifyMainnetResults"></div>
+</section>
 <strong>Deployment order</strong>
 <ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Oracle — time-weighted pool price reference (TWAP)</li><li>SobyaV2Router — trading and liquidity router</li></ol>
 <p class="muted">The Oracle and Router constructors are encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
@@ -148,6 +155,7 @@ async function connect(){
   }
   await restoreSavedDeployments();
   ready=true;
+  $("verifyMainnet").disabled=false;
   $("deploy").disabled=DEPLOYMENT_LOCKED;
   connectSay("Connected: "+account+" · SOBYA Mainnet");
   say(DEPLOYMENT_LOCKED ? "Deployment is locked." : "Wallet and public RPC verified. Deployment is enabled; review every MetaMask transaction before approving.");
@@ -368,6 +376,83 @@ async function recoverExistingTransaction(){
  }catch(e){out.textContent="Recovery check failed without sending a transaction: "+short(e)+". Keep the hash; do not redeploy until its status is known."}
  finally{busy=false;$("recover").disabled=false;$("deploy").disabled=!ready||DEPLOYMENT_LOCKED}
 }
+
+const MAINNET_DEPLOYMENTS = [
+ {name:"WSOBY",address:"0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c",hash:"0x4e0b7754508f740df1e711fe72ad99c9b2a1b2eaf18f68959a695c304d570e5a"},
+ {name:"SobyaV2Factory",address:"0x35f59c1Bb30e1FA29020294cB02Bd770D6e3fa8e",hash:"0x1f3b7b47f2ef63030c7d08209acf4c33cd86003535b6882a649133ccd5f2558e"},
+ {name:"SobyaV2Oracle",address:"0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4",hash:"0xba6088e4e73e8cff1ced92aa6ce243697b0ea7a47968076315088c69ddc20d3e"},
+ {name:"SobyaV2Router",address:"0x9F3B4AeFbCb937227Dac641Bf7b9e8b42d6CA23D",hash:"0x35870514e3ad877f55b1780c489096e7d5e34ab467d338d5e41f4d2d765d0385"}
+];
+const VERIFY_ABIS = {
+ oracle:["function factory() view returns (address)"],
+ router:["function factory() view returns (address)","function wrappedSoby() view returns (address)"],
+ factory:["function allPairsLength() view returns (uint256)"],
+ wsoby:["function name() view returns (string)","function symbol() view returns (string)","function decimals() view returns (uint8)"]
+};
+function verifyRow(label,detail,ok){
+ const row=document.createElement("div");row.className="item";
+ const title=document.createElement("div");title.className="label";title.textContent=(ok?"PASS · ":"CHECK · ")+label;
+ const value=document.createElement("div");value.className="value";value.textContent=detail;
+ row.append(title,value);$("verifyMainnetResults").append(row);
+}
+async function verifyMainnetDeployments(){
+ const out=$("verifyMainnetStatus"),button=$("verifyMainnet");
+ if(!ready||busy){out.textContent="Connect MetaMask to SOBYA Mainnet first.";return}
+ busy=true;button.disabled=true;$("deploy").disabled=true;$("verifyMainnetResults").replaceChildren();
+ let allPass=true;
+ const record=(label,detail,ok)=>{verifyRow(label,detail,ok);if(!ok)allPass=false};
+ try{
+  const chain=Number(await provider.send("eth_chainId",[]));
+  if(chain!==CHAIN_ID)throw Error("Wrong chain ID: "+chain);
+  record("Network","EVM chain ID "+chain,true);
+  const verified={};
+  for(const item of MAINNET_DEPLOYMENTS){
+   out.textContent="Checking receipt and bytecode: "+item.name+"…";
+   const receipt=await provider.getTransactionReceipt(item.hash);
+   const receiptOk=!!receipt&&receipt.status===1&&!!receipt.contractAddress&&receipt.contractAddress.toLowerCase()===item.address.toLowerCase();
+   record(item.name+" deployment receipt",receiptOk?("status=1; contractAddress matches "+item.address):("Receipt missing/failed or contractAddress mismatch; returned "+(receipt&&receipt.contractAddress||"none")),receiptOk);
+   const senderOk=!!receipt&&!!receipt.from&&receipt.from.toLowerCase()===account.toLowerCase();
+   record(item.name+" deployer",senderOk?("sender matches connected wallet "+account):("Receipt sender "+(receipt&&receipt.from||"unavailable")+"; connected wallet "+account),senderOk);
+   const code=await provider.getCode(item.address);
+   const codeOk=typeof code==="string"&&code!=="0x"&&code.length>2;
+   record(item.name+" runtime bytecode",codeOk?((code.length-2)/2+" bytes at "+item.address):"No runtime bytecode returned at recorded address",codeOk);
+   verified[item.name]=receiptOk&&senderOk&&codeOk;
+  }
+  if(verified.SobyaV2Oracle&&verified.SobyaV2Factory){
+   out.textContent="Checking Oracle → Factory constructor link…";
+   const oracle=new ethers.Contract(MAINNET_DEPLOYMENTS[2].address,VERIFY_ABIS.oracle,provider);
+   const linked=await oracle.factory();
+   const ok=linked.toLowerCase()===MAINNET_DEPLOYMENTS[1].address.toLowerCase();
+   record("Oracle.factory()",linked+" (expected "+MAINNET_DEPLOYMENTS[1].address+")",ok);
+  }else record("Oracle → Factory link","Skipped because Oracle or Factory receipt/bytecode did not pass",false);
+  if(verified.SobyaV2Router&&verified.SobyaV2Factory&&verified.WSOBY){
+   out.textContent="Checking Router → Factory and WSOBY links…";
+   const router=new ethers.Contract(MAINNET_DEPLOYMENTS[3].address,VERIFY_ABIS.router,provider);
+   const [factoryLink,wrappedLink]=await Promise.all([router.factory(),router.wrappedSoby()]);
+   const fOk=factoryLink.toLowerCase()===MAINNET_DEPLOYMENTS[1].address.toLowerCase();
+   const wOk=wrappedLink.toLowerCase()===MAINNET_DEPLOYMENTS[0].address.toLowerCase();
+   record("Router.factory()",factoryLink+" (expected "+MAINNET_DEPLOYMENTS[1].address+")",fOk);
+   record("Router.wrappedSoby()",wrappedLink+" (expected "+MAINNET_DEPLOYMENTS[0].address+")",wOk);
+  }else record("Router constructor links","Skipped because Router, Factory or WSOBY receipt/bytecode did not pass",false);
+  if(verified.SobyaV2Factory){
+   const factory=new ethers.Contract(MAINNET_DEPLOYMENTS[1].address,VERIFY_ABIS.factory,provider);
+   const count=await factory.allPairsLength();
+   record("Factory.allPairsLength()",count.toString()+" registered pairs",true);
+  }else record("Factory read test","Skipped because Factory receipt/bytecode did not pass",false);
+  if(verified.WSOBY){
+   const token=new ethers.Contract(MAINNET_DEPLOYMENTS[0].address,VERIFY_ABIS.wsoby,provider);
+   const [name,symbol,decimals]=await Promise.all([token.name(),token.symbol(),token.decimals()]);
+   record("WSOBY token metadata",name+" / "+symbol+" / "+decimals+" decimals",true);
+  }else record("WSOBY metadata read","Skipped because WSOBY receipt/bytecode did not pass",false);
+  out.textContent=allPass?"Read-only checks passed: all four receipts, bytecode and constructor links match. This does not yet test liquidity or swaps; trading remains disabled.":"Verification incomplete or failed. Do not deploy again and do not enable trading. Review each CHECK row below.";
+ }catch(e){
+  allPass=false;
+  out.textContent="Verification could not complete (read-only; no transaction sent): "+deploymentErrorDetail(e)+". Keep deploymentStatus pending.";
+ }finally{
+  busy=false;button.disabled=!ready;$("deploy").disabled=!ready||DEPLOYMENT_LOCKED;
+ }
+}
+
 async function runDeploy(){
  if(DEPLOYMENT_LOCKED){say("Deployment is locked.");return;}
  if(!ready||busy)return;
@@ -397,6 +482,7 @@ async function runDeploy(){
 }
 $("connect").addEventListener("click",connect);
 $("recover").addEventListener("click",recoverExistingTransaction);
+$("verifyMainnet").addEventListener("click",verifyMainnetDeployments);
 (async function initWalletConnector(){
  try{
   connectSay("Loading official MetaMask Connect…");
