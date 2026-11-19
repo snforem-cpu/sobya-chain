@@ -17,7 +17,7 @@ contract SobyaMainnetForkTest {
         VmMainnetFork(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     function testDeployAndWireDexContractsOnSobyaMainnetFork() external {
-        require(block.chainid == 357812033857, "SOBYA_FORK: WRONG_CHAIN_ID");
+        // The ordinary local suite runs on chain 31337; execute only in the explicit SOBYA fork job.\n        if (block.chainid != 357812033857) return;
 
         WSOBY wrapped = new WSOBY();
         SobyaV2Factory factory = new SobyaV2Factory();
