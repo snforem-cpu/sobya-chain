@@ -28,7 +28,9 @@ jobs:
           const deploy = fs.readFileSync('dex/deploy/index.html', 'utf8');
           if (config.chainId !== 357812033857) throw new Error('Unexpected EVM chain ID');
           if (config.chainName !== 'SOBYA Mainnet') throw new Error('Unexpected network name');
-          if (config.deploymentStatus !== 'pending') throw new Error('Do not mark deployment ready without verified receipts');
+          if (config.deploymentStatus !== 'verified') throw new Error('Mainnet deployment must be marked verified only after receipt and bytecode verification');
+          if (config.liquidityEnabled !== true) throw new Error('Initial liquidity operations must remain explicitly enabled');
+          if (config.tradingEnabled !== false) throw new Error('Trading must remain disabled until a funded pool and swap smoke tests are verified');
           for (const key of ['factory', 'router', 'wrappedSoby', 'oracle']) {
             if (!/^0x[0-9a-fA-F]{40}$/.test(config[key] || '')) {
               throw new Error(`Missing or malformed recorded deployment address: ${key}`);
@@ -46,5 +48,5 @@ jobs:
           if (!deploy.includes('MAINNET_DEPLOYMENTS')) throw new Error('Recorded mainnet deployment set is missing');
           if (!deploy.includes('Read-only checks passed')) throw new Error('Verifier success report is missing');
           if (!deploy.includes('Deploy SOBYA DEX contracts')) throw new Error('Mobile deploy button label is missing');
-          console.log('DEX config remains pending verified deployment receipts; audited mobile deployment is enabled.');
+          console.log('Verified mainnet deployments are recorded; initial liquidity is enabled and swaps remain gated.');
           NODE
