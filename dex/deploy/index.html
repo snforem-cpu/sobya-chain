@@ -64,24 +64,46 @@ async function loadBuild(){
   $("build").textContent="3 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
 }
 async function connect(){
- if(!window.ethereum){say("Open this page inside the MetaMask mobile browser (Explore). No injected wallet was detected.");return}
+ if(!window.ethereum || typeof window.ethereum.request!=="function"){
+  say("MetaMask provider is not injected in this browser tab. Open this exact page in MetaMask's in-app browser.");
+  return;
+ }
  try{
-  provider=new ethers.BrowserProvider(window.ethereum);
-  await provider.send("eth_requestAccounts",[]);
-  signer=await provider.getSigner();account=await signer.getAddress();
-  const network=await provider.getNetwork();
+  say("Requesting wallet connection from MetaMask…");
+  var accounts=await window.ethereum.request({method:"eth_requestAccounts"});
+  if(!accounts || !accounts.length) throw Error("MetaMask returned no selected account.");
+  account=accounts[0];
+  var chainHex=await window.ethereum.request({method:"eth_chainId"});
+  var chainId=parseInt(chainHex,16);
   $("wallet").textContent=account;
-  $("network").textContent=network.name+" · "+network.chainId.toString();
-  if(Number(network.chainId)!==CHAIN_ID){ready=false;$("deploy").disabled=true;say("Wrong network. Switch MetaMask manually to SOBYA Mainnet (357812033857), then reconnect.");return}
-  const balance=await provider.getBalance(account);
-  $("balance").textContent=ethers.formatEther(balance)+" SOBY";
-  const rpcProvider=new ethers.JsonRpcProvider(RPC);
-  const rpcNetwork=await rpcProvider.getNetwork();
-  if(rpcNetwork.chainId!==CHAIN_ID)throw Error("Configured SOBYA RPC returned an unexpected chain ID.");
-  ready=buildReady;if(!ready)throw Error("Verified build artifacts are unavailable; deployment is disabled.");$("deploy").disabled=false;
-  say("Preflight passed: wallet and public RPC both report SOBYA Mainnet. Review the risk notice before deploying.");
+  $("network").textContent="Chain ID "+chainId;
+  if(chainId!==CHAIN_ID){
+   ready=false;$("deploy").disabled=true;
+   say("Wallet connected, but wrong network. Switch to SOBYA Mainnet (357812033857), then reconnect.");
+   return;
+  }
+  var balanceHex=await window.ethereum.request({method:"eth_getBalance",params:[account,"latest"]});
+  $("balance").textContent=(typeof ethers!=="undefined" ? ethers.formatEther(balanceHex)+" SOBY" : balanceHex+" wei");
+  if(typeof ethers==="undefined"){
+   ready=false;$("deploy").disabled=true;
+   say("Wallet connection succeeded. The deployment library did not load from its CDN, so deployment remains disabled.");
+   return;
+  }
+  provider=new ethers.BrowserProvider(window.ethereum);
+  signer=await provider.getSigner();
+  var rpcResponse=await fetch(RPC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_chainId",params:[]})});
+  if(!rpcResponse.ok) throw Error("SOBYA public RPC is unreachable.");
+  var rpcData=await rpcResponse.json();
+  if(!rpcData.result || parseInt(rpcData.result,16)!==CHAIN_ID) throw Error("Configured SOBYA RPC returned an unexpected chain ID.");
+  ready=buildReady;
+  if(!ready) throw Error("Verified build artifacts are unavailable; deployment is disabled.");
+  $("deploy").disabled=false;
+  say("Preflight passed: MetaMask and public RPC both report SOBYA Mainnet. Do not deploy until contract review is complete.");
   $("estimate").textContent="Will estimate each deployment immediately before sending.";
- }catch(e){ready=false;$("deploy").disabled=true;say(short(e))}
+ }catch(e){
+  ready=false;$("deploy").disabled=true;
+  say("Wallet connection check failed: "+short(e));
+ }
 }
 async function deployOne(name,args=[]){
  const c=bundle.contracts[name];
