@@ -100,9 +100,14 @@ async function connect(){
    say("Wrong network. Deployment remains disabled until MetaMask is on SOBYA Mainnet.");
    return;
   }
+  connectSay("Connected: "+account+" · SOBYA Mainnet");
+  say("MetaMask connection approved. Checking deployment prerequisites…");
   const balanceHex=await provider.request({method:"eth_getBalance",params:[account,"latest"]});
   $("balance").textContent=(typeof ethers!=="undefined" ? ethers.formatEther(balanceHex)+" SOBY" : balanceHex+" wei");
-  if(typeof ethers==="undefined") throw Error("Wallet connected, but the deployment library did not load. Deployment remains disabled.");
+  if(typeof ethers==="undefined"){
+   say("Wallet is connected. The deployment library did not load, so deployment remains disabled.");
+   return;
+  }
   const rpcResponse=await fetch(RPC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_chainId",params:[]})});
   if(!rpcResponse.ok) throw Error("SOBYA public RPC is unreachable.");
   const rpcData=await rpcResponse.json();
@@ -110,7 +115,10 @@ async function connect(){
   const walletProvider=provider;
   provider=new ethers.BrowserProvider(walletProvider);
   signer=await provider.getSigner();
-  if(!buildReady) throw Error("Wallet connected successfully, but verified build artifacts are unavailable. Deployment remains disabled.");
+  if(!buildReady){
+   say("Wallet is connected and the SOBYA RPC is verified. Verified build artifacts are unavailable, so deployment remains disabled.");
+   return;
+  }
   ready=true;
   $("deploy").disabled=false;
   connectSay("Connected: "+account+" · SOBYA Mainnet");
@@ -118,8 +126,13 @@ async function connect(){
   $("estimate").textContent="Will estimate each deployment immediately before sending.";
  }catch(e){
   ready=false;$("deploy").disabled=true;
-  connectSay("Connection issue: "+short(e));
-  say("Wallet connection/preflight did not complete. No deployment was sent.");
+  if(account){
+   connectSay("Connected: "+account);
+   say("Wallet is connected, but deployment preflight is blocked: "+short(e)+". No deployment was sent.");
+  }else{
+   connectSay("Connection issue: "+short(e));
+   say("Wallet connection did not complete. No deployment was sent.");
+  }
  }finally{
   button.disabled=false;
  }
