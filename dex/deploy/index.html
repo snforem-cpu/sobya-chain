@@ -123,9 +123,9 @@ async function connect(){
   preflightStage="verifying SOBYA chain ID";
   const rpcChainHex=await provider.request({method:"eth_chainId",params:[]});
   if(parseInt(rpcChainHex,16)!==CHAIN_ID) throw Error("MetaMask provider is connected to an unexpected chain.");
-  preflightStage="checking SOBYA latest block";
-  const rpcBlock=await provider.request({method:"eth_blockNumber",params:[]});
-  if(typeof rpcBlock!=="string" || !/^0x[0-9a-f]+$/i.test(rpcBlock)) throw Error("SOBYA RPC did not return a valid block height through MetaMask.");
+  // eth_chainId has already confirmed the selected SOBYA network.
+  // Do not require eth_blockNumber here: some MetaMask Connect provider
+  // transports reject this read even while chain ID and signing are available.
   preflightStage="initializing wallet signer";
   const walletProvider=provider;
   provider=new ethers.BrowserProvider(walletProvider);
