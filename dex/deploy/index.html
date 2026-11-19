@@ -31,6 +31,14 @@
 <div class="item"><div class="label">Estimated deployment gas</div><div class="value" id="estimate">Connect wallet to estimate</div></div>
 </section>
 <section class="panel">
+<strong>Recover a previous deployment transaction</strong>
+<p class="muted">If a previous attempt displayed a transaction hash but stopped before showing its result, enter that hash here. This checks the existing transaction only; it never sends a transaction.</p>
+<div class="item"><label class="label" for="recoverName">Contract submitted</label><select id="recoverName" style="width:100%;padding:12px;background:#07182b;color:#f2f6ff;border:1px solid var(--line);border-radius:9px"><option value="">Select the contract (required)</option><option>WSOBY</option><option>SobyaV2Factory</option><option>SobyaV2Oracle</option><option>SobyaV2Router</option></select></div>
+<div class="item"><label class="label" for="recoverHash">Existing transaction hash</label><input id="recoverHash" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" value="0x4e0b7754508f740df1e711fe72ad99c9b2a1b2eaf18f68959a695c304d570e5a" style="width:100%;padding:12px;background:#07182b;color:#f2f6ff;border:1px solid var(--line);border-radius:9px;font-family:ui-monospace,monospace"></div>
+<button class="btn secondary" id="recover" type="button">Check and recover existing transaction</button>
+<div class="status" id="recoverStatus" aria-live="polite">No recovery check has been run.</div>
+</section>
+<section class="panel">
 <strong>Deployment order</strong>
 <ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Oracle — time-weighted pool price reference (TWAP)</li><li>SobyaV2Router — trading and liquidity router</li></ol>
 <p class="muted">The Oracle and Router constructors are encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
@@ -50,7 +58,7 @@ const CHAIN_ID_HEX="0x534f425941";
 const RPC="https://sobya-evm-rpc.nodesafe-dapp.xyz";
 const $=id=>document.getElementById(id);
 const DEPLOYMENT_LOCKED = false; // Independent audit completed; current SOBYA mainnet fork integration passed.
-let provider,signer,account,bundle,buildReady=false,ready=false,busy=false,evmClient=null,connectError=null,preflightStage="initialization",savedDeployments={};
+let provider,signer,account,bundle,buildReady=false,ready=false,busy=false,evmClient=null,connectError=null,preflightStage="initialization",savedDeployments={},pendingDeployments={};
 const say=m=>$("status").textContent=m;
 const connectSay=m=>$("connectStatus").textContent=m;
 const short=e=>(e&&e.shortMessage)||(e&&e.reason)||(e&&e.message)||String(e);
@@ -198,33 +206,39 @@ async function resolveFeeOverrides(){
  }catch(_){}
  return {overrides,price:null,source:"MetaMask transaction fee estimator"};
 }
-async function restoreSavedDeployments(){
- savedDeployments={};
- try{
-  const key="sobya.dex.deployments."+CHAIN_ID+"."+account.toLowerCase();
-  const parsed=JSON.parse(localStorage.getItem(key)||"{}");
-  for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"]){
-   const item=parsed[name];
-   if(!item||!/^0x[a-fA-F0-9]{64}$/.test(item.hash||"")||!/^0x[a-fA-F0-9]{40}$/.test(item.address||""))continue;
-   try{
-    const receipt=await provider.getTransactionReceipt(item.hash);
-    if(!receipt||receipt.status!==1||!receipt.contractAddress||receipt.contractAddress.toLowerCase()!==item.address.toLowerCase()||!receipt.from||receipt.from.toLowerCase()!==account.toLowerCase())continue;
-    const code=await provider.getCode(item.address);
-    if(code==="0x")continue;
-    savedDeployments[name]={address:item.address,hash:item.hash,gasUsed:receipt.gasUsed.toString()};
-    showResult(name,savedDeployments[name]);
-   }catch(_){}
-  }
- }catch(e){console.warn("Could not restore local deployment history:",e)}
+function deploymentStorageKey(){return "sobya.dex.deployments."+CHAIN_ID+"."+account.toLowerCase()}
+function readDeploymentStore(){try{return JSON.parse(localStorage.getItem(deploymentStorageKey())||"{}")}catch(_){return {}}}
+function writeDeploymentStore(store){try{localStorage.setItem(deploymentStorageKey(),JSON.stringify(store))}catch(e){console.warn("Could not persist deployment history:",e);throw Error("Browser storage is unavailable. Stop before deploying; transaction recovery data cannot be saved.")}}
+function persistPendingDeployment(name,tx){
+ const store=readDeploymentStore();store.pending=store.pending||{};
+ const record={hash:tx.hash,from:account,nonce:tx.nonce,submittedAt:Date.now(),status:"pending"};
+ store.pending[name]=record;writeDeploymentStore(store);pendingDeployments[name]=record;
 }
 function persistDeployment(name,result){
  savedDeployments[name]=result;
- try{
-  const key="sobya.dex.deployments."+CHAIN_ID+"."+account.toLowerCase();
-  const current=JSON.parse(localStorage.getItem(key)||"{}");
-  current[name]={address:result.address,hash:result.hash};
-  localStorage.setItem(key,JSON.stringify(current));
- }catch(e){console.warn("Could not persist deployment history:",e)}
+ const store=readDeploymentStore();store[name]={address:result.address,hash:result.hash,gasUsed:result.gasUsed,codeVerified:!!result.codeVerified};
+ if(store.pending)delete store.pending[name];
+ writeDeploymentStore(store);
+}
+async function restoreSavedDeployments(){
+ savedDeployments={};pendingDeployments={};
+ const store=readDeploymentStore();
+ for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"]){
+  const pending=store.pending&&store.pending[name];
+  if(pending&&/^0x[a-fA-F0-9]{64}$/.test(pending.hash||""))pendingDeployments[name]=pending;
+  const item=store[name];
+  if(!item||!/^0x[a-fA-F0-9]{64}$/.test(item.hash||"")||!/^0x[a-fA-F0-9]{40}$/.test(item.address||""))continue;
+  try{
+   const receipt=await provider.getTransactionReceipt(item.hash);
+   if(!receipt||receipt.status!==1||!receipt.contractAddress||receipt.contractAddress.toLowerCase()!==item.address.toLowerCase()||!receipt.from||receipt.from.toLowerCase()!==account.toLowerCase())continue;
+   const recovered={address:item.address,hash:item.hash,gasUsed:receipt.gasUsed.toString(),codeVerified:false};
+   // Preserve the confirmed receipt before optional bytecode lookup. A read error
+   // must never make a confirmed deployment eligible for a duplicate send.
+   persistDeployment(name,recovered);
+   try{const code=await provider.getCode(item.address);if(code!=="0x"){recovered.codeVerified=true;persistDeployment(name,recovered)}}catch(_){}
+   showResult(name,recovered);
+  }catch(e){console.warn("Could not verify saved deployment "+name,e)}
+ }
 }
 async function deployOne(name,args=[]){
  const c=bundle.contracts[name];
@@ -247,20 +261,62 @@ async function deployOne(name,args=[]){
  // can populate its own fee estimate instead of aborting before wallet review.
  const contract=Object.keys(txOverrides).length?await factory.deploy(...args,txOverrides):await factory.deploy(...args);
  const tx=contract.deploymentTransaction();
- if(!tx)throw Error("Wallet did not return a deployment transaction.");
- say(name+" submitted. Waiting for confirmation: "+tx.hash);
- const receipt=await tx.wait();
- if(!receipt||receipt.status!==1||!receipt.contractAddress)throw Error(name+" deployment receipt failed or has no contract address.");
- const code=await provider.getCode(receipt.contractAddress);
- if(code==="0x")throw Error(name+" receipt succeeded but no contract bytecode is present at the address.");
- return {address:receipt.contractAddress,hash:tx.hash,gasUsed:receipt.gasUsed.toString()};
+ if(!tx||!tx.hash)throw Error("Wallet did not return a deployment transaction hash.");
+ // Persist the hash synchronously before waiting for a receipt or making any
+ // further RPC call. If storage fails, stop here; do not wait or send another tx.
+ persistPendingDeployment(name,tx);
+ say(name+" submitted. Transaction hash saved before confirmation: "+tx.hash+". Waiting for receipt; do not submit again.");
+ let receipt;
+ try{receipt=await tx.wait()}catch(waitError){
+  throw Error(name+" was submitted (hash saved: "+tx.hash), but receipt confirmation could not be read. Use Recover Existing Transaction; do not deploy again. RPC detail: "+short(waitError));
+ }
+ if(!receipt)throw Error(name+" transaction hash "+tx.hash+" is saved, but no receipt is available yet. Recover this transaction; do not deploy again.");
+ if(receipt.status!==1)throw Error(name+" transaction "+tx.hash+" was mined but failed (receipt status 0). Verify the receipt before retrying.");
+ if(!receipt.contractAddress)throw Error(name+" transaction "+tx.hash+" succeeded but RPC omitted contractAddress. The hash is saved; recover the receipt before retrying.");
+ const result={address:receipt.contractAddress,hash:tx.hash,gasUsed:receipt.gasUsed.toString(),codeVerified:false};
+ // Save the confirmed contract address immediately, before getCode (which may fail).
+ persistDeployment(name,result);
+ try{
+  const code=await provider.getCode(receipt.contractAddress);
+  if(code==="0x")throw Error("empty bytecode");
+  result.codeVerified=true;persistDeployment(name,result);
+ }catch(codeError){
+  throw Error(name+" receipt is confirmed and contract address "+receipt.contractAddress+" is saved, but bytecode verification is pending. Do not redeploy. Retry recovery/verification. "+short(codeError));
+ }
+ return result;
 }
 function showResult(name,result){
  const row=document.createElement("div");row.className="item";
- const label=document.createElement("div");label.className="label";label.textContent=name;
+ const label=document.createElement("div");label.className="label";label.textContent=name+(result.codeVerified===false?" · receipt confirmed; bytecode check pending":"");
  const address=document.createElement("div");address.className="value";address.textContent="Address: "+result.address;
  const tx=document.createElement("div");tx.className="value";tx.textContent="Transaction: "+result.hash;
  row.append(label,address,tx);$("addresses").append(row);$("results").classList.remove("hidden");
+}
+async function recoverExistingTransaction(){
+ const name=$("recoverName").value,hash=$("recoverHash").value.trim();
+ const out=$("recoverStatus");out.textContent="Checking existing transaction; no transaction will be sent.";
+ if(!ready||busy){out.textContent="Connect MetaMask to SOBYA Mainnet first.";return}
+ if(!["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"].includes(name)){out.textContent="Select which contract this transaction attempted to deploy.";return}
+ if(!/^0x[a-fA-F0-9]{64}$/.test(hash)){out.textContent="Enter a valid 32-byte transaction hash.";return}
+ busy=true;$("recover").disabled=true;$("deploy").disabled=true;
+ try{
+  const tx=await provider.getTransaction(hash);
+  if(tx&&tx.from&&tx.from.toLowerCase()!==account.toLowerCase())throw Error("This transaction was sent by a different wallet. Connect the original deployer wallet.");
+  const receipt=await provider.getTransactionReceipt(hash);
+  if(!receipt){out.textContent="Transaction not yet mined (or this RPC cannot find it). Hash retained. Do not deploy this contract again; check again later.";return}
+  if(receipt.status!==1){out.textContent="Transaction was mined but failed (receipt status 0). No contract was created by this transaction. Verify the hash and receipt before retrying.";return}
+  if(!receipt.contractAddress){out.textContent="Receipt reports success but does not include a contract address. Keep the hash and request RPC/indexer verification; do not redeploy.";return}
+  if(!receipt.from||receipt.from.toLowerCase()!==account.toLowerCase())throw Error("Receipt sender does not match the connected deployer wallet.");
+  const result={address:receipt.contractAddress,hash,gasUsed:receipt.gasUsed.toString(),codeVerified:false};
+  persistDeployment(name,result);
+  pendingDeployments[name]=undefined;
+  out.textContent="Receipt confirmed. Contract address saved: "+result.address+". Checking bytecode…";
+  const code=await provider.getCode(result.address);
+  if(code==="0x"){out.textContent="Receipt confirmed and address saved, but bytecode is not visible from this RPC yet. Do not redeploy; retry this check later.";showResult(name,result);return}
+  result.codeVerified=true;persistDeployment(name,result);showResult(name,result);
+  out.textContent="Recovered successfully: "+name+" is confirmed at "+result.address+". It will be skipped on the next deployment run.";
+ }catch(e){out.textContent="Recovery check failed without sending a transaction: "+short(e)+". Keep the hash; do not redeploy until its status is known."}
+ finally{busy=false;$("recover").disabled=false;$("deploy").disabled=!ready||DEPLOYMENT_LOCKED}
 }
 async function runDeploy(){
  if(DEPLOYMENT_LOCKED){say("Deployment is locked.");return;}
@@ -269,7 +325,12 @@ async function runDeploy(){
  busy=true;$("deploy").disabled=true;
  try{
   const obtain=async(name,args,label)=>{
-   if(savedDeployments[name]){say(name+" was already confirmed in this wallet session and its receipt/bytecode were re-verified. Skipping duplicate deployment.");return savedDeployments[name]}
+   if(savedDeployments[name]){
+    const existing=savedDeployments[name];
+    if(!existing.codeVerified){const code=await provider.getCode(existing.address);if(code==="0x")throw Error(name+" has a confirmed receipt at "+existing.address+" but bytecode is not yet visible. Stop; do not redeploy.");existing.codeVerified=true;persistDeployment(name,existing)}
+    say(name+" was already confirmed and its bytecode is verified. Skipping duplicate deployment.");return existing
+   }
+   if(pendingDeployments[name])throw Error(name+" already has a saved transaction hash ("+pendingDeployments[name].hash+"). Recover it before any new deployment.");
    const result=await deployOne(name,args);
    persistDeployment(name,result);
    showResult(label,result);
@@ -285,6 +346,7 @@ async function runDeploy(){
  finally{busy=false;$("deploy").disabled=!ready||DEPLOYMENT_LOCKED}
 }
 $("connect").addEventListener("click",connect);
+$("recover").addEventListener("click",recoverExistingTransaction);
 (async function initWalletConnector(){
  try{
   connectSay("Loading official MetaMask Connect…");
