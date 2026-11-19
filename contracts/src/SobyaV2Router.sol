@@ -195,6 +195,18 @@ contract SobyaV2Router {
         liquidity = ISobyaRouterPair(p.pair).mint(p.recipient);
     }
 
+    function _sobyAmountForActualToken(
+        address token, address pair, uint256 actualToken, uint256 nominalSoby
+    ) private view returns (uint256 amountSoby) {
+        (uint256 reserveToken, uint256 reserveSoby) = _reservesFor(token, wrappedSoby, pair);
+        if (reserveToken == 0 && reserveSoby == 0) {
+            // The initial price is established by the first LP; no prior ratio exists.
+            return nominalSoby;
+        }
+        require(reserveToken > 0 && reserveSoby > 0, "SOBYA: INVALID_RESERVES");
+        return quote(actualToken, reserveToken, reserveSoby);
+    }
+
     function addLiquiditySOBY(
         address token, uint256 desiredToken, uint256 minToken, uint256 minSoby,
         address to, uint256 deadline
@@ -206,14 +218,7 @@ contract SobyaV2Router {
         uint256 beforeToken = ISobyaRouterToken(token).balanceOf(pair);
         _safeTransferFrom(token, msg.sender, pair, nominalToken);
         amountToken = ISobyaRouterToken(token).balanceOf(pair) - beforeToken;
-        (uint256 reserveToken, uint256 reserveSoby) = _reservesFor(token, wrappedSoby, pair);
-        if (reserveToken == 0 && reserveSoby == 0) {
-            // The initial price is established by the first LP; no prior ratio exists.
-            amountSoby = nominalSoby;
-        } else {
-            require(reserveToken > 0 && reserveSoby > 0, "SOBYA: INVALID_RESERVES");
-            amountSoby = quote(amountToken, reserveToken, reserveSoby);
-        }
+        amountSoby = _sobyAmountForActualToken(token, pair, amountToken, nominalSoby);
         require(amountToken >= minToken && amountSoby >= minSoby, "SOBYA: SLIPPAGE");
         require(amountSoby > 0 && amountSoby <= msg.value, "SOBYA: INSUFFICIENT_SOBY");
         ISobyaWrappedNative(wrappedSoby).deposit{value: amountSoby}();
