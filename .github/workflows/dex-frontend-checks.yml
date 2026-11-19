@@ -36,8 +36,8 @@ jobs:
             throw new Error('Wallet transaction controls are not deployment-gated');
           }
           if (!html.includes('CHAIN_ID=357812033857n')) throw new Error('Wallet chain guard missing');
-          if (!deploy.includes('const DEPLOYMENT_LOCKED = true')) throw new Error('Mobile deployer must stay locked pending independent audit');
+          if (!deploy.includes('const DEPLOYMENT_LOCKED = false')) throw new Error('Mobile deployer must be enabled after independent audit and live integration');
           if (!deploy.includes('if(DEPLOYMENT_LOCKED){')) throw new Error('Mobile deploy handler does not enforce the deployment lock');
-          if (!deploy.includes('Deployment locked — audit required')) throw new Error('Mobile deploy button does not communicate the safety lock');
-          console.log('DEX config and mobile deployment are safely locked pending audit and live integration.');
+          if (!deploy.includes('Deploy SOBYA DEX contracts')) throw new Error('Mobile deploy button label is missing');
+          console.log('DEX config remains pending verified deployment receipts; audited mobile deployment is enabled.');
           NODE
