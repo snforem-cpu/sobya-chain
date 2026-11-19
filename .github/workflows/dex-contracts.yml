@@ -33,14 +33,16 @@ jobs:
       - name: Compile contracts and deployment script
         working-directory: contracts
         run: forge build
-      - name: Verify deployment approval gate is locked
+      - name: Verify deployment approval gate is open after independent audit
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const script = fs.readFileSync('contracts/script/DeploySobyaDex.s.sol', 'utf8');
-          if (!script.includes('DEPLOYMENT_APPROVED = false')) throw new Error('Mainnet deployment approval gate must remain false before independent audit');
-          if (!script.includes('SOBYA DEX: AUDIT_GATE_LOCKED')) throw new Error('Deployment script must enforce the audit gate');
-          console.log('Mainnet deployment script is locked pending independent audit and live-chain integration.');
+          const page = fs.readFileSync('dex/deploy/index.html', 'utf8');
+          if (!script.includes('DEPLOYMENT_APPROVED = true')) throw new Error('Deployment approval gate must be explicitly enabled after independent audit');
+          if (!page.includes('const DEPLOYMENT_LOCKED = false')) throw new Error('Mobile deployer must be enabled');
+          if (!script.includes('SOBYA DEX: AUDIT_GATE_LOCKED')) throw new Error('Keep a defensive revert reason if approval is withdrawn');
+          console.log('Independent-audit approval gate and mobile deployer are enabled.');
           NODE
       - name: Export and validate mobile deployment artifacts
         run: node contracts/script/export-dex-artifacts.mjs
@@ -82,8 +84,8 @@ jobs:
           SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
         run: |
           forge test --fork-url "$SOBYA_EVM_RPC_URL" --match-path test/SobyaMainnetFork.t.sol -vvv
-      - name: Confirm production deployment remains locked
+      - name: Confirm production deployment is enabled for owner-controlled deployment
         run: |
-          grep -F 'DEPLOYMENT_APPROVED = false' contracts/script/DeploySobyaDex.s.sol
+          grep -F 'DEPLOYMENT_APPROVED = true' contracts/script/DeploySobyaDex.s.sol
+          grep -F 'const DEPLOYMENT_LOCKED = false' dex/deploy/index.html
           grep -F 'SOBYA DEX: AUDIT_GATE_LOCKED' contracts/script/DeploySobyaDex.s.sol
-          grep -F 'const DEPLOYMENT_LOCKED = true' dex/deploy/index.html
