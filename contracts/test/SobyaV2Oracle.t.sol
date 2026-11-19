@@ -76,7 +76,6 @@ contract SobyaV2OracleTest {
         address token0 = pair.token0();
         address token1 = pair.token1();
         OracleMockToken input = token0 == address(tokenA) ? tokenA : tokenB;
-        OracleMockToken output = token1 == address(tokenA) ? tokenA : tokenB;
 
         input.transfer(address(pair), 10 ether);
         pair.swap(0, 9 ether, address(this));
@@ -85,7 +84,6 @@ contract SobyaV2OracleTest {
         (uint256 averagePrice,) = oracle.consultPriceX112(address(pair), token0);
         require(averagePrice < 2 ** 112, "TWAP_IGNORED_PRICE_CHANGE");
         require(averagePrice > (2 ** 112) / 2, "TWAP_OUT_OF_EXPECTED_RANGE");
-        require(output.balanceOf(address(this)) >= 0, "UNREACHABLE");
     }
 
     function testRejectsStaleObservation() public {
@@ -98,7 +96,7 @@ contract SobyaV2OracleTest {
     }
 
     function testRejectsUnregisteredPair() public {
-        (bool ok,) = address(oracle).staticcall(
+        (bool ok,) = address(oracle).call(
             abi.encodeCall(oracle.update, (address(this)))
         );
         require(!ok, "UNREGISTERED_PAIR_ACCEPTED");
