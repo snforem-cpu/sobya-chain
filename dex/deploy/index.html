@@ -268,7 +268,7 @@ async function deployOne(name,args=[]){
  say(name+" submitted. Transaction hash saved before confirmation: "+tx.hash+". Waiting for receipt; do not submit again.");
  let receipt;
  try{receipt=await tx.wait()}catch(waitError){
-  throw Error(name+" was submitted (hash saved: "+tx.hash), but receipt confirmation could not be read. Use Recover Existing Transaction; do not deploy again. RPC detail: "+short(waitError));
+  throw Error(name+" was submitted (hash saved: "+tx.hash+"), but receipt confirmation could not be read. Use Recover Existing Transaction; do not deploy again. RPC detail: "+short(waitError));
  }
  if(!receipt)throw Error(name+" transaction hash "+tx.hash+" is saved, but no receipt is available yet. Recover this transaction; do not deploy again.");
  if(receipt.status!==1)throw Error(name+" transaction "+tx.hash+" was mined but failed (receipt status 0). Verify the receipt before retrying.");
@@ -293,15 +293,21 @@ function showResult(name,result){
  row.append(label,address,tx);$("addresses").append(row);$("results").classList.remove("hidden");
 }
 async function recoverExistingTransaction(){
- const name=$("recoverName").value,hash=$("recoverHash").value.trim();
+ let name=$("recoverName").value,hash=$("recoverHash").value.trim();
  const out=$("recoverStatus");out.textContent="Checking existing transaction; no transaction will be sent.";
  if(!ready||busy){out.textContent="Connect MetaMask to SOBYA Mainnet first.";return}
- if(!["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"].includes(name)){out.textContent="Select which contract this transaction attempted to deploy.";return}
  if(!/^0x[a-fA-F0-9]{64}$/.test(hash)){out.textContent="Enter a valid 32-byte transaction hash.";return}
  busy=true;$("recover").disabled=true;$("deploy").disabled=true;
  try{
   const tx=await provider.getTransaction(hash);
   if(tx&&tx.from&&tx.from.toLowerCase()!==account.toLowerCase())throw Error("This transaction was sent by a different wallet. Connect the original deployer wallet.");
+  if(!["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"].includes(name)){
+   if(!tx||!tx.data)throw Error("Contract type cannot be detected because transaction input is unavailable. Select the contract manually.");
+   const input=tx.data.toLowerCase();
+   const matches=["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"].filter(n=>input.startsWith(bundle.contracts[n].bytecode.toLowerCase()));
+   if(matches.length!==1)throw Error("Could not uniquely identify the contract from transaction input. Select the attempted contract manually.");
+   name=matches[0];$("recoverName").value=name;
+  }
   const receipt=await provider.getTransactionReceipt(hash);
   if(!receipt){out.textContent="Transaction not yet mined (or this RPC cannot find it). Hash retained. Do not deploy this contract again; check again later.";return}
   if(receipt.status!==1){out.textContent="Transaction was mined but failed (receipt status 0). No contract was created by this transaction. Verify the hash and receipt before retrying.";return}
