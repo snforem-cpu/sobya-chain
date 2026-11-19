@@ -182,6 +182,19 @@ contract SobyaV2Test {
         require(amountA == 99 ether && amountB == 100 ether, "FOT_DEPOSIT_NOT_MEASURED");
     }
 
+    function testFeeOnTransferLiquidityRemovalChecksRecipientNetAmounts() public {
+        _addInitialLiquidity();
+        SobyaV2Pair p = SobyaV2Pair(pair);
+        uint256 lp = p.balanceOf(address(this));
+        p.approve(address(router), lp);
+        tokenB.setFeeBps(100);
+        (uint256 amountA, uint256 amountB) = router.removeLiquiditySupportingFeeOnTransferTokens(
+            address(tokenA), address(tokenB), lp, 1, 1, address(this), block.timestamp + 1 hours
+        );
+        require(amountA > 0 && amountB > 0, "FOT_REMOVE_NO_NET_OUTPUT");
+        require(amountB < 100 ether, "FOT_REMOVE_DID_NOT_ACCOUNT_FOR_TAX");
+    }
+
     function testFeeOnTransferSwapUsesActualPairInput() public {
         _addInitialLiquidity();
         tokenA.setFeeBps(100);
