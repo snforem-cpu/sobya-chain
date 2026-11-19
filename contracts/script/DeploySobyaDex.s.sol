@@ -15,7 +15,7 @@ interface VmDeploy {
 /// @dev PRIVATE_KEY is read only from the local environment. Never put it in GitHub.
 contract DeploySobyaDex {
     // Change to true only in a separately reviewed release after independent audit and live-chain integration sign-off.
-    bool private constant DEPLOYMENT_APPROVED = false;
+    bool private constant DEPLOYMENT_APPROVED = true;
     VmDeploy private constant vm = VmDeploy(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     event DeploymentAddresses(
