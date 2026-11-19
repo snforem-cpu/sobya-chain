@@ -7,6 +7,8 @@
   "router": "0x9F3B4AeFbCb937227Dac641Bf7b9e8b42d6CA23D",
   "wrappedSoby": "0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c",
   "oracle": "0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4",
-  "deploymentStatus": "pending",
-  "notice": "Deployment addresses recorded from the owner-controlled deployment results. Trading remains disabled until the four receipts, deployed bytecode, and constructor relationships are independently verified on SOBYA Mainnet and the smoke tests pass. The TWAP oracle is pool-specific, not a global USD price feed."
+  "deploymentStatus": "verified",
+  "notice": "The four mainnet contract deployments passed read-only receipt, bytecode, deployer and constructor-link verification. Liquidity operations are enabled for owner-controlled initial pool creation and funding. Swaps remain disabled until a funded pool is verified and mainnet swap smoke tests pass. The TWAP oracle is pool-specific, not a global USD price feed.",
+  "liquidityEnabled": true,
+  "tradingEnabled": false
 }
