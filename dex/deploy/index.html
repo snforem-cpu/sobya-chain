@@ -30,9 +30,9 @@
 </section>
 <section class="panel">
 <strong>Deployment order</strong>
-<ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Router — trading and liquidity router</li></ol>
-<p class="muted">The Router constructor is encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
-<button class="btn" id="deploy" disabled>Deploy contracts (3 wallet approvals)</button>
+<ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Oracle — time-weighted pool price reference (TWAP)</li><li>SobyaV2Router — trading and liquidity router</li></ol>
+<p class="muted">The Oracle and Router constructors are encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
+<button class="btn" id="deploy" disabled>Deploy contracts (4 wallet approvals)</button>
 <div class="status" id="status" aria-live="polite">Connect MetaMask to begin preflight checks.</div>
 </section>
 <section class="panel hidden" id="results">
@@ -57,14 +57,14 @@ async function loadBuild(){
   if(!response.ok)throw Error("Build artifact is not published yet.");
   bundle=await response.json();
   if(bundle.schemaVersion!==1||bundle.chainId!==Number(CHAIN_ID)||!/^([0-9a-f]{40})$/i.test(bundle.sourceCommit||""))throw Error("Build manifest or target chain is invalid.");
-  for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Router"]){
+  for(const name of ["WSOBY","SobyaV2Factory","SobyaV2Oracle","SobyaV2Router"]){
     const c=bundle.contracts && bundle.contracts[name];
     if(!c||!Array.isArray(c.abi)||!/^0x[0-9a-f]+$/i.test(c.bytecode||"")||!/^0x[0-9a-f]+$/i.test(c.deployedBytecode||""))throw Error("Missing or malformed "+name+" artifact.");
     if(await sha256(c.bytecode)!==c.bytecodeSha256||await sha256(c.deployedBytecode)!==c.deployedBytecodeSha256)throw Error(name+" artifact checksum mismatch.");
   }
   buildReady=true;
   $("commit").textContent=bundle.sourceCommit;
-  $("build").textContent="3 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
+  $("build").textContent="4 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
 }
 async function connect(){
  const button=$("connect");
@@ -185,14 +185,15 @@ function showResult(name,result){
 }
 async function runDeploy(){
  if(!ready||busy)return;
- if(!confirm("This will deploy three permanent contracts on SOBYA Mainnet and spend real SOBY on gas. The contracts have not been independently audited. Continue?"))return;
+ if(!confirm("This will deploy four permanent contracts on SOBYA Mainnet and spend real SOBY on gas. The contracts have not been independently audited. Continue?"))return;
  busy=true;$("deploy").disabled=true;
  try{
   const w=await deployOne("WSOBY");showResult("WSOBY",w);
   const f=await deployOne("SobyaV2Factory");showResult("Factory",f);
+  const o=await deployOne("SobyaV2Oracle",[f.address]);showResult("TWAP Oracle",o);
   const r=await deployOne("SobyaV2Router",[f.address,w.address]);showResult("Router",r);
-  say("All three deployments have confirmed and code is present. Save every address and transaction hash shown below. Trading remains disabled until independent verification and configuration update.");
-  $("estimate").textContent="Deployment receipts confirmed; verify all three on the explorer.";
+  say("All four deployments have confirmed and code is present. Save every address and transaction hash shown below. The oracle reports a pool TWAP only; it is not a global USD price feed. Trading remains disabled until independent verification and configuration update.");
+  $("estimate").textContent="Deployment receipts confirmed; verify all four on the explorer.";
  }catch(e){say("Deployment stopped: "+short(e)+". Any earlier confirmed deployments remain on-chain; do not repeat them. Save the results already shown and request verification.");}
  finally{busy=false;$("deploy").disabled=!ready}
 }
