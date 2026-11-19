@@ -12,6 +12,10 @@ interface VmOracle {
 contract OracleMockToken {
     mapping(address => uint256) public balanceOf;
     function mint(address to, uint256 amount) external { balanceOf[to] += amount; }
+    function burn(address from, uint256 amount) external {
+        require(balanceOf[from] >= amount, "MOCK: BALANCE");
+        balanceOf[from] -= amount;
+    }
     function transfer(address to, uint256 amount) external returns (bool) {
         require(balanceOf[msg.sender] >= amount, "MOCK: BALANCE");
         balanceOf[msg.sender] -= amount;
@@ -90,7 +94,6 @@ contract SobyaV2OracleTest {
         vm.warp(block.timestamp + oracle.MIN_PERIOD());
         oracle.update(address(pair));
 
-        // The earlier checkpoint must remain usable after a public update.
         (uint256 firstPrice, uint32 firstElapsed) =
             oracle.consultPriceX112(address(pair), pair.token0());
         require(firstPrice == 2 ** 112, "FIRST_CHECKPOINT_PRICE");
@@ -117,9 +120,27 @@ contract SobyaV2OracleTest {
     function testToken1DirectionReturnsReciprocalTwap() public {
         oracle.update(address(pair));
         vm.warp(block.timestamp + oracle.MIN_PERIOD());
-        (uint256 averagePrice,) =
-            oracle.consultPriceX112(address(pair), pair.token1());
+        (uint256 averagePrice,) = oracle.consultPriceX112(address(pair), pair.token1());
         require(averagePrice == 2 ** 112, "TOKEN1_PRICE_INCORRECT");
+    }
+
+    function testHistoricalTwapRemainsReadableAfterPoolLosesAllLiquidity() public {
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + oracle.MIN_PERIOD());
+
+        tokenA.burn(address(pair), tokenA.balanceOf(address(pair)));
+        tokenB.burn(address(pair), tokenB.balanceOf(address(pair)));
+        pair.sync();
+
+        (uint256 averagePrice, uint32 elapsed) =
+            oracle.consultPriceX112(address(pair), pair.token0());
+        require(elapsed == oracle.MIN_PERIOD(), "EMPTY_POOL_WINDOW_INCORRECT");
+        require(averagePrice == 2 ** 112, "EMPTY_POOL_HISTORICAL_PRICE_INCORRECT");
+
+        (bool updateSucceeded,) = address(oracle).call(
+            abi.encodeCall(oracle.update, (address(pair)))
+        );
+        require(!updateSucceeded, "EMPTY_POOL_NEW_OBSERVATION_ACCEPTED");
     }
 
     function testRejectsInvalidToken() public {
