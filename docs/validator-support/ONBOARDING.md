@@ -21,7 +21,14 @@ Before telling an applicant to synchronize or create a validator, the team must 
 5. Current staking parameters, minimum self-delegation, denomination, transaction fees, and validator eligibility rules read from the running chain.
 6. A documented operator support contact and incident procedure.
 
-**Current publication gap:** no public RPC endpoint is published in this repository. NodeSafe's previously supplied RPC endpoint was loopback-only; it is not an external RPC service. A P2P address alone cannot prove that the chain is producing blocks or replace RPC-based checks. Until the preflight above is complete, collect expressions of interest only and do not send transaction commands or amount/fee instructions.
+**Published public endpoints (NodeSafe):**
+
+- EVM JSON-RPC for MetaMask, EVM wallets and EVM applications: `https://sobya-evm-rpc.nodesafe-dapp.xyz` (EVM chain ID `357812033857`).
+- CometBFT RPC for consensus/node queries: `https://sobya-rpc.nodesafe-dapp.xyz`.
+- REST API: `https://sobya-api.nodesafe-dapp.xyz`.
+- Explorer: `https://explorer.nodesafe-app.xyz/sobya`.
+
+These are different interfaces: applicants must not configure the CometBFT RPC or REST API as an EVM wallet RPC. Publishing an endpoint does not by itself complete the live-network preflight. Before issuing validator synchronization or transaction instructions, the team must still confirm external reachability, `sobya-1`, recent block height and block advancement, binary and Genesis checksums, peers, and current on-chain staking/fee parameters.
 
 ## 3. Review applications
 
