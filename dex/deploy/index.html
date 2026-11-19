@@ -10,7 +10,8 @@
 <script async src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
 </head>
 <body><main class="wrap">
-<header class="top"><a class="brand" href="../">SOBYA<small>SECURE DEPLOYMENT</small></a><button class="btn secondary" style="width:auto" id="connect" onclick="document.getElementById('status').textContent='Button is responding; checking MetaMask connection…'">Connect MetaMask</button></header>
+<header class="top"><a class="brand" href="../">SOBYA<small>SECURE DEPLOYMENT</small></a><button class="btn secondary" style="width:auto" id="connect" type="button">Connect MetaMask</button></header>
+<div class="status" id="connectStatus" aria-live="polite">Preparing MetaMask Connect…</div>
 <div class="tag">SOBYA MAINNET · CHAIN 357812033857</div>
 <h1>Mobile DEX deployment</h1>
 <p class="muted">This page sends deployment transactions directly from your MetaMask wallet. No private key is collected or transmitted. Each contract deployment requires a separate wallet approval.</p>
@@ -32,7 +33,7 @@
 <ol><li>WSOBY — wrapped native SOBY token</li><li>SobyaV2Factory — pool registry</li><li>SobyaV2Router — trading and liquidity router</li></ol>
 <p class="muted">The Router constructor is encoded with the Factory and WSOBY addresses produced in this same session. The page verifies each deployment receipt and checks that contract code exists before continuing.</p>
 <button class="btn" id="deploy" disabled>Deploy contracts (3 wallet approvals)</button>
-<div class="status" id="status" aria-live="polite">Connect MetaMask from its in-app browser to begin preflight checks.</div>
+<div class="status" id="status" aria-live="polite">Connect MetaMask to begin preflight checks.</div>
 </section>
 <section class="panel hidden" id="results">
 <strong>Deployment results — save these addresses and transaction hashes</strong>
@@ -41,12 +42,14 @@
 </section>
 <p class="foot"><a href="../">Back to SOBYA DEX</a> · <a href="../../">Official website</a></p>
 </main>
-<script>
+<script type="module">
 const CHAIN_ID=357812033857;
+const CHAIN_ID_HEX="0x534f425941";
 const RPC="https://sobya-evm-rpc.nodesafe-app.xyz";
 const $=id=>document.getElementById(id);
-let provider,signer,account,bundle,buildReady=false,ready=false,busy=false;
+let provider,signer,account,bundle,buildReady=false,ready=false,busy=false,evmClient=null,connectError=null;
 const say=m=>$("status").textContent=m;
+const connectSay=m=>$("connectStatus").textContent=m;
 const short=e=>(e&&e.shortMessage)||(e&&e.reason)||(e&&e.message)||String(e);
 async function sha256(value){const bytes=new TextEncoder().encode(value.toLowerCase());const hash=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 async function loadBuild(){
@@ -64,45 +67,61 @@ async function loadBuild(){
   $("build").textContent="3 artifacts present; SHA-256 checks passed; "+bundle.compiler+"; optimizer 200 runs.";
 }
 async function connect(){
- if(!window.ethereum || typeof window.ethereum.request!=="function"){
-  say("MetaMask provider is not injected in this browser tab. Open this exact page in MetaMask's in-app browser.");
-  return;
- }
+ const button=$("connect");
+ button.disabled=true;
+ ready=false;$("deploy").disabled=true;
  try{
-  say("Requesting wallet connection from MetaMask…");
-  var accounts=await window.ethereum.request({method:"eth_requestAccounts"});
-  if(!accounts || !accounts.length) throw Error("MetaMask returned no selected account.");
+  connectSay("Opening MetaMask connection…");
+  let accounts=[];
+  if(evmClient){
+   await evmClient.connect({chainIds:[CHAIN_ID_HEX],forceRequest:true});
+   provider=evmClient.getProvider();
+   let selected=null;
+   try{selected=evmClient.getAccount && evmClient.getAccount()}catch(_){}
+   if(typeof selected==="string" && /^0x[a-fA-F0-9]{40}$/.test(selected)) accounts=[selected];
+   if(!accounts.length && provider && provider.request){
+    try{selected=await provider.request({method:"eth_coinbase"});if(typeof selected==="string" && /^0x[a-fA-F0-9]{40}$/.test(selected))accounts=[selected]}catch(_){}
+   }
+  }else if(window.ethereum && typeof window.ethereum.request==="function"){
+   provider=window.ethereum;
+   accounts=await provider.request({method:"eth_requestAccounts",params:[]});
+  }else{
+   throw Error("MetaMask Connect could not load. Check your internet connection and try again.");
+  }
+  if(!accounts || !accounts.length) throw Error("MetaMask connected but no selected account was returned. Reopen MetaMask and approve the account.");
   account=accounts[0];
-  var chainHex=await window.ethereum.request({method:"eth_chainId"});
-  var chainId=parseInt(chainHex,16);
+  const chainHex=await provider.request({method:"eth_chainId",params:[]});
+  const chainId=parseInt(chainHex,16);
   $("wallet").textContent=account;
   $("network").textContent="Chain ID "+chainId;
   if(chainId!==CHAIN_ID){
-   ready=false;$("deploy").disabled=true;
-   say("Wallet connected, but wrong network. Switch to SOBYA Mainnet (357812033857), then reconnect.");
+   $("balance").textContent="—";
+   connectSay("Wallet connected. Switch MetaMask to SOBYA Mainnet (357812033857), then reconnect.");
+   say("Wrong network. Deployment remains disabled until MetaMask is on SOBYA Mainnet.");
    return;
   }
-  var balanceHex=await window.ethereum.request({method:"eth_getBalance",params:[account,"latest"]});
+  const balanceHex=await provider.request({method:"eth_getBalance",params:[account,"latest"]});
   $("balance").textContent=(typeof ethers!=="undefined" ? ethers.formatEther(balanceHex)+" SOBY" : balanceHex+" wei");
-  if(typeof ethers==="undefined"){
-   ready=false;$("deploy").disabled=true;
-   say("Wallet connection succeeded. The deployment library did not load from its CDN, so deployment remains disabled.");
-   return;
-  }
-  provider=new ethers.BrowserProvider(window.ethereum);
-  signer=await provider.getSigner();
-  var rpcResponse=await fetch(RPC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_chainId",params:[]})});
+  if(typeof ethers==="undefined") throw Error("Wallet connected, but the deployment library did not load. Deployment remains disabled.");
+  const rpcResponse=await fetch(RPC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_chainId",params:[]})});
   if(!rpcResponse.ok) throw Error("SOBYA public RPC is unreachable.");
-  var rpcData=await rpcResponse.json();
+  const rpcData=await rpcResponse.json();
   if(!rpcData.result || parseInt(rpcData.result,16)!==CHAIN_ID) throw Error("Configured SOBYA RPC returned an unexpected chain ID.");
-  ready=buildReady;
-  if(!ready) throw Error("Verified build artifacts are unavailable; deployment is disabled.");
+  const walletProvider=provider;
+  provider=new ethers.BrowserProvider(walletProvider);
+  signer=await provider.getSigner();
+  if(!buildReady) throw Error("Wallet connected successfully, but verified build artifacts are unavailable. Deployment remains disabled.");
+  ready=true;
   $("deploy").disabled=false;
-  say("Preflight passed: MetaMask and public RPC both report SOBYA Mainnet. Do not deploy until contract review is complete.");
+  connectSay("Connected: "+account+" · SOBYA Mainnet");
+  say("Wallet and public RPC verified. Deployment remains subject to the contract review and explicit wallet approvals.");
   $("estimate").textContent="Will estimate each deployment immediately before sending.";
  }catch(e){
   ready=false;$("deploy").disabled=true;
-  say("Wallet connection check failed: "+short(e));
+  connectSay("Connection issue: "+short(e));
+  say("Wallet connection/preflight did not complete. No deployment was sent.");
+ }finally{
+  button.disabled=false;
  }
 }
 async function deployOne(name,args=[]){
@@ -149,7 +168,23 @@ async function runDeploy(){
  finally{busy=false;$("deploy").disabled=!ready}
 }
 $("connect").addEventListener("click",connect);
+(async function initWalletConnector(){
+ try{
+  connectSay("Loading official MetaMask Connect…");
+  const mod=await import("https://esm.sh/@metamask/connect-evm@2.1.1?bundle");
+  evmClient=await mod.createEVMClient({
+   dapp:{name:"SOBYA DEX Deployer",url:window.location.href,iconUrl:new URL("../../assets/logo/sobya-coin-128.png",window.location.href).href},
+   api:{supportedNetworks:{[CHAIN_ID_HEX]:RPC}},
+   analytics:{enabled:false}
+  });
+  connectSay("Ready. Press Connect MetaMask to open the wallet selection and approval flow.");
+ }catch(e){
+  console.error("MetaMask Connect initialization failed:",e);
+  connectError=short(e);
+  connectSay("MetaMask Connect could not initialize. The direct wallet fallback will be used if available.");
+ }
+})();
 $("deploy").onclick=runDeploy;
-(async()=>{try{await loadBuild()}catch(e){$("build").textContent=short(e);say("Build artifacts are not ready. Do not use a third-party deployer or paste private keys.")}})();
+(async()=>{try{await loadBuild()}catch(e){$("build").textContent=short(e);say("Build artifacts are not ready. Wallet connection can still be tested, but deployment remains disabled. Do not use a third-party deployer or paste private keys.")}})();
 if(window.ethereum && typeof window.ethereum.on==="function"){window.ethereum.on("chainChanged",()=>location.reload());window.ethereum.on("accountsChanged",()=>location.reload())}
 </script></body></html>
