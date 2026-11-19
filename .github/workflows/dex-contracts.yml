@@ -1,4 +1,5 @@
 name: SOBYA DEX contracts tests
+# Keep this workflow scoped to all contract, Router, Oracle, and deployment changes.
 
 on:
   pull_request:
