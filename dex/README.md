@@ -6,7 +6,7 @@ This directory contains the first self-custody web interface for the planned SOB
 - Network: SOBYA Mainnet
 - EVM chain ID: 357812033857
 - Native asset: SOBY (18 decimals)
-- RPC: https://sobya-evm-rpc.nodesafe-app.xyz
+- RPC: https://sobya-evm-rpc.nodesafe-dapp.xyz
 - Explorer: https://explorer.nodesafe-app.xyz/sobya
 
 ## Current status
