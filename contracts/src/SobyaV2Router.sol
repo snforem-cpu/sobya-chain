@@ -31,6 +31,17 @@ contract SobyaV2Router {
     address public immutable factory;
     address public immutable wrappedSoby;
 
+    struct LiquidityRequest {
+        address tokenA;
+        address tokenB;
+        address pair;
+        address recipient;
+        uint256 nominalA;
+        uint256 nominalB;
+        uint256 minA;
+        uint256 minB;
+    }
+
     modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, "SOBYA: EXPIRED");
         _;
@@ -151,14 +162,23 @@ contract SobyaV2Router {
         require(to != address(0), "SOBYA: ZERO_TO");
         address pair = _getOrCreatePair(a, b);
         (uint256 nominalA, uint256 nominalB) = _optimalLiquidity(a, b, desiredA, desiredB, pair);
-        uint256 beforeA = ISobyaRouterToken(a).balanceOf(pair);
-        uint256 beforeB = ISobyaRouterToken(b).balanceOf(pair);
-        _safeTransferFrom(a, msg.sender, pair, nominalA);
-        _safeTransferFrom(b, msg.sender, pair, nominalB);
-        amountA = ISobyaRouterToken(a).balanceOf(pair) - beforeA;
-        amountB = ISobyaRouterToken(b).balanceOf(pair) - beforeB;
-        require(amountA >= minA && amountB >= minB, "SOBYA: SLIPPAGE");
-        liquidity = ISobyaRouterPair(pair).mint(to);
+        LiquidityRequest memory request = LiquidityRequest(
+            a, b, pair, to, nominalA, nominalB, minA, minB
+        );
+        return _addLiquidityMeasured(request);
+    }
+
+    function _addLiquidityMeasured(LiquidityRequest memory p)
+        private returns (uint256 amountA, uint256 amountB, uint256 liquidity)
+    {
+        uint256 beforeA = ISobyaRouterToken(p.tokenA).balanceOf(p.pair);
+        uint256 beforeB = ISobyaRouterToken(p.tokenB).balanceOf(p.pair);
+        _safeTransferFrom(p.tokenA, msg.sender, p.pair, p.nominalA);
+        _safeTransferFrom(p.tokenB, msg.sender, p.pair, p.nominalB);
+        amountA = ISobyaRouterToken(p.tokenA).balanceOf(p.pair) - beforeA;
+        amountB = ISobyaRouterToken(p.tokenB).balanceOf(p.pair) - beforeB;
+        require(amountA >= p.minA && amountB >= p.minB, "SOBYA: SLIPPAGE");
+        liquidity = ISobyaRouterPair(p.pair).mint(p.recipient);
     }
 
     function addLiquiditySOBY(
