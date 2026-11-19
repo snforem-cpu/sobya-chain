@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 const root = new URL("../../", import.meta.url);
 const contractsDir = new URL("../out/", import.meta.url);
 const outputDir = new URL("../../dex/deploy/", import.meta.url);
-const names = ["WSOBY", "SobyaV2Factory", "SobyaV2Router"];
+const names = ["WSOBY", "SobyaV2Factory", "SobyaV2Oracle", "SobyaV2Router"];
 const sourceCommit = process.env.GITHUB_SHA;
 if (!sourceCommit || !/^[0-9a-f]{40}$/i.test(sourceCommit)) {
   throw new Error("GITHUB_SHA must be a full commit SHA");
