@@ -77,12 +77,11 @@ contract SobyaMultiMarketUsdOracleTest {
     }
 
     function testRejectsDuplicateSources() public {
-        (bool ok,) = address(this).call(
-            abi.encodeWithSelector(
-                SobyaMultiMarketUsdOracle.constructor.selector,
-                address(a), address(a), address(c), uint16(500)
-            )
-        );
+        (bool ok,) = address(this).call(abi.encodeWithSignature("deployDuplicateSources()"));
         require(!ok, "DUPLICATE_SOURCE_ACCEPTED");
+    }
+
+    function deployDuplicateSources() external {
+        new SobyaMultiMarketUsdOracle(address(a), address(a), address(c), 500);
     }
 }
