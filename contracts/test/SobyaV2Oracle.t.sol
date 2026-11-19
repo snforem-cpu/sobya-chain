@@ -104,6 +104,24 @@ contract SobyaV2OracleTest {
         require(nextElapsed == oracle.MIN_PERIOD(), "NEXT_CHECKPOINT_WINDOW");
     }
 
+    function testTimestampWrapKeepsTwapElapsedTimeCorrect() public {
+        vm.warp((uint256(1) << 32) - 900);
+        oracle.update(address(pair));
+        vm.warp((uint256(1) << 32) + 900);
+        (uint256 averagePrice, uint32 elapsed) =
+            oracle.consultPriceX112(address(pair), pair.token0());
+        require(elapsed == oracle.MIN_PERIOD(), "WRAP_WINDOW_INCORRECT");
+        require(averagePrice == 2 ** 112, "WRAP_PRICE_INCORRECT");
+    }
+
+    function testToken1DirectionReturnsReciprocalTwap() public {
+        oracle.update(address(pair));
+        vm.warp(block.timestamp + oracle.MIN_PERIOD());
+        (uint256 averagePrice,) =
+            oracle.consultPriceX112(address(pair), pair.token1());
+        require(averagePrice == 2 ** 112, "TOKEN1_PRICE_INCORRECT");
+    }
+
     function testRejectsInvalidToken() public {
         address unknownToken = address(0x1234);
         (bool ok,) = address(oracle).staticcall(
