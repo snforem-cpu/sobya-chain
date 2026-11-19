@@ -44,6 +44,12 @@ contract SobyaMultiMarketUsdOracle {
         (uint256 p1, uint32 e1) = source1.sobyUsdPrice();
         (uint256 p2, uint32 e2) = source2.sobyUsdPrice();
         require(p0 > 0 && p1 > 0 && p2 > 0, "SOBYA_MULTI: ZERO_PRICE");
+        require(
+            e0 >= 30 minutes && e0 <= 2 hours &&
+            e1 >= 30 minutes && e1 <= 2 hours &&
+            e2 >= 30 minutes && e2 <= 2 hours,
+            "SOBYA_MULTI: INVALID_TWAP_WINDOW"
+        );
 
         uint256 low = p0;
         uint256 mid = p1;
