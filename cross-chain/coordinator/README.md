@@ -32,3 +32,11 @@ observers have independently verified their evidence.
   backups, access controls, monitoring, rate limits, and recovery procedures.
 - No server, RPC endpoint, private key, source-chain address, or production
   database is configured.
+
+## Attestation payload preparation (no signer)
+
+`attestation_payload.py` builds the EIP-712 payout typed-data/digest expected
+by the Ethereum/TRON escrow state machine and the Borsh `AttestPayout`
+instruction bytes expected by the Solana program. It performs serialization
+only: no private keys, signature creation, transaction signing, or broadcast.
+See `ATTESTATION_PROTOCOL.md` for exact fields and the trust boundary.
