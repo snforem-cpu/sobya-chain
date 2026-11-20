@@ -17,7 +17,7 @@ from solana_source_observer import (
     _pubkey_bytes, _b58encode, LEGACY_SPL_TOKEN_PROGRAM,
 )
 from order_ledger import OrderQuote, SourceDepositEvidence
-from self_hosted_supervisor import validate_self_hosted_url, NodeHealthError
+from self_hosted_supervisor import validate_self_hosted_url, SupervisorConfigError
 
 
 def quote_from_ledger(ledger: Any, order_id: str) -> OrderQuote:
@@ -63,7 +63,7 @@ def _require_private_rpc(rpc: Any) -> None:
         raise VerificationError("observer RPC must expose its configured URL")
     try:
         validate_self_hosted_url(url)
-    except NodeHealthError as exc:
+    except SupervisorConfigError as exc:
         raise VerificationError("observer RPC must be a SOBYA-operated private node") from exc
 
 
