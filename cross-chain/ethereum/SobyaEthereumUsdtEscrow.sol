@@ -83,7 +83,11 @@ contract SobyaEthereumUsdtEscrow {
         ));
     }
 
-    function orderDigest(Order calldata order) public view returns (bytes32) {
+    function orderDigest(Order calldata order) external view returns (bytes32) {
+        return _orderDigest(order);
+    }
+
+    function _orderDigest(Order calldata order) private view returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(
             ORDER_TYPEHASH, order.orderId, order.user, order.token, order.sourceAmount,
             order.solver, order.destinationChainId, order.destinationRecipient,
@@ -101,7 +105,7 @@ contract SobyaEthereumUsdtEscrow {
             order.refundAfter <= order.quoteExpiry
         ) revert InvalidOrder();
         if (status[order.orderId] != Status.NONE) revert OrderAlreadyUsed();
-        if (_recover(orderDigest(order), solverQuoteSignature) != order.solver) revert InvalidSignature();
+        if (_recover(_orderDigest(order), solverQuoteSignature) != order.solver) revert InvalidSignature();
 
         status[order.orderId] = Status.FUNDED;
         orders[order.orderId] = order;
