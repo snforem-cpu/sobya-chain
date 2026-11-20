@@ -38,7 +38,7 @@ class InventoryStorageTests(unittest.TestCase):
                     updated_at INTEGER NOT NULL
                 )
             """)
-            db.execute("INSERT INTO orders VALUES('legacy-order')")
+            db.execute("INSERT INTO orders(order_id) VALUES('legacy-order')")
             db.execute("INSERT INTO solver_inventory VALUES(?,?,?)",
                        ("solver", 9_000_000_000_000_000_000, 1_000_000_000_000_000_000))
             db.execute("INSERT INTO inventory_reservations VALUES(?,?,?,?,?,?)",
