@@ -79,7 +79,7 @@ class SettlementObserverTests(unittest.TestCase):
         }
         self.fake.transaction = {
             "hash": self.tx_hash, "to": self.contract,
-            "from": self.expected.solver, "value": hex(self.expected.soby_amount),
+            "from": self.expected.destination_solver, "value": hex(self.expected.soby_amount),
         }
 
     def test_valid_finalized_payout_is_verified(self):
