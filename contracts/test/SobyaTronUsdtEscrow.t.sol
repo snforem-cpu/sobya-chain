@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "../src/SobyaTronUsdtEscrow.sol";
+import "../src/SobyaEthereumUsdtEscrow.sol";
 
 interface VmTronEscrow {
     function addr(uint256 privateKey) external returns (address);
@@ -52,8 +53,8 @@ contract SobyaTronUsdtEscrowTest {
         vm.prank(user); usdt.approve(address(escrow), 100_000_000);
     }
 
-    function _order() private view returns (SobyaTronUsdtEscrow.Order memory) {
-        return SobyaTronUsdtEscrow.Order({
+    function _order() private view returns (SobyaEthereumUsdtEscrow.Order memory) {
+        return SobyaEthereumUsdtEscrow.Order({
             orderId: keccak256("tron-test-order-1"), user: user, token: address(usdt),
             sourceAmount: 25_000_000, solver: solver,
             destinationChainId: 357812033857, destinationRecipient: address(0x5150),
@@ -90,23 +91,23 @@ contract SobyaTronUsdtEscrowTest {
     }
 
     function testTronEscrowFundAndAttestedClaim() public {
-        SobyaTronUsdtEscrow.Order memory order = _order();
+        SobyaEthereumUsdtEscrow.Order memory order = _order();
         bytes memory quote = _signature(SOLVER_KEY, escrow.orderDigest(order));
         vm.prank(user); escrow.fund(order, quote);
-        require(escrow.status(order.orderId) == SobyaTronUsdtEscrow.Status.FUNDED, "not funded");
+        require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.FUNDED, "not funded");
         bytes[] memory sigs = _payoutSignatures(order.orderId);
         vm.prank(solver); escrow.claim(order.orderId, keccak256("sobya-tron-payout-tx"), sigs);
-        require(escrow.status(order.orderId) == SobyaTronUsdtEscrow.Status.CLAIMED, "not claimed");
+        require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.CLAIMED, "not claimed");
         require(usdt.balanceOf(solver) == order.sourceAmount, "solver not paid");
     }
 
     function testTronEscrowRefundIsExclusiveTerminalState() public {
-        SobyaTronUsdtEscrow.Order memory order = _order();
+        SobyaEthereumUsdtEscrow.Order memory order = _order();
         bytes memory quote = _signature(SOLVER_KEY, escrow.orderDigest(order));
         vm.prank(user); escrow.fund(order, quote);
         vm.warp(order.refundAfter);
         vm.prank(user); escrow.refund(order.orderId);
-        require(escrow.status(order.orderId) == SobyaTronUsdtEscrow.Status.REFUNDED, "not refunded");
+        require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.REFUNDED, "not refunded");
         require(usdt.balanceOf(user) == 100_000_000, "user not refunded");
         bytes[] memory sigs = _payoutSignatures(order.orderId);
         vm.prank(solver);
@@ -117,7 +118,7 @@ contract SobyaTronUsdtEscrowTest {
     }
 
     function testTronEscrowRejectsWrongSolverQuote() public {
-        SobyaTronUsdtEscrow.Order memory order = _order();
+        SobyaEthereumUsdtEscrow.Order memory order = _order();
         bytes memory badQuote = _signature(USER_KEY, escrow.orderDigest(order));
         vm.prank(user);
         (bool ok,) = address(escrow).call(abi.encodeWithSelector(escrow.fund.selector, order, badQuote));
