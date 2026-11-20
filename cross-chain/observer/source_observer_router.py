@@ -19,6 +19,18 @@ from solana_source_observer import (
 from order_ledger import OrderQuote, SourceDepositEvidence
 
 
+def quote_from_ledger(ledger: Any, order_id: str) -> OrderQuote:
+    """Adapt the immutable quote stored by CrossChainOrderLedger for observer checks."""
+    record = ledger.get_order(order_id)
+    quote = record.get("quote") if isinstance(record, dict) else None
+    if not isinstance(quote, dict):
+        raise VerificationError("registered quote record is malformed")
+    try:
+        return OrderQuote(**quote)
+    except (TypeError, ValueError) as exc:
+        raise VerificationError("registered quote record is malformed") from exc
+
+
 ASSOCIATED_TOKEN_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsJA8knL"
 
 
