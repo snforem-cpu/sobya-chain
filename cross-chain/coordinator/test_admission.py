@@ -88,7 +88,7 @@ class AdmissionGuardTests(unittest.TestCase):
             user=self.quote.user, solver=self.quote.solver,
             destination_chain_id=self.quote.destination_chain_id,
             destination_recipient="0x" + "66"*20,
-            destination_amount=10**18, quote_expiry=self.quote.quote_expiry,
+            destination_amount=10**18 + 1, quote_expiry=self.quote.quote_expiry,
             refund_after=self.quote.refund_after,
         )
         with self.assertRaisesRegex(Exception, "insufficient unreserved SOBY inventory"):
