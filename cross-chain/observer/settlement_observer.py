@@ -31,7 +31,7 @@ class ExpectedPayout:
     source_amount: int
     recipient: str
     soby_amount: int
-    solver: str
+    destination_solver: str
 
 
 @dataclass(frozen=True)
@@ -164,7 +164,7 @@ class SettlementVerifier:
         expected_asset = _hex_bytes(expected.source_asset, 32, "expected source asset")
         recipient_bytes = _hex_bytes("0x" + "00" * 12 + expected.recipient[2:], 32, "expected recipient")
         expected_recipient = "0x" + recipient_bytes[12:].hex()
-        expected_solver = expected.solver.lower()
+        expected_solver = expected.destination_solver.lower()
 
         matches = []
         for log in receipt.get("logs", []):
