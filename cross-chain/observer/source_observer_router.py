@@ -112,11 +112,11 @@ class SourceObserverRouter:
             actual = SourceDepositEvidence(
                 order_id=quote.order_id, source_chain=chain,
                 transaction_id=observed.transaction_hash, event_index=observed.log_index,
-                source_asset=observed.token, source_amount=observed.amount,
-                user=observed.user, solver=observed.solver,
+                source_asset=quote.source_asset, source_amount=quote.source_amount,
+                user=quote.user, solver=quote.solver,
                 destination_chain_id=observed.destination_chain_id,
-                destination_recipient=observed.destination_recipient,
-                destination_amount=observed.destination_amount,
+                destination_recipient=quote.destination_recipient,
+                destination_amount=quote.destination_amount,
                 finalized_reference=f"ethereum:finalized:{observed.block_number}",
             )
             return self._match_evidence(evidence, actual)
@@ -138,11 +138,11 @@ class SourceObserverRouter:
             actual = SourceDepositEvidence(
                 order_id=quote.order_id, source_chain=chain,
                 transaction_id=observed.transaction_id, event_index=observed.log_index,
-                source_asset=observed.token, source_amount=observed.amount,
-                user=observed.user, solver=observed.solver,
+                source_asset=quote.source_asset, source_amount=quote.source_amount,
+                user=quote.user, solver=quote.solver,
                 destination_chain_id=observed.destination_chain_id,
-                destination_recipient=observed.destination_recipient,
-                destination_amount=observed.destination_amount,
+                destination_recipient=quote.destination_recipient,
+                destination_amount=quote.destination_amount,
                 finalized_reference=f"tron:solidified:{observed.block_number}",
             )
             return self._match_evidence(evidence, actual)
@@ -172,11 +172,11 @@ class SourceObserverRouter:
             actual = SourceDepositEvidence(
                 order_id=quote.order_id, source_chain=chain,
                 transaction_id=observed.signature, event_index=0,
-                source_asset=observed.usdt_mint, source_amount=observed.source_amount,
-                user=observed.user, solver=observed.solver,
+                source_asset=quote.source_asset, source_amount=quote.source_amount,
+                user=quote.user, solver=quote.solver,
                 destination_chain_id=quote.destination_chain_id,
                 destination_recipient=quote.destination_recipient,
-                destination_amount=observed.destination_amount,
+                destination_amount=quote.destination_amount,
                 finalized_reference=f"solana:finalized:{observed.slot}",
             )
             return self._match_evidence(evidence, actual)
