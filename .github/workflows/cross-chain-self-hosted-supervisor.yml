@@ -5,6 +5,8 @@ on:
     paths:
       - "cross-chain/observer/self_hosted_supervisor.py"
       - "cross-chain/observer/rpc_probes.py"
+      - "cross-chain/observer/supervisor_service.py"
+      - "cross-chain/observer/test_supervisor_service.py"
       - "cross-chain/observer/test_rpc_probes.py"
       - "cross-chain/observer/test_self_hosted_supervisor.py"
       - "cross-chain/observer/requirements.txt"
@@ -35,4 +37,4 @@ jobs:
         run: |
           python -m pip install -r cross-chain/observer/requirements.txt
           cd cross-chain/observer
-          python -m unittest -v test_self_hosted_supervisor.py test_rpc_probes.py
+          python -m unittest -v test_self_hosted_supervisor.py test_rpc_probes.py test_supervisor_service.py
