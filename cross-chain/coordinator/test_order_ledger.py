@@ -108,5 +108,28 @@ class OrderLedgerTests(unittest.TestCase):
         self.assertEqual(self.ledger.get_order("order-001")["status"], "SOURCE_FUNDED")
 
 
+    def test_expired_unfunded_quote_releases_soby_inventory(self):
+        self.ledger.set_solver_inventory(self.quote.solver, 3 * 10**18)
+        self.ledger.register_quote_with_inventory(self.quote, now=1_900_000_000)
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 2 * 10**18)
+        with self.assertRaisesRegex(LedgerError, "has not reached"):
+            self.ledger.expire_unfunded_quote(self.quote.order_id, now=self.quote.quote_expiry - 1)
+        self.ledger.expire_unfunded_quote(self.quote.order_id, now=self.quote.quote_expiry)
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 3 * 10**18)
+        reservation = self.ledger.db.execute(
+            "SELECT status FROM inventory_reservations WHERE order_id=?",
+            (self.quote.order_id,),
+        ).fetchone()
+        self.assertEqual(reservation["status"], "RELEASED")
+        self.assertIsNotNone(self.ledger.get_order(self.quote.order_id)["expired_at"])
+        with self.assertRaisesRegex(LedgerError, "only a live"):
+            self.ledger.expire_unfunded_quote(self.quote.order_id, now=self.quote.quote_expiry + 1)
+
+    def test_source_deposit_after_quote_expiry_is_rejected(self):
+        self.ledger.register_quote(self.quote, now=1_900_000_000)
+        with self.assertRaisesRegex(LedgerError, "quote expired"):
+            self.ledger.record_source_deposit(self.deposit, now=self.quote.quote_expiry)
+        self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "QUOTED")
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
