@@ -12,6 +12,8 @@ on:
       - "feat/sobya-cross-chain-swap-foundation"
     paths:
       - "cross-chain/observer/self_hosted_supervisor.py"
+      - "cross-chain/observer/rpc_probes.py"
+      - "cross-chain/observer/test_rpc_probes.py"
       - "cross-chain/observer/test_self_hosted_supervisor.py"
       - "cross-chain/observer/requirements.txt"
       - ".github/workflows/cross-chain-self-hosted-supervisor.yml"
