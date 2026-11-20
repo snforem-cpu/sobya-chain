@@ -12,6 +12,8 @@ from typing import Any
 from admission import ReadinessAdmissionGuard
 from coordinator import LocalCoordinator
 from eip712_quote_verifier import Eip712QuoteVerifier, Eip712QuoteDomain
+from quote_signature_router import ChainQuoteSignatureVerifier
+from solana_quote_verifier import SolanaQuoteVerifier
 from http_api import create_server
 from order_ledger import CrossChainOrderLedger
 from pricing import InventoryAwareQuotePricer
@@ -40,7 +42,18 @@ def build_local_server(
     quote_pricer: InventoryAwareQuotePricer,
 ):
     """Build, but do not start, the fully wired loopback coordinator HTTP server."""
-    quote_signatures = Eip712QuoteVerifier(quote_domains)
+    evm_quote_signatures = Eip712QuoteVerifier(quote_domains)
+    solana_quote_signatures = None
+    if solana_source is not None:
+        solana_quote_signatures = SolanaQuoteVerifier(
+            program_id=solana_source.program_id,
+            config_authority=solana_source.config_authority,
+            usdt_mint=solana_source.usdt_mint,
+            destination_chain_id=solana_source.sobya_chain_id,
+        )
+    quote_signatures = ChainQuoteSignatureVerifier(
+        evm_quote_signatures, solana_quote_signatures
+    )
     lookup = lambda order_id: quote_from_ledger(ledger, order_id)
     source_observer = SourceObserverRouter(
         quote_lookup=lookup,
