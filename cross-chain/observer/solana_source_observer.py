@@ -152,7 +152,7 @@ class SolanaDepositVerifier:
                 or config_raw[32] != derived_config_bump
                 or config_raw[33:65] != _pubkey_bytes(expected.usdt_mint)
                 or int.from_bytes(config_raw[65:73], "little") != expected.sobya_chain_id):
-            raise VerificationError("Solana config authority, bump, or USDT mint does not match pinned configuration")
+            raise VerificationError("Solana config authority, bump, USDT mint, or SOBYA chain ID does not match pinned configuration")
 
         tx = self.rpc.call("getTransaction", [expected.signature, {
             "encoding": "json", "commitment": "finalized", "maxSupportedTransactionVersion": 0,
