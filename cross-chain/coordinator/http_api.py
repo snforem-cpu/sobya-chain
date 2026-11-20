@@ -5,7 +5,7 @@ signing keys, transaction broadcaster, RPC client, or public-bind capability.
 """
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import asdict, fields
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
@@ -55,6 +55,7 @@ def create_server(
     verify_quote_signature: Callable[..., bool],
     verify_source_deposit: Callable[..., bool],
     verify_destination_payout: Callable[..., bool],
+    quote_pricer: Any | None = None,
     max_body_bytes: int = 65536,
 ) -> ThreadingHTTPServer:
     try:
@@ -119,6 +120,27 @@ def create_server(
             path = urlsplit(self.path).path
             try:
                 body = self._body()
+                if path == "/v1/quote-previews":
+                    if self.server.quote_pricer is None:
+                        self._send(503, {"error": "quote pricing is not configured"})
+                        return
+                    if set(body) != {"request"} or not isinstance(body["request"], dict):
+                        raise ValueError("request object is required")
+                    request = body["request"]
+                    required = {
+                        "order_id", "source_chain", "source_asset", "source_amount",
+                        "user", "solver", "destination_recipient",
+                    }
+                    if set(request) != required:
+                        raise ValueError("quote request fields do not match the required schema")
+                    if not isinstance(request["source_amount"], int) or isinstance(request["source_amount"], bool):
+                        raise ValueError("source_amount must be an integer token base-unit amount")
+                    for field in required - {"source_amount"}:
+                        if not isinstance(request[field], str) or not request[field]:
+                            raise ValueError(f"{field} is required")
+                    quote = self.server.quote_pricer.quote(**request)
+                    self._send(200, {"signed": False, "reserved": False, "quote": asdict(quote)})
+                    return
                 if path == "/v1/quotes":
                     if set(body) != {"quote", "signature"} or not isinstance(body["signature"], str):
                         raise ValueError("quote and hex signature are required")
@@ -178,4 +200,5 @@ def create_server(
     server.verify_quote_signature = verify_quote_signature
     server.verify_source_deposit = verify_source_deposit
     server.verify_destination_payout = verify_destination_payout
+    server.quote_pricer = quote_pricer
     return server
