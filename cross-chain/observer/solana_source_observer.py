@@ -28,6 +28,7 @@ class ExpectedSolanaDeposit:
     order_pda: str
     config_pda: str
     config_authority: str
+    sobya_chain_id: int
     user: str
     solver: str
     escrow_token_account: str
@@ -121,8 +122,9 @@ class SolanaDepositVerifier:
         self.rpc = rpc
 
     def verify(self, expected: ExpectedSolanaDeposit) -> VerifiedSolanaDeposit:
-        if len(expected.order_id) != 32 or len(expected.destination_recipient) != 20:
-            raise ValueError("order ID and destination recipient must be 32 and 20 bytes")
+        if (len(expected.order_id) != 32 or len(expected.destination_recipient) != 20
+                or not isinstance(expected.sobya_chain_id, int) or expected.sobya_chain_id <= 0):
+            raise ValueError("order ID, recipient, and pinned SOBYA chain ID are invalid")
         derived_config, _ = _find_program_address(
             [b"config", _pubkey_bytes(expected.config_authority)], expected.program_id
         )
@@ -148,7 +150,8 @@ class SolanaDepositVerifier:
         if (len(config_raw) < 65
                 or config_raw[:32] != _pubkey_bytes(expected.config_authority)
                 or config_raw[32] != derived_config_bump
-                or config_raw[33:65] != _pubkey_bytes(expected.usdt_mint)):
+                or config_raw[33:65] != _pubkey_bytes(expected.usdt_mint)
+                or int.from_bytes(config_raw[65:73], "little") != expected.sobya_chain_id):
             raise VerificationError("Solana config authority, bump, or USDT mint does not match pinned configuration")
 
         tx = self.rpc.call("getTransaction", [expected.signature, {
