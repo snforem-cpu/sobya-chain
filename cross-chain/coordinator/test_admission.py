@@ -31,6 +31,7 @@ class AdmissionGuardTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.ledger = CrossChainOrderLedger(str(Path(self.temp.name) / "orders.sqlite"))
         self.monitor = FakeMonitor()
+        self.ledger.set_solver_inventory("0x" + "44"*20, 2 * 10**18)
         self.guard = ReadinessAdmissionGuard(self.monitor, self.ledger)
         self.quote = OrderQuote(
             order_id="order-guard-001", source_chain="ethereum",
@@ -67,7 +68,32 @@ class AdmissionGuardTests(unittest.TestCase):
         self.guard.register_quote(self.quote, now=1_900_000_000)
         self.guard.record_source_deposit(self.deposit, now=1_900_000_001)
         self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "SOURCE_FUNDED")
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
         self.assertEqual(self.monitor.calls, [("ethereum", "sobya"), ("ethereum", "sobya")])
+
+    def test_insufficient_solver_inventory_denies_quote_atomically(self):
+        self.ledger.set_solver_inventory(self.quote.solver, self.quote.destination_amount - 1)
+        with self.assertRaisesRegex(Exception, "insufficient unreserved SOBY inventory"):
+            self.guard.register_quote(self.quote, now=1_900_000_000)
+        with self.assertRaisesRegex(Exception, "unknown order"):
+            self.ledger.get_order(self.quote.order_id)
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver),
+                         self.quote.destination_amount - 1)
+
+    def test_quote_reserves_inventory_against_concurrent_orders(self):
+        self.guard.register_quote(self.quote, now=1_900_000_000)
+        second = OrderQuote(
+            order_id="order-guard-002", source_chain="ethereum",
+            source_asset=self.quote.source_asset, source_amount=self.quote.source_amount,
+            user=self.quote.user, solver=self.quote.solver,
+            destination_chain_id=self.quote.destination_chain_id,
+            destination_recipient="0x" + "66"*20,
+            destination_amount=10**18, quote_expiry=self.quote.quote_expiry,
+            refund_after=self.quote.refund_after,
+        )
+        with self.assertRaisesRegex(Exception, "insufficient unreserved SOBY inventory"):
+            self.guard.register_quote(second, now=1_900_000_000)
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
 
     def test_unhealthy_source_or_destination_denies_quote(self):
         self.monitor.ready = False
@@ -103,6 +129,7 @@ class AdmissionGuardTests(unittest.TestCase):
         self.monitor.ready = False
         self.guard.record_destination_payout(self.payout, now=1_900_000_002)
         self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "DESTINATION_PAID")
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
 
     def test_readiness_exception_does_not_change_existing_order(self):
         self.guard.register_quote(self.quote, now=1_900_000_000)
