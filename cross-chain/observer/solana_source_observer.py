@@ -140,6 +140,8 @@ class SolanaDepositVerifier:
             (k.get("pubkey") if isinstance(k, dict) else k)
             for k in keys if isinstance(k, dict) and k.get("signer")
         }
+        if tx.get("transaction", {}).get("signatures", [None])[0] != expected.signature:
+            raise VerificationError("Solana transaction signature does not match request")
         if not signers:
             # json encoding may return string keys; signer flags are then in header.
             header = message.get("header", {})
@@ -158,6 +160,21 @@ class SolanaDepositVerifier:
             if pubkeys[program_index] == expected.program_id:
                 accounts = [pubkeys[i] for i in ix.get("accounts", []) if isinstance(i, int) and i < len(pubkeys)]
                 if expected.order_pda in accounts:
+                    raw_instruction = _b58decode(ix.get("data", ""))
+                    if len(raw_instruction) != 1 + 32 + 20 + 16 + 8 + 8 + 8 or raw_instruction[0] != 1:
+                        raise VerificationError("Solana instruction is not a canonical Fund instruction")
+                    p = 1
+                    fields = [raw_instruction[p:p+32]]; p += 32
+                    fields.append(raw_instruction[p:p+20]); p += 20
+                    fields.append(int.from_bytes(raw_instruction[p:p+16], "little")); p += 16
+                    fields.append(int.from_bytes(raw_instruction[p:p+8], "little")); p += 8
+                    fields.append(int.from_bytes(raw_instruction[p:p+8], "little")); p += 8
+                    fields.append(int.from_bytes(raw_instruction[p:p+8], "little"))
+                    wanted_instruction = [expected.order_id, expected.destination_recipient,
+                        expected.destination_amount, expected.source_amount,
+                        expected.quote_expiry, expected.refund_after]
+                    if fields != wanted_instruction:
+                        raise VerificationError("Solana Fund instruction data does not match expected quote")
                     fund_calls.append(accounts)
         if len(fund_calls) != 1:
             raise VerificationError("expected exactly one escrow-program instruction for this order PDA")
@@ -227,3 +244,4 @@ def _pubkey_bytes(value: str) -> bytes:
     if len(raw) != 32:
         raise VerificationError("Solana public key must decode to 32 bytes")
     return raw
+\n\ndef _b58decode(value: str) -> bytes:\n    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"\n    number = 0\n    try:\n        for char in value:\n            number = number * 58 + alphabet.index(char)\n    except ValueError as exc:\n        raise VerificationError("invalid base58 instruction data") from exc\n    decoded = number.to_bytes((number.bit_length() + 7) // 8, "big")\n    return bytes(len(value) - len(value.lstrip("1"))) + decoded\n
