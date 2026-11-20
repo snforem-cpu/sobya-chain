@@ -109,7 +109,7 @@ class SolanaSourceObserverTests(unittest.TestCase):
             self.verifier.verify(self.expected)
 
     def test_wrong_order_state_rejected(self):
-        self.fake.order_data = self.fake.order_data[:-1] + bytes([1])
+        self.fake.order_data = self.fake.order_data[:-2] + bytes([1]) + self.fake.order_data[-1:]
         with self.assertRaisesRegex(VerificationError, "status"):
             self.verifier.verify(self.expected)
 
