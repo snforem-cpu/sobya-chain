@@ -131,3 +131,60 @@ def probe_for_network(network: str, *, opener=urlopen) -> Callable[[NodeTarget],
     if normalized == "solana":
         return lambda target: probe_solana(target, opener=opener)
     raise ProbeError("unsupported network probe")
+
+
+def targets_from_config(config: dict[str, Any]) -> tuple[NodeTarget, ...]:
+    """Build targets only for explicitly enabled self-hosted networks.
+
+    Public fallback and signing must remain disabled. Empty enabled-network
+    configuration is rejected rather than treated as an operational service.
+    """
+    from self_hosted_supervisor import SupervisorConfigError, validate_targets
+
+    if not isinstance(config, dict) or config.get("mode") != "self-hosted-only":
+        raise SupervisorConfigError("configuration must use self-hosted-only mode")
+    if config.get("publicRpcFallback") is not False:
+        raise SupervisorConfigError("public RPC fallback must be explicitly disabled")
+    if config.get("signingEnabled") is not False:
+        raise SupervisorConfigError("signing must be explicitly disabled")
+    networks = config.get("networks")
+    if not isinstance(networks, dict):
+        raise SupervisorConfigError("network configuration is required")
+
+    targets: list[NodeTarget] = []
+    for network, settings in networks.items():
+        if not isinstance(settings, dict) or settings.get("enabled") is not True:
+            continue
+        identity = (
+            settings.get("expectedChainId")
+            or settings.get("expectedNetworkIdentity")
+            or settings.get("expectedGenesisHash")
+        )
+        nodes = settings.get("nodes")
+        if not isinstance(identity, str) or not identity.strip() or not isinstance(nodes, list) or not nodes:
+            raise SupervisorConfigError(f"enabled network {network} requires pinned identity and nodes")
+        for node in nodes:
+            if not isinstance(node, dict):
+                raise SupervisorConfigError(f"enabled network {network} has an invalid node entry")
+            targets.append(NodeTarget(
+                network=network,
+                node_id=str(node.get("id", "")),
+                rpc_url=str(node.get("rpcUrl", "")),
+                expected_identity=identity,
+                max_head_lag=node.get("maxHeadLag", 3),
+                max_finality_lag=node.get("maxFinalityLag", 64),
+            ))
+    if not targets:
+        raise SupervisorConfigError("no networks are enabled")
+    return validate_targets(targets)
+
+
+def probe_target(target: NodeTarget) -> NodeHealth:
+    """Dispatch one target to its read-only chain-specific probe."""
+    return probe_for_network(target.network)(target)
+
+
+def supervisor_from_config(config: dict[str, Any]):
+    """Construct a fail-closed supervisor from a self-hosted JSON config object."""
+    from self_hosted_supervisor import SelfHostedNodeSupervisor
+    return SelfHostedNodeSupervisor(targets_from_config(config), probe_target)
