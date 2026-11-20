@@ -58,7 +58,7 @@ Alternative terminal paths:
 - `SOURCE_FUNDED/SOURCE_FINAL -> REFUNDABLE -> REFUNDED` if no valid destination payout occurs before the refund deadline.
 - `DESTINATION_PAID -> COMPLETE` only after payout confirmation; the source escrow claim then becomes available to the committed solver under the order's exact rules.
 
-The implementation must resolve race conditions between payout and refund on-chain. No off-chain status update alone can make a terminal transition valid.
+The implementation must resolve race conditions between payout and refund on-chain. Solver claim must execute before the refund deadline; after that deadline a late attestation cannot authorize a solver claim, and the user refund path remains available. No off-chain status update alone can make a terminal transition valid.
 
 ## 5. Atomicity and solvency limitation
 
