@@ -42,6 +42,10 @@ class LocalCoordinator:
         self._verify(verify_quote_signature, quote, signature)
         self.admission.register_quote(quote, now=now)
 
+    def expire_unfunded_quote(self, order_id: str, now: int | None = None) -> None:
+        """Expire a quote that never received a source deposit."""
+        self.admission.expire_unfunded_quote(order_id, now=now)
+
     def accept_source_deposit(self, evidence: SourceDepositEvidence, proof: Any,
                               verify_source_deposit: Callable[[SourceDepositEvidence, Any], bool],
                               now: int | None = None) -> None:
