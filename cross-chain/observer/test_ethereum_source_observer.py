@@ -41,11 +41,11 @@ class FakeRpc:
                 result = {"hash": self.canonical_hash}
         elif method == "eth_call":
             data = params[0]["data"]
-            if data.startswith("0xfc0c546a"):  # token()
+            if data[:10] == "0x" + keccak(b"token()")[:4].hex():
                 result = "0x" + word_address(self.token).hex()
-            elif data.startswith("0x5b7b8f"):  # status(bytes32), selector checked below
+            elif data[:10] == "0x" + keccak(b"status(bytes32)")[:4].hex():
                 result = "0x" + word_int(self.status).hex()
-            elif data.startswith("0x"):  # orders(bytes32), use selector map
+            elif data[:10] == "0x" + keccak(b"orders(bytes32)")[:4].hex():
                 result = "0x" + b"".join(self.order).hex()
             else:
                 raise AssertionError(data)
