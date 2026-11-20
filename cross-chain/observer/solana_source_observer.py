@@ -7,6 +7,7 @@ SPL Token escrow account state. It does not sign or submit transactions.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import urllib.request
 from dataclasses import dataclass
@@ -121,6 +122,16 @@ class SolanaDepositVerifier:
     def verify(self, expected: ExpectedSolanaDeposit) -> VerifiedSolanaDeposit:
         if len(expected.order_id) != 32 or len(expected.destination_recipient) != 20:
             raise ValueError("order ID and destination recipient must be 32 and 20 bytes")
+        derived_config, _ = _find_program_address(
+            [b"config", _pubkey_bytes(expected.user)], expected.program_id
+        )
+        derived_order, _ = _find_program_address(
+            [b"order", expected.order_id], expected.program_id
+        )
+        if expected.config_pda != derived_config:
+            raise VerificationError("configured Solana config PDA does not match its authority and program")
+        if expected.order_pda != derived_order:
+            raise VerificationError("Solana order PDA does not match its order ID and program")
         tx = self.rpc.call("getTransaction", [expected.signature, {
             "encoding": "json", "commitment": "finalized", "maxSupportedTransactionVersion": 0,
         }])
@@ -228,6 +239,66 @@ class SolanaDepositVerifier:
             destination_amount=expected.destination_amount,
             quote_expiry=expected.quote_expiry, refund_after=expected.refund_after,
         )
+
+
+def _is_ed25519_point(encoded: bytes) -> bool:
+    """Return whether encoded bytes decompress to a canonical Ed25519 point."""
+    if len(encoded) != 32:
+        return False
+    p = (1 << 255) - 19
+    value = int.from_bytes(encoded, "little")
+    sign = value >> 255
+    y = value & ((1 << 255) - 1)
+    if y >= p:
+        return False
+    d = (-121665 * pow(121666, p - 2, p)) % p
+    y2 = y * y % p
+    denominator = (d * y2 + 1) % p
+    if denominator == 0:
+        return False
+    x2 = ((y2 - 1) * pow(denominator, p - 2, p)) % p
+    x = pow(x2, (p + 3) // 8, p)
+    if (x * x - x2) % p != 0:
+        sqrt_m1 = pow(2, (p - 1) // 4, p)
+        x = x * sqrt_m1 % p
+    if (x * x - x2) % p != 0:
+        return False
+    if x == 0 and sign:
+        return False
+    return True
+
+
+def _create_program_address(seeds: list[bytes], program_id: str) -> bytes:
+    if len(seeds) > 16 or any(len(seed) > 32 for seed in seeds):
+        raise VerificationError("invalid Solana PDA seeds")
+    digest = hashlib.sha256(
+        b"".join(seeds) + _pubkey_bytes(program_id) + b"ProgramDerivedAddress"
+    ).digest()
+    if _is_ed25519_point(digest):
+        raise VerificationError("derived Solana PDA is on the Ed25519 curve")
+    return digest
+
+
+def _find_program_address(seeds: list[bytes], program_id: str) -> tuple[str, int]:
+    for bump in range(255, -1, -1):
+        try:
+            address = _create_program_address([*seeds, bytes([bump])], program_id)
+            return _b58encode(address), bump
+        except VerificationError as exc:
+            if "on the Ed25519 curve" not in str(exc):
+                raise
+    raise VerificationError("unable to derive a valid Solana PDA")
+
+
+def _b58encode(raw: bytes) -> str:
+    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    zeros = len(raw) - len(raw.lstrip(b"\\0"))
+    number = int.from_bytes(raw, "big")
+    encoded = ""
+    while number:
+        number, remainder = divmod(number, 58)
+        encoded = alphabet[remainder] + encoded
+    return "1" * zeros + (encoded or "")
 
 
 def _pubkey_bytes(value: str) -> bytes:
