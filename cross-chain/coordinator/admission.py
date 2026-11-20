@@ -48,7 +48,7 @@ class ReadinessAdmissionGuard:
 
     def register_quote(self, quote: OrderQuote, now: int | None = None) -> None:
         self._require_ready(quote.source_chain)
-        self.ledger.register_quote(quote, now=now)
+        self.ledger.register_quote_with_inventory(quote, now=now)
 
     def record_source_deposit(self, evidence: SourceDepositEvidence,
                               now: int | None = None) -> None:
