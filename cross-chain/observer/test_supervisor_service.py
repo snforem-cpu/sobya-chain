@@ -70,6 +70,36 @@ class ServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "loopback only"):
             create_server("0.0.0.0", 8765, monitor)
 
+
+    def test_admission_requires_source_and_destination_ready(self):
+        class SobyaReady:
+            network = "sobya"
+            ready = True
+            checked_nodes = ("sobya-a",)
+            failures = ()
+        class TronNotReady:
+            network = "tron"
+            ready = False
+            checked_nodes = ("tron-a",)
+            failures = ("tron-a: ProbeError",)
+        class MultiSupervisor:
+            def all_ready(self):
+                return (SobyaReady(), TronNotReady())
+        monitor = Monitor(MultiSupervisor())
+        monitor.refresh()
+        admissible, payload = monitor.admission("tron", "sobya")
+        self.assertFalse(admissible)
+        self.assertFalse(payload["admissible"])
+        self.assertTrue(payload["destination"]["ready"])
+        self.assertFalse(payload["source"]["ready"])
+
+    def test_admission_is_closed_for_missing_destination(self):
+        monitor = Monitor(FakeSupervisor())
+        monitor.refresh()
+        admissible, payload = monitor.admission("ethereum", "sobya")
+        self.assertFalse(admissible)
+        self.assertFalse(payload["destination"]["ready"])
+
     def test_http_ready_endpoint_and_method_rejection(self):
         monitor = Monitor(FakeSupervisor())
         monitor.refresh()
