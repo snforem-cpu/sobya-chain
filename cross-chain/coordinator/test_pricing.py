@@ -11,7 +11,7 @@ class PricingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.ledger = CrossChainOrderLedger(str(Path(self.temp.name) / "ledger.sqlite"))
         self.solver = "0x" + "44" * 20
-        self.ledger.set_solver_inventory(self.solver, 100 * 10**18)
+        self.ledger.set_solver_inventory(self.solver, 150_000_000 * 10**18)
         self.config = PricingConfig(
             usdt_atoms_numerator=2_000_000, soby_whole_denominator=1,
             fee_bps=100, min_source_amount=1_000_000,
@@ -37,6 +37,10 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(quote.destination_amount, 9_900_000_000_000_000_000)
         self.assertEqual(quote.quote_expiry, 1_900_000_060)
         self.assertEqual(quote.refund_after, 1_900_003_600)
+
+    def test_large_mainnet_scale_inventory_is_exact(self):
+        expected = 150_000_000 * 10**18
+        self.assertEqual(self.ledger.available_solver_inventory(self.solver), expected)
 
     def test_insufficient_inventory_rejected(self):
         self.ledger.set_solver_inventory(self.solver, 1)
