@@ -115,3 +115,33 @@ Tests:
 ```sh
 python -m unittest -v test_admission.py test_coordinator.py test_order_ledger.py
 ```
+
+## Authenticated loopback HTTP API
+
+`http_api.py` exposes a small HTTP adapter around `LocalCoordinator`:
+
+- `POST /v1/quotes`: submit a signed quote; signature verifier, readiness gate,
+  and atomic solver inventory reservation must all succeed.
+- `POST /v1/source-deposits`: submit source-deposit evidence and its proof;
+  the injected observer verifier must accept it, then both source and SOBYA
+  readiness are checked again before ledger acceptance.
+- `POST /v1/destination-payouts`: submit payout evidence and proof for an
+  existing funded order; verifier is required, but new-order readiness is not
+  used to block completion.
+- Every route requires `Authorization: Bearer <token>`; token must be at least
+  32 UTF-8 bytes. Requests are JSON with strict record schemas and a bounded
+  body (64 KiB default). The server only binds to a literal loopback address.
+
+The server is created programmatically with `create_server(...)`; it is not
+started automatically and has no default token or default verifier. The
+application integrator must provide secure token loading and audited
+chain-specific verification callbacks. Do not bind it to a public interface,
+commit a bearer token, or expose it through a reverse proxy. The current API
+does not include quote pricing, automatic quote signing, RPC calls, relaying,
+escrow claims, refunds, or an inventory balance oracle.
+
+HTTP API tests:
+
+```sh
+python -m unittest -v test_http_api.py
+```
