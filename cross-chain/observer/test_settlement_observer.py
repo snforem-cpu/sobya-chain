@@ -54,7 +54,7 @@ class SettlementObserverTests(unittest.TestCase):
             source_amount=25_000_000,
             recipient="0x" + "44" * 20,
             soby_amount=10**18,
-            solver="0x" + "55" * 20,
+            destination_solver="0x" + "55" * 20,
         )
         self.fake = FakeRpc()
         self.rpc = JsonRpc("https://rpc.invalid", transport=self.fake)
@@ -67,7 +67,7 @@ class SettlementObserverTests(unittest.TestCase):
             bytes.fromhex(self.expected.source_escrow[2:]),
             bytes.fromhex(self.expected.source_asset[2:]),
             word_int(self.expected.source_amount), word_int(self.expected.soby_amount),
-            word_address(self.expected.solver), word_int(357812033857),
+            word_address(self.expected.destination_solver), word_int(357812033857),
         ])
         self.fake.receipt = {
             "transactionHash": self.tx_hash, "to": self.contract,
