@@ -60,8 +60,8 @@ A chain is not ready merely because its observer code passes unit tests. Readine
 ## Implementation gates
 
 1. Implemented: independent config/order PDA derivation and forged-PDA rejection tests in the Solana source observer. Still pending: validator-based integration tests.
-2. Add explicit self-hosted node configuration with no public-RPC fallback.
-3. Add a local observer supervisor with health, lag, finality and disagreement checks.
+2. Added a self-hosted node configuration template with public-RPC fallback disabled; all networks remain disabled and example identities must be pinned before use.
+3. Added a fail-closed supervisor library that rejects public RPC URLs, checks node identity/sync/finality lag, and blocks order acceptance when a configured node fails. Chain-specific live probe adapters and deployment remain pending.
 4. Implement separately isolated SOBYA-controlled attestor processes and key lifecycle; keep all signing disabled by default.
 5. Add coordinator/risk-controller integration, strict caps, pause and refund-preservation tests.
 6. Run end-to-end tests on each source-chain test network and SOBYA test environment.
