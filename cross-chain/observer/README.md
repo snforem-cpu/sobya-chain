@@ -59,9 +59,9 @@ and validator-based integration tests before production. Mocked JSON-RPC tests
 do not establish Solana validator execution, Token CPI behavior, or RPC
 independence.
 
-## What it does not do
+## Destination payout observer boundaries
 
-- It does not verify source-chain deposits or their finality.
+- The SOBYA destination payout observer does not itself verify source-chain deposits or their finality; the separate Ethereum, TRON, and Solana source observers cover those chains with their respective trust limits.
 - It does not sign or submit payout attestations.
 - It does not operate a solver, hold private keys, or submit transactions.
 - It does not replace independent RPC providers, chain-specific finality policy,
