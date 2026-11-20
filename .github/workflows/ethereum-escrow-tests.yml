@@ -1,0 +1,28 @@
+name: Ethereum source escrow tests
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/ethereum-escrow-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "contracts/**"
+      - ".github/workflows/ethereum-escrow-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  foundry-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Run Solidity tests
+        working-directory: contracts
+        run: forge test -vvv
