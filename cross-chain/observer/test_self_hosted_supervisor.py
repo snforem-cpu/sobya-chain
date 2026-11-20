@@ -39,27 +39,31 @@ class SelfHostedSupervisorTests(unittest.TestCase):
             validate_targets([target(), target()])
 
     def test_healthy_synced_correct_chain_is_ready(self):
-        health = NodeHealth("1", 1000, 995, False)
+        health = NodeHealth("1", 1000, 995, 1000, False)
         supervisor = SelfHostedNodeSupervisor([target()], lambda _: health)
         self.assertTrue(supervisor.may_accept_orders("ethereum"))
 
     def test_wrong_chain_identity_fails_closed(self):
-        health = NodeHealth("5", 1000, 995, False)
+        health = NodeHealth("5", 1000, 995, 1000, False)
         supervisor = SelfHostedNodeSupervisor([target()], lambda _: health)
         self.assertFalse(supervisor.may_accept_orders("ethereum"))
 
     def test_syncing_node_fails_closed(self):
-        health = NodeHealth("1", 1000, 995, True)
+        health = NodeHealth("1", 1000, 995, 1000, True)
         supervisor = SelfHostedNodeSupervisor([target()], lambda _: health)
         self.assertFalse(supervisor.may_accept_orders("ethereum"))
 
     def test_stale_finality_fails_closed(self):
         with self.assertRaisesRegex(NodeHealthError, "too far behind"):
-            validate_health(target(), NodeHealth("1", 1000, 900, False))
+            validate_health(target(), NodeHealth("1", 1000, 900, 1000, False))
+
+    def test_peer_head_lag_fails_closed(self):
+        with self.assertRaisesRegex(NodeHealthError, "too far behind"):
+            validate_health(target(), NodeHealth("1", 1000, 995, 1005, False))
 
     def test_finalized_height_cannot_exceed_head(self):
         with self.assertRaisesRegex(NodeHealthError, "exceeds head"):
-            validate_health(target(), NodeHealth("1", 100, 101, False))
+            validate_health(target(), NodeHealth("1", 100, 101, 100, False))
 
     def test_probe_exception_fails_closed_without_leaking_details(self):
         def fail(_):
@@ -70,7 +74,7 @@ class SelfHostedSupervisorTests(unittest.TestCase):
         self.assertNotIn("do-not-leak", str(result))
 
     def test_missing_network_fails_closed(self):
-        supervisor = SelfHostedNodeSupervisor([target()], lambda _: NodeHealth("1", 1, 1, False))
+        supervisor = SelfHostedNodeSupervisor([target()], lambda _: NodeHealth("1", 1, 1, 1, False))
         self.assertFalse(supervisor.may_accept_orders("tron"))
 
     def test_all_configured_nodes_must_be_healthy(self):
