@@ -502,6 +502,8 @@ class CrossChainOrderLedger:
         row = self._order(order_id)
         result = dict(row)
         result["quote"] = json.loads(result.pop("quote_json"))
+        if result["status"] == "QUOTED" and result["expired_at"] is not None:
+            result["status"] = "EXPIRED"
         result["events"] = [dict(event) for event in self.db.execute(
             "SELECT event_type,evidence_digest,created_at FROM ledger_events WHERE order_id=? ORDER BY sequence",
             (order_id,),
