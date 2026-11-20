@@ -4,7 +4,7 @@ import unittest
 from settlement_observer import VerificationError
 from solana_source_observer import (
     ExpectedSolanaDeposit, SolanaDepositVerifier, SolanaRpc, LEGACY_SPL_TOKEN_PROGRAM,
-    _find_program_address,
+    _find_program_address, _pubkey_bytes,
 )
 
 ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -25,7 +25,7 @@ def pk(byte):
 
 def order_bytes(e):
     return b"".join([
-        e.order_id, bytes([1])*32, bytes([2])*32, bytes([3])*32, bytes([6])*32,
+        e.order_id, bytes([1])*32, bytes([2])*32, _pubkey_bytes(e.config_pda), bytes([6])*32,
         e.destination_recipient, e.destination_amount.to_bytes(16, "little"),
         e.source_amount.to_bytes(8, "little"), e.quote_expiry.to_bytes(8, "little"),
         e.refund_after.to_bytes(8, "little"), bytes(32), bytes(2), bytes([0, 254]),
