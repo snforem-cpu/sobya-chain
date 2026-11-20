@@ -1,0 +1,31 @@
+name: Cross-chain coordinator ledger tests
+
+on:
+  pull_request:
+    paths:
+      - "cross-chain/coordinator/**"
+      - ".github/workflows/cross-chain-coordinator.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "cross-chain/coordinator/**"
+      - ".github/workflows/cross-chain-coordinator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  coordinator-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run durable order ledger tests
+        working-directory: cross-chain/coordinator
+        run: python -m unittest discover -s . -p 'test_*.py' -v
