@@ -9,6 +9,7 @@ from pathlib import Path
 from admission import ReadinessAdmissionGuard
 from coordinator import LocalCoordinator
 from http_api import create_server
+from pricing import InventoryAwareQuotePricer, PricingConfig
 from order_ledger import (
     CrossChainOrderLedger, DestinationPayoutEvidence, OrderQuote,
     SourceDepositEvidence,
@@ -52,8 +53,18 @@ class CoordinatorHttpApiTests(unittest.TestCase):
             destination_amount=self.quote.destination_amount, solver=self.quote.solver,
             finalized_reference="sobya:finalized:200",
         )
+        self.pricer = InventoryAwareQuotePricer(
+            PricingConfig(
+                usdt_atoms_numerator=2_000_000, fee_bps=100,
+                min_source_amount=1_000_000, max_source_amount=10_000_000,
+                quote_ttl_seconds=60, refund_grace_seconds=3600,
+            ),
+            self.ledger, destination_chain_id=357812033857,
+            now=lambda: 1_900_000_000,
+        )
         self.server = create_server(
             "127.0.0.1", 0, self.service, bearer_token=TOKEN,
+            quote_pricer=self.pricer,
             verify_quote_signature=lambda *_: True,
             verify_source_deposit=lambda *_: True,
             verify_destination_payout=lambda *_: True,
@@ -85,6 +96,35 @@ class CoordinatorHttpApiTests(unittest.TestCase):
     def test_authentication_required(self):
         status, _ = self.post("/v1/quotes", {}, token=None)
         self.assertEqual(status, 401)
+
+    def test_unsigned_quote_preview_uses_pricing_and_does_not_reserve(self):
+        status, body = self.post("/v1/quote-previews", {"request": {
+            "order_id": "0x" + "01"*32,
+            "source_chain": "ethereum",
+            "source_asset": "0x" + "33"*20,
+            "source_amount": 2_000_000,
+            "user": "0x" + "22"*20,
+            "solver": self.solver,
+            "destination_recipient": "0x" + "55"*20,
+        }})
+        self.assertEqual(status, 200, body)
+        payload = json.loads(body)
+        self.assertFalse(payload["signed"])
+        self.assertFalse(payload["reserved"])
+        self.assertEqual(payload["quote"]["destination_amount"], 990_000_000_000_000_000)
+        self.assertEqual(self.ledger.available_solver_inventory(self.solver), 3 * 10**18)
+
+    def test_quote_preview_rejects_boolean_amount(self):
+        status, _ = self.post("/v1/quote-previews", {"request": {
+            "order_id": "0x" + "01"*32,
+            "source_chain": "ethereum",
+            "source_asset": "0x" + "33"*20,
+            "source_amount": True,
+            "user": "0x" + "22"*20,
+            "solver": self.solver,
+            "destination_recipient": "0x" + "55"*20,
+        }})
+        self.assertEqual(status, 400)
 
     def test_quote_deposit_and_payout_flow(self):
         status, body = self.post("/v1/quotes", {
