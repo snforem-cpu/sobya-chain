@@ -10,9 +10,11 @@ For each order, the caller must provide expected values from the signed
 solver quote/source escrow record. The observer independently checks:
 
 - JSON-RPC chain ID equals the configured SOBYA EVM chain ID.
-- Transaction receipt exists, succeeded, targets the configured settlement
-  contract, and belongs to the requested transaction hash.
-- The receipt has at least the configured number of destination confirmations.
+- Transaction and receipt exist, succeeded, target the configured settlement
+  contract, and agree on the requested transaction hash. The actual transaction
+  sender and native SOBY value must match the destination solver and quote.
+- The receipt block hash matches the canonical block at that height, and the
+  receipt has at least the configured number of destination confirmations.
 - Exactly one matching PayoutExecuted event exists from the configured
   settlement contract.
 - Order ID, canonical source-chain key, source escrow, source USDT contract or
