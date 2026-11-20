@@ -114,3 +114,28 @@ and fail closed.
 
 CI now runs the guard tests alongside the ledger tests. Passing these unit
 tests does not establish live-node readiness or production operation.
+
+## Local coordinator orchestration and solver inventory
+
+The coordinator now has an in-process orchestration module
+(`cross-chain/coordinator/coordinator.py`) that requires explicit verifier
+callbacks for signed quotes and finalized source/destination evidence. It
+rejects missing verifiers, false results, ambiguous results, and verifier
+exceptions. New quotes pass through the dual-chain readiness guard and reserve
+the exact SOBY payout amount in the SQLite ledger in the same database
+transaction as quote registration. This prevents two quotes from promising
+the same unreserved solver units.
+
+Solver inventory is provisioned locally by a trusted operator in SOBY base
+units (18 decimals). A verified destination payout consumes the reservation
+and reduces the solver's tracked total inventory. This accounting is an
+operational reservation record; it does not prove an on-chain wallet balance.
+Before production, inventory provisioning must be reconciled with finalized
+SOBYA balances and protected from unauthorized local access.
+
+The coordinator is **not yet an HTTP API** and has no caller authentication,
+production signature verifiers, live observer bindings, signing keys, relayer,
+or transaction broadcast. The injected verification callbacks are placeholders
+for audited chain-specific verification implementations, not a claim that
+verification has already been integrated. No order can be safely offered to
+public users until those components and end-to-end tests exist.
