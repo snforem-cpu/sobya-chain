@@ -155,5 +155,16 @@ class SolanaSourceObserverTests(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, "mint or authority"):
             verifier.verify(self.expected)
 
+    def test_wrong_config_chain_id_rejected(self):
+        raw = bytearray(base64.b64decode(self.fake.config_data))
+        raw[65:73] = (1).to_bytes(8, "little")
+        self.fake.config_data = base64.b64encode(raw).decode()
+        with self.assertRaisesRegex(VerificationError, "chain ID"):
+            self.verifier.verify(self.expected)
+
+    def test_config_authority_is_independent_of_swap_user(self):
+        self.assertNotEqual(self.expected.config_authority, self.expected.user)
+        self.assertEqual(self.verifier.verify(self.expected).config_pda, self.expected.config_pda)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
