@@ -7,7 +7,7 @@ This directory defines the first engineering milestone for integrating cross-cha
 The planned user flow is one DEX experience:
 
 - Local Swap: trades against pools deployed on SOBYA.
-- Cross-Chain Swap: a user pays USDT on TRON, Ethereum, or Solana and receives native SOBY on SOBYA after the source payment is finalized and independently verified.
+- Cross-Chain Swap: a user pays USDT on TRON, Ethereum, or Solana and receives native SOBY on SOBYA after the source payment is finalized and verified by SOBYA-operated observers.
 
 This is **not** a claim that a bridge, source-chain escrow, solver network, or cross-chain swap is deployed. The initial configuration is deliberately disabled. No production transaction can be initiated from this work.
 
@@ -18,7 +18,7 @@ The initial design is a non-wrapped-token, intent-based swap:
 1. The user requests a quote for a fixed amount of USDT on one supported source chain and a SOBY destination address on SOBYA.
 2. A solver (or a decentralized solver set) commits to the quote and provides the SOBY payout inventory on SOBYA.
 3. The user deposits USDT into a source-chain escrow contract for that specific order.
-4. Independent verification confirms the source-chain deposit reached the required finality.
+4. SOBYA-operated observers verify the source-chain deposit against SOBYA-operated nodes and the configured finality policy.
 5. The solver pays SOBY to the destination address on SOBYA.
 6. The order is marked complete only after the SOBYA payout is confirmed. The solver's claim to the source USDT is governed by the order state machine and the source escrow contract.
 7. If the order expires without a valid payout, the user can reclaim the escrowed USDT under the documented refund rules.
@@ -41,7 +41,7 @@ Each adapter must produce the same normalized deposit proof fields while retaini
 - Duplicate, replayed, malformed, non-final, or reorged deposits cannot create a payout.
 - User refunds and solver claims are mutually exclusive terminal outcomes.
 - Pausing new orders must not silently confiscate funds or disable a safe, already-earned refund path.
-- No single project-controlled key can mint arbitrary SOBY, release escrow, or bypass verification.
+- No single key may mint arbitrary SOBY, release escrow, or bypass verification. The selected self-operated threshold remains centrally administered by SOBYA and must be disclosed as such.
 - Quotes must disclose fees, slippage/price expiry, solver, expected finality, and refund conditions.
 
 ## Implementation sequence
@@ -64,4 +64,4 @@ Each adapter must produce the same normalized deposit proof fields while retaini
 - No admin withdrawal function for user escrow.
 - No promise of zero operating cost: source-chain gas, relayer/solver operations, monitoring, and audits remain necessary.
 
-See [architecture](ARCHITECTURE.md), [threat model](THREAT_MODEL.md), and [disabled network registry](config.example.json).
+See [architecture](ARCHITECTURE.md), [threat model](THREAT_MODEL.md), [self-hosted operations](SELF_HOSTED_OPERATIONS.md), and [disabled network registry](config.example.json).
