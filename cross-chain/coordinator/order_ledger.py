@@ -106,6 +106,7 @@ class CrossChainOrderLedger:
                 destination_evidence_digest TEXT,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
+                expired_at INTEGER,
                 CHECK (
                     (status = 'QUOTED' AND source_tx IS NULL AND destination_tx IS NULL)
                     OR (status = 'SOURCE_FUNDED' AND source_tx IS NOT NULL AND destination_tx IS NULL)
@@ -142,6 +143,12 @@ class CrossChainOrderLedger:
             );
         """)
         self._migrate_inventory_decimal_storage()
+        self._migrate_order_expiry_column()
+
+    def _migrate_order_expiry_column(self) -> None:
+        columns = {row["name"] for row in self.db.execute("PRAGMA table_info(orders)")}
+        if "expired_at" not in columns:
+            self.db.execute("ALTER TABLE orders ADD COLUMN expired_at INTEGER")
 
     def _migrate_inventory_decimal_storage(self) -> None:
         """Rebuild legacy INTEGER inventory tables as exact decimal TEXT storage."""
@@ -327,6 +334,52 @@ class CrossChainOrderLedger:
             raise
 
     @_synchronized
+    def expire_unfunded_quote(self, order_id: str, now: int | None = None) -> None:
+        """Expire an un-funded quote and atomically release its SOBY inventory reservation."""
+        now = int(time.time()) if now is None else now
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self._order(order_id)
+            if row["status"] != "QUOTED" or row["expired_at"] is not None:
+                raise LedgerError("only a live, un-funded quote can be expired")
+            quote = json.loads(row["quote_json"])
+            if now < quote["quote_expiry"]:
+                raise LedgerError("quote has not reached its expiry time")
+            reservation = self.db.execute(
+                "SELECT solver,units,status FROM inventory_reservations WHERE order_id=?",
+                (order_id,),
+            ).fetchone()
+            if reservation is not None and reservation["status"] == "ACTIVE":
+                inventory = self.db.execute(
+                    "SELECT reserved_units FROM solver_inventory WHERE solver=?",
+                    (reservation["solver"],),
+                ).fetchone()
+                units = int(reservation["units"])
+                if inventory is None or int(inventory["reserved_units"]) < units:
+                    raise LedgerError("reserved solver inventory is inconsistent; expiry rejected")
+                self.db.execute(
+                    "UPDATE solver_inventory SET reserved_units=? WHERE solver=?",
+                    (str(int(inventory["reserved_units"]) - units), reservation["solver"]),
+                )
+                self.db.execute(
+                    "UPDATE inventory_reservations SET status='RELEASED',updated_at=? WHERE order_id=?",
+                    (now, order_id),
+                )
+            digest = _digest({"order_id": order_id, "expired_at": now})
+            self.db.execute(
+                "UPDATE orders SET expired_at=?,updated_at=? WHERE order_id=?",
+                (now, now, order_id),
+            )
+            self.db.execute(
+                "INSERT INTO ledger_events(order_id,event_type,evidence_digest,created_at) VALUES(?,?,?,?)",
+                (order_id, "QUOTE_EXPIRED", digest, now),
+            )
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    @_synchronized
     def record_source_deposit(self, evidence: SourceDepositEvidence,
                               now: int | None = None) -> None:
         now = int(time.time()) if now is None else now
@@ -336,6 +389,8 @@ class CrossChainOrderLedger:
             if row["status"] != "QUOTED":
                 raise LedgerError("source deposit already recorded or order is not quote-pending")
             quote = json.loads(row["quote_json"])
+            if row["expired_at"] is not None or now >= quote["quote_expiry"]:
+                raise LedgerError("quote expired; source deposit rejected")
             fields = {
                 "source_chain": evidence.source_chain,
                 "source_asset": evidence.source_asset,
