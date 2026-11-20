@@ -88,5 +88,6 @@ returns identical normalized results. It rejects provider failures and
 disagreement. This reduces dependence on a single RPC endpoint only when the
 configured endpoints are genuinely independent; source IDs alone do not prove
 independence. It is a local library, not a deployed service, cryptographic
-light client, signer, or transaction relayer. See `quorum-README.md` for the
-trust boundary.
+light client, signer, or transaction relayer. Seven unit tests cover majority
+agreement, disagreement, provider failures, duplicate source IDs, and invalid
+thresholds. See `quorum-README.md` for the trust boundary.
