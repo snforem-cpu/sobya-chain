@@ -49,3 +49,34 @@ Payout typed data/digests for Ethereum and TRON escrow domains, plus the Borsh
 signature generation, transaction submission, or claim automation. See
 `ATTESTATION_PROTOCOL.md`; live signing remains disabled pending external
 review and chain-specific integration testing.
+
+## Fail-closed admission guard
+
+`admission.py` adds an in-process boundary for a future local coordinator API.
+Construct `ReadinessAdmissionGuard(monitor, ledger)` with the live supervisor
+`Monitor` instance and the SQLite ledger:
+
+- `register_quote` requires a fresh positive `monitor.admission(source, "sobya")`
+  result before recording a new quote.
+- `record_source_deposit` repeats the readiness check immediately before
+  recording already-verified source-deposit evidence. A timeout, exception,
+  malformed result, missing network, stale snapshot, or unhealthy source or
+  destination denies admission.
+- `record_destination_payout` deliberately does not use the admission gate:
+  it allows completion of an already-funded order while new orders are paused.
+
+This is a library guard, **not yet an HTTP quote/order API** and not a complete
+production coordinator. The future API must call these guarded methods rather
+than accessing the ledger directly. It must authenticate callers, verify quote
+signatures and observer evidence before passing them in, reserve solver
+inventory atomically, enforce per-order/global limits and rate limits, and
+keep recovery/refund paths available. A readiness check and SQLite write are
+not one atomic operation with node health; deployments must fail closed and
+recheck immediately before each admission step. The guard does not sign,
+broadcast, claim escrow, or move funds.
+
+Run its focused tests from this directory:
+
+```sh
+python -m unittest -v test_admission.py test_order_ledger.py
+```
