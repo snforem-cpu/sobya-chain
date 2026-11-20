@@ -2,6 +2,7 @@ name: Cross-chain settlement observer tests
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - "cross-chain/observer/**"
       - "cross-chain/coordinator/**"
