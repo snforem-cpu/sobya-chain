@@ -12,7 +12,15 @@ class InventoryStorageTests(unittest.TestCase):
             path = str(Path(directory) / "legacy.sqlite")
             db = sqlite3.connect(path)
             db.execute("PRAGMA foreign_keys=ON")
-            db.execute("CREATE TABLE orders(order_id TEXT PRIMARY KEY)")
+            db.execute("""
+                CREATE TABLE orders(
+                    order_id TEXT PRIMARY KEY, quote_json TEXT, quote_digest TEXT,
+                    status TEXT, source_chain TEXT, source_tx TEXT,
+                    source_event_index INTEGER, source_evidence_digest TEXT,
+                    destination_tx TEXT, destination_event_index INTEGER,
+                    destination_evidence_digest TEXT, created_at INTEGER, updated_at INTEGER
+                )
+            """)
             db.execute("""
                 CREATE TABLE solver_inventory(
                     solver TEXT PRIMARY KEY,
