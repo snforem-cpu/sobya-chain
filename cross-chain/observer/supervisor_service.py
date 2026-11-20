@@ -56,6 +56,18 @@ class Monitor:
             age = time.monotonic() - self._checked_at
             return json.loads(json.dumps(self._snapshot)), age
 
+
+    def admission(self, source_network: str, destination_network: str = "sobya") -> tuple[bool, dict[str, Any]]:
+        """Require both source and destination chains ready before new order admission."""
+        source_ready, source = self.readiness(source_network)
+        destination_ready, destination = self.readiness(destination_network)
+        ready = source_ready and destination_ready
+        return ready, {
+            "admissible": ready,
+            "source": source,
+            "destination": destination,
+        }
+
     def readiness(self, network: str) -> tuple[bool, dict[str, Any]]:
         snapshot, age = self.snapshot()
         if snapshot is None:
@@ -98,6 +110,17 @@ def make_handler(monitor: Monitor):
                     "hasSnapshot": snapshot is not None,
                     "snapshotAgeSeconds": None if snapshot is None else round(age, 3),
                 })
+                return
+
+            if parsed.path == "/admission":
+                query = parse_qs(parsed.query, strict_parsing=False)
+                source_values = query.get("source", [])
+                destination_values = query.get("destination", ["sobya"])
+                if len(source_values) != 1 or len(destination_values) != 1:
+                    self._send(400, {"admissible": False, "reason": "exactly one source and destination are required"})
+                    return
+                admissible, payload = monitor.admission(source_values[0], destination_values[0])
+                self._send(200 if admissible else 503, payload)
                 return
             if parsed.path == "/ready":
                 query = parse_qs(parsed.query, strict_parsing=False)
