@@ -57,6 +57,28 @@ Self-hosting avoids mandatory SaaS subscriptions, but it is not costless by defi
 
 A chain is not ready merely because its observer code passes unit tests. Readiness requires the node to synchronize, pass live finality checks, and complete end-to-end tests on that chain's test network before any mainnet use.
 
+
+## Local supervisor readiness service
+
+A loopback-only operational service is now included at `cross-chain/observer/supervisor_service.py`. It loads the self-hosted JSON configuration, constructs the read-only chain probes and supervisor, and refreshes health on a fixed interval.
+
+Run it from the observer directory:
+
+```sh
+python supervisor_service.py --config ../self-hosted-nodes.json --host 127.0.0.1 --port 8765 --interval 5 --max-snapshot-age 15
+```
+
+The configuration file must be a private deployment copy, not the example file. It must pin independently verified chain identities and list only SOBYA-operated private node URLs. The example config remains all-disabled and is intentionally rejected by the service.
+
+Read-only endpoints:
+- `GET /healthz`: confirms the process is responding and reports whether a health snapshot exists.
+- `GET /ready?network=ethereum`: returns HTTP 200 only when the latest non-stale snapshot says every configured node for that network is healthy; otherwise returns HTTP 503.
+- The network value may be `ethereum`, `tron`, `solana`, or `sobya`, provided that network is explicitly enabled and configured.
+
+The service refuses non-loopback bind addresses. Keep it behind a local order API or private host boundary; do not expose it directly to the public internet. A consumer must treat every non-200 response, timeout, malformed response, or unknown network as **not ready**. This service is a health/readiness gate only: it does not itself accept orders, integrate with the coordinator, stop an existing order API, sign, or broadcast transactions. The coordinator/order API must be wired to check this endpoint before issuing quotes and again before accepting a funded order. That integration and live-node tests remain outstanding.
+
+The monitor clears its snapshot if a refresh operation raises, and stale snapshots fail closed. It does not preserve a previously healthy result after a probe exception.
+
 ## Implementation gates
 
 1. Implemented: independent config/order PDA derivation and forged-PDA rejection tests in the Solana source observer. Still pending: validator-based integration tests.
