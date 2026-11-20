@@ -45,6 +45,8 @@ pub struct Order {
     pub order_id: [u8; 32],
     pub user: Pubkey,
     pub solver: Pubkey,
+    pub config: Pubkey,
+    pub escrow_token_account: Pubkey,
     pub destination_recipient: [u8; 20],
     pub destination_amount: u128,
     pub source_amount: u64,
@@ -201,14 +203,16 @@ fn process_fund(
 
     let user_token_state = SplAccount::unpack(&user_token.data.borrow())?;
     let escrow_token_state = SplAccount::unpack(&escrow_token.data.borrow())?;
-    if user_token_state.owner != *user.key || user_token_state.mint != config.usdt_mint
+    if user_token.owner != token_program.key || escrow_token.owner != token_program.key
+        || user_token_state.owner != *user.key || user_token_state.mint != config.usdt_mint
         || escrow_token_state.owner != expected_order || escrow_token_state.mint != config.usdt_mint
     {
         return Err(ProgramError::InvalidAccountData);
     }
 
     let order = Order {
-        order_id, user: *user.key, solver: *solver.key, destination_recipient,
+        order_id, user: *user.key, solver: *solver.key, config: *config_account.key,
+        escrow_token_account: *escrow_token.key, destination_recipient,
         destination_amount, source_amount, quote_expiry, refund_after,
         destination_tx_hash: [0; 32], attested_bitmap: 0,
         status: OrderStatus::Funded, bump,
@@ -252,7 +256,7 @@ fn process_attest(
         return Err(ProgramError::InvalidAccountData);
     }
     let mut order = load_order(order_account)?;
-    if order.order_id != order_id || order.status != OrderStatus::Funded {
+    if order.order_id != order_id || order.config != *config_account.key || order.status != OrderStatus::Funded {
         return Err(ProgramError::InvalidAccountData);
     }
     let index = config.attestors.iter().position(|key| key == attestor.key)
@@ -291,7 +295,8 @@ fn process_claim(program_id: &Pubkey, accounts: &[AccountInfo], order_id: [u8; 3
     }
     let mut order = load_order(order_account)?;
     let now = Clock::get()?.unix_timestamp.max(0) as u64;
-    if order.order_id != order_id || order.status != OrderStatus::Funded
+    if order.order_id != order_id || order.config != *config_account.key
+        || order.escrow_token_account != *escrow_token.key || order.status != OrderStatus::Funded
         || order.solver != *solver.key || order.destination_tx_hash == [0; 32]
         || order.attested_bitmap.count_ones() < config.threshold as u32
         || now >= order.refund_after
@@ -324,7 +329,8 @@ fn process_refund(program_id: &Pubkey, accounts: &[AccountInfo], order_id: [u8; 
     }
     let mut order = load_order(order_account)?;
     let now = Clock::get()?.unix_timestamp.max(0) as u64;
-    if order.order_id != order_id || order.status != OrderStatus::Funded
+    if order.order_id != order_id || order.config != *config_account.key
+        || order.escrow_token_account != *escrow_token.key || order.status != OrderStatus::Funded
         || order.user != *user.key || now < order.refund_after
     {
         return Err(ProgramError::InvalidAccountData);
@@ -347,7 +353,8 @@ fn transfer_from_order(
     let (expected_order, bump) = Pubkey::find_program_address(&[ORDER_SEED, &order.order_id], program_id);
     let escrow_state = SplAccount::unpack(&escrow_token.data.borrow())?;
     let destination_state = SplAccount::unpack(&destination_token.data.borrow())?;
-    if escrow_state.owner != expected_order || escrow_state.mint != config.usdt_mint
+    if escrow_token.owner != token_program.key || destination_token.owner != token_program.key
+        || escrow_state.owner != expected_order || escrow_state.mint != config.usdt_mint
         || destination_state.owner != *destination_owner.key || destination_state.mint != config.usdt_mint
     {
         return Err(ProgramError::InvalidAccountData);
@@ -404,6 +411,7 @@ mod tests {
     fn order_serialization_round_trips() {
         let order = Order {
             order_id: [7; 32], user: Pubkey::new_unique(), solver: Pubkey::new_unique(),
+            config: Pubkey::new_unique(), escrow_token_account: Pubkey::new_unique(),
             destination_recipient: [9; 20], destination_amount: 1_000_000_000_000_000_000,
             source_amount: 42_000_000, quote_expiry: 100, refund_after: 200,
             destination_tx_hash: [0; 32], attested_bitmap: 0,
