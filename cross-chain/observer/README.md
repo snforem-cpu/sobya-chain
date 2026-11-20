@@ -79,3 +79,14 @@ independence.
 
 Do not place RPC credentials or signer private keys here or commit them to Git.
 The observer is deliberately read-only.
+
+## Independent observer quorum (prototype)
+
+`observer_quorum.py` can run chain-specific verifier callbacks through
+multiple configured sources and accepts evidence only when a strict majority
+returns identical normalized results. It rejects provider failures and
+disagreement. This reduces dependence on a single RPC endpoint only when the
+configured endpoints are genuinely independent; source IDs alone do not prove
+independence. It is a local library, not a deployed service, cryptographic
+light client, signer, or transaction relayer. See `quorum-README.md` for the
+trust boundary.
