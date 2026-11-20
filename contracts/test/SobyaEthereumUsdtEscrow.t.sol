@@ -122,8 +122,9 @@ contract SobyaEthereumUsdtEscrowTest {
         require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.FUNDED, "not funded");
         require(usdt.balanceOf(address(escrow)) == order.sourceAmount, "wrong escrow balance");
 
+        bytes[] memory payoutSigs = _payoutSignatures(order.orderId);
         vm.prank(solver);
-        escrow.claim(order.orderId, keccak256("sobya-payout-tx"), _payoutSignatures(order.orderId));
+        escrow.claim(order.orderId, keccak256("sobya-payout-tx"), payoutSigs);
         require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.CLAIMED, "not claimed");
         require(usdt.balanceOf(solver) == order.sourceAmount, "solver not paid");
         require(usdt.balanceOf(address(escrow)) == 0, "escrow not empty");
@@ -141,10 +142,10 @@ contract SobyaEthereumUsdtEscrowTest {
         require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.REFUNDED, "not refunded");
         require(usdt.balanceOf(user) == 100_000_000, "user not fully refunded");
 
+        bytes[] memory payoutSigs = _payoutSignatures(order.orderId);
         vm.prank(solver);
         (bool ok, ) = address(escrow).call(abi.encodeWithSelector(
-            escrow.claim.selector, order.orderId, keccak256("sobya-payout-tx"),
-            _payoutSignatures(order.orderId)
+            escrow.claim.selector, order.orderId, keccak256("sobya-payout-tx"), payoutSigs
         ));
         require(!ok, "solver claimed after refund");
     }
