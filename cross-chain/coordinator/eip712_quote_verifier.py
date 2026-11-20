@@ -134,6 +134,12 @@ class Eip712QuoteVerifier:
     def __init__(self, domains: dict[str, Eip712QuoteDomain]):
         if not domains:
             raise ValueError("at least one explicitly pinned source escrow domain is required")
+        for name, domain in domains.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("source chain names must be non-empty")
+            if not isinstance(domain, Eip712QuoteDomain) or domain.chain_id <= 0:
+                raise ValueError("each source chain requires a positive pinned chain ID")
+            _address(domain.verifying_contract, "escrow")
         self.domains = {key.lower(): value for key, value in domains.items()}
 
     def digest(self, quote: OrderQuote) -> bytes:
@@ -164,4 +170,4 @@ class Eip712QuoteVerifier:
     def verify(self, quote: OrderQuote, signature: bytes) -> bool:
         digest = self.digest(quote)
         recovered = _recover_address(digest, signature)
-        return recovered.lower() == _address(quote.solver, "solver").hex().join(["0x", ""]).lower()
+        return recovered.lower() == ("0x" + _address(quote.solver, "solver").hex()).lower()
