@@ -121,7 +121,9 @@ class OrderLedgerTests(unittest.TestCase):
             (self.quote.order_id,),
         ).fetchone()
         self.assertEqual(reservation["status"], "RELEASED")
-        self.assertIsNotNone(self.ledger.get_order(self.quote.order_id)["expired_at"])
+        expired = self.ledger.get_order(self.quote.order_id)
+        self.assertIsNotNone(expired["expired_at"])
+        self.assertEqual(expired["status"], "EXPIRED")
         with self.assertRaisesRegex(LedgerError, "only a live"):
             self.ledger.expire_unfunded_quote(self.quote.order_id, now=self.quote.quote_expiry + 1)
 
