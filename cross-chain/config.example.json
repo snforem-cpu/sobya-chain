@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "featureEnabled": false,
+  "mode": "intent-settlement",
+  "destination": {
+    "name": "SOBYA Mainnet",
+    "chainId": 357812033857,
+    "nativeAsset": "SOBY",
+    "rpcUrl": "https://sobya-evm-rpc.nodesafe-dapp.xyz"
+  },
+  "sources": {
+    "tron": {
+      "enabled": false,
+      "network": "TRON",
+      "chainId": null,
+      "usdtContract": null,
+      "escrowAddress": null,
+      "requiredFinality": null
+    },
+    "ethereum": {
+      "enabled": false,
+      "network": "Ethereum",
+      "chainId": 1,
+      "usdtContract": null,
+      "escrowAddress": null,
+      "requiredFinality": null
+    },
+    "solana": {
+      "enabled": false,
+      "network": "Solana",
+      "cluster": "mainnet-beta",
+      "usdtMint": null,
+      "tokenProgram": null,
+      "escrowProgramId": null,
+      "requiredCommitment": "finalized"
+    }
+  },
+  "limits": {
+    "maxOrderUsdt": null,
+    "maxDailyUsdtPerSource": null,
+    "maxOutstandingOrders": 0
+  },
+  "safety": {
+    "requireSignedSolverQuote": true,
+    "requireIndependentDepositVerification": true,
+    "requireDestinationPayoutProofBeforeSolverClaim": true,
+    "allowAdminEscrowWithdrawal": false,
+    "allowPublicQuotes": false
+  },
+  "notice": "Example only. All source networks are disabled. Null contract/mint/program addresses and limits must be independently verified and configured before testnet or production use."
+}
