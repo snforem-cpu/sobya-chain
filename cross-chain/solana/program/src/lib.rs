@@ -290,9 +290,11 @@ fn process_claim(program_id: &Pubkey, accounts: &[AccountInfo], order_id: [u8; 3
         return Err(ProgramError::InvalidAccountData);
     }
     let mut order = load_order(order_account)?;
+    let now = Clock::get()?.unix_timestamp.max(0) as u64;
     if order.order_id != order_id || order.status != OrderStatus::Funded
         || order.solver != *solver.key || order.destination_tx_hash == [0; 32]
         || order.attested_bitmap.count_ones() < config.threshold as u32
+        || now >= order.refund_after
     {
         return Err(ProgramError::InvalidAccountData);
     }
