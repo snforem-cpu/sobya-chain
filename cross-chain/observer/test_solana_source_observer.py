@@ -24,7 +24,7 @@ def pk(byte):
 
 def order_bytes(e):
     return b"".join([
-        e.order_id, bytes([1])*32, bytes([2])*32, bytes([3])*32, bytes([4])*32,
+        e.order_id, bytes([1])*32, bytes([2])*32, bytes([3])*32, bytes([6])*32,
         e.destination_recipient, e.destination_amount.to_bytes(16, "little"),
         e.source_amount.to_bytes(8, "little"), e.quote_expiry.to_bytes(8, "little"),
         e.refund_after.to_bytes(8, "little"), bytes(32), bytes(2), bytes([0, 254]),
