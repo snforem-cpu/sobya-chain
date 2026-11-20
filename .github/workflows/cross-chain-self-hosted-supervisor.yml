@@ -13,6 +13,8 @@ on:
       - "cross-chain/coordinator/test_admission.py"
       - "cross-chain/coordinator/coordinator.py"
       - "cross-chain/coordinator/test_coordinator.py"
+      - "cross-chain/coordinator/order_ledger.py"
+      - "cross-chain/coordinator/test_order_ledger.py"
       - "cross-chain/observer/requirements.txt"
       - ".github/workflows/cross-chain-self-hosted-supervisor.yml"
   push:
@@ -27,6 +29,10 @@ on:
       - "cross-chain/observer/test_self_hosted_supervisor.py"
       - "cross-chain/coordinator/admission.py"
       - "cross-chain/coordinator/test_admission.py"
+      - "cross-chain/coordinator/coordinator.py"
+      - "cross-chain/coordinator/test_coordinator.py"
+      - "cross-chain/coordinator/order_ledger.py"
+      - "cross-chain/coordinator/test_order_ledger.py"
       - "cross-chain/observer/requirements.txt"
       - ".github/workflows/cross-chain-self-hosted-supervisor.yml"
 
