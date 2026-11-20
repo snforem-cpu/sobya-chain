@@ -33,6 +33,8 @@ on:
       - "cross-chain/coordinator/test_admission.py"
       - "cross-chain/coordinator/coordinator.py"
       - "cross-chain/coordinator/test_coordinator.py"
+      - "cross-chain/coordinator/http_api.py"
+      - "cross-chain/coordinator/test_http_api.py"
       - "cross-chain/coordinator/order_ledger.py"
       - "cross-chain/coordinator/test_order_ledger.py"
       - "cross-chain/observer/requirements.txt"
