@@ -17,6 +17,7 @@ from solana_source_observer import (
     _pubkey_bytes, _b58encode, LEGACY_SPL_TOKEN_PROGRAM,
 )
 from order_ledger import OrderQuote, SourceDepositEvidence
+from self_hosted_supervisor import validate_self_hosted_url, NodeHealthError
 
 
 def quote_from_ledger(ledger: Any, order_id: str) -> OrderQuote:
@@ -52,7 +53,18 @@ class TronSourceConfig:
 class SolanaSourceConfig:
     program_id: str
     usdt_mint: str
+    expected_genesis_hash: str
     rpc: Any
+
+
+def _require_private_rpc(rpc: Any) -> None:
+    url = getattr(rpc, "url", None) or getattr(rpc, "base_url", None)
+    if not isinstance(url, str):
+        raise VerificationError("observer RPC must expose its configured URL")
+    try:
+        validate_self_hosted_url(url)
+    except NodeHealthError as exc:
+        raise VerificationError("observer RPC must be a SOBYA-operated private node") from exc
 
 
 def _associated_token_address(owner: str, mint: str) -> str:
@@ -99,6 +111,7 @@ class SourceObserverRouter:
             if set(proof) != {"transaction_id"} or not isinstance(proof["transaction_id"], str):
                 raise VerificationError("Ethereum proof must contain only transaction_id")
             config = self.ethereum[chain]
+            _require_private_rpc(config.rpc)
             verifier = EthereumDepositVerifier(config.rpc, config.chain_id, config.escrow)
             expected = ExpectedDeposit(
                 order_id=quote.order_id, user=quote.user, token=quote.source_asset,
@@ -125,6 +138,7 @@ class SourceObserverRouter:
             if set(proof) != {"transaction_id"} or not isinstance(proof["transaction_id"], str):
                 raise VerificationError("TRON proof must contain only transaction_id")
             config = self.tron[chain]
+            _require_private_rpc(config.rpc)
             verifier = TronDepositVerifier(config.rpc, config.escrow, config.genesis_hash)
             expected = ExpectedTronDeposit(
                 order_id=quote.order_id, user=quote.user, token=quote.source_asset,
@@ -151,6 +165,10 @@ class SourceObserverRouter:
             if set(proof) != {"signature"} or not isinstance(proof["signature"], str):
                 raise VerificationError("Solana proof must contain only transaction signature")
             config = self.solana
+            _require_private_rpc(config.rpc)
+            actual_genesis = config.rpc.call("getGenesisHash", [])
+            if actual_genesis != config.expected_genesis_hash:
+                raise VerificationError("Solana genesis hash does not match pinned network identity")
             order_id = bytes.fromhex(quote.order_id.removeprefix("0x"))
             recipient = bytes.fromhex(quote.destination_recipient.removeprefix("0x"))
             config_pda, _ = _find_program_address(
