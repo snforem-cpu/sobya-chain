@@ -147,15 +147,9 @@ fn process_initialize(
 
     let config = Config { authority: *payer.key, bump, usdt_mint, sobya_chain_id, threshold, attestors };
     let data = borsh::to_vec(&config).map_err(|_| ProgramError::InvalidAccountData)?;
-    let rent = Rent::get()?;
-    let lamports = rent.minimum_balance(data.len());
     let bump_seed = [bump];
     let signer_seeds: &[&[u8]] = &[CONFIG_SEED, payer.key.as_ref(), &bump_seed];
-    invoke_signed(
-        &system_instruction::create_account(payer.key, config_account.key, lamports, data.len() as u64, program_id),
-        &[payer.clone(), config_account.clone(), system_program_account.clone()],
-        &[signer_seeds],
-    )?;
+    create_pda_account(payer, config_account, system_program_account, program_id, data.len(), signer_seeds)?;
     config_account.data.borrow_mut().copy_from_slice(&data);
     Ok(())
 }
@@ -218,12 +212,9 @@ fn process_fund(
         status: OrderStatus::Funded, bump,
     };
     let data = borsh::to_vec(&order).map_err(|_| ProgramError::InvalidAccountData)?;
-    let rent = Rent::get()?;
-    invoke_signed(
-        &system_instruction::create_account(user.key, order_account.key, rent.minimum_balance(data.len()), data.len() as u64, program_id),
-        &[user.clone(), order_account.clone(), system_program_account.clone()],
-        &[&[ORDER_SEED, &order_id, &[bump]]],
-    )?;
+    let bump_seed = [bump];
+    let signer_seeds: &[&[u8]] = &[ORDER_SEED, &order_id, &bump_seed];
+    create_pda_account(user, order_account, system_program_account, program_id, data.len(), signer_seeds)?;
 
     let before = SplAccount::unpack(&escrow_token.data.borrow())?.amount;
     let transfer_ix = token_instruction::transfer(token_program.key, user_token.key, escrow_token.key, user.key, &[], source_amount)?;
@@ -365,6 +356,38 @@ fn transfer_from_order<'a>(
         &[escrow_token.clone(), destination_token.clone(), order_account.clone(), token_program.clone()],
         &[&[ORDER_SEED, &order.order_id, &[bump]]],
     )
+}
+
+fn create_pda_account<'a>(
+    payer: &AccountInfo<'a>,
+    pda: &AccountInfo<'a>,
+    system_program_account: &AccountInfo<'a>,
+    owner: &Pubkey,
+    space: usize,
+    signer_seeds: &[&[u8]],
+) -> ProgramResult {
+    if pda.owner != &system_program::id() || !pda.data_is_empty() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    let required_lamports = Rent::get()?.minimum_balance(space);
+    let shortfall = required_lamports.saturating_sub(pda.lamports());
+    if shortfall > 0 {
+        invoke(
+            &system_instruction::transfer(payer.key, pda.key, shortfall),
+            &[payer.clone(), pda.clone(), system_program_account.clone()],
+        )?;
+    }
+    invoke_signed(
+        &system_instruction::allocate(pda.key, space as u64),
+        &[pda.clone(), system_program_account.clone()],
+        &[signer_seeds],
+    )?;
+    invoke_signed(
+        &system_instruction::assign(pda.key, owner),
+        &[pda.clone(), system_program_account.clone()],
+        &[signer_seeds],
+    )?;
+    Ok(())
 }
 
 fn load_config(program_id: &Pubkey, account: &AccountInfo) -> Result<Config, ProgramError> {
