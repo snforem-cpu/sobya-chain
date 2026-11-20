@@ -35,6 +35,15 @@ class FakeSolana:
     def __init__(self, expected):
         self.e = expected
         self.order_data = order_bytes(expected)
+        _, config_bump = _find_program_address(
+            [b"config", _pubkey_bytes(expected.config_authority)], expected.program_id
+        )
+        config_data = (
+            _pubkey_bytes(expected.config_authority) + bytes([config_bump])
+            + _pubkey_bytes(expected.usdt_mint) + (357812033857).to_bytes(8, "little")
+            + bytes([1]) + (1).to_bytes(4, "little") + _pubkey_bytes(pk(14))
+        )
+        self.config_data = base64.b64encode(config_data).decode()
         self.token_amount = str(expected.source_amount)
         self.tx = {
             "slot": 123,
@@ -70,6 +79,9 @@ class FakeSolana:
         method, params = payload["method"], payload["params"]
         if method == "getTransaction":
             result = self.tx
+        elif method == "getAccountInfo" and params[0] == self.e.config_pda:
+            result = {"value": {"owner": self.e.program_id,
+                "data": [self.config_data, "base64"]}}
         elif method == "getAccountInfo" and params[0] == self.e.order_pda:
             result = {"value": {"owner": self.e.program_id,
                 "data": [base64.b64encode(self.order_data).decode(), "base64"]}}
@@ -84,11 +96,12 @@ class FakeSolana:
 class SolanaSourceObserverTests(unittest.TestCase):
     def setUp(self):
         program_id, user, order_id = pk(9), pk(1), bytes([10]) * 32
-        config_pda, _ = _find_program_address([b"config", bytes([1]) * 32], program_id)
+        config_authority = pk(12)
+        config_pda, _ = _find_program_address([b"config", _pubkey_bytes(config_authority)], program_id)
         order_pda, _ = _find_program_address([b"order", order_id], program_id)
         self.expected = ExpectedSolanaDeposit(
             signature="sig-test", program_id=program_id, order_pda=order_pda, config_pda=config_pda,
-            user=user, solver=pk(2), escrow_token_account=pk(6), usdt_mint=pk(7),
+            config_authority=config_authority, user=user, solver=pk(2), escrow_token_account=pk(6), usdt_mint=pk(7),
             source_amount=25_000_000, order_id=order_id,
             destination_recipient=bytes([11])*20, destination_amount=10**18,
             quote_expiry=1_900_000_000, refund_after=1_900_003_600,
