@@ -123,9 +123,10 @@ class OrderStateTests(unittest.TestCase):
         with self.assertRaisesRegex(OrderError, "ORDER_NOT_REFUNDABLE"):
             self.book.refund_user("order-001", now=3_000)
 
-    def test_refund_for_unfunded_committed_order_only_after_deadline(self):
+    def test_unfunded_order_cannot_call_refund(self):
         self.commit()
-        self.assertEqual(self.book.refund_user("order-001", now=2_000).state, OrderState.REFUNDED)
+        with self.assertRaisesRegex(OrderError, "ORDER_NOT_REFUNDABLE"):
+            self.book.refund_user("order-001", now=2_000)
 
 
 if __name__ == "__main__":
