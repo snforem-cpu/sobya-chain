@@ -12,6 +12,7 @@ on:
       - feat/sobya-cross-chain-swap-foundation
     paths:
       - "cross-chain/observer/**"
+      - "cross-chain/coordinator/**"
       - ".github/workflows/cross-chain-observer.yml"
 
 permissions:
