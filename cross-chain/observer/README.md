@@ -42,6 +42,23 @@ TRON-Solidity compiler/TVM deployment, and Shasta integration tests against
 the actual deployed bytecode. Mocked tests do not establish TVM compatibility
 or production finality guarantees.
 
+## Solana source deposit observer (prototype)
+
+`solana_source_observer.py` requests the transaction at `finalized`
+commitment, binds the requested signature, requires both user and solver
+signatures, checks the exact escrow-program `Fund` instruction and its Borsh
+quote fields, then decodes the 256-byte Borsh order PDA. It also verifies the
+legacy SPL Token account owner, configured mint, order-PDA authority, and
+exact escrow balance. This follows the current Rust account layout and
+instruction enum in `cross-chain/solana/program/src/lib.rs`.
+
+The observer currently requires the caller to supply the expected order PDA
+and config PDA; it checks their presence and stored bindings but does not
+independently derive PDA addresses. Add a reviewed PDA derivation implementation
+and validator-based integration tests before production. Mocked JSON-RPC tests
+do not establish Solana validator execution, Token CPI behavior, or RPC
+independence.
+
 ## What it does not do
 
 - It does not verify source-chain deposits or their finality.
