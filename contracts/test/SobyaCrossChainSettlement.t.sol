@@ -75,7 +75,7 @@ contract SobyaCrossChainSettlementTest {
         require(!ok, "zero source chain accepted");
     }
 
-    function testFailedRecipientTransferRevertsOrderState() public {
+    function testRecipientTransferFailureRevertsOrderState() public {
         bytes32 orderId = keccak256("settlement-rejecting-recipient");
         RejectNativeRecipient recipient = new RejectNativeRecipient();
         (bool ok,) = address(settlement).call{value: 1 ether}(abi.encodeWithSelector(
