@@ -2,6 +2,7 @@ name: Cross-chain coordinator ledger tests
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - "cross-chain/coordinator/**"
       - "cross-chain/observer/source_observer_router.py"
