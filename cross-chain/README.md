@@ -51,7 +51,7 @@ Each adapter must produce the same normalized deposit proof fields while retaini
 3. Source-chain escrow prototypes on TRON, Ethereum, and Solana testnets.
 4. SOBYA payout/settlement contract prototype and independent verifier/relayer interfaces.
 5. Adversarial tests, reorg/finality tests, replay tests, refund tests, and external security review.
-6. DEX UI integration behind a hard-disabled feature flag.
+6. DEX UI integration behind a hard-disabled feature flag. Solver claims must execute before each order's refund deadline; after that deadline only the user's refund path remains available.
 7. Testnet end-to-end operation with independent operators.
 8. Mainnet deployment only after explicit approval, funded solver inventory, verified addresses, audit, and controlled live tests.
 
