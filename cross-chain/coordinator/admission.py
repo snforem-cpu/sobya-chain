@@ -40,6 +40,11 @@ class ReadinessAdmissionGuard:
             raise AdmissionDenied("readiness check failed; new order admission is closed") from exc
         if ready is not True or not isinstance(evidence, dict) or evidence.get("admissible") is not True:
             raise AdmissionDenied("source or destination network is not ready; new order admission is closed")
+        source_state = evidence.get("source")
+        destination_state = evidence.get("destination")
+        if (not isinstance(source_state, dict) or source_state.get("ready") is not True
+                or not isinstance(destination_state, dict) or destination_state.get("ready") is not True):
+            raise AdmissionDenied("readiness response is malformed; new order admission is closed")
 
     def register_quote(self, quote: OrderQuote, now: int | None = None) -> None:
         self._require_ready(quote.source_chain)
