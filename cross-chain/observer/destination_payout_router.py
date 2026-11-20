@@ -8,6 +8,18 @@ from settlement_observer import SettlementVerifier, ExpectedPayout, Verification
 from order_ledger import OrderQuote, DestinationPayoutEvidence
 
 
+def quote_from_ledger(ledger: Any, order_id: str) -> OrderQuote:
+    """Adapt the immutable quote stored by CrossChainOrderLedger for observer checks."""
+    record = ledger.get_order(order_id)
+    quote = record.get("quote") if isinstance(record, dict) else None
+    if not isinstance(quote, dict):
+        raise VerificationError("registered quote record is malformed")
+    try:
+        return OrderQuote(**quote)
+    except (TypeError, ValueError) as exc:
+        raise VerificationError("registered quote record is malformed") from exc
+
+
 @dataclass(frozen=True)
 class SobyaSettlementConfig:
     destination_chain_id: int
