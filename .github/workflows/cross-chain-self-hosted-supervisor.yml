@@ -9,13 +9,9 @@ on:
       - "cross-chain/observer/test_supervisor_service.py"
       - "cross-chain/observer/test_rpc_probes.py"
       - "cross-chain/observer/test_self_hosted_supervisor.py"
-      - "cross-chain/observer/supervisor_service.py"
-      - "cross-chain/observer/test_supervisor_service.py"
       - "cross-chain/coordinator/admission.py"
       - "cross-chain/coordinator/test_admission.py"
       - "cross-chain/observer/requirements.txt"
-      - "cross-chain/coordinator/admission.py"
-      - "cross-chain/coordinator/test_admission.py"
       - ".github/workflows/cross-chain-self-hosted-supervisor.yml"
   push:
     branches:
@@ -23,8 +19,12 @@ on:
     paths:
       - "cross-chain/observer/self_hosted_supervisor.py"
       - "cross-chain/observer/rpc_probes.py"
+      - "cross-chain/observer/supervisor_service.py"
+      - "cross-chain/observer/test_supervisor_service.py"
       - "cross-chain/observer/test_rpc_probes.py"
       - "cross-chain/observer/test_self_hosted_supervisor.py"
+      - "cross-chain/coordinator/admission.py"
+      - "cross-chain/coordinator/test_admission.py"
       - "cross-chain/observer/requirements.txt"
       - ".github/workflows/cross-chain-self-hosted-supervisor.yml"
 
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Run coordinator admission tests
+      - name: Run coordinator admission and ledger tests
         run: |
           cd cross-chain/coordinator
           python -m unittest -v test_admission.py test_order_ledger.py
