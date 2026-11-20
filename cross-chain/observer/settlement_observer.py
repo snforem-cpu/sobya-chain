@@ -139,10 +139,19 @@ class SettlementVerifier:
             raise VerificationError("destination transaction failed")
         if receipt.get("transactionHash", "").lower() != transaction_hash.lower():
             raise VerificationError("receipt transaction hash mismatch")
-        if receipt.get("to", "").lower() != self.contract:
+
+        transaction = self.rpc.call("eth_getTransactionByHash", [transaction_hash])
+        if transaction is None:
+            raise VerificationError("destination transaction not found")
+        if transaction.get("to", "").lower() != self.contract:
             raise VerificationError("transaction target is not settlement contract")
+        if int(transaction.get("value", "0x0"), 16) <= 0:
+            raise VerificationError("transaction did not transfer native SOBY")
 
         block_number = int(receipt["blockNumber"], 16)
+        canonical_block = self.rpc.call("eth_getBlockByNumber", [hex(block_number), False])
+        if canonical_block is None or canonical_block.get("hash", "").lower() != receipt.get("blockHash", "").lower():
+            raise VerificationError("receipt block is not canonical (possible reorg)")
         latest = int(self.rpc.call("eth_blockNumber", []), 16)
         if latest < block_number or latest - block_number + 1 < self.confirmations:
             raise VerificationError("destination payout has insufficient confirmations")
@@ -180,8 +189,10 @@ class SettlementVerifier:
                 or soby_amount != expected.soby_amount
                 or solver != expected_solver
                 or destination_chain_id != self.expected_chain_id
+                or int(transaction.get("value", "0x0"), 16) != expected.soby_amount
+                or transaction.get("from", "").lower() != expected_solver
             ):
-                raise VerificationError("payout event does not match signed source order")
+                raise VerificationError("payout event/transaction does not match signed source order")
             matches.append(log)
 
         if len(matches) != 1:
