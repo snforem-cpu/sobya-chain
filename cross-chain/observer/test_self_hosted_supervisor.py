@@ -82,7 +82,7 @@ class SelfHostedSupervisorTests(unittest.TestCase):
         def probe(item):
             if item.node_id == "eth-node-b":
                 raise RuntimeError("offline")
-            return NodeHealth("1", 1000, 995, False)
+            return NodeHealth("1", 1000, 995, 1000, False)
         result = SelfHostedNodeSupervisor([target(), second], probe).check_network("ethereum")
         self.assertFalse(result.ready)
         self.assertEqual(result.checked_nodes, ("eth-node-a", "eth-node-b"))
