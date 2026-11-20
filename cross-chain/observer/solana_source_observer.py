@@ -27,6 +27,7 @@ class ExpectedSolanaDeposit:
     program_id: str
     order_pda: str
     config_pda: str
+    config_authority: str
     user: str
     solver: str
     escrow_token_account: str
@@ -123,7 +124,7 @@ class SolanaDepositVerifier:
         if len(expected.order_id) != 32 or len(expected.destination_recipient) != 20:
             raise ValueError("order ID and destination recipient must be 32 and 20 bytes")
         derived_config, _ = _find_program_address(
-            [b"config", _pubkey_bytes(expected.user)], expected.program_id
+            [b"config", _pubkey_bytes(expected.config_authority)], expected.program_id
         )
         derived_order, _ = _find_program_address(
             [b"order", expected.order_id], expected.program_id
@@ -132,6 +133,24 @@ class SolanaDepositVerifier:
             raise VerificationError("configured Solana config PDA does not match its authority and program")
         if expected.order_pda != derived_order:
             raise VerificationError("Solana order PDA does not match its order ID and program")
+        config_info = self.rpc.call("getAccountInfo", [expected.config_pda, {
+            "encoding": "base64", "commitment": "finalized",
+        }]).get("value")
+        if not config_info or config_info.get("owner") != expected.program_id:
+            raise VerificationError("configured Solana config account is missing or has the wrong owner")
+        try:
+            config_raw = base64.b64decode(config_info.get("data", [""])[0], validate=True)
+        except Exception as exc:
+            raise VerificationError("Solana config account data is not valid base64") from exc
+        derived_config_bump = _find_program_address(
+            [b"config", _pubkey_bytes(expected.config_authority)], expected.program_id
+        )[1]
+        if (len(config_raw) < 65
+                or config_raw[:32] != _pubkey_bytes(expected.config_authority)
+                or config_raw[32] != derived_config_bump
+                or config_raw[33:65] != _pubkey_bytes(expected.usdt_mint)):
+            raise VerificationError("Solana config authority, bump, or USDT mint does not match pinned configuration")
+
         tx = self.rpc.call("getTransaction", [expected.signature, {
             "encoding": "json", "commitment": "finalized", "maxSupportedTransactionVersion": 0,
         }])
