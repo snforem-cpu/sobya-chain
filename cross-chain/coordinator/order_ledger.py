@@ -129,19 +129,78 @@ class CrossChainOrderLedger:
             );
             CREATE TABLE IF NOT EXISTS solver_inventory (
                 solver TEXT PRIMARY KEY,
-                total_units INTEGER NOT NULL CHECK(total_units >= 0),
-                reserved_units INTEGER NOT NULL DEFAULT 0
-                    CHECK(reserved_units >= 0 AND reserved_units <= total_units)
+                total_units TEXT NOT NULL,
+                reserved_units TEXT NOT NULL DEFAULT '0'
             );
             CREATE TABLE IF NOT EXISTS inventory_reservations (
                 order_id TEXT PRIMARY KEY REFERENCES orders(order_id),
                 solver TEXT NOT NULL REFERENCES solver_inventory(solver),
-                units INTEGER NOT NULL CHECK(units > 0),
+                units TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN ('ACTIVE','CONSUMED','RELEASED')),
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
         """)
+        self._migrate_inventory_decimal_storage()
+
+    def _migrate_inventory_decimal_storage(self) -> None:
+        """Rebuild legacy INTEGER inventory tables as exact decimal TEXT storage."""
+        inventory_columns = {
+            row["name"]: row["type"].upper()
+            for row in self.db.execute("PRAGMA table_info(solver_inventory)")
+        }
+        reservation_columns = {
+            row["name"]: row["type"].upper()
+            for row in self.db.execute("PRAGMA table_info(inventory_reservations)")
+        }
+        if (inventory_columns.get("total_units") == "TEXT"
+                and inventory_columns.get("reserved_units") == "TEXT"
+                and reservation_columns.get("units") == "TEXT"):
+            return
+
+        inventory_rows = [dict(row) for row in self.db.execute(
+            "SELECT solver,total_units,reserved_units FROM solver_inventory"
+        )]
+        reservation_rows = [dict(row) for row in self.db.execute(
+            "SELECT order_id,solver,units,status,created_at,updated_at FROM inventory_reservations"
+        )]
+        self.db.execute("PRAGMA foreign_keys = OFF")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            self.db.execute("DROP TABLE inventory_reservations")
+            self.db.execute("DROP TABLE solver_inventory")
+            self.db.executescript("""
+                CREATE TABLE solver_inventory (
+                    solver TEXT PRIMARY KEY,
+                    total_units TEXT NOT NULL,
+                    reserved_units TEXT NOT NULL DEFAULT '0'
+                );
+                CREATE TABLE inventory_reservations (
+                    order_id TEXT PRIMARY KEY REFERENCES orders(order_id),
+                    solver TEXT NOT NULL REFERENCES solver_inventory(solver),
+                    units TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('ACTIVE','CONSUMED','RELEASED')),
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+            """)
+            self.db.executemany(
+                "INSERT INTO solver_inventory(solver,total_units,reserved_units) VALUES(?,?,?)",
+                [(r["solver"], str(int(r["total_units"])), str(int(r["reserved_units"])))
+                 for r in inventory_rows],
+            )
+            self.db.executemany(
+                """INSERT INTO inventory_reservations
+                   (order_id,solver,units,status,created_at,updated_at) VALUES(?,?,?,?,?,?)""",
+                [(r["order_id"], r["solver"], str(int(r["units"])), r["status"],
+                  r["created_at"], r["updated_at"]) for r in reservation_rows],
+            )
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        finally:
+            self.db.execute("PRAGMA foreign_keys = ON")
 
     @_synchronized
     def register_quote(self, quote: OrderQuote, now: int | None = None) -> None:
@@ -183,19 +242,20 @@ class CrossChainOrderLedger:
     @_synchronized
     def set_solver_inventory(self, solver: str, total_units: int) -> None:
         """Provision solver inventory in SOBY base units; reserved units cannot be withdrawn."""
-        if not isinstance(solver, str) or not solver.strip() or not isinstance(total_units, int) or total_units < 0:
+        if (not isinstance(solver, str) or not solver.strip()
+                or not isinstance(total_units, int) or isinstance(total_units, bool) or total_units < 0):
             raise LedgerError("invalid solver inventory")
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.db.execute(
                 "SELECT reserved_units FROM solver_inventory WHERE solver=?", (solver,)
             ).fetchone()
-            if row is not None and total_units < row["reserved_units"]:
+            if row is not None and total_units < int(row["reserved_units"]):
                 raise LedgerError("inventory cannot be reduced below active reservations")
             self.db.execute(
                 """INSERT INTO solver_inventory(solver,total_units,reserved_units) VALUES(?,?,0)
                    ON CONFLICT(solver) DO UPDATE SET total_units=excluded.total_units""",
-                (solver, total_units),
+                (solver, str(total_units), "0"),
             )
             self.db.execute("COMMIT")
         except Exception:
@@ -205,10 +265,10 @@ class CrossChainOrderLedger:
     @_synchronized
     def available_solver_inventory(self, solver: str) -> int:
         row = self.db.execute(
-            "SELECT total_units-reserved_units AS available FROM solver_inventory WHERE solver=?",
+            "SELECT total_units,reserved_units FROM solver_inventory WHERE solver=?",
             (solver,),
         ).fetchone()
-        return 0 if row is None else int(row["available"])
+        return 0 if row is None else int(row["total_units"]) - int(row["reserved_units"])
 
     @_synchronized
     def register_quote_with_inventory(self, quote: OrderQuote, now: int | None = None) -> None:
@@ -235,7 +295,8 @@ class CrossChainOrderLedger:
                 "SELECT total_units,reserved_units FROM solver_inventory WHERE solver=?",
                 (quote.solver,),
             ).fetchone()
-            if inventory is None or inventory["total_units"] - inventory["reserved_units"] < quote.destination_amount:
+            if (inventory is None or int(inventory["total_units"]) - int(inventory["reserved_units"])
+                    < quote.destination_amount):
                 raise LedgerError("solver has insufficient unreserved SOBY inventory")
             self.db.execute(
                 """INSERT INTO orders(order_id,quote_json,quote_digest,status,source_chain,created_at,updated_at)
@@ -249,11 +310,11 @@ class CrossChainOrderLedger:
             self.db.execute(
                 """INSERT INTO inventory_reservations(order_id,solver,units,status,created_at,updated_at)
                    VALUES(?,?,?,'ACTIVE',?,?)""",
-                (quote.order_id, quote.solver, quote.destination_amount, now, now),
+                (quote.order_id, quote.solver, str(quote.destination_amount), now, now),
             )
             self.db.execute(
-                "UPDATE solver_inventory SET reserved_units=reserved_units+? WHERE solver=?",
-                (quote.destination_amount, quote.solver),
+                "UPDATE solver_inventory SET reserved_units=? WHERE solver=?",
+                (str(int(inventory["reserved_units"]) + quote.destination_amount), quote.solver),
             )
             self.db.execute("COMMIT")
         except sqlite3.IntegrityError as exc:
@@ -343,15 +404,19 @@ class CrossChainOrderLedger:
                 (evidence.order_id,),
             ).fetchone()
             if reservation is not None and reservation["status"] == "ACTIVE":
-                inventory_update = self.db.execute(
-                    """UPDATE solver_inventory
-                       SET total_units=total_units-?, reserved_units=reserved_units-?
-                       WHERE solver=? AND total_units>=? AND reserved_units>=?""",
-                    (reservation["units"], reservation["units"], reservation["solver"],
-                     reservation["units"], reservation["units"]),
-                )
-                if inventory_update.rowcount != 1:
+                inventory = self.db.execute(
+                    "SELECT total_units,reserved_units FROM solver_inventory WHERE solver=?",
+                    (reservation["solver"],),
+                ).fetchone()
+                units = int(reservation["units"])
+                if (inventory is None or int(inventory["total_units"]) < units
+                        or int(inventory["reserved_units"]) < units):
                     raise LedgerError("reserved solver inventory is inconsistent; payout record rejected")
+                self.db.execute(
+                    "UPDATE solver_inventory SET total_units=?,reserved_units=? WHERE solver=?",
+                    (str(int(inventory["total_units"]) - units),
+                     str(int(inventory["reserved_units"]) - units), reservation["solver"]),
+                )
                 self.db.execute(
                     """UPDATE inventory_reservations SET status='CONSUMED',updated_at=?
                        WHERE order_id=?""",
