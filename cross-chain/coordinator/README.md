@@ -80,3 +80,38 @@ Run its focused tests from this directory:
 ```sh
 python -m unittest -v test_admission.py test_order_ledger.py
 ```
+
+## Local coordinator orchestration and solver inventory
+
+`coordinator.py` adds a local orchestration boundary. It requires injected,
+chain-specific verifier callbacks to return the literal boolean `True` before
+it will pass quote, source-deposit, or destination-payout evidence onward.
+Verifier exceptions and false/ambiguous results fail closed. The quote path
+then calls the readiness guard and atomically reserves the exact SOBY payout
+amount against the named solver's inventory.
+
+The SQLite ledger now supports:
+- `set_solver_inventory(solver, total_units)`: provision total SOBY inventory
+  in 18-decimal base units; it cannot reduce total below active reservations.
+- `available_solver_inventory(solver)`: return unreserved units.
+- `register_quote_with_inventory(quote)`: in one SQLite transaction, require
+  enough unreserved inventory, register the order, create its reservation,
+  and increment reserved units. Concurrent quote attempts cannot reserve the
+  same units twice.
+- When verified destination payout evidence is recorded, the active
+  reservation is consumed and total inventory is reduced by the payout amount.
+
+This is still **not a network-facing HTTP API**. It has no HTTP listener,
+caller authentication, real EIP-712/Solana signature verifier, live observer
+binding, key management, transaction submission, or escrow claim automation.
+The injected verifier callbacks are security-critical and must be implemented
+and reviewed against the chain-specific observer/attestation formats before
+deployment. Inventory provisioning is a trusted local operator action, not a
+user-facing endpoint. Do not expose SQLite or these methods directly to
+untrusted callers.
+
+Tests:
+
+```sh
+python -m unittest -v test_admission.py test_coordinator.py test_order_ledger.py
+```
