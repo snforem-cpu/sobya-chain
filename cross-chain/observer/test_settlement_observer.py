@@ -22,6 +22,8 @@ class FakeRpc:
         self.chain_id = chain_id
         self.latest = latest
         self.receipt = None
+        self.transaction = None
+        self.block_hash = "0x" + "bb" * 32
 
     def __call__(self, _url, payload, _timeout):
         method = payload["method"]
@@ -31,6 +33,10 @@ class FakeRpc:
             result = hex(self.latest)
         elif method == "eth_getTransactionReceipt":
             result = self.receipt
+        elif method == "eth_getTransactionByHash":
+            result = self.transaction
+        elif method == "eth_getBlockByNumber":
+            result = {"hash": self.block_hash}
         else:
             raise AssertionError(method)
         return {"jsonrpc": "2.0", "id": payload["id"], "result": result}
@@ -65,11 +71,15 @@ class SettlementObserverTests(unittest.TestCase):
         ])
         self.fake.receipt = {
             "transactionHash": self.tx_hash, "to": self.contract,
-            "status": "0x1", "blockNumber": "0x64",
+            "status": "0x1", "blockNumber": "0x64", "blockHash": self.fake.block_hash,
             "logs": [{
                 "address": self.contract, "topics": topics,
                 "data": "0x" + data.hex(), "logIndex": "0x2",
             }],
+        }
+        self.fake.transaction = {
+            "hash": self.tx_hash, "to": self.contract,
+            "from": self.expected.solver, "value": hex(self.expected.soby_amount),
         }
 
     def test_valid_finalized_payout_is_verified(self):
@@ -97,6 +107,21 @@ class SettlementObserverTests(unittest.TestCase):
     def test_insufficient_confirmations_rejected(self):
         self.fake.latest = 110
         with self.assertRaisesRegex(VerificationError, "insufficient confirmations"):
+            self.verifier.verify(self.tx_hash, self.expected)
+
+    def test_non_canonical_block_rejected(self):
+        self.fake.block_hash = "0x" + "cc" * 32
+        with self.assertRaisesRegex(VerificationError, "possible reorg"):
+            self.verifier.verify(self.tx_hash, self.expected)
+
+    def test_wrong_transaction_sender_rejected(self):
+        self.fake.transaction["from"] = "0x" + "66" * 20
+        with self.assertRaisesRegex(VerificationError, "does not match"):
+            self.verifier.verify(self.tx_hash, self.expected)
+
+    def test_wrong_transaction_value_rejected(self):
+        self.fake.transaction["value"] = "0x1"
+        with self.assertRaisesRegex(VerificationError, "does not match"):
             self.verifier.verify(self.tx_hash, self.expected)
 
     def test_wrong_amount_rejected(self):
