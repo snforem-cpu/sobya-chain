@@ -220,3 +220,14 @@ or price oracle**. The pricer does not sign quotes; the solver must sign the
 resulting EIP-712 order with its own wallet. Inventory values must be reconciled
 against finalized SOBYA balances before production. No live quote endpoint is
 enabled by this change.
+
+
+## Exact SOBY base-unit inventory storage
+
+Solver inventory and reservation amounts are stored as decimal TEXT, then
+parsed and arithmetically updated as Python integers inside the same SQLite
+write transaction. This avoids SQLite's signed 64-bit INTEGER ceiling, which
+is far below the base-unit representation of the network's token supply.
+Initialization migrates the earlier INTEGER inventory tables transactionally
+and preserves existing totals and active reservations. Tests cover a
+150,000,000 SOBY-scale balance and legacy-table migration.
