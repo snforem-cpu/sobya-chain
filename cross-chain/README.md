@@ -49,7 +49,7 @@ Each adapter must produce the same normalized deposit proof fields while retaini
 1. Architecture, state machine, threat model, and disabled chain registry (this milestone).
 2. Local deterministic test harness and order-state model; no real funds.
 3. Source-chain escrow prototypes for TRON, Ethereum, and Solana (local tests only; TVM/validator testnet verification remains pending).
-4. SOBYA native-SOBY destination payout contract prototype and read-only observers for Ethereum source deposits and SOBYA destination payouts (local mocked-RPC tests only). TRON/Solana source observers, production signer/relayer services, and durable order API remain pending.
+4. SOBYA native-SOBY destination payout contract prototype, read-only observers for Ethereum/TRON/Solana source deposits and SOBYA destination payouts, and a loopback-only authenticated durable coordinator API (local mocked-RPC tests only). EVM quotes use EIP-712; Solana quotes use a deployment-pinned Ed25519 domain. Production signer/relayer services, automatic source-escrow claims, refund-proof processing, DEX UI integration, and live-node tests remain pending.
 5. Adversarial tests, reorg/finality tests, replay tests, refund tests, and external security review.
 6. DEX UI integration behind a hard-disabled feature flag. Solver claims must execute before each order's refund deadline; after that deadline only the user's refund path remains available.
 7. Testnet end-to-end operation with independent operators.
