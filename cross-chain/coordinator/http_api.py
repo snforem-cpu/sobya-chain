@@ -154,6 +154,12 @@ def create_server(
                     )
                     self._send(201, {"accepted": True, "orderId": quote.order_id, "status": "QUOTED"})
                     return
+                if path == "/v1/expire-quotes":
+                    if set(body) != {"order_id"} or not isinstance(body["order_id"], str) or not body["order_id"]:
+                        raise ValueError("a non-empty order_id is required")
+                    self.server.coordinator.expire_unfunded_quote(body["order_id"])
+                    self._send(200, {"accepted": True, "orderId": body["order_id"], "status": "EXPIRED"})
+                    return
                 if path == "/v1/source-deposits":
                     if set(body) != {"evidence", "proof"}:
                         raise ValueError("evidence and proof are required")
