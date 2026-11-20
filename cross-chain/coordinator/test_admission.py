@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import unittest
 from pathlib import Path
@@ -94,6 +95,28 @@ class AdmissionGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "insufficient unreserved SOBY inventory"):
             self.guard.register_quote(second, now=1_900_000_000)
         self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
+
+    def test_parallel_quotes_cannot_oversubscribe_solver_inventory(self):
+        self.ledger.set_solver_inventory(self.quote.solver, self.quote.destination_amount)
+        second = OrderQuote(
+            order_id="order-guard-parallel-002", source_chain="ethereum",
+            source_asset=self.quote.source_asset, source_amount=self.quote.source_amount,
+            user=self.quote.user, solver=self.quote.solver,
+            destination_chain_id=self.quote.destination_chain_id,
+            destination_recipient="0x" + "66"*20,
+            destination_amount=self.quote.destination_amount,
+            quote_expiry=self.quote.quote_expiry, refund_after=self.quote.refund_after,
+        )
+        def attempt(quote):
+            try:
+                self.guard.register_quote(quote, now=1_900_000_000)
+                return "accepted"
+            except Exception:
+                return "rejected"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(attempt, [self.quote, second]))
+        self.assertCountEqual(results, ["accepted", "rejected"])
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 0)
 
     def test_unhealthy_source_or_destination_denies_quote(self):
         self.monitor.ready = False
