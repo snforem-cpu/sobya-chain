@@ -15,7 +15,7 @@ The UI must never imply that a quote is executable unless a live solver has rese
 
 A Solidity AMM pair on SOBYA cannot read USDT balances or transactions on TRON, Ethereum, or Solana. A traditional wrapped-asset bridge would require locking source USDT and minting a distinct wrapped representation on SOBYA. The agreed initial direction is instead a cross-chain swap intent: the source payment and destination SOBY payout are linked by a unique order, without pretending source USDT is already an ERC-20 on SOBYA.
 
-This is a solver/settlement model, not a magic direct connection between chains. A solver must have SOBY available for payout on SOBYA and must receive the source USDT only after the payout condition is satisfied. Multiple independent solvers are preferred to a single project-operated hot wallet.
+This is a solver/settlement model, not a magic direct connection between chains. A solver must have SOBY available for payout on SOBYA and must receive the source USDT only after the payout condition is satisfied. Solver inventory must be reserved before quoting. A SOBYA-operated initial solver is possible, but it concentrates inventory and operational risk; the DEX must disclose that concentration and enforce strict caps.
 
 ## 3. Components
 
@@ -38,7 +38,7 @@ The escrow holds only the exact USDT amount for an order. It has no arbitrary ow
 
 ### Verification and relaying
 
-Independent observers verify source-chain deposit finality and SOBYA payout finality. A threshold authorization model may be used for the first testnet prototype, but signers must be operationally independent, geographically and administratively separated, rate-limited, and monitored. A threshold signature is not a light client and must not be described as trustless.
+SOBYA-operated observers verify source-chain deposit finality and SOBYA payout finality using SOBYA-operated chain nodes. Under the selected no-third-party operating constraint, the attestor threshold is also controlled by SOBYA and is therefore a single-operator trust model. Separate processes, hosts and keys provide fault containment, not independent governance. A threshold signature is not a light client and must not be described as trustless. See [self-hosted operations](SELF_HOSTED_OPERATIONS.md).
 
 A later trust-minimized design may replace or supplement attestations with chain-specific light-client proofs where feasible.
 
@@ -94,4 +94,4 @@ The exact USDT contract/mint addresses, decimals, token program, escrow addresse
 - `Solver`: reserves SOBY inventory, executes payout, and claims source escrow only under the contract rules.
 - `RiskController`: global/per-chain limits, pause controls, inventory thresholds, anomaly detection, and incident procedures.
 
-The native-SOBY destination payout contract prototype is implemented under `contracts/src/SobyaCrossChainSettlement.sol`; it emits a payout event but does not verify source-chain deposits itself. Read-only Python observers now verify Ethereum escrow funding at the finalized block tag and SOBYA payout receipts/events using mocked-RPC tests. They do not sign attestations or submit transactions. TRON/Solana source observers, production RPC quorum, signer/relayer services, durable order API, solver inventory service, and risk controller remain outstanding.
+The native-SOBY destination payout contract prototype is implemented under `contracts/src/SobyaCrossChainSettlement.sol`; it emits a payout event but does not verify source-chain deposits itself. Read-only Python observers now verify Ethereum escrow funding at the finalized block tag and SOBYA payout receipts/events using mocked-RPC tests. They do not sign attestations or submit transactions. TRON/Solana source observers, self-hosted node operations, a local observer supervisor, signer processes, durable order API, solver inventory service, and risk controller remain outstanding.
