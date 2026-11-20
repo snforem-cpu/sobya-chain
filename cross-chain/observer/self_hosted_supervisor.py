@@ -34,6 +34,7 @@ class NodeHealth:
     identity: str
     head_height: int
     finalized_height: int
+    reference_head_height: int
     syncing: bool
     healthy: bool = True
 
@@ -91,6 +92,10 @@ def validate_health(target: NodeTarget, health: NodeHealth) -> None:
         raise NodeHealthError("node chain identity does not match configured identity")
     if health.head_height < 0 or health.finalized_height < 0:
         raise NodeHealthError("node returned a negative block height")
+    if health.reference_head_height < 0:
+        raise NodeHealthError("reference head height is invalid")
+    if health.reference_head_height - health.head_height > target.max_head_lag:
+        raise NodeHealthError("node head is too far behind its configured local peer reference")
     if health.finalized_height > health.head_height:
         raise NodeHealthError("finalized height exceeds head height")
     if health.head_height - health.finalized_height > target.max_finality_lag:
