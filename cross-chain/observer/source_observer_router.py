@@ -52,7 +52,9 @@ class TronSourceConfig:
 @dataclass(frozen=True)
 class SolanaSourceConfig:
     program_id: str
+    config_authority: str
     usdt_mint: str
+    sobya_chain_id: int
     expected_genesis_hash: str
     rpc: Any
 
@@ -73,6 +75,33 @@ def _associated_token_address(owner: str, mint: str) -> str:
         ASSOCIATED_TOKEN_PROGRAM,
     )
     return address
+
+
+def _build_solana_expected_deposit(
+    quote: OrderQuote, signature: str, config: SolanaSourceConfig
+) -> ExpectedSolanaDeposit:
+    if quote.source_asset != config.usdt_mint:
+        raise VerificationError("Solana quote asset does not match the pinned USDT mint")
+    if config.sobya_chain_id != quote.destination_chain_id:
+        raise VerificationError("Solana escrow configuration is pinned to a different SOBYA chain ID")
+    order_id = bytes.fromhex(quote.order_id.removeprefix("0x"))
+    recipient = bytes.fromhex(quote.destination_recipient.removeprefix("0x"))
+    config_pda, _ = _find_program_address(
+        [b"config", _pubkey_bytes(config.config_authority)], config.program_id
+    )
+    order_pda, _ = _find_program_address([b"order", order_id], config.program_id)
+    escrow_token = _associated_token_address(order_pda, config.usdt_mint)
+    return ExpectedSolanaDeposit(
+        signature=signature, program_id=config.program_id,
+        order_pda=order_pda, config_pda=config_pda,
+        config_authority=config.config_authority, sobya_chain_id=config.sobya_chain_id,
+        user=quote.user, solver=quote.solver,
+        escrow_token_account=escrow_token, usdt_mint=config.usdt_mint,
+        source_amount=quote.source_amount, order_id=order_id,
+        destination_recipient=recipient,
+        destination_amount=quote.destination_amount,
+        quote_expiry=quote.quote_expiry, refund_after=quote.refund_after,
+    )
 
 
 class SourceObserverRouter:
@@ -169,23 +198,7 @@ class SourceObserverRouter:
             actual_genesis = config.rpc.call("getGenesisHash", [])
             if actual_genesis != config.expected_genesis_hash:
                 raise VerificationError("Solana genesis hash does not match pinned network identity")
-            order_id = bytes.fromhex(quote.order_id.removeprefix("0x"))
-            recipient = bytes.fromhex(quote.destination_recipient.removeprefix("0x"))
-            config_pda, _ = _find_program_address(
-                [b"config", _pubkey_bytes(quote.user)], config.program_id
-            )
-            order_pda, _ = _find_program_address([b"order", order_id], config.program_id)
-            escrow_token = _associated_token_address(order_pda, config.usdt_mint)
-            expected = ExpectedSolanaDeposit(
-                signature=proof["signature"], program_id=config.program_id,
-                order_pda=order_pda, config_pda=config_pda,
-                user=quote.user, solver=quote.solver,
-                escrow_token_account=escrow_token, usdt_mint=config.usdt_mint,
-                source_amount=quote.source_amount, order_id=order_id,
-                destination_recipient=recipient,
-                destination_amount=quote.destination_amount,
-                quote_expiry=quote.quote_expiry, refund_after=quote.refund_after,
-            )
+            expected = _build_solana_expected_deposit(quote, proof["signature"], config)
             observed = SolanaDepositVerifier(config.rpc).verify(expected)
             actual = SourceDepositEvidence(
                 order_id=quote.order_id, source_chain=chain,
