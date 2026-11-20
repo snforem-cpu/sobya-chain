@@ -26,6 +26,22 @@ Canonical source-chain keys are keccak256(UTF-8 network label), for example
 keccak256("ETHEREUM_MAINNET"). EVM/TVM addresses are left-padded to 32 bytes;
 Solana public keys are used as their native 32-byte values.
 
+## TRON source deposit observer (prototype)
+
+`tron_source_observer.py` reads transaction details and block data through
+TRON's Solidity Node endpoints, then checks the solidified transaction result,
+target contract, sender, zero native-TRX value, canonical solidified block ID,
+configured TRC-20 token, FUNDED order storage, all ten stored order fields,
+and exactly one matching `OrderFunded` event. It accepts TRON's 41-prefixed
+hex addresses and normalizes them to the 20-byte EVM representation used by
+the escrow ABI.
+
+This remains an RPC-based observer, not a cryptographic TRON light client.
+Before production use it needs independent Solidity Node quorum, a verified
+TRON-Solidity compiler/TVM deployment, and Shasta integration tests against
+the actual deployed bytecode. Mocked tests do not establish TVM compatibility
+or production finality guarantees.
+
 ## What it does not do
 
 - It does not verify source-chain deposits or their finality.
