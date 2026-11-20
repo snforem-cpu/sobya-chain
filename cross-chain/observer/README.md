@@ -16,7 +16,7 @@ solver quote/source escrow record. The observer independently checks:
 - Exactly one matching PayoutExecuted event exists from the configured
   settlement contract.
 - Order ID, canonical source-chain key, source escrow, source USDT contract or
-  mint, exact source amount, SOBYA recipient, exact SOBY amount, solver, and
+  mint, exact source amount, SOBYA recipient, exact SOBY amount, destination-chain solver address (which may differ from the source-chain solver account), and
   destination chain ID match the expected order record.
 - SQLite prevents recording the same order or transaction log twice.
 
