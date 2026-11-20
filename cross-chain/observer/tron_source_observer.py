@@ -136,8 +136,8 @@ class TronDepositVerifier:
         response = self.rpc.call("/walletsolidity/triggerconstantcontract", {
             "owner_address": "41" + self.escrow[2:],
             "contract_address": "41" + self.escrow[2:],
-            "function_selector": "",
-            "parameter": "",
+            # Send complete calldata only; TRON prioritizes the split
+            # function_selector/parameter form when both are supplied.
             "data": data,
             "visible": False,
         })
