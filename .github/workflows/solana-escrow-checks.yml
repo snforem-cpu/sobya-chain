@@ -1,0 +1,35 @@
+name: Solana escrow program checks
+
+on:
+  pull_request:
+    paths:
+      - "cross-chain/solana/**"
+      - ".github/workflows/solana-escrow-checks.yml"
+  push:
+    branches:
+      - main
+      - feat/sobya-cross-chain-swap-foundation
+    paths:
+      - "cross-chain/solana/**"
+      - ".github/workflows/solana-escrow-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cross-chain/solana/program
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run unit tests
+        run: cargo test --locked
+      - name: Compile program crate
+        run: cargo check --locked
