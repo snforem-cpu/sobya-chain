@@ -115,6 +115,20 @@ class CrossChainOrderLedger:
                 UNIQUE(order_id, event_type),
                 UNIQUE(evidence_digest)
             );
+            CREATE TABLE IF NOT EXISTS solver_inventory (
+                solver TEXT PRIMARY KEY,
+                total_units INTEGER NOT NULL CHECK(total_units >= 0),
+                reserved_units INTEGER NOT NULL DEFAULT 0
+                    CHECK(reserved_units >= 0 AND reserved_units <= total_units)
+            );
+            CREATE TABLE IF NOT EXISTS inventory_reservations (
+                order_id TEXT PRIMARY KEY REFERENCES orders(order_id),
+                solver TEXT NOT NULL REFERENCES solver_inventory(solver),
+                units INTEGER NOT NULL CHECK(units > 0),
+                status TEXT NOT NULL CHECK(status IN ('ACTIVE','CONSUMED','RELEASED')),
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
         """)
 
     def register_quote(self, quote: OrderQuote, now: int | None = None) -> None:
@@ -144,6 +158,86 @@ class CrossChainOrderLedger:
             self.db.execute(
                 "INSERT INTO ledger_events(order_id,event_type,evidence_digest,created_at) VALUES(?,?,?,?)",
                 (quote.order_id, "QUOTE_REGISTERED", digest, now),
+            )
+            self.db.execute("COMMIT")
+        except sqlite3.IntegrityError as exc:
+            self.db.execute("ROLLBACK")
+            raise LedgerError("order quote already registered or replayed") from exc
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def set_solver_inventory(self, solver: str, total_units: int) -> None:
+        """Provision solver inventory in SOBY base units; reserved units cannot be withdrawn."""
+        if not isinstance(solver, str) or not solver.strip() or not isinstance(total_units, int) or total_units < 0:
+            raise LedgerError("invalid solver inventory")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute(
+                "SELECT reserved_units FROM solver_inventory WHERE solver=?", (solver,)
+            ).fetchone()
+            if row is not None and total_units < row["reserved_units"]:
+                raise LedgerError("inventory cannot be reduced below active reservations")
+            self.db.execute(
+                """INSERT INTO solver_inventory(solver,total_units,reserved_units) VALUES(?,?,0)
+                   ON CONFLICT(solver) DO UPDATE SET total_units=excluded.total_units""",
+                (solver, total_units),
+            )
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def available_solver_inventory(self, solver: str) -> int:
+        row = self.db.execute(
+            "SELECT total_units-reserved_units AS available FROM solver_inventory WHERE solver=?",
+            (solver,),
+        ).fetchone()
+        return 0 if row is None else int(row["available"])
+
+    def register_quote_with_inventory(self, quote: OrderQuote, now: int | None = None) -> None:
+        """Atomically register a quote and reserve its exact SOBY payout amount."""
+        now = int(time.time()) if now is None else now
+        if (not quote.order_id or not quote.source_chain or not quote.source_asset
+            or not quote.user or not quote.solver or not quote.destination_recipient
+            or min(quote.source_amount, quote.destination_amount, quote.destination_chain_id) <= 0
+            or quote.quote_expiry <= now or quote.refund_after <= quote.quote_expiry):
+            raise LedgerError("invalid or expired signed quote")
+        payload = {
+            "order_id": quote.order_id, "source_chain": quote.source_chain,
+            "source_asset": quote.source_asset, "source_amount": quote.source_amount,
+            "user": quote.user, "solver": quote.solver,
+            "destination_chain_id": quote.destination_chain_id,
+            "destination_recipient": quote.destination_recipient,
+            "destination_amount": quote.destination_amount,
+            "quote_expiry": quote.quote_expiry, "refund_after": quote.refund_after,
+        }
+        digest = _digest(payload)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            inventory = self.db.execute(
+                "SELECT total_units,reserved_units FROM solver_inventory WHERE solver=?",
+                (quote.solver,),
+            ).fetchone()
+            if inventory is None or inventory["total_units"] - inventory["reserved_units"] < quote.destination_amount:
+                raise LedgerError("solver has insufficient unreserved SOBY inventory")
+            self.db.execute(
+                """INSERT INTO orders(order_id,quote_json,quote_digest,status,source_chain,created_at,updated_at)
+                   VALUES(?,?,?,'QUOTED',?,?,?)""",
+                (quote.order_id, _canonical(payload), digest, quote.source_chain, now, now),
+            )
+            self.db.execute(
+                "INSERT INTO ledger_events(order_id,event_type,evidence_digest,created_at) VALUES(?,?,?,?)",
+                (quote.order_id, "QUOTE_REGISTERED", digest, now),
+            )
+            self.db.execute(
+                """INSERT INTO inventory_reservations(order_id,solver,units,status,created_at,updated_at)
+                   VALUES(?,?,?,'ACTIVE',?,?)""",
+                (quote.order_id, quote.solver, quote.destination_amount, now, now),
+            )
+            self.db.execute(
+                "UPDATE solver_inventory SET reserved_units=reserved_units+? WHERE solver=?",
+                (quote.destination_amount, quote.solver),
             )
             self.db.execute("COMMIT")
         except sqlite3.IntegrityError as exc:
@@ -226,6 +320,23 @@ class CrossChainOrderLedger:
             if not evidence.transaction_id or evidence.event_index < 0 or not evidence.finalized_reference:
                 raise LedgerError("destination payout evidence is incomplete")
             digest = _digest(evidence.__dict__)
+            reservation = self.db.execute(
+                "SELECT solver,units,status FROM inventory_reservations WHERE order_id=?",
+                (evidence.order_id,),
+            ).fetchone()
+            if reservation is not None and reservation["status"] == "ACTIVE":
+                self.db.execute(
+                    """UPDATE solver_inventory
+                       SET total_units=total_units-?, reserved_units=reserved_units-?
+                       WHERE solver=? AND total_units>=? AND reserved_units>=?""",
+                    (reservation["units"], reservation["units"], reservation["solver"],
+                     reservation["units"], reservation["units"]),
+                )
+                self.db.execute(
+                    """UPDATE inventory_reservations SET status='CONSUMED',updated_at=?
+                       WHERE order_id=?""",
+                    (now, evidence.order_id),
+                )
             self.db.execute(
                 """UPDATE orders SET status='DESTINATION_PAID',destination_tx=?,
                    destination_event_index=?,destination_evidence_digest=?,updated_at=?
