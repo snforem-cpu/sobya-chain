@@ -34,8 +34,8 @@ class PricingConfig:
             raise PricingError("a positive rational USDT/SOBY reference rate is required")
         if not 0 <= self.fee_bps < 10_000:
             raise PricingError("fee_bps must be between 0 and 9999")
-        if self.usdt_decimals < 0 or self.soby_decimals < 0:
-            raise PricingError("token decimals cannot be negative")
+        if self.soby_decimals < 0:
+            raise PricingError("SOBY decimals cannot be negative")
         if self.min_source_amount <= 0 or self.max_source_amount < self.min_source_amount:
             raise PricingError("invalid source amount limits")
         if self.quote_ttl_seconds < 15 or self.refund_grace_seconds <= self.quote_ttl_seconds:
