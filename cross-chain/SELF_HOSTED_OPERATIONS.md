@@ -73,9 +73,10 @@ The configuration file must be a private deployment copy, not the example file. 
 Read-only endpoints:
 - `GET /healthz`: confirms the process is responding and reports whether a health snapshot exists.
 - `GET /ready?network=ethereum`: returns HTTP 200 only when the latest non-stale snapshot says every configured node for that network is healthy; otherwise returns HTTP 503.
+- `GET /admission?source=tron&destination=sobya`: returns HTTP 200 only when both the source and destination networks are ready; otherwise returns HTTP 503. The destination defaults to `sobya` if omitted.
 - The network value may be `ethereum`, `tron`, `solana`, or `sobya`, provided that network is explicitly enabled and configured.
 
-The service refuses non-loopback bind addresses. Keep it behind a local order API or private host boundary; do not expose it directly to the public internet. A consumer must treat every non-200 response, timeout, malformed response, or unknown network as **not ready**. This service is a health/readiness gate only: it does not itself accept orders, integrate with the coordinator, stop an existing order API, sign, or broadcast transactions. The coordinator/order API must be wired to check this endpoint before issuing quotes and again before accepting a funded order. That integration and live-node tests remain outstanding.
+The service refuses non-loopback bind addresses. Keep it behind a local order API or private host boundary; do not expose it directly to the public internet. A consumer must treat every non-200 response, timeout, malformed response, or unknown network as **not ready**. This service is a health/readiness gate only: it does not itself accept orders, integrate with the coordinator, stop an existing order API, sign, or broadcast transactions. The coordinator/order API must check `/admission` before issuing a quote and again before accepting a source deposit. There is not yet an HTTP order/quote API in this repository, so no live order endpoint has been connected to this gate. The admission endpoint and live-node tests remain outstanding.
 
 The monitor clears its snapshot if a refresh operation raises, and stale snapshots fail closed. It does not preserve a previously healthy result after a probe exception.
 
