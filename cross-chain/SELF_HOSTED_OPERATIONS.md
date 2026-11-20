@@ -159,3 +159,40 @@ do not expose it publicly or put a token in the repository. It has no quote
 pricing engine, automatic signature creation, RPC client, signer, relayer,
 escrow claim/refund automation, or on-chain inventory oracle. No server was
 started and no node or transaction was contacted.
+
+
+## Concrete quote, observer, and pricing implementation
+
+The coordinator now includes:
+- `coordinator/eip712_quote_verifier.py`: secp256k1 recovery for the exact
+  Ethereum/TRON escrow EIP-712 `Order` digest, including low-s and v/r/s
+  validation and strict matching to the quote's solver address.
+- `coordinator/pricing.py`: integer-only conversion from an operator-pinned
+  rational USDT-base-unit/SOBY rate, fee deduction, amount bounds, quote expiry,
+  refund grace, and local unreserved-inventory check. `POST /v1/quote-previews`
+  returns an explicitly unsigned and unreserved preview; it never signs or
+  accepts the order.
+- `observer/source_observer_router.py`: finalized Ethereum, TRON Solidity
+  Node, and Solana observers composed into the coordinator callback. Solana
+  config/order PDAs and the associated legacy-SPL escrow token account are
+  derived internally; Solana genesis identity is pinned.
+- `observer/destination_payout_router.py`: validates the SOBYA settlement
+  receipt and exact payout event against the immutable quote.
+- `coordinator/runtime.py`: composition root that wires these verifiers,
+  pricing, admission, and the loopback HTTP API without starting the server.
+
+The routers reject public RPC URLs and require self-hosted private/internal
+node URLs. They are read-only and do not sign, claim, refund, or broadcast.
+The EIP-712 verifier has no private key; the solver signs its own quote. The
+Solana source flow requires both the user and solver to sign the Fund
+transaction, and the finalized observer checks both signer identities.
+
+## Exact inventory accounting
+
+SQLite stores SOBY base-unit totals and reservations as decimal TEXT and uses
+Python arbitrary-precision integers for arithmetic within database
+transactions. Initialization migrates the earlier INTEGER schema and
+preserves reservations. This is required because a token balance in 18-decimal
+base units can exceed SQLite's signed 64-bit integer limit. Inventory remains
+an operator-provisioned ledger value until reconciled against finalized SOBYA
+wallet balances; the code does not claim an on-chain balance oracle.
