@@ -145,3 +145,78 @@ HTTP API tests:
 ```sh
 python -m unittest -v test_http_api.py
 ```
+
+
+## EIP-712 solver quote verification
+
+`eip712_quote_verifier.py` now implements the escrow's exact `Order` EIP-712
+type hash and domain (`SOBYA Cross-Chain Escrow`, version `1`, pinned source
+chain ID, pinned escrow address). It recovers the signer using secp256k1,
+enforces canonical low-s signatures and accepts a quote only when the recovered
+address equals the configured solver address. Ethereum and the TRON TVM wrapper
+use the same Solidity order digest; each must have its own configured chain ID
+and deployed escrow address. Solana uses the solver as a transaction co-signer
+on the Fund instruction, and its observer checks that signer in the finalized
+transaction. The service never receives a solver private key.
+
+Example wiring:
+
+```python
+quote_signature_verifier = Eip712QuoteVerifier({
+    "ethereum": Eip712QuoteDomain(chain_id=ETHEREUM_CHAIN_ID, verifying_contract=ETH_ESCROW),
+    "tron": Eip712QuoteDomain(chain_id=TRON_TVM_CHAIN_ID, verifying_contract=TRON_ESCROW),
+})
+# Pass quote_signature_verifier.verify as verify_quote_signature to create_server.
+```
+
+All chain IDs and escrow addresses must come from verified private deployment
+configuration. No guessed defaults are provided.
+
+## Finalized observer routers
+
+`cross-chain/observer/source_observer_router.py` composes the existing
+Ethereum, TRON Solidity Node, and Solana finalized source observers. Its
+coordinator callback accepts only a minimal transaction identifier/signature,
+loads the immutable registered quote, queries the configured self-hosted node,
+and compares every evidence field with the exact finalized on-chain order.
+Solana derives the config PDA, order PDA, and associated legacy-SPL escrow
+token account itself; callers cannot choose those addresses.
+
+`destination_payout_router.py` composes the SOBYA `SettlementVerifier`. It
+requires pinned bytes32 source-chain/escrow/asset identities and verifies the
+canonical receipt, configured settlement contract, transaction sender/value,
+confirmation depth, exact `PayoutExecuted` event, and all order bindings.
+
+Example composition:
+```python
+lookup = lambda order_id: quote_from_ledger(ledger, order_id)
+source_verifier = SourceObserverRouter(
+    quote_lookup=lookup, ethereum=ETHEREUM_NODES, tron=TRON_NODES,
+    solana=SOLANA_NODE,
+)
+payout_verifier = DestinationPayoutRouter(
+    quote_lookup=lookup, settlement=SOBYA_SETTLEMENT,
+    source_identities=PINNED_SOURCE_IDENTITIES,
+)
+# Pass source_verifier and payout_verifier to create_server.
+```
+
+The routers are read-only. They do not start nodes, sign, broadcast, or claim
+escrow. They require configured SOBYA-operated node RPC clients and pinned
+identities. Unit/mock tests are not live-chain or testnet integration evidence.
+
+## Inventory-aware quote pricing
+
+`pricing.py` converts integer USDT base units to integer SOBY base units using
+an explicitly configured rational reference rate (USDT base units per whole
+SOBY), deducts a configured fee in basis points, enforces source amount limits,
+and refuses quotes exceeding the solver's unreserved ledger inventory.
+It sets bounded quote/refund deadlines. The coordinator still performs the
+atomic inventory reservation when the signed quote is submitted, preventing
+concurrent quotes from promising the same SOBY twice.
+
+The rate is an operator-maintained reference input, **not a live market price
+or price oracle**. The pricer does not sign quotes; the solver must sign the
+resulting EIP-712 order with its own wallet. Inventory values must be reconciled
+against finalized SOBYA balances before production. No live quote endpoint is
+enabled by this change.
