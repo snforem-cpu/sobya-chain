@@ -20,7 +20,7 @@ class FakeTron:
         self.expected, self.escrow, self.txid = expected, escrow, txid
         self.token = expected.token
         self.status = 1
-        self.block_hash = "ab" * 32
+        self.block_hash = "ab" * 32\n        self.genesis_hash = "ef" * 32
         self.order = [
             bytes.fromhex(expected.order_id[2:]), word_address(expected.user),
             word_address(expected.token), word_int(expected.source_amount),
@@ -91,7 +91,7 @@ class TronSourceObserverTests(unittest.TestCase):
         )
         self.fake = FakeTron(self.expected, self.escrow, self.txid)
         self.rpc = TronSolidityRpc("https://tron.invalid", transport=self.fake)
-        self.verifier = TronDepositVerifier(self.rpc, self.escrow)
+        self.verifier = TronDepositVerifier(self.rpc, self.escrow, self.fake.genesis_hash)
 
     def test_valid_solidified_deposit(self):
         result = self.verifier.verify(self.txid, self.expected)
