@@ -169,12 +169,14 @@ class CrossChainOrderLedger:
         try:
             self.db.execute("DROP TABLE inventory_reservations")
             self.db.execute("DROP TABLE solver_inventory")
-            self.db.executescript("""
+            self.db.execute("""
                 CREATE TABLE solver_inventory (
                     solver TEXT PRIMARY KEY,
                     total_units TEXT NOT NULL,
                     reserved_units TEXT NOT NULL DEFAULT '0'
-                );
+                )
+            """)
+            self.db.execute("""
                 CREATE TABLE inventory_reservations (
                     order_id TEXT PRIMARY KEY REFERENCES orders(order_id),
                     solver TEXT NOT NULL REFERENCES solver_inventory(solver),
@@ -182,7 +184,7 @@ class CrossChainOrderLedger:
                     status TEXT NOT NULL CHECK(status IN ('ACTIVE','CONSUMED','RELEASED')),
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
-                );
+                )
             """)
             self.db.executemany(
                 "INSERT INTO solver_inventory(solver,total_units,reserved_units) VALUES(?,?,?)",
@@ -253,7 +255,7 @@ class CrossChainOrderLedger:
             if row is not None and total_units < int(row["reserved_units"]):
                 raise LedgerError("inventory cannot be reduced below active reservations")
             self.db.execute(
-                """INSERT INTO solver_inventory(solver,total_units,reserved_units) VALUES(?,?,0)
+                """INSERT INTO solver_inventory(solver,total_units,reserved_units) VALUES(?,?,?)
                    ON CONFLICT(solver) DO UPDATE SET total_units=excluded.total_units""",
                 (solver, str(total_units), "0"),
             )
