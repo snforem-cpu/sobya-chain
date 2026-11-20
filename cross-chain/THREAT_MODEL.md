@@ -20,7 +20,7 @@ Status: initial review checklist; not a security audit.
 6. SOBYA settlement contract and solver wallet.
 7. Monitoring, pause authority, and key-management infrastructure.
 
-No API response, single RPC response, browser event, or project-operated database entry is sufficient proof of a cross-chain deposit.
+No API response, single RPC response, browser event, or project-operated database entry is sufficient proof of a cross-chain deposit. The Ethereum prototype observer uses the finalized block tag and verifies escrow storage plus the funding event, but production operation still requires multiple independent RPC operators and independent attestor review.
 
 ## Principal threats and required controls
 
