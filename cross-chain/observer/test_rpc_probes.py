@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import Mock
 
 from rpc_probes import (
-    ProbeError, probe_evm, probe_solana, probe_tron, probe_for_network,
+    ProbeError, probe_evm, probe_solana, probe_tron, probe_for_network, targets_from_config,
 )
 from self_hosted_supervisor import NodeTarget
 
@@ -94,5 +94,45 @@ class ReadOnlyProbeTests(unittest.TestCase):
         with self.assertRaises(Exception):
             probe_evm(bad, opener=Mock())
 
-if __name__ == "__main__":
+
+    def test_config_factory_rejects_all_disabled_example(self):
+        from self_hosted_supervisor import SupervisorConfigError
+        config = {
+            "mode": "self-hosted-only", "publicRpcFallback": False,
+            "signingEnabled": False,
+            "networks": {"ethereum": {"enabled": False, "expectedChainId": "1", "nodes": []}},
+        }
+        with self.assertRaisesRegex(SupervisorConfigError, "no networks are enabled"):
+            targets_from_config(config)
+
+    def test_config_factory_builds_only_enabled_pinned_private_nodes(self):
+        config = {
+            "mode": "self-hosted-only", "publicRpcFallback": False,
+            "signingEnabled": False,
+            "networks": {
+                "ethereum": {
+                    "enabled": True, "expectedChainId": "1",
+                    "nodes": [{"id": "eth-a", "rpcUrl": "http://127.0.0.1:8545",
+                               "maxHeadLag": 2, "maxFinalityLag": 32}],
+                },
+                "solana": {"enabled": False, "expectedGenesisHash": "unused", "nodes": []},
+            },
+        }
+        targets = targets_from_config(config)
+        self.assertEqual(len(targets), 1)
+        self.assertEqual((targets[0].network, targets[0].node_id, targets[0].expected_identity),
+                         ("ethereum", "eth-a", "1"))
+
+    def test_config_factory_rejects_public_fallback_or_signing(self):
+        from self_hosted_supervisor import SupervisorConfigError
+        base = {
+            "mode": "self-hosted-only", "publicRpcFallback": False,
+            "signingEnabled": False, "networks": {},
+        }
+        for key, value in (("publicRpcFallback", True), ("signingEnabled", True)):
+            config = dict(base)
+            config[key] = value
+            with self.subTest(key=key), self.assertRaises(SupervisorConfigError):
+                targets_from_config(config)
+\n\nif __name__ == "__main__":
     unittest.main(verbosity=2)
