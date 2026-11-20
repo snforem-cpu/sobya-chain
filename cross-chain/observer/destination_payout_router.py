@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from settlement_observer import SettlementVerifier, ExpectedPayout, VerificationError
 from order_ledger import OrderQuote, DestinationPayoutEvidence
+from self_hosted_supervisor import validate_self_hosted_url, NodeHealthError
 
 
 def quote_from_ledger(ledger: Any, order_id: str) -> OrderQuote:
@@ -82,6 +83,13 @@ class DestinationPayoutRouter:
             soby_amount=quote.destination_amount,
             destination_solver=quote.solver,
         )
+        rpc_url = getattr(self.settlement.rpc, "url", None)
+        if not isinstance(rpc_url, str):
+            raise VerificationError("SOBYA observer RPC must expose its configured URL")
+        try:
+            validate_self_hosted_url(rpc_url)
+        except NodeHealthError as exc:
+            raise VerificationError("SOBYA payout observer must use a private self-hosted node") from exc
         verifier = SettlementVerifier(
             self.settlement.rpc, self.settlement.destination_chain_id,
             self.settlement.settlement_contract, self.settlement.confirmations,
