@@ -40,3 +40,12 @@ by the Ethereum/TRON escrow state machine and the Borsh `AttestPayout`
 instruction bytes expected by the Solana program. It performs serialization
 only: no private keys, signature creation, transaction signing, or broadcast.
 See `ATTESTATION_PROTOCOL.md` for exact fields and the trust boundary.
+
+## Attestation payload preparation
+
+The adjacent `attestation_payload.py` module creates deterministic EIP-712
+Payout typed data/digests for Ethereum and TRON escrow domains, plus the Borsh
+`AttestPayout` instruction bytes for Solana. It contains no signing keys,
+signature generation, transaction submission, or claim automation. See
+`ATTESTATION_PROTOCOL.md`; live signing remains disabled pending external
+review and chain-specific integration testing.
