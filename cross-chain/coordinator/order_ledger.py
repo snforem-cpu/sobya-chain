@@ -325,13 +325,15 @@ class CrossChainOrderLedger:
                 (evidence.order_id,),
             ).fetchone()
             if reservation is not None and reservation["status"] == "ACTIVE":
-                self.db.execute(
+                inventory_update = self.db.execute(
                     """UPDATE solver_inventory
                        SET total_units=total_units-?, reserved_units=reserved_units-?
                        WHERE solver=? AND total_units>=? AND reserved_units>=?""",
                     (reservation["units"], reservation["units"], reservation["solver"],
                      reservation["units"], reservation["units"]),
                 )
+                if inventory_update.rowcount != 1:
+                    raise LedgerError("reserved solver inventory is inconsistent; payout record rejected")
                 self.db.execute(
                     """UPDATE inventory_reservations SET status='CONSUMED',updated_at=?
                        WHERE order_id=?""",
