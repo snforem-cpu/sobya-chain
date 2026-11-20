@@ -1,0 +1,40 @@
+{
+  "$schema": "../chain.schema.json",
+  "chain_name": "sobya",
+  "status": "live",
+  "network_type": "mainnet",
+  "website": "https://github.com/snforem-cpu/sobya-chain",
+  "pretty_name": "SOBYA",
+  "chain_type": "cosmos",
+  "chain_id": "sobya-1",
+  "bech32_prefix": "sobya",
+  "daemon_name": "sobyad",
+  "node_home": "$HOME/.sobya",
+  "key_algos": ["secp256k1"],
+  "slip44": 118,
+  "staking": {
+    "staking_tokens": [{ "denom": "asobya" }]
+  },
+  "logo_URIs": {
+    "png": "https://raw.githubusercontent.com/cosmos/chain-registry/master/sobya/images/sobya.png"
+  },
+  "images": [
+    {
+      "png": "https://raw.githubusercontent.com/cosmos/chain-registry/master/sobya/images/sobya.png",
+      "theme": { "dark_mode": true }
+    }
+  ],
+  "description": "SOBYA is a Cosmos SDK and CometBFT blockchain with EVM compatibility. Its native asset SOBY uses 18 decimal places.",
+  "codebase": {
+    "git_repo": "https://github.com/snforem-cpu/sobya-chain",
+    "recommended_version": "v0.1.0-rc.2"
+  },
+  "apis": {
+    "rpc": [{ "address": "https://sobya-rpc.nodesafe-app.xyz", "provider": "NodeSafe" }],
+    "rest": [{ "address": "https://sobya-api.nodesafe-app.xyz", "provider": "NodeSafe" }],
+    "evm-http-jsonrpc": [{ "address": "https://sobya-evm-rpc.nodesafe-app.xyz", "provider": "NodeSafe" }]
+  },
+  "explorers": [
+    { "kind": "other", "url": "https://explorer.nodesafe-app.xyz/sobya" }
+  ]
+}
