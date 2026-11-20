@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "mode": "self-hosted-only",
+  "publicRpcFallback": false,
+  "signingEnabled": false,
+  "networks": {
+    "ethereum": {
+      "enabled": false,
+      "expectedChainId": "1",
+      "nodes": [
+        {"id": "eth-node-a", "rpcUrl": "http://10.10.0.11:8545", "maxHeadLag": 3, "maxFinalityLag": 64},
+        {"id": "eth-node-b", "rpcUrl": "http://10.10.0.12:8545", "maxHeadLag": 3, "maxFinalityLag": 64}
+      ]
+    },
+    "tron": {
+      "enabled": false,
+      "expectedNetworkIdentity": "REPLACE_WITH_VERIFIED_TRON_GENESIS_HASH",
+      "nodes": [
+        {"id": "tron-solidity-a", "rpcUrl": "http://10.20.0.11:8091", "maxHeadLag": 2, "maxFinalityLag": 2}
+      ]
+    },
+    "solana": {
+      "enabled": false,
+      "expectedGenesisHash": "REPLACE_WITH_VERIFIED_SOLANA_GENESIS_HASH",
+      "nodes": [
+        {"id": "solana-rpc-a", "rpcUrl": "http://10.30.0.11:8899", "maxHeadLag": 32, "maxFinalityLag": 0}
+      ]
+    },
+    "sobya": {
+      "enabled": false,
+      "expectedChainId": "357812033857",
+      "nodes": [
+        {"id": "sobya-evm-a", "rpcUrl": "http://10.40.0.11:8545", "maxHeadLag": 3, "maxFinalityLag": 64}
+      ]
+    }
+  },
+  "policy": {
+    "acceptOrdersOnlyWhenEveryConfiguredNodeIsHealthy": true,
+    "failClosedOnUnknownNetwork": true,
+    "failClosedOnIdentityMismatch": true,
+    "failClosedOnSyncing": true,
+    "failClosedOnStaleFinality": true
+  },
+  "notice": "Example only. Replace private-network addresses and chain identity pins after independently verifying the nodes. All networks remain disabled. This config does not start nodes or enable signing."
+}
