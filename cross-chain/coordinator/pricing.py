@@ -22,7 +22,6 @@ class PricingConfig:
     # USDT atomic units per one whole SOBY, represented as a rational.
     usdt_atoms_numerator: int
     soby_whole_denominator: int = 1
-    usdt_decimals: int = 6
     soby_decimals: int = 18
     fee_bps: int = 100
     min_source_amount: int = 1
