@@ -101,7 +101,7 @@ class SolanaSourceObserverTests(unittest.TestCase):
         order_pda, _ = _find_program_address([b"order", order_id], program_id)
         self.expected = ExpectedSolanaDeposit(
             signature="sig-test", program_id=program_id, order_pda=order_pda, config_pda=config_pda,
-            config_authority=config_authority, user=user, solver=pk(2), escrow_token_account=pk(6), usdt_mint=pk(7),
+            config_authority=config_authority, sobya_chain_id=357812033857, user=user, solver=pk(2), escrow_token_account=pk(6), usdt_mint=pk(7),
             source_amount=25_000_000, order_id=order_id,
             destination_recipient=bytes([11])*20, destination_amount=10**18,
             quote_expiry=1_900_000_000, refund_after=1_900_003_600,
