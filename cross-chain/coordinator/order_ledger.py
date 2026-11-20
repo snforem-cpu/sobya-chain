@@ -9,7 +9,9 @@ from dataclasses import dataclass
 import hashlib
 import json
 import sqlite3
+import threading
 import time
+from functools import wraps
 from typing import Any
 
 
@@ -71,11 +73,21 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode()).hexdigest()
 
 
+def _synchronized(method):
+    """Serialize operations on the shared SQLite connection across API threads."""
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
+
+
 class CrossChainOrderLedger:
     """SQLite-backed monotonic evidence ledger with replay-resistant uniqueness."""
 
     def __init__(self, database_path: str):
-        self.db = sqlite3.connect(database_path, timeout=15, isolation_level=None)
+        self._lock = threading.RLock()
+        self.db = sqlite3.connect(database_path, timeout=15, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.execute("PRAGMA journal_mode = WAL")
@@ -131,6 +143,7 @@ class CrossChainOrderLedger:
             );
         """)
 
+    @_synchronized
     def register_quote(self, quote: OrderQuote, now: int | None = None) -> None:
         now = int(time.time()) if now is None else now
         if (not quote.order_id or not quote.source_chain or not quote.source_asset
@@ -167,6 +180,7 @@ class CrossChainOrderLedger:
             self.db.execute("ROLLBACK")
             raise
 
+    @_synchronized
     def set_solver_inventory(self, solver: str, total_units: int) -> None:
         """Provision solver inventory in SOBY base units; reserved units cannot be withdrawn."""
         if not isinstance(solver, str) or not solver.strip() or not isinstance(total_units, int) or total_units < 0:
@@ -188,6 +202,7 @@ class CrossChainOrderLedger:
             self.db.execute("ROLLBACK")
             raise
 
+    @_synchronized
     def available_solver_inventory(self, solver: str) -> int:
         row = self.db.execute(
             "SELECT total_units-reserved_units AS available FROM solver_inventory WHERE solver=?",
@@ -195,6 +210,7 @@ class CrossChainOrderLedger:
         ).fetchone()
         return 0 if row is None else int(row["available"])
 
+    @_synchronized
     def register_quote_with_inventory(self, quote: OrderQuote, now: int | None = None) -> None:
         """Atomically register a quote and reserve its exact SOBY payout amount."""
         now = int(time.time()) if now is None else now
@@ -247,6 +263,7 @@ class CrossChainOrderLedger:
             self.db.execute("ROLLBACK")
             raise
 
+    @_synchronized
     def record_source_deposit(self, evidence: SourceDepositEvidence,
                               now: int | None = None) -> None:
         now = int(time.time()) if now is None else now
@@ -289,6 +306,7 @@ class CrossChainOrderLedger:
             self.db.execute("ROLLBACK")
             raise
 
+    @_synchronized
     def record_destination_payout(self, evidence: DestinationPayoutEvidence,
                                   now: int | None = None) -> None:
         now = int(time.time()) if now is None else now
@@ -357,6 +375,7 @@ class CrossChainOrderLedger:
             self.db.execute("ROLLBACK")
             raise
 
+    @_synchronized
     def get_order(self, order_id: str) -> dict[str, Any]:
         row = self._order(order_id)
         result = dict(row)
@@ -373,5 +392,6 @@ class CrossChainOrderLedger:
             raise LedgerError("unknown order ID")
         return row
 
+    @_synchronized
     def close(self) -> None:
         self.db.close()
