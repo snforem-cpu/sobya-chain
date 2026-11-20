@@ -5,8 +5,11 @@ Anchor program. The program uses PDAs for the immutable config and each order.
 
 ## Order flow
 
-1. Initialize the config PDA once with the USDT mint, SOBYA EVM chain ID, an
-   immutable attestor public-key set (maximum 16), and a threshold.
+1. Initialize an authority-scoped config PDA (derived from the initializer's
+   public key) with the USDT mint, SOBYA EVM chain ID, an immutable attestor
+   public-key set (maximum 16), and a threshold. Each authority has a separate
+   config; the DEX must pin the intended config address and never trust an
+   arbitrary user-supplied config.
 2. Create the escrow token account as the associated token account for the
    order PDA and the configured USDT mint. This account must be owned by the
    legacy SPL Token program; Token-2022 is not supported by this prototype.
@@ -30,7 +33,7 @@ Anchor program. The program uses PDAs for the immutable config and each order.
   cryptographically. Attestors must independently verify SOBYA.
 - Solver commitment is provided by co-signing the funding transaction rather
   than a detached EIP-712 quote. The wallet flow must collect both signatures.
-- Config has no update or withdrawal instruction. The program has no admin
+- Each config is bound to its initializer's public key and has no update or withdrawal instruction. The program has no admin
   escrow withdrawal path.
 - The program supports one configured legacy SPL USDT mint per deployment.
   The exact mainnet mint must be independently verified before configuration.
