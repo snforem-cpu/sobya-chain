@@ -52,7 +52,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Run coordinator admission and ledger tests
+      - name: Run coordinator admission, malformed-response, and ledger tests
         run: |
           cd cross-chain/coordinator
           python -m unittest -v test_admission.py test_order_ledger.py
