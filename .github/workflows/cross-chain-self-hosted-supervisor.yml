@@ -3,7 +3,9 @@ name: Cross-chain self-hosted supervisor tests
 on:
   pull_request:
     paths:
-      - "cross-chain/observer/self_hosted_supervisor.py"\n      - "cross-chain/observer/rpc_probes.py"\n      - "cross-chain/observer/test_rpc_probes.py"
+      - "cross-chain/observer/self_hosted_supervisor.py"
+      - "cross-chain/observer/rpc_probes.py"
+      - "cross-chain/observer/test_rpc_probes.py"
       - "cross-chain/observer/test_self_hosted_supervisor.py"
       - "cross-chain/observer/requirements.txt"
       - ".github/workflows/cross-chain-self-hosted-supervisor.yml"
@@ -29,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Run observer supervisor tests
+      - name: Run observer supervisor and RPC probe tests
         run: |
           python -m pip install -r cross-chain/observer/requirements.txt
           cd cross-chain/observer
