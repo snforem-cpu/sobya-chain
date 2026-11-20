@@ -31,3 +31,6 @@ jobs:
       - name: Run settlement observer tests
         working-directory: cross-chain/observer
         run: python -m unittest -v
+      - name: Run Ethereum source deposit observer tests
+        working-directory: cross-chain/observer
+        run: python -m unittest test_ethereum_source_observer -v
