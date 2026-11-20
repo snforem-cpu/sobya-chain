@@ -90,3 +90,27 @@ The monitor clears its snapshot if a refresh operation raises, and stale snapsho
 6. Run end-to-end tests on each source-chain test network and SOBYA test environment.
 7. Review the single-operator trust model and publish it honestly in the DEX UI.
 8. Enable any network only after explicit owner approval. No mainnet deployment, signing, escrow claim, or funds movement is authorized by this document.
+
+## Coordinator admission boundary (library stage)
+
+The coordinator now includes `cross-chain/coordinator/admission.py`.
+`ReadinessAdmissionGuard` checks both the selected source network and SOBYA
+through the in-process supervisor monitor before recording a quote, and checks
+again before accepting verified source-deposit evidence. Any unhealthy,
+unknown, stale, malformed, or unavailable readiness result denies that new
+admission step. The guard deliberately does not gate destination-payout
+recording for an already-funded order, so a pause for new orders does not
+prevent an existing order from progressing toward safe completion.
+
+This is currently an **in-process library integration**, not a running order
+API. No network listener, public quote endpoint, authentication, inventory
+reservation, or API-to-ledger wiring exists yet. A future local coordinator
+API must exclusively use this guard for quote and deposit admission; direct
+ledger access would bypass the protection. Refunds remain governed by the
+source escrow's on-chain deadline path and must never be disabled by this
+readiness gate. The readiness check and ledger write are not an atomic
+cross-system transaction, so the API must recheck at each admission boundary
+and fail closed.
+
+CI now runs the guard tests alongside the ledger tests. Passing these unit
+tests does not establish live-node readiness or production operation.
