@@ -13,6 +13,8 @@ on:
       - "cross-chain/coordinator/test_admission.py"
       - "cross-chain/coordinator/coordinator.py"
       - "cross-chain/coordinator/test_coordinator.py"
+      - "cross-chain/coordinator/http_api.py"
+      - "cross-chain/coordinator/test_http_api.py"
       - "cross-chain/coordinator/order_ledger.py"
       - "cross-chain/coordinator/test_order_ledger.py"
       - "cross-chain/observer/requirements.txt"
@@ -63,4 +65,4 @@ jobs:
       - name: Run coordinator admission, malformed-response, and ledger tests
         run: |
           cd cross-chain/coordinator
-          python -m unittest -v test_admission.py test_coordinator.py test_order_ledger.py
+          python -m unittest -v test_admission.py test_coordinator.py test_http_api.py test_order_ledger.py
