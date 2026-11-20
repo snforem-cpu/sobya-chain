@@ -1,22 +1,24 @@
 # TRON source escrow observer (prototype)
 
-This read-only observer verifies a TRON source deposit for the SOBYA intent-settlement flow.
+Read-only verifier for TRC-20 deposits into `SobyaTronUsdtEscrow`.
 
-## Finality and checks
+## Verification path
 
-It queries only TRON SolidityNode endpoints:
+The observer uses SolidityNode endpoints only:
 
-- `walletsolidity/gettransactionbyid` to require the transaction body in the solidified view.
-- `walletsolidity/gettransactioninfobyid` to require a solidified execution receipt with `receipt.result == SUCCESS`.
+- `walletsolidity/gettransactioninfobyid` to obtain a solidified execution receipt and require `receipt.result == SUCCESS`.
+- `walletsolidity/gettransactionbyid` to require the transaction body in the solidified chain.
+- `walletsolidity/getblockbynum` to compare the solidified transaction block and verify the configured genesis block hash.
+- `walletsolidity/triggerconstantcontract` to read the escrow's configured token, order status, and full stored order from the latest solidified state.
 
-It then checks the TriggerSmartContract target and sender, decodes the escrow `fund(Order,bytes)` calldata, matches every signed order field, validates the 65-byte solver quote signature encoding, and requires exactly one matching `OrderFunded` event emitted by the configured escrow with the expected amount.
+It verifies the transaction sender and escrow target, rejects native TRX value, requires exactly one matching `OrderFunded(bytes32,address,address,uint256)` event from the escrow, and compares all stored order fields (user, token, source amount, solver, destination chain/recipient/amount, quote expiry, and refund deadline) with the expected signed order.
 
-The observer normalizes TRON's 21-byte `41`-prefixed addresses to EVM-style 20-byte hex for comparisons. Event log contract addresses are checked in their 20-byte representation.
+TRON's 21-byte `41`-prefixed address format is normalized to the corresponding 20-byte ABI address for comparisons. The RPC client is HTTPS-only.
 
 ## Limitations
 
-- This is a read-only verifier, not a relayer, signer, RPC quorum, or durable order service.
-- The SolidityNode API must be independently operated or selected with a production RPC trust/quorum policy. A single endpoint can lie.
-- The TRON escrow wrapper still requires TRON-solc compilation and Shasta TVM deployment/integration tests. Solidity/EVM unit tests do not prove TVM compatibility.
-- The observer does not itself call the contract's storage getters. It validates the exact submitted order calldata plus the solidified escrow event/receipt. Production rollout should add independent solidified state reads and RPC quorum.
-- No TRON addresses, USDT contract, or production keys are configured.
+- This is a read-only library and mocked-RPC test suite, not an autonomous relayer, signer, durable order service, or independent RPC quorum.
+- A single SolidityNode endpoint remains a trust dependency; production requires independently operated or diverse RPC sources and quorum policy.
+- The TRON escrow wrapper still requires a TRON-solc build and Shasta TVM deployment/integration tests. Local Foundry EVM tests do not establish TVM compatibility.
+- No TRON escrow address, USDT contract address, production RPC, or signing key is configured.
+- No TRON testnet or mainnet deployment has occurred.
