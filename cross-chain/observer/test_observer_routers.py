@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "coordinator"))
 
 from order_ledger import OrderQuote, SourceDepositEvidence, DestinationPayoutEvidence
 from settlement_observer import VerificationError
-from source_observer_router import SourceObserverRouter
+from source_observer_router import SourceObserverRouter, EthereumSourceConfig
 from destination_payout_router import (
     DestinationPayoutRouter, SobyaSettlementConfig, quote_from_ledger,
 )
@@ -26,6 +26,26 @@ class ObserverRouterTests(unittest.TestCase):
 
     def test_source_router_fails_closed_without_pinned_node(self):
         router = SourceObserverRouter(quote_lookup=lambda _id: self.quote)
+        evidence = SourceDepositEvidence(
+            order_id=self.quote.order_id, source_chain="ethereum",
+            transaction_id="0x" + "aa"*32, event_index=0,
+            source_asset=self.quote.source_asset, source_amount=self.quote.source_amount,
+            user=self.quote.user, solver=self.quote.solver,
+            destination_chain_id=self.quote.destination_chain_id,
+            destination_recipient=self.quote.destination_recipient,
+            destination_amount=self.quote.destination_amount,
+            finalized_reference="ethereum:finalized:100",
+        )
+        with self.assertRaises(VerificationError):
+            router(evidence, {"transaction_id": evidence.transaction_id})
+
+    def test_source_router_rejects_public_rpc_before_query(self):
+        class PublicRpc:
+            url = "https://rpc.example.invalid"
+        router = SourceObserverRouter(
+            quote_lookup=lambda _id: self.quote,
+            ethereum={"ethereum": EthereumSourceConfig(1, "0x" + "11"*20, PublicRpc())},
+        )
         evidence = SourceDepositEvidence(
             order_id=self.quote.order_id, source_chain="ethereum",
             transaction_id="0x" + "aa"*32, event_index=0,
