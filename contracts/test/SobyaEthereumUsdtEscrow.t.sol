@@ -137,12 +137,18 @@ contract SobyaEthereumUsdtEscrowTest {
         escrow.fund(order, quote);
 
         vm.warp(order.refundAfter);
+        bytes[] memory payoutSigs = _payoutSignatures(order.orderId);
+        vm.prank(solver);
+        (bool lateClaim, ) = address(escrow).call(abi.encodeWithSelector(
+            escrow.claim.selector, order.orderId, keccak256("sobya-payout-tx"), payoutSigs
+        ));
+        require(!lateClaim, "solver claimed after refund deadline");
+
         vm.prank(user);
         escrow.refund(order.orderId);
         require(escrow.status(order.orderId) == SobyaEthereumUsdtEscrow.Status.REFUNDED, "not refunded");
         require(usdt.balanceOf(user) == 100_000_000, "user not fully refunded");
 
-        bytes[] memory payoutSigs = _payoutSignatures(order.orderId);
         vm.prank(solver);
         (bool ok, ) = address(escrow).call(abi.encodeWithSelector(
             escrow.claim.selector, order.orderId, keccak256("sobya-payout-tx"), payoutSigs
