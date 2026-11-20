@@ -134,5 +134,7 @@ class ReadOnlyProbeTests(unittest.TestCase):
             config[key] = value
             with self.subTest(key=key), self.assertRaises(SupervisorConfigError):
                 targets_from_config(config)
-\n\nif __name__ == "__main__":
+
+
+if __name__ == "__main__":
     unittest.main(verbosity=2)
