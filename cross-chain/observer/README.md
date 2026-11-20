@@ -86,3 +86,16 @@ independence. It is a local library, not a deployed service, cryptographic
 light client, signer, or transaction relayer. Seven unit tests cover majority
 agreement, disagreement, provider failures, duplicate source IDs, and invalid
 thresholds. See `quorum-README.md` for the trust boundary.
+
+
+## SOBYA self-hosted node supervisor (prototype)
+
+`self_hosted_supervisor.py` provides a fail-closed health gate for SOBYA-operated node processes. It accepts only loopback, private-network, or explicitly internal HTTP(S) node URLs; rejects public RPC hosts, URL credentials and query-string API keys; checks configured chain identity, syncing state, head/finality consistency and finality lag; and blocks order acceptance if any configured node for a network is unhealthy. Probe exceptions are reduced to safe error classes so local credentials are not leaked.
+
+The module deliberately has no network client, no public fallback, no signer and no transaction submission. A deployment must supply a chain-specific probe adapter that reads the local node's health/finality APIs. This is an operational gate, not proof of consensus or a light client. Multiple nodes administered by SOBYA remain within one trust boundary.
+
+Run its tests:
+
+    python -m unittest -v test_self_hosted_supervisor.py
+
+Example private-network node layout: `cross-chain/self-hosted-nodes.example.json`. All networks are disabled in that example.
