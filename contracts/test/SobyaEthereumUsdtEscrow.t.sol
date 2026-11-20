@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../ethereum/SobyaEthereumUsdtEscrow.sol";
+import "../../cross-chain/ethereum/SobyaEthereumUsdtEscrow.sol";
 
 interface VmEscrow {
     function addr(uint256 privateKey) external returns (address);
