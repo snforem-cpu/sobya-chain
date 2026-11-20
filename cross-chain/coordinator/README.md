@@ -120,6 +120,7 @@ python -m unittest -v test_admission.py test_coordinator.py test_order_ledger.py
 
 `http_api.py` exposes a small HTTP adapter around `LocalCoordinator`:
 
+- `POST /v1/quote-previews`: create an unsigned, inventory-aware price preview; it does not reserve inventory or accept an order.
 - `POST /v1/quotes`: submit a signed quote; signature verifier, readiness gate,
   and atomic solver inventory reservation must all succeed.
 - `POST /v1/source-deposits`: submit source-deposit evidence and its proof;
@@ -132,7 +133,7 @@ python -m unittest -v test_admission.py test_coordinator.py test_order_ledger.py
   32 UTF-8 bytes. Requests are JSON with strict record schemas and a bounded
   body (64 KiB default). The server only binds to a literal loopback address.
 
-The server is created programmatically with `create_server(...)`; it is not
+The server is created programmatically with `create_server(...)`; pass an `InventoryAwareQuotePricer` as `quote_pricer` to enable the unsigned preview route. The route returns explicit `signed: false` and `reserved: false` flags. It is not
 started automatically and has no default token or default verifier. The
 application integrator must provide secure token loading and audited
 chain-specific verification callbacks. Do not bind it to a public interface,
