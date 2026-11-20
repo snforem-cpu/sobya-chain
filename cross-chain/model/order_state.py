@@ -166,7 +166,7 @@ class OrderBook:
 
     def refund_user(self, order_id: str, now: int) -> Order:
         order = self.get(order_id)
-        if order.state not in {OrderState.SOURCE_FINAL, OrderState.COMMITTED}:
+        if order.state is not OrderState.SOURCE_FINAL:
             raise OrderError("ORDER_NOT_REFUNDABLE")
         if now < order.refund_after:
             raise OrderError("REFUND_DEADLINE_NOT_REACHED")
