@@ -12,8 +12,8 @@ Read-only verifier for deposits to the native Solana escrow program.
 
 ## Limitations
 
-- The caller must pin the approved program ID and config/order PDAs from independently trusted configuration. The observer does not independently derive PDAs.
+- The caller must pin the approved program ID and intended config PDA. The observer independently derives the config PDA from the user authority and the order PDA from the order ID, and rejects mismatches.
 - The implementation supports the legacy SPL Token account layout, not Token-2022.
 - This is a read-only library with mocked-RPC tests, not a signer, relayer, RPC quorum, or durable order service. A single RPC endpoint can lie.
-- Validator-based integration tests, program deployment, and an independent RPC quorum remain required before testnet or production use.
+- Validator-based integration tests and program deployment remain required before testnet or production use. The self-hosted operating profile is documented separately; multiple local nodes do not create independent-operator trust.
 - No Solana program ID, USDT mint, or production RPC is configured.
