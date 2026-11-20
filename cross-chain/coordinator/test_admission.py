@@ -14,12 +14,16 @@ class FakeMonitor:
         self.ready = ready
         self.calls = []
         self.raise_error = False
+        self.malformed = False
 
     def admission(self, source, destination):
         self.calls.append((source, destination))
         if self.raise_error:
             raise TimeoutError("local monitor unavailable")
-        return self.ready, {"admissible": self.ready}
+        if self.malformed:
+            return True, {"admissible": True}
+        state = {"ready": self.ready}
+        return self.ready, {"admissible": self.ready, "source": state, "destination": state}
 
 
 class AdmissionGuardTests(unittest.TestCase):
@@ -81,6 +85,11 @@ class AdmissionGuardTests(unittest.TestCase):
 
     def test_monitor_timeout_fails_closed(self):
         self.monitor.raise_error = True
+        with self.assertRaises(AdmissionDenied):
+            self.guard.register_quote(self.quote, now=1_900_000_000)
+
+    def test_malformed_positive_readiness_fails_closed(self):
+        self.monitor.malformed = True
         with self.assertRaises(AdmissionDenied):
             self.guard.register_quote(self.quote, now=1_900_000_000)
 
