@@ -50,6 +50,17 @@ class Eip712QuoteVerifierTests(unittest.TestCase):
         changed = OrderQuote(**{**self.quote.__dict__, "destination_amount": 2 * 10**18})
         self.assertIs(self.verifier.verify(changed, signature), False)
 
+    def test_high_s_malleable_signature_rejected(self):
+        digest = self.verifier.digest(self.quote)
+        signature = sign_digest(self.private_key, digest, 0xABCDEF123456789)
+        r = signature[:32]
+        s = int.from_bytes(signature[32:64], "big")
+        v = signature[64]
+        high_s = (N - s).to_bytes(32, "big")
+        high_v = bytes([28 if v == 27 else 27])
+        with self.assertRaises(SignatureVerificationError):
+            self.verifier.verify(self.quote, r + high_s + high_v)
+
     def test_bad_signature_rejected(self):
         with self.assertRaises(SignatureVerificationError):
             self.verifier.verify(self.quote, b"bad")
