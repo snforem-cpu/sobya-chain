@@ -115,7 +115,7 @@ class TronSolidityRpc:
         result = self.transport(self.base_url + endpoint, payload, self.timeout)
         if not isinstance(result, dict):
             raise VerificationError(f"TRON {endpoint} returned an invalid response")
-        if result.get("Error") or result.get("result", {}).get("result") is False:
+        nested = result.get("result")\n        if result.get("Error") or (isinstance(nested, dict) and nested.get("result") is False):
             raise VerificationError(f"TRON {endpoint} RPC error")
         return result
 
@@ -123,9 +123,12 @@ class TronSolidityRpc:
 class TronDepositVerifier:
     """Verifies a TRC-20 escrow deposit using solidified transaction data."""
 
-    def __init__(self, rpc: TronSolidityRpc, escrow: str):
+    def __init__(self, rpc: TronSolidityRpc, escrow: str, expected_genesis_hash: str):
         self.rpc = rpc
         self.escrow = _address(escrow, "escrow")
+        if len(expected_genesis_hash.removeprefix("0x")) != 64:
+            raise ValueError("expected TRON genesis block hash must be 32-byte hex")
+        self.expected_genesis_hash = expected_genesis_hash.removeprefix("0x").lower()
 
     def _constant_call(self, selector: str, order_id: str | None = None) -> str:
         data = selector + (order_id[2:] if order_id else "")
@@ -154,7 +157,13 @@ class TronDepositVerifier:
         if receipt.get("result") != "SUCCESS":
             raise VerificationError("TRON source transaction failed")
 
+        genesis = self.rpc.call("/walletsolidity/getblockbynum", {"num": 0})
+        if genesis.get("blockID", "").lower() != self.expected_genesis_hash:
+            raise VerificationError("TRON network genesis hash mismatch")
+
         tx_response = self.rpc.call("/walletsolidity/gettransactionbyid", {"value": txid})
+        if tx_response.get("txID", "").lower() != txid:
+            raise VerificationError("TRON transaction ID does not match request")
         raw_contracts = tx_response.get("raw_data", {}).get("contract", [])
         if len(raw_contracts) != 1:
             raise VerificationError("expected one TRON escrow call")
