@@ -139,3 +139,23 @@ or transaction broadcast. The injected verification callbacks are placeholders
 for audited chain-specific verification implementations, not a claim that
 verification has already been integrated. No order can be safely offered to
 public users until those components and end-to-end tests exist.
+
+## Authenticated local coordinator API
+
+An HTTP adapter now exists at `cross-chain/coordinator/http_api.py`. It binds
+only to loopback and requires a bearer token of at least 32 UTF-8 bytes. Its
+three POST routes accept signed quotes, verified source-deposit proofs, and
+verified destination-payout proofs. The request body is JSON, bounded to 64
+KiB by default, and record fields are schema-checked. Quote requests are gated
+by node readiness and atomic solver inventory reservation. Existing funded
+orders can still progress through verified destination payout while new-order
+admission is paused.
+
+The server is a programmatic adapter, not an enabled production daemon. It
+cannot start without the application supplying a bearer token and all three
+chain-specific verifier callbacks. Those callbacks are security-critical and
+are not yet implemented as production verifiers. Keep the API on loopback;
+do not expose it publicly or put a token in the repository. It has no quote
+pricing engine, automatic signature creation, RPC client, signer, relayer,
+escrow claim/refund automation, or on-chain inventory oracle. No server was
+started and no node or transaction was contacted.
