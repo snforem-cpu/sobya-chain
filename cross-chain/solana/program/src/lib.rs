@@ -340,14 +340,14 @@ fn process_refund(program_id: &Pubkey, accounts: &[AccountInfo], order_id: [u8; 
     save_order(order_account, &order)
 }
 
-fn transfer_from_order(
+fn transfer_from_order<'a>(
     program_id: &Pubkey,
     order: &Order,
-    order_account: &AccountInfo,
-    escrow_token: &AccountInfo,
-    destination_token: &AccountInfo,
-    destination_owner: &AccountInfo,
-    token_program: &AccountInfo,
+    order_account: &AccountInfo<'a>,
+    escrow_token: &AccountInfo<'a>,
+    destination_token: &AccountInfo<'a>,
+    destination_owner: &AccountInfo<'a>,
+    token_program: &AccountInfo<'a>,
     config: &Config,
 ) -> ProgramResult {
     let (expected_order, bump) = Pubkey::find_program_address(&[ORDER_SEED, &order.order_id], program_id);
