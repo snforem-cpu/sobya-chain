@@ -18,7 +18,11 @@ ORDER_FUNDED_TOPIC = "0x" + keccak(b"OrderFunded(bytes32,address,address,uint256
 
 
 def _selector(signature: str) -> str:
-    return "0x" + keccak(signature.encode())[:4].hex()
+    return keccak(signature.encode())[:4].hex()
+
+
+def _topic(value: str) -> str:
+    return value.removeprefix("0x").lower()
 
 
 def _address(value: str, field: str) -> str:
@@ -126,8 +130,8 @@ class TronDepositVerifier:
     def _constant_call(self, selector: str, order_id: str | None = None) -> str:
         data = selector + (order_id[2:] if order_id else "")
         response = self.rpc.call("/walletsolidity/triggerconstantcontract", {
-            "owner_address": self.escrow[2:],
-            "contract_address": self.escrow[2:],
+            "owner_address": "41" + self.escrow[2:],
+            "contract_address": "41" + self.escrow[2:],
             "function_selector": "",
             "parameter": "",
             "data": data,
@@ -208,12 +212,13 @@ class TronDepositVerifier:
             if _address(log.get("address", ""), "event address") != self.escrow:
                 continue
             topics = log.get("topics", [])
-            if len(topics) != 4 or topics[0].lower() != ORDER_FUNDED_TOPIC.lower():
+            if len(topics) != 4:
                 continue
             if (
-                topics[1].lower() != order_id
-                or _word_address(bytes.fromhex(topics[2]), "event user") != _address(expected.user, "expected user")
-                or _word_address(bytes.fromhex(topics[3]), "event solver") != _address(expected.solver, "expected solver")
+                _topic(topics[0]) != _topic(ORDER_FUNDED_TOPIC)
+                or _topic(topics[1]) != _topic(order_id)
+                or _word_address(bytes.fromhex(_topic(topics[2])), "event user") != _address(expected.user, "expected user")
+                or _word_address(bytes.fromhex(_topic(topics[3])), "event solver") != _address(expected.solver, "expected solver")
             ):
                 continue
             data = _words(log.get("data", ""), 1)
