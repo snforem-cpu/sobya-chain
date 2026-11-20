@@ -11,8 +11,12 @@ on:
   push:
     branches:
       - main
+      - feat/sobya-cross-chain-swap-foundation
     paths:
       - "cross-chain/coordinator/**"
+      - "cross-chain/observer/source_observer_router.py"
+      - "cross-chain/observer/destination_payout_router.py"
+      - "cross-chain/observer/test_observer_routers.py"
       - ".github/workflows/cross-chain-coordinator.yml"
 
 permissions:
