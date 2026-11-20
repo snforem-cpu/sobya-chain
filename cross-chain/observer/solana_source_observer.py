@@ -244,4 +244,14 @@ def _pubkey_bytes(value: str) -> bytes:
     if len(raw) != 32:
         raise VerificationError("Solana public key must decode to 32 bytes")
     return raw
-\n\ndef _b58decode(value: str) -> bytes:\n    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"\n    number = 0\n    try:\n        for char in value:\n            number = number * 58 + alphabet.index(char)\n    except ValueError as exc:\n        raise VerificationError("invalid base58 instruction data") from exc\n    decoded = number.to_bytes((number.bit_length() + 7) // 8, "big")\n    return bytes(len(value) - len(value.lstrip("1"))) + decoded\n
+
+def _b58decode(value: str) -> bytes:
+    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    number = 0
+    try:
+        for char in value:
+            number = number * 58 + alphabet.index(char)
+    except ValueError as exc:
+        raise VerificationError("invalid base58 instruction data") from exc
+    decoded = number.to_bytes((number.bit_length() + 7) // 8, "big")
+    return bytes(len(value) - len(value.lstrip("1"))) + decoded
