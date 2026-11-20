@@ -25,6 +25,7 @@ const ORDER_SEED: &[u8] = b"order";
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 pub struct Config {
+    pub authority: Pubkey,
     pub bump: u8,
     pub usdt_mint: Pubkey,
     pub sobya_chain_id: u64,
@@ -135,19 +136,19 @@ fn process_initialize(
         }
     }
 
-    let (expected_config, bump) = Pubkey::find_program_address(&[CONFIG_SEED], program_id);
+    let (expected_config, bump) = Pubkey::find_program_address(&[CONFIG_SEED, payer.key.as_ref()], program_id);
     if config_account.key != &expected_config || config_account.owner != &system_program::id()
         || !config_account.data_is_empty()
     {
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let config = Config { bump, usdt_mint, sobya_chain_id, threshold, attestors };
+    let config = Config { authority: *payer.key, bump, usdt_mint, sobya_chain_id, threshold, attestors };
     let data = borsh::to_vec(&config).map_err(|_| ProgramError::InvalidAccountData)?;
     let rent = Rent::get()?;
     let lamports = rent.minimum_balance(data.len());
     let bump_seed = [bump];
-    let signer_seeds: &[&[u8]] = &[CONFIG_SEED, &bump_seed];
+    let signer_seeds: &[&[u8]] = &[CONFIG_SEED, payer.key.as_ref(), &bump_seed];
     invoke_signed(
         &system_instruction::create_account(payer.key, config_account.key, lamports, data.len() as u64, program_id),
         &[payer.clone(), config_account.clone(), system_program_account.clone()],
@@ -358,11 +359,15 @@ fn transfer_from_order(
 }
 
 fn load_config(program_id: &Pubkey, account: &AccountInfo) -> Result<Config, ProgramError> {
-    let (expected, _) = Pubkey::find_program_address(&[CONFIG_SEED], program_id);
-    if account.key != &expected || account.owner != program_id {
+    if account.owner != program_id {
         return Err(ProgramError::InvalidAccountData);
     }
-    Config::try_from_slice(&account.data.borrow()).map_err(|_| ProgramError::InvalidAccountData)
+    let config = Config::try_from_slice(&account.data.borrow()).map_err(|_| ProgramError::InvalidAccountData)?;
+    let (expected, _) = Pubkey::find_program_address(&[CONFIG_SEED, config.authority.as_ref()], program_id);
+    if account.key != &expected {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    Ok(config)
 }
 
 fn load_order(account: &AccountInfo) -> Result<Order, ProgramError> {
