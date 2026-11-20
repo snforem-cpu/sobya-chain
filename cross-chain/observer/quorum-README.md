@@ -1,7 +1,7 @@
 # Independent observer quorum (prototype)
 
 `observer_quorum.py` wraps the existing read-only chain-specific verifiers.
-Configure one observer callback per independently operated RPC/observer path;
+Configure one observer callback per separately operated RPC/observer path;
 the wrapper accepts evidence only when a strict majority returns the same
 normalized verified result.
 
