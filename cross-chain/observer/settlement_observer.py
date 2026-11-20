@@ -140,6 +140,8 @@ class SettlementVerifier:
         if receipt.get("transactionHash", "").lower() != transaction_hash.lower():
             raise VerificationError("receipt transaction hash mismatch")
 
+        if receipt.get("to", "").lower() != self.contract:
+            raise VerificationError("receipt target is not settlement contract")
         transaction = self.rpc.call("eth_getTransactionByHash", [transaction_hash])
         if transaction is None:
             raise VerificationError("destination transaction not found")
