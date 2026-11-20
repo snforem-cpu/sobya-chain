@@ -232,3 +232,27 @@ is far below the base-unit representation of the network's token supply.
 Initialization migrates the earlier INTEGER inventory tables transactionally
 and preserves existing totals and active reservations. Tests cover a
 150,000,000 SOBY-scale balance and legacy-table migration.
+
+
+## Fully wired local runtime
+
+`runtime.py` is the composition root. It constructs the EIP-712 quote verifier,
+source and destination observer routers, readiness admission guard, inventory
+pricer, and authenticated loopback HTTP server as one object. The caller must
+supply the live supervisor monitor, ledger, private RPC clients, pinned
+Ethereum/TRON chain IDs and escrow addresses, Solana program/mint/genesis
+identity, SOBYA settlement contract and source bytes32 identities, and a bearer
+token loaded from the local secret store or process environment.
+
+The module returns a server object but **does not start it**. Before importing
+it from a deployment process, expose both local modules on the Python path,
+for example from `cross-chain/coordinator`:
+
+```sh
+PYTHONPATH=.:../observer python your_local_launcher.py
+```
+
+The launcher must keep the server bound to loopback, start it under a
+supervised process manager, and provide only SOBYA-operated private RPC
+endpoints. No node addresses, genesis hashes, escrow addresses, API tokens,
+or keys are populated with guessed defaults.
