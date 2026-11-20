@@ -59,11 +59,11 @@ class FakeTron:
             result = {"blockID": self.block_hash}
         elif url.endswith("/walletsolidity/triggerconstantcontract"):
             data = payload["data"]
-            if data.startswith("0x" + keccak(b"token()")[:4].hex()):
+            if data.startswith(keccak(b"token()")[:4].hex()):
                 words = [word_address(self.token)]
-            elif data.startswith("0x" + keccak(b"status(bytes32)")[:4].hex()):
+            elif data.startswith(keccak(b"status(bytes32)")[:4].hex()):
                 words = [word_int(self.status)]
-            elif data.startswith("0x" + keccak(b"orders(bytes32)")[:4].hex()):
+            elif data.startswith(keccak(b"orders(bytes32)")[:4].hex()):
                 words = self.order
             else:
                 raise AssertionError(data)
