@@ -50,6 +50,10 @@ class ReadinessAdmissionGuard:
         self._require_ready(quote.source_chain)
         self.ledger.register_quote_with_inventory(quote, now=now)
 
+    def expire_unfunded_quote(self, order_id: str, now: int | None = None) -> None:
+        """Release inventory for an expired quote; no chain readiness is needed."""
+        self.ledger.expire_unfunded_quote(order_id, now=now)
+
     def record_source_deposit(self, evidence: SourceDepositEvidence,
                               now: int | None = None) -> None:
         # Recheck immediately before accepting verified source-deposit evidence.
