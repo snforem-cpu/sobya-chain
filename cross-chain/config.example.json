@@ -6,7 +6,8 @@
     "name": "SOBYA Mainnet",
     "chainId": 357812033857,
     "nativeAsset": "SOBY",
-    "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz"
+    "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
+    "settlementContract": null
   },
   "sources": {
     "tron": {
