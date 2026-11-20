@@ -115,7 +115,8 @@ class TronSolidityRpc:
         result = self.transport(self.base_url + endpoint, payload, self.timeout)
         if not isinstance(result, dict):
             raise VerificationError(f"TRON {endpoint} returned an invalid response")
-        nested = result.get("result")\n        if result.get("Error") or (isinstance(nested, dict) and nested.get("result") is False):
+        nested = result.get("result")
+        if result.get("Error") or (isinstance(nested, dict) and nested.get("result") is False):
             raise VerificationError(f"TRON {endpoint} RPC error")
         return result
 
