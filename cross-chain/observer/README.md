@@ -52,12 +52,7 @@ legacy SPL Token account owner, configured mint, order-PDA authority, and
 exact escrow balance. This follows the current Rust account layout and
 instruction enum in `cross-chain/solana/program/src/lib.rs`.
 
-The observer currently requires the caller to supply the expected order PDA
-and config PDA; it checks their presence and stored bindings but does not
-independently derive PDA addresses. Add a reviewed PDA derivation implementation
-and validator-based integration tests before production. Mocked JSON-RPC tests
-do not establish Solana validator execution, Token CPI behavior, or RPC
-independence.
+The observer now independently derives the config PDA from the `config` seed and user authority, and the order PDA from the `order` seed and 32-byte order ID, using the configured program ID. It rejects caller-supplied PDA addresses that do not match these derivations. Adversarial tests cover forged config and order PDAs. Validator-based integration tests are still required; mocked JSON-RPC tests do not establish Solana validator execution, Token CPI behavior, or RPC independence.
 
 ## Destination payout observer boundaries
 
