@@ -122,6 +122,8 @@ contract SobyaEthereumUsdtEscrow {
         if (status[orderId] != Status.FUNDED) revert WrongStatus();
         Order storage order = orders[orderId];
         if (msg.sender != order.solver || destinationTxHash == bytes32(0)) revert InvalidOrder();
+        // The solver must complete the claim before the user's refund deadline.
+        if (block.timestamp >= order.refundAfter) revert TooEarly();
 
         bytes32 structHash = keccak256(abi.encode(
             PAYOUT_TYPEHASH, orderId, destinationTxHash, order.destinationChainId,
