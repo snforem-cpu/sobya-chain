@@ -175,5 +175,18 @@ class CoordinatorHttpApiTests(unittest.TestCase):
             )
 
 
+    def test_expire_quote_endpoint_releases_reserved_inventory(self):
+        from dataclasses import replace
+        expiring = replace(
+            self.quote, order_id="http-expired-order",
+            quote_expiry=1, refund_after=2,
+        )
+        self.ledger.register_quote_with_inventory(expiring, now=0)
+        self.assertEqual(self.ledger.available_solver_inventory(self.solver), 2 * 10**18)
+        status, body = self.post("/v1/expire-quotes", {"order_id": expiring.order_id})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)["status"], "EXPIRED")
+        self.assertEqual(self.ledger.available_solver_inventory(self.solver), 3 * 10**18)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
