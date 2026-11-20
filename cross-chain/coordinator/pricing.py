@@ -86,7 +86,7 @@ class InventoryAwareQuotePricer:
         # Net source proceeds after fee, then convert USDT atoms to SOBY atoms.
         net_source = source_amount * (10_000 - c.fee_bps) // 10_000
         numerator = net_source * (10 ** c.soby_decimals) * c.soby_whole_denominator
-        denominator = c.usdt_atoms_numerator * (10 ** c.usdt_decimals)
+        denominator = c.usdt_atoms_numerator
         destination_amount = numerator // denominator
         if destination_amount <= 0:
             raise PricingError("source amount is too small to produce a positive SOBY payout")
