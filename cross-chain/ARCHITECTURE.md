@@ -94,4 +94,4 @@ The exact USDT contract/mint addresses, decimals, token program, escrow addresse
 - `Solver`: reserves SOBY inventory, executes payout, and claims source escrow only under the contract rules.
 - `RiskController`: global/per-chain limits, pause controls, inventory thresholds, anomaly detection, and incident procedures.
 
-These are design interfaces, not implemented or audited components.
+The native-SOBY destination payout contract prototype is implemented under `contracts/src/SobyaCrossChainSettlement.sol`; it emits a payout event but does not verify source-chain deposits itself. The quote service, independent source/destination verifiers, relayers, solver inventory service, and risk controller remain design interfaces, not implemented or audited components.
