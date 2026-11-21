@@ -374,11 +374,20 @@ class InventoryDepositRecorder:
     def verify_and_record(self, verifier: Any, order_id: str,
                           expected: ExpectedInventoryDeposit) -> VerifiedInventoryDeposit:
         verified = verifier.verify(expected)
-        self.ledger.record_deposit(
+        inserted = self.ledger.record_deposit(
             order_id, tx_id=verified.tx_id, event_index=verified.event_index,
             observed_amount=verified.amount_base_units,
             observed_recipient=verified.inventory_wallet,
             observed_asset=verified.asset,
         )
-        self.ledger.confirm_deposit_final(order_id, verified=True)
+        if inserted:
+            self.ledger.confirm_deposit_final(order_id, verified=True)
+        else:
+            # A retry after a crash may encounter the same event already credited.
+            # Treat the already-final order as success; never advance another state.
+            order = self.ledger.get_order(order_id)
+            if order is None or order.get("state") not in {"deposit_seen", "deposit_final"}:
+                raise InventoryDepositError("duplicate event is not attached to a deposit-pending order")
+            if order.get("state") == "deposit_seen":
+                self.ledger.confirm_deposit_final(order_id, verified=True)
         return verified
