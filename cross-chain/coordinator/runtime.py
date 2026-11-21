@@ -24,6 +24,7 @@ from source_observer_router import (
 from destination_payout_router import (
     DestinationPayoutRouter, SobyaSettlementConfig, SourceIdentity,
 )
+from solver_balance_reader import FinalizedNativeBalanceReader
 
 
 def build_local_server(
@@ -42,6 +43,14 @@ def build_local_server(
     quote_pricer: InventoryAwareQuotePricer,
 ):
     """Build, but do not start, the fully wired loopback coordinator HTTP server."""
+    balance_reader = getattr(quote_pricer, "finalized_balance", None)
+    if not isinstance(balance_reader, FinalizedNativeBalanceReader):
+        raise ValueError("runtime requires a pinned finalized SOBYA native-balance reader")
+    if balance_reader.expected_chain_id != sobya_settlement.destination_chain_id:
+        raise ValueError("solver balance reader and payout observer chain IDs differ")
+    settlement_rpc_url = getattr(sobya_settlement.rpc, "url", None)
+    if not isinstance(settlement_rpc_url, str) or balance_reader.rpc.url != settlement_rpc_url:
+        raise ValueError("solver balance reader must use the same pinned SOBYA node as payout verification")
     evm_quote_signatures = Eip712QuoteVerifier(quote_domains)
     solana_quote_signatures = None
     if solana_source is not None:
