@@ -92,6 +92,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                         )
                     },
                     quote_pricer=pricer,
+                    reserve_onchain_inventory=lambda _quote: True,
                     additional_source_observers=source_replicas,
                     additional_destination_observers=destination_replicas,
                 )
