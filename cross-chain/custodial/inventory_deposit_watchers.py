@@ -19,6 +19,11 @@ class InventoryDepositError(ValueError):
     pass
 
 
+class RetryableInventoryDepositError(InventoryDepositError):
+    """Deposit evidence is validly submitted but not yet available at finality."""
+    pass
+
+
 @dataclass(frozen=True)
 class ExpectedInventoryDeposit:
     network: str
@@ -103,7 +108,7 @@ class JsonRpc:
         if not isinstance(response, dict) or response.get("id") != self._id:
             raise InventoryDepositError("invalid JSON-RPC response envelope")
         if response.get("error") or "result" not in response:
-            raise InventoryDepositError(f"RPC call failed: {method}")
+            raise RetryableInventoryDepositError(f"RPC call failed: {method}")
         return response["result"]
 
 
@@ -131,14 +136,14 @@ class EvmInventoryDepositVerifier:
 
         receipt = self.rpc.call("eth_getTransactionReceipt", [tx_hash])
         if not isinstance(receipt, dict) or receipt.get("transactionHash", "").lower() != tx_hash:
-            raise InventoryDepositError("transaction receipt is missing or mismatched")
+            raise RetryableInventoryDepositError("transaction receipt is not available yet or mismatched")
         if _hex_quantity(receipt.get("status"), "receipt status") != 1:
             raise InventoryDepositError("deposit transaction failed")
         block_number = _hex_quantity(receipt.get("blockNumber"), "receipt block")
         block_hash = _hash32(receipt.get("blockHash"), "receipt block hash")
         finalized = self.rpc.call("eth_getBlockByNumber", ["finalized", False])
         if not isinstance(finalized, dict) or _hex_quantity(finalized.get("number"), "finalized height") < block_number:
-            raise InventoryDepositError("deposit is not finalized")
+            raise RetryableInventoryDepositError("deposit is not finalized")
         canonical = self.rpc.call("eth_getBlockByNumber", [hex(block_number), False])
         if not isinstance(canonical, dict) or canonical.get("hash", "").lower() != block_hash:
             raise InventoryDepositError("deposit block is not canonical")
@@ -248,7 +253,7 @@ class TronInventoryDepositVerifier:
             raise InventoryDepositError("TRON transaction ID is malformed") from exc
         info = self._call("/walletsolidity/gettransactioninfobyid", {"value": txid})
         if info.get("id", "").lower() != txid or not info.get("blockNumber"):
-            raise InventoryDepositError("solidified TRON transaction is missing")
+            raise RetryableInventoryDepositError("solidified TRON transaction is not available yet")
         receipt = info.get("receipt") or {}
         if receipt.get("result") != "SUCCESS":
             raise InventoryDepositError("TRON transaction did not succeed")
@@ -256,7 +261,7 @@ class TronInventoryDepositVerifier:
         block = self._call("/walletsolidity/getblockbynum", {"num": block_number})
         block_id = block.get("blockID")
         if not isinstance(block_id, str) or len(block_id) != 64:
-            raise InventoryDepositError("solidified TRON block identity is missing")
+            raise RetryableInventoryDepositError("solidified TRON block identity is not available yet")
         logs = info.get("log", [])
         matches = []
         token = _tron_hex_address(expected.asset, "USDT contract")
@@ -304,7 +309,7 @@ class SolanaInventoryDepositVerifier:
             "maxSupportedTransactionVersion": 0,
         }])
         if not isinstance(tx, dict):
-            raise InventoryDepositError("Solana transaction is not finalized or not found")
+            raise RetryableInventoryDepositError("Solana transaction is not finalized or not found yet")
         meta = tx.get("meta") or {}
         if meta.get("err") is not None:
             raise InventoryDepositError("Solana deposit transaction failed")
@@ -396,6 +401,84 @@ class InventoryDepositService:
             amount_base_units=int(order["source_amount"]), event_index=event_index,
         )
         return self.recorder.verify_and_record(verifier, order_id, expected)
+
+class InventoryDepositWorker:
+    """Durable retry worker for user-submitted, order-bound deposit proofs.
+
+    The host service calls run_once periodically (or run_forever in a worker
+    process). Pending proofs survive restarts; finalized ledger writes are
+    idempotent if a process stops before marking the queue row complete.
+    """
+
+    def __init__(self, service: InventoryDepositService, database: str):
+        import sqlite3
+        self.service = service
+        self.database = str(database)
+        with sqlite3.connect(self.database) as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS pending_inventory_deposits (
+                order_id TEXT PRIMARY KEY, network TEXT NOT NULL, tx_id TEXT NOT NULL,
+                event_index INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+                attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(network, tx_id, event_index))""")
+
+    def submit(self, order_id: str, tx_id: str, event_index: int) -> None:
+        import sqlite3
+        order = self.service.ledger.get_order(order_id)
+        if order is None:
+            raise InventoryDepositError("unknown order")
+        network = order.get("source_network", "").lower()
+        if network not in self.service.verifiers:
+            raise InventoryDepositError("source network verifier is not configured")
+        if not isinstance(tx_id, str) or not tx_id.strip():
+            raise InventoryDepositError("transaction ID/signature is required")
+        if not isinstance(event_index, int) or isinstance(event_index, bool) or event_index < 0:
+            raise InventoryDepositError("event/instruction index must be non-negative")
+        with sqlite3.connect(self.database) as db:
+            existing = db.execute(
+                "SELECT network, tx_id, event_index, status FROM pending_inventory_deposits WHERE order_id=?",
+                (order_id,),
+            ).fetchone()
+            if existing:
+                if existing[:3] != (network, tx_id, event_index):
+                    raise InventoryDepositError("order already has a different submitted deposit proof")
+                return
+            db.execute(
+                "INSERT INTO pending_inventory_deposits(order_id,network,tx_id,event_index) VALUES (?,?,?,?)",
+                (order_id, network, tx_id, event_index),
+            )
+
+    def run_once(self) -> dict[str, int]:
+        import sqlite3
+        with sqlite3.connect(self.database) as db:
+            db.row_factory = sqlite3.Row
+            rows = db.execute("SELECT * FROM pending_inventory_deposits WHERE status='pending' ORDER BY created_at").fetchall()
+        counts = {"verified": 0, "pending": 0, "failed": 0}
+        for row in rows:
+            try:
+                self.service.verify_order_deposit(row["order_id"], row["tx_id"], row["event_index"])
+            except RetryableInventoryDepositError as exc:
+                with sqlite3.connect(self.database) as db:
+                    db.execute("UPDATE pending_inventory_deposits SET attempts=attempts+1,last_error=?,updated_at=CURRENT_TIMESTAMP WHERE order_id=? AND status='pending'", (str(exc)[:500], row["order_id"]))
+                counts["pending"] += 1
+            except Exception as exc:
+                with sqlite3.connect(self.database) as db:
+                    db.execute("UPDATE pending_inventory_deposits SET status='failed',attempts=attempts+1,last_error=?,updated_at=CURRENT_TIMESTAMP WHERE order_id=? AND status='pending'", (str(exc)[:500], row["order_id"]))
+                counts["failed"] += 1
+            else:
+                with sqlite3.connect(self.database) as db:
+                    db.execute("UPDATE pending_inventory_deposits SET status='verified',attempts=attempts+1,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE order_id=?", (row["order_id"],))
+                counts["verified"] += 1
+        return counts
+
+    def run_forever(self, stop_event: Any, interval_seconds: int = 10) -> None:
+        import time
+        if not isinstance(interval_seconds, int) or isinstance(interval_seconds, bool) or interval_seconds < 1:
+            raise ValueError("worker interval must be a positive integer")
+        while not stop_event.is_set():
+            self.run_once()
+            stop_event.wait(interval_seconds)
 
 class InventoryDepositRecorder:
     """The only bridge from verified chain evidence into the custodial order ledger."""
