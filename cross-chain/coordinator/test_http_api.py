@@ -80,6 +80,7 @@ class CoordinatorHttpApiTests(unittest.TestCase):
         self.service = LocalCoordinator(
             ReadinessAdmissionGuard(FakeMonitor(), self.ledger),
             inventory_guard=self.pricer.assert_quote_inventory,
+            reserve_onchain_inventory=lambda _quote: True,
         )
         self.server = create_server(
             "127.0.0.1", 0, self.service, bearer_token=TOKEN,
