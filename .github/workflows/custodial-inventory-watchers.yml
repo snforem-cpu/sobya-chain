@@ -31,6 +31,9 @@ jobs:
       - name: Test shared-inventory deposit verifiers
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_deposit_watchers.py -v
+      - name: Test EVM inventory payout adapters
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_evm_inventory_payout.py -v
       - name: Test encrypted inventory keystores
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_keystore.py -v
