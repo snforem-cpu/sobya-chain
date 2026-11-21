@@ -88,7 +88,7 @@ async function initWalletConnector(){
 walletConnectorPromise=initWalletConnector();
 
 function valid(a){return /^0x[0-9a-fA-F]{40}$/.test(a)}
-function configured(){return !!config&&config.chainId===Number(CHAIN_ID)&&config.deploymentStatus==='verified'&&typeof config.rpcUrl==='string'&&config.rpcUrl.startsWith('https://')&&valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby)}
+function configured(){return !!config&&config.chainId===Number(CHAIN_ID)&&config.deploymentStatus==='ready'&&typeof config.rpcUrl==='string'&&config.rpcUrl.startsWith('https://')&&valid(config.router)&&valid(config.factory)&&valid(config.wrappedSoby)}
 function liquidityEnabled(){return configured()&&config.liquidityEnabled===true}
 function tradingEnabled(){return configured()&&config.tradingEnabled===true}
 async function init(){try{config=await fetch(CONFIG_URL,{cache:'no-store'}).then(r=>r.json());const ready=liquidityEnabled();$('network').textContent=ready?'Contracts verified. Pool creation and liquidity funding are enabled; swaps remain locked pending live pool tests.':'Deployment verification/configuration pending. Transactions are disabled.';if(!ready)$('network').classList.add('warn');}catch(e){$('network').textContent='Configuration unavailable. DEX transactions are disabled.'}}
