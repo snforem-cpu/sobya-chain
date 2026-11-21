@@ -4,14 +4,14 @@ This is the selected initial product model, replacing the earlier per-order escr
 
 ## User flows
 
-- USDT to SOBY: select Ethereum, TRON, or Solana; receive a dedicated network inventory wallet for the order; the watcher verifies the correct USDT asset, amount, recipient, transaction success, and finality; the service checks the quoted SOBY amount against available inventory; a local payout worker sends native SOBY to the user's SOBYA wallet.
+- USDT to SOBY: select Ethereum, TRON, or Solana; the DEX sends USDT to that network's shared inventory wallet and binds the exact transaction hash/signature plus token event index to the order; the watcher verifies the correct USDT asset, amount, recipient, transaction success, and finality; the service checks the quoted SOBY amount against available inventory; a local payout worker sends native SOBY to the user's SOBYA wallet.
 - SOBY to USDT: deposit SOBY to the dedicated SOBYA inventory wallet and the DEX binds the exact transaction hash to the order; after finality, the payout worker sends USDT from the selected Ethereum, TRON, or Solana inventory wallet to the user's destination address.
 
 The platform is custodial: project-controlled wallets hold the assets. This avoids source-chain escrow contracts and a solver marketplace, but users must be told that custody and payout availability depend on the platform's wallets and controls.
 
 ## Required automation
 
-1. Allocate a unique deposit address per order, or a chain-native unique memo where supported. A single shared address without a unique identifier cannot safely attribute concurrent deposits.
+1. Use one dedicated inventory address per network. The DEX must initiate the transfer from the connected wallet and bind the exact returned transaction hash/signature and token event index to the order. This safely attributes concurrent deposits to the same shared address. A transfer sent outside the DEX flow must be submitted with its transaction hash before it can be credited.
 2. Watch finalized transactions using SOBYA-operated node infrastructure for Ethereum, TRON, Solana, and SOBYA.
 3. Record each source event once. A network/transaction/event tuple can fund at most one order.
 4. Lock the quote in integer base units, apply fees and limits, and check inventory before accepting an order.
