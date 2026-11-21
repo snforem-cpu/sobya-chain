@@ -4,61 +4,23 @@
   "featureEnabled": false,
   "orderAddressPolicy": "shared-inventory-wallet; bind exact submitted transaction hash and event index to order",
   "networks": {
-    "ethereum": {
-      "enabled": false,
-      "chainId": 1,
-      "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL",
-      "usdtContract": null,
-      "inventoryWallet": null,
-      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE"
-    },
-    "tron": {
-      "enabled": false,
-      "network": "mainnet",
-      "rpcUrlEnv": "SOBYA_TRON_RPC_URL",
-      "usdtContract": null,
-      "inventoryWallet": null,
-      "keystorePathEnv": "SOBYA_TRON_KEYSTORE"
-    },
-    "solana": {
-      "enabled": false,
-      "cluster": "mainnet-beta",
-      "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL",
-      "usdtMint": null,
-      "tokenProgram": null,
-      "inventoryWallet": null,
-      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE"
-    },
-    "sobya": {
-      "enabled": false,
-      "chainId": 357812033857,
-      "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
-      "inventoryWallet": null,
-      "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE"
-    }
+    "ethereum": {"enabled": false, "chainId": 1, "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL", "usdtContract": null, "inventoryWallet": null, "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE"},
+    "tron": {"enabled": false, "network": "mainnet", "rpcUrlEnv": "SOBYA_TRON_RPC_URL", "usdtContract": null, "inventoryWallet": null, "keystorePathEnv": "SOBYA_TRON_KEYSTORE"},
+    "solana": {"enabled": false, "cluster": "mainnet-beta", "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL", "usdtMint": null, "tokenProgram": null, "inventoryWallet": null, "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE"},
+    "sobya": {"enabled": false, "chainId": 357812033857, "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz", "inventoryWallet": null, "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE"}
   },
   "pricing": {
-    "baseReferencePriceUsdtPerSoby": null,
-    "demandSensitivityBps": 2000,
-    "maxDemandAdjustmentBps": 1500,
+    "baseReferencePriceUsdtPerSoby": "0.005",
+    "referenceLiquidityUsdtBaseUnits": null,
+    "upwardDemandSensitivityBps": 10000,
+    "downwardDemandSensitivityBps": 2500,
     "demandWindowSeconds": 3600,
     "demandMaxAgeSeconds": 300,
-    "demandSignalSource": "finalized-executed-swaps-only"
+    "demandSignalSource": "finalized-executed-swaps-only",
+    "priceCeiling": null,
+    "priceFloor": null
   },
-  "limits": {
-    "maxOrderUsdtBaseUnits": null,
-    "maxDailyUsdtBaseUnitsPerNetwork": null,
-    "minimumInventoryBaseUnits": null,
-    "feeBps": null,
-    "quoteLifetimeSeconds": 120
-  },
-  "safety": {
-    "requireFinalizedDeposit": true,
-    "requireUniqueDepositDestination": true,
-    "requireInventoryBeforeAcceptingOrder": true,
-    "requirePayoutFinalityBeforeComplete": true,
-    "pauseOnWatcherFailure": true,
-    "allowAdminWithdrawal": false
-  },
-  "notice": "Template only. All networks are disabled. Set an explicitly approved base reference price before quote creation. Fill only verified public wallet/token identities and private RPC endpoints. Keystore paths are local environment settings; never put private keys or seed phrases in this file or the repository."
+  "limits": {"maxOrderUsdtBaseUnits": null, "maxDailyUsdtBaseUnitsPerNetwork": null, "minimumInventoryBaseUnits": null, "feeBps": null, "quoteLifetimeSeconds": 120},
+  "safety": {"requireFinalizedDeposit": true, "requireUniqueDepositDestination": true, "requireInventoryBeforeAcceptingOrder": true, "requirePayoutFinalityBeforeComplete": true, "pauseOnWatcherFailure": true, "allowAdminWithdrawal": false},
+  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository."
 }
