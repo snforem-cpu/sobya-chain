@@ -71,6 +71,8 @@ class EvmInventoryPayoutAdapter:
         nonce = self.w3.eth.get_transaction_count(self.inventory, "pending")
         base = {"from": self.inventory, "nonce": nonce, "chainId": self.chain_id}
         if self.network == "sobya":
+            if intent.asset.upper() != "SOBY":
+                raise PayoutError("SOBYA payout asset must be native SOBY")
             tx = {**base, "to": recipient, "value": intent.amount_base_units, "data": b""}
         else:
             if intent.asset.lower() not in {self.token.lower(), "usdt-eth", "usdt"}:
@@ -158,6 +160,7 @@ class EvmInventoryPayoutAdapter:
                 and _address(tx["to"], "observed recipient") == _address(intent.destination, "destination")
                 and int(tx["value"]) == intent.amount_base_units
                 and int(tx.get("value", 0)) > 0
+                and tx.get("input", b"") in (b"", "0x", None)
             )
         if _address(tx["from"], "observed sender") != self.inventory or _address(tx["to"], "observed token") != self.token:
             return False
