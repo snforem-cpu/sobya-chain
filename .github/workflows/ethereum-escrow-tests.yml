@@ -1,0 +1,35 @@
+name: Ethereum and TRON escrow state-machine tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/ethereum-escrow-tests.yml"
+  push:
+    branches:
+      - main
+      - feat/sobya-cross-chain-swap-foundation
+    paths:
+      - "contracts/**"
+      - ".github/workflows/ethereum-escrow-tests.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  foundry-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Compile contracts, tests, and deployment scripts
+        working-directory: contracts
+        run: forge build --sizes --skip script/DeploySobyaDex.s.sol
+      - name: Run Solidity state-machine tests (local EVM only)
+        working-directory: contracts
+        run: forge test -vvv

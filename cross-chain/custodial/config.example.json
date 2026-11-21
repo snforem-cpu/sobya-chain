@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "mode": "custodial-inventory",
+  "featureEnabled": false,
+  "orderAddressPolicy": "shared-inventory-wallet; bind exact submitted transaction hash and event index to order",
+  "networks": {
+    "ethereum": {
+      "enabled": false,
+      "chainId": 1,
+      "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL",
+      "usdtContract": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
+      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE",
+      "usdtDecimals": 6,
+      "keystorePassphraseEnv": "SOBYA_ETHEREUM_KEYSTORE_PASSPHRASE",
+      "confirmations": 64
+    },
+    "tron": {
+      "enabled": false,
+      "network": "mainnet",
+      "rpcUrlEnv": "SOBYA_TRON_RPC_URL",
+      "usdtContract": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+      "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx",
+      "keystorePathEnv": "SOBYA_TRON_KEYSTORE",
+      "usdtDecimals": 6,
+      "keystorePassphraseEnv": "SOBYA_TRON_KEYSTORE_PASSPHRASE",
+      "feeLimitSun": 100000000
+    },
+    "solana": {
+      "enabled": false,
+      "cluster": "mainnet-beta",
+      "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL",
+      "usdtMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh",
+      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE",
+      "usdtDecimals": 6,
+      "keystorePassphraseEnv": "SOBYA_SOLANA_KEYSTORE_PASSPHRASE"
+    },
+    "sobya": {
+      "enabled": false,
+      "chainId": 357812033857,
+      "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
+      "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE",
+      "rpcUrlEnv": "SOBYA_SOBYA_RPC_URL",
+      "keystorePassphraseEnv": "SOBYA_SOBYA_KEYSTORE_PASSPHRASE",
+      "confirmations": 2
+    }
+  },
+  "pricing": {
+    "baseReferencePriceUsdtPerSoby": "0.005",
+    "referenceLiquidityUsdtBaseUnits": null,
+    "upwardDemandSensitivityBps": 10000,
+    "downwardDemandSensitivityBps": 2500,
+    "demandWindowSeconds": 3600,
+    "demandMaxAgeSeconds": 300,
+    "demandSignalSource": "finalized-executed-swaps-only",
+    "priceCeiling": null,
+    "priceFloor": null
+  },
+  "limits": {
+    "maxOrderUsdtBaseUnits": null,
+    "maxDailyUsdtBaseUnitsPerNetwork": null,
+    "minimumInventoryBaseUnits": null,
+    "feeBps": null,
+    "quoteLifetimeSeconds": 120
+  },
+  "safety": {
+    "requireFinalizedDeposit": true,
+    "requireUniqueDepositDestination": true,
+    "requireInventoryBeforeAcceptingOrder": true,
+    "requirePayoutFinalityBeforeComplete": true,
+    "pauseOnWatcherFailure": true,
+    "allowAdminWithdrawal": false
+  },
+  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only."
+}

@@ -40,7 +40,7 @@ jobs:
             throw new Error('Wallet transaction controls must require verified deployment and explicit liquidity/trading gates');
           }
           if (!html.includes('CHAIN_ID=357812033857n')) throw new Error('Wallet chain guard missing');
-          if (!deploy.includes('const DEPLOYMENT_LOCKED = false')) throw new Error('Mobile deployer must be enabled after independent audit and live integration');
+          if (!deploy.includes('const DEPLOYMENT_LOCKED = true')) throw new Error('Mobile deployer must remain locked until verified release approval');
           if (!deploy.includes('if(DEPLOYMENT_LOCKED){')) throw new Error('Mobile deploy handler does not enforce the deployment lock');
           if (!deploy.includes('id="verifyMainnet"') || !deploy.includes('async function verifyMainnetDeployments()')) {
             throw new Error('Read-only mainnet deployment verifier is missing');

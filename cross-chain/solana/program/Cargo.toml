@@ -1,0 +1,19 @@
+[package]
+name = "sobya-solana-usdt-escrow"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata.solana]
+tools-version = "v1.54"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+borsh = { version = "=1.5.7", features = ["derive"] }
+solana-program = "=2.2.1"
+spl-token = { version = "=8.0.0", features = ["no-entrypoint"] }

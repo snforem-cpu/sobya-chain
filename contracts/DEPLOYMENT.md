@@ -97,3 +97,69 @@ Owner-led smoke test, beginning with tiny amounts:
 - The AMM supports ordinary ERC-20 token pairs; it does not create or guarantee genuine USDT.
 - A successful read-only RPC preflight or local Foundry test is not proof of live contract correctness.
 - Never disclose a seed phrase/private key or upload it to GitHub Actions. The owner signs deployment locally.
+
+
+---
+
+# Cross-chain inventory vault deployment (separate from the DEX)
+
+The cross-chain settlement pair is separate from the existing DEX deployment
+guide above. `script/DeploySobyaInventory.s.sol` deploys:
+
+1. `SobyaSolverInventoryVault`
+2. `SobyaCrossChainSettlement` with three distinct attestor addresses and a
+   2-of-3 strict-majority threshold
+3. The vault's one-time settlement link
+
+The script refuses to run unless `block.chainid == 357812033857`. It reads
+the deployer key and attestor addresses from the local process environment.
+It does not generate, store, or transmit private keys.
+
+## Build and simulation
+
+From `contracts/`:
+
+```sh
+forge build
+forge test -vvv
+```
+
+Set these values in a private shell or local secret manager, never in a
+committed file:
+
+- `SOBYA_DEPLOYER_PRIVATE_KEY`: local deployer key for SOBYA EVM
+- `SOBYA_ATTESTOR_1`, `SOBYA_ATTESTOR_2`, `SOBYA_ATTESTOR_3`: three distinct
+  SOBYA-controlled EVM addresses whose keys are separately stored and
+  controlled by the SOBYA operator
+
+Use only the verified, private SOBYA EVM RPC endpoint. Simulate first and
+confirm the exact chain ID, deployer, attestor addresses, deployment
+addresses, constructor state, and estimated gas. The script is a deployment
+preparation artifact; it has not been run and no cross-chain vault has been
+deployed by this change.
+
+## After deployment
+
+Independently verify the runtime bytecode, owner, attestor membership,
+2-of-3 threshold, and reciprocal vault/settlement link. Then each solver must
+deposit native SOBY into the vault. The ordinary wallet balance is not
+spendable cross-chain inventory. The coordinator now reconciles quotes against
+the vault's finalized `available(solver)` view and the local ledger.
+
+Do not enable a source chain until its escrow/program is deployed and verified
+on that chain's testnet, the correct USDT token/mint is pinned, SOBYA-operated
+nodes are synchronized, and end-to-end attestation signing and claim/refund
+tests have passed. The TRON wrapper requires a TRON-distributed Solidity
+compiler and Shasta TVM verification; Foundry EVM tests do not prove TVM
+compatibility. The Solana program still requires validator-based integration
+tests and a verified deployment/program ID.
+
+## Security boundary
+
+- The three attestor keys are separate signing identities administered by one
+  SOBYA operator. This is not independent third-party decentralization.
+- This script only deploys and links the SOBYA vault and settlement contracts.
+  It does not fund the vault, deploy source escrows, start observers, run the
+  coordinator, sign attestations, claim USDT, or enable the DEX.
+- Keep all source networks disabled until live testnet integration and
+  independent security review are complete.
