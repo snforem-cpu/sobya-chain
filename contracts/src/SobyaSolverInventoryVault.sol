@@ -19,6 +19,8 @@ contract SobyaSolverInventoryVault {
     mapping(address => uint256) public reserved;
     mapping(bytes32 => Reservation) public reservations;
     uint256 private entered = 1;
+    address public immutable owner;
+    address public settlement;
 
     event Deposited(address indexed solver, uint256 amount);
     event Withdrawn(address indexed solver, address indexed recipient, uint256 amount);
@@ -36,6 +38,21 @@ contract SobyaSolverInventoryVault {
     error UnauthorizedSolver();
     error NativeTransferFailed();
     error ReentrantCall();
+    error UnauthorizedOwner();
+    error UnauthorizedSettlement();
+    error SettlementAlreadySet();
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    /// @notice Set the settlement contract exactly once after deploying the pair.
+    function setSettlement(address settlementAddress) external {
+        if (msg.sender != owner) revert UnauthorizedOwner();
+        if (settlement != address(0)) revert SettlementAlreadySet();
+        if (settlementAddress == address(0)) revert InvalidReservation();
+        settlement = settlementAddress;
+    }
 
     modifier nonReentrant() {
         if (entered != 1) revert ReentrantCall();
@@ -89,6 +106,7 @@ contract SobyaSolverInventoryVault {
     /// @notice Anyone may trigger payout, but funds can only go to the reserved recipient.
     ///         This intentionally allows a funded order to complete if the solver is offline.
     function executePayout(bytes32 orderId) external nonReentrant {
+        if (msg.sender != settlement || settlement == address(0)) revert UnauthorizedSettlement();
         Reservation storage r = reservations[orderId];
         if (!r.active) revert ReservationNotActive();
         if (block.timestamp >= r.releaseAfter) revert ReservationExpired();
