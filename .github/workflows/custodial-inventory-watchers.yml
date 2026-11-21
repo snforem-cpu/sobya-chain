@@ -37,6 +37,12 @@ jobs:
       - name: Test EVM inventory payout adapters
         working-directory: cross-chain/custodial
         run: python -m unittest test_evm_inventory_payout.py -v
+      - name: Test TRON inventory payout adapter
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_tron_inventory_payout.py -v
+      - name: Test Solana inventory payout adapter guards
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_solana_inventory_payout.py -v
       - name: Test encrypted inventory keystores
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_keystore.py -v
