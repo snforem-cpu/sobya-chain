@@ -6,12 +6,9 @@ on:
     paths:
       - "cross-chain/custodial/**"
       - ".github/workflows/custodial-inventory-watchers.yml"
-  push:
-    branches:
-      - feat/sobya-cross-chain-swap-foundation
-    paths:
-      - "cross-chain/custodial/**"
-      - ".github/workflows/custodial-inventory-watchers.yml"
+concurrency:
+  group: custodial-inventory-watchers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
