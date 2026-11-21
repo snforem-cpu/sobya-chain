@@ -3,7 +3,8 @@ import unittest
 from pathlib import Path
 
 from order_ledger import CrossChainOrderLedger
-from pricing import InventoryAwareQuotePricer, PricingConfig, PricingError
+from pricing import (DemandSnapshot, InventoryAwareQuotePricer, PricingConfig,
+                      PricingError, demand_adjustment_bps)
 
 
 class PricingTests(unittest.TestCase):
@@ -103,6 +104,47 @@ class PricingTests(unittest.TestCase):
         with self.assertRaises(PricingError):
             PricingConfig(0, max_source_amount=1).validate()
 
+
+    def test_finalized_net_buy_demand_increases_reference_price(self):
+        config = PricingConfig(2_000_000, demand_sensitivity_bps=2_000,
+                               max_demand_adjustment_bps=1_500)
+        snapshot = DemandSnapshot(900_000_000, 100_000_000, 3600, 1_900_000_000)
+        self.assertEqual(demand_adjustment_bps(snapshot, config, 1_900_000_010), 1_600 if False else 1_500)
+
+    def test_finalized_net_sell_demand_reduces_reference_price(self):
+        config = PricingConfig(2_000_000, demand_sensitivity_bps=2_000,
+                               max_demand_adjustment_bps=1_500)
+        snapshot = DemandSnapshot(100_000_000, 900_000_000, 3600, 1_900_000_000)
+        self.assertEqual(demand_adjustment_bps(snapshot, config, 1_900_000_010), -1_500)
+
+    def test_pending_or_stale_demand_is_rejected(self):
+        config = PricingConfig(2_000_000, demand_sensitivity_bps=2_000,
+                               max_demand_adjustment_bps=1_500)
+        pending = DemandSnapshot(900, 100, 3600, 1_900_000_000, finalized=False)
+        with self.assertRaises(PricingError):
+            demand_adjustment_bps(pending, config, 1_900_000_010)
+        stale = DemandSnapshot(900, 100, 3600, 1_900_000_000)
+        with self.assertRaises(PricingError):
+            demand_adjustment_bps(stale, config, 1_900_000_400)
+
+    def test_demand_enabled_without_provider_fails_closed(self):
+        config = PricingConfig(
+            usdt_atoms_numerator=2_000_000, demand_sensitivity_bps=2_000,
+            max_demand_adjustment_bps=1_500, min_source_amount=1_000_000,
+            max_source_amount=100_000_000,
+        )
+        pricer = InventoryAwareQuotePricer(
+            config, self.ledger, destination_chain_id=357812033857,
+            finalized_balance=lambda _solver: 150_000_000 * 10**18,
+            now=lambda: 1_900_000_000,
+        )
+        with self.assertRaisesRegex(PricingError, "no finalized-volume provider"):
+            pricer.quote(
+                order_id="0x" + "03"*32, source_chain="ethereum",
+                source_asset="0x" + "33"*20, source_amount=20_000_000,
+                user="0x" + "22"*20, solver=self.solver,
+                destination_recipient="0x" + "55"*20,
+            )
 
 if __name__ == "__main__":
     unittest.main()
