@@ -68,5 +68,6 @@ jobs:
           python-version: "3.11"
       - name: Run coordinator admission, malformed-response, and ledger tests
         run: |
+          python -m pip install -r cross-chain/observer/requirements.txt
           cd cross-chain/coordinator
           python -m unittest -v test_admission.py test_coordinator.py test_http_api.py test_order_ledger.py test_runtime.py
