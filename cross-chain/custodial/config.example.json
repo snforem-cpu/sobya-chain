@@ -8,26 +8,29 @@
       "enabled": false,
       "chainId": 1,
       "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL",
-      "usdtContract": null,
+      "usdtContract": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
       "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
-      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE"
+      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE",
+      "usdtDecimals": 6
     },
     "tron": {
       "enabled": false,
       "network": "mainnet",
       "rpcUrlEnv": "SOBYA_TRON_RPC_URL",
-      "usdtContract": null,
+      "usdtContract": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
       "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx",
-      "keystorePathEnv": "SOBYA_TRON_KEYSTORE"
+      "keystorePathEnv": "SOBYA_TRON_KEYSTORE",
+      "usdtDecimals": 6
     },
     "solana": {
       "enabled": false,
       "cluster": "mainnet-beta",
       "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL",
-      "usdtMint": null,
-      "tokenProgram": null,
+      "usdtMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
       "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh",
-      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE"
+      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE",
+      "usdtDecimals": 6
     },
     "sobya": {
       "enabled": false,
