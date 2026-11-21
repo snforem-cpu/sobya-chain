@@ -135,7 +135,7 @@ class TronInventoryWatcherTests(unittest.TestCase):
     def test_trc20_transfer_from_solidified_node(self):
         # Well-known, checksum-valid TRON test-format addresses are not needed:
         # use the project inventory and sender Base58 forms in fixture as constants.
-        sender = "TJRabPrwbZy45sbavfcwabuhX9p5v6aQ6"
+        sender = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
         inventory = "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"
         token = "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj"
         # Convert Base58Check addresses to 21-byte hex using the module normalizer.
@@ -169,7 +169,7 @@ class TronInventoryWatcherTests(unittest.TestCase):
             return {"id": txid, "blockNumber": 500, "receipt": {"result": "FAILED"}, "log": []}
         verifier = TronInventoryDepositVerifier("https://tron-solidity.invalid", transport=transport)
         expected = ExpectedInventoryDeposit(
-            "tron", txid, "TJRabPrwbZy45sbavfcwabuhX9p5v6aQ6",
+            "tron", txid, "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
             "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx",
             "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj", 1000, 0
         )
