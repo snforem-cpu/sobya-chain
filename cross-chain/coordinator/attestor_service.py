@@ -35,6 +35,8 @@ class PinnedSourceIdentity:
     source_escrow_id: str
     source_asset_id: str
     source_escrow_address: str | None = None
+    source_program_id: str | None = None
+    solana_attestor_pubkey: str | None = None
 
 
 @dataclass(frozen=True)
@@ -147,9 +149,9 @@ class AttestorService:
             raise AttestorServiceError("source chain deployment identity is not pinned")
         return identity
 
-    def _require_attestor_membership(self, network: str, contract: str) -> None:
+    def _require_attestor_membership(self, network: str, contract: str, address: str | None = None) -> None:
         try:
-            approved = self.attestor_membership(network, contract, self.attestor.address)
+            approved = self.attestor_membership(network, contract, address or self.attestor.address)
         except Exception as exc:
             raise AttestorServiceError("finalized on-chain attestor membership lookup failed") from exc
         if approved is not True:
@@ -279,12 +281,18 @@ class AttestorService:
             or evidence.solver.lower() != quote.solver.lower()
         ):
             raise AttestorServiceError("finalized SOBYA payout differs from the immutable quote")
+        identity = self._identity(quote)
+        if not identity.source_program_id or not identity.solana_attestor_pubkey:
+            raise AttestorServiceError("pinned Solana program ID and Solana attestor public key are required")
+        self._require_attestor_membership(
+            "solana", identity.source_program_id, identity.solana_attestor_pubkey
+        )
         instruction = build_solana_attest_payout_instruction(
             quote.order_id, evidence.transaction_id
         )
         return {
             "order_id": quote.order_id,
             "instruction_data": "0x" + instruction.hex(),
-            "attestor": self.attestor.address,
+            "attestor": identity.solana_attestor_pubkey,
             "purpose": "SOLANA_ATTEST_PAYOUT_UNSIGNED_TRANSACTION",
         }
