@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "mode": "custodial-inventory",
   "featureEnabled": false,
-  "orderAddressPolicy": "unique-per-order",
+  "orderAddressPolicy": "shared-inventory-wallet; bind exact submitted transaction hash and event index to order",
   "networks": {
     "ethereum": {
       "enabled": false,
