@@ -2,6 +2,7 @@ name: Ethereum and TRON escrow state-machine tests
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - "contracts/**"
       - ".github/workflows/ethereum-escrow-tests.yml"
