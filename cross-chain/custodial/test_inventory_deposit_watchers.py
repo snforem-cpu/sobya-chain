@@ -4,7 +4,7 @@ from pathlib import Path
 from inventory_deposit_watchers import (
     ExpectedInventoryDeposit, InventoryDepositError, EvmInventoryDepositVerifier,
     JsonRpc, SolanaInventoryDepositVerifier, TronInventoryDepositVerifier,
-    TRANSFER_TOPIC, InventoryDepositRecorder, VerifiedInventoryDeposit,
+    TRANSFER_TOPIC, InventoryDepositRecorder, InventoryDepositService, VerifiedInventoryDeposit,
 )
 from custodial_ledger import CustodialOrderLedger, CustodialOrderError
 
@@ -268,6 +268,19 @@ class InventoryDepositRecorderTests(unittest.TestCase):
         recorder.verify_and_record(Verifier(), self.order, self.expected)
         self.assertEqual(self.ledger.get_order(self.order)["state"], "deposit_final")
 
+    def test_order_service_derives_expected_deposit_from_persisted_order(self):
+        class Verifier:
+            def verify(inner, expected):
+                self.assertEqual(expected.tx_id, TX)
+                self.assertEqual(expected.sender, SENDER)
+                self.assertEqual(expected.inventory_wallet, INVENTORY)
+                self.assertEqual(expected.asset, TOKEN)
+                self.assertEqual(expected.amount_base_units, 1000)
+                self.assertEqual(expected.event_index, 2)
+                return self.verified
+        service = InventoryDepositService(self.ledger, {"ethereum": Verifier()})
+        service.verify_order_deposit(self.order, TX, 2)
+        self.assertEqual(self.ledger.get_order(self.order)["state"], "deposit_final")
     def test_same_chain_event_cannot_be_credited_to_two_orders(self):
         second = self.ledger.create_order(
             direction="usdt_to_soby", source_network="ethereum",
