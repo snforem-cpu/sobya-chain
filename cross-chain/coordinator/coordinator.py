@@ -47,6 +47,9 @@ class LocalCoordinator:
         if not isinstance(signature, bytes) or not signature:
             raise VerificationRejected("signed quote bytes are required")
         self._verify(verify_quote_signature, quote, signature)
+        # Check readiness before touching the vault, then check it again when
+        # the quote is committed locally after vault finality.
+        self.admission.assert_quote_admissible(quote)
         # A quote preview may be stale or inventory may have been moved since
         # it was generated. Reconcile finalized on-chain inventory again just
         # before the atomic local reservation; missing guard fails closed.
