@@ -133,11 +133,6 @@ def load_encrypted_keystore(path: str | os.PathLike[str], passphrase: str) -> by
 
 def evm_signer_from_keystore(path: str | os.PathLike[str], passphrase: str):
     """Return an EVM signing backend loaded from the encrypted local keystore."""
-    from attestor_service import EvmSigningBackend
+    from attestor_service import LocalEvmKeyBackend
 
-    private_key = keys.PrivateKey(load_encrypted_keystore(path, passphrase))
-    address = private_key.public_key.to_checksum_address()
-    return EvmSigningBackend(
-        address,
-        lambda digest: private_key.sign_msg_hash(digest).to_bytes(),
-    )
+    return LocalEvmKeyBackend(load_encrypted_keystore(path, passphrase))
