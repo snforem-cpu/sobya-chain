@@ -21,6 +21,7 @@ class LocalCoordinatorTests(unittest.TestCase):
         self.service = LocalCoordinator(
             ReadinessAdmissionGuard(self.monitor, self.ledger),
             inventory_guard=lambda _quote: True,
+            reserve_onchain_inventory=lambda _quote: True,
         )
         self.quote = OrderQuote(
             order_id="coordinator-order-001", source_chain="ethereum",
@@ -60,6 +61,16 @@ class LocalCoordinatorTests(unittest.TestCase):
             service.issue_quote(
                 self.quote, b"sig", lambda *_: True, now=1_900_000_000
             )
+
+    def test_quote_fails_closed_without_finalized_vault_reservation(self):
+        service = LocalCoordinator(
+            ReadinessAdmissionGuard(self.monitor, self.ledger),
+            inventory_guard=lambda _quote: True,
+        )
+        with self.assertRaises(VerificationRejected):
+            service.issue_quote(self.quote, b"sig", lambda *_: True, now=1_900_000_000)
+        with self.assertRaisesRegex(Exception, "unknown order"):
+            self.ledger.get_order(self.quote.order_id)
 
     def test_source_deposit_requires_positive_observer_verification(self):
         self.service.issue_quote(self.quote, b"sig", lambda *_: True, now=1_900_000_000)
