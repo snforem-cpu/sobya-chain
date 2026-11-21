@@ -72,6 +72,17 @@ class LocalCoordinatorTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "unknown order"):
             self.ledger.get_order(self.quote.order_id)
 
+    def test_failed_vault_reservation_never_registers_quote(self):
+        service = LocalCoordinator(
+            ReadinessAdmissionGuard(self.monitor, self.ledger),
+            inventory_guard=lambda _quote: True,
+            reserve_onchain_inventory=lambda _quote: False,
+        )
+        with self.assertRaises(VerificationRejected):
+            service.issue_quote(self.quote, b"sig", lambda *_: True, now=1_900_000_000)
+        with self.assertRaisesRegex(Exception, "unknown order"):
+            self.ledger.get_order(self.quote.order_id)
+
     def test_source_deposit_requires_positive_observer_verification(self):
         self.service.issue_quote(self.quote, b"sig", lambda *_: True, now=1_900_000_000)
         with self.assertRaises(VerificationRejected):
