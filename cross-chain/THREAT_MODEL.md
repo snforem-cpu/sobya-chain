@@ -62,3 +62,20 @@ No API response, single RPC response, browser event, or project-operated databas
 No testnet deployment until the state machine, contracts/programs, property tests, and threat review are complete. No mainnet deployment until independent security review, source token address verification, operational key separation, monitoring, funded solver inventory, incident/refund procedures, and explicit owner approval are complete.
 
 The initial documentation milestone does not satisfy any deployment or audit gate.
+
+
+## Security hardening applied in the implementation branch
+
+The following fail-closed controls have been added after the initial threat review:
+
+- The coordinator runtime now requires at least three uniquely named source-observer replicas and three destination-observer replicas. It derives a strict-majority quorum (or validates an explicitly configured threshold), requires distinct private RPC URLs per network, and invokes every configured verifier before accepting source-deposit or destination-payout evidence.
+- The destination payout observer now requires the receipt block to be covered by the SOBYA EVM `finalized` checkpoint. A configurable confirmation depth remains an additional policy check; confirmations alone are no longer treated as finality.
+- The self-hosted supervisor now requires at least two configured nodes for each enabled network and compares each observed head against the highest head observed from the configured local nodes. It no longer trusts a node's self-reported head as its own reference.
+- Quote pricing now requires a finalized native-SOBY balance reader. The runtime requires that reader to use the same pinned SOBYA node and chain ID as payout verification. New quotes are limited to the lower of ledger-available inventory and finalized on-chain balance after subtracting existing reservations.
+- Ethereum/TRON escrow and Solana escrow initialization now require at least three distinct attestors and a strict-majority threshold.
+
+## Remaining trust and release limitations
+
+These controls improve fault detection and inventory safety but do **not** establish independent-operator decentralization. Distinct RPC URLs can still point to nodes controlled by the same administrator, and the code cannot prove that attestor keys belong to different people or organizations. A colluding threshold of attestors can still authorize a false source-chain release. Key rotation/revocation, signer isolation, secure key provisioning, incident pause/recovery, and independent operator governance remain operational/security design work.
+
+The TRON wrapper still requires TRON-specific compiler validation and Shasta/TVM execution tests. Solana still requires validator-based integration tests. The new runtime composition and finalized-balance path require CI verification and later testnet integration. No network has been enabled, no contract deployed, no signing service started, and no funds moved. These changes do not authorize mainnet operation.
