@@ -164,7 +164,14 @@ class InventoryPayoutExecutor:
                 raise PayoutError("custodial payouts are disabled by the runtime release gate")
             order,intent,adapter = self._intent(order_id)
             row = self.journal.get(order_id)
+            if order["state"] == "complete":
+                if row and row["state"] in {"broadcast","finalized"}:
+                    self.journal.mark(order_id,"finalized")
+                    return row["tx_id"]
+                raise PayoutError("completed order cannot create another payout; reconcile its existing journal")
             if row is None:
+                if order["state"] != "deposit_final":
+                    raise PayoutError("ledger records an existing payout but its signed journal is missing; manual reconciliation required")
                 prepared = adapter.prepare(intent)
                 row = self.journal.create_prepared(intent,prepared)
             else:
@@ -172,6 +179,8 @@ class InventoryPayoutExecutor:
                     intent.network,intent.asset,str(intent.amount_base_units),intent.destination
                 ):
                     raise PayoutError("journal does not match the immutable order")
+                if order["state"] == "payout_submitted" and order.get("payout_tx","").lower() != row["tx_id"].lower():
+                    raise PayoutError("ledger payout transaction conflicts with durable journal")
             if row["state"] == "finalized":
                 return row["tx_id"]
             prepared = self.journal.prepared_from_row(row)
