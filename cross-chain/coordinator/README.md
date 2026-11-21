@@ -256,3 +256,52 @@ The launcher must keep the server bound to loopback, start it under a
 supervised process manager, and provide only SOBYA-operated private RPC
 endpoints. No node addresses, genesis hashes, escrow addresses, API tokens,
 or keys are populated with guessed defaults.
+
+## Finalized SOBYA vault reservation adapter
+
+`sobya_vault_connector.py` now supplies the concrete adapter required by
+`LocalCoordinator.issue_quote`. It calls the pinned SOBYA EVM RPC, verifies
+the chain ID and deployed vault bytecode, builds the exact
+`reserve(bytes32,address,uint128,uint64)` call, and delegates transaction
+signing to a caller-supplied local signer callback. It then verifies the
+broadcast transaction fields, successful receipt, canonical block, finalized
+checkpoint, configured confirmation depth, exact `InventoryReserved` event,
+and the finalized `reservations(orderId)` storage readback. A mismatched or
+unfinalized reservation fails closed.
+
+The module does not load a key, write a key file, or expose a signing endpoint.
+The signer callback must use a locally protected keystore or hardware signer
+on SOBYA-operated infrastructure and return the signed raw transaction as
+hex. Never implement that callback by placing a private key in this repository,
+the browser, the quote API, or observer configuration.
+
+Integration shape (the runtime accepts either the adapter object or its
+`reserve` method):
+
+```python
+from settlement_observer import JsonRpc
+from sobya_vault_connector import SobyaVaultReserver
+
+vault = SobyaVaultReserver(
+    JsonRpc("http://127.0.0.1:8545"),
+    expected_chain_id=357812033857,
+    vault_address=PINNED_DEPLOYED_VAULT,
+    signer=local_keystore_signer,
+    confirmations=2,
+)
+server = build_local_server(
+    # existing pinned observer, ledger, quote and readiness arguments
+    reserve_onchain_inventory=vault,
+)
+```
+
+`PINNED_DEPLOYED_VAULT` and `local_keystore_signer` are deployment inputs,
+not repository defaults. No vault address or signer is guessed here. Run the
+focused adapter tests with:
+
+```sh
+python -m unittest -v test_sobya_vault_connector.py
+```
+
+This adapter closes the transaction-submission interface in code; it does
+not mean a vault has been deployed, funded, or configured on SOBYA Mainnet.
