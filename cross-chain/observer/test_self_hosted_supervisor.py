@@ -39,18 +39,39 @@ class SelfHostedSupervisorTests(unittest.TestCase):
             validate_targets([target(), target()])
 
     def test_healthy_synced_correct_chain_is_ready(self):
+        second = target(node_id="eth-node-b", rpc_url="http://10.10.0.12:8545")
         health = NodeHealth("1", 1000, 995, 1000, False)
-        supervisor = SelfHostedNodeSupervisor([target()], lambda _: health)
+        supervisor = SelfHostedNodeSupervisor([target(), second], lambda _: health)
         self.assertTrue(supervisor.may_accept_orders("ethereum"))
+
+    def test_single_node_is_not_sufficient_for_readiness(self):
+        health = NodeHealth("1", 1000, 995, 1000, False)
+        result = SelfHostedNodeSupervisor([target()], lambda _: health).check_network("ethereum")
+        self.assertFalse(result.ready)
+        self.assertIn("at least two", result.failures[0])
+
+    def test_peer_head_is_derived_from_other_configured_nodes(self):
+        second = target(node_id="eth-node-b", rpc_url="http://10.10.0.12:8545")
+        def probe(item):
+            # Both probes lie by setting their own head as the reference. The
+            # supervisor must ignore that field and compare the observed heads.
+            if item.node_id == "eth-node-a":
+                return NodeHealth("1", 1000, 995, 1000, False)
+            return NodeHealth("1", 1005, 1000, 1005, False)
+        result = SelfHostedNodeSupervisor([target(), second], probe).check_network("ethereum")
+        self.assertFalse(result.ready)
+        self.assertIn("eth-node-a: NodeHealthError", result.failures)
 
     def test_wrong_chain_identity_fails_closed(self):
         health = NodeHealth("5", 1000, 995, 1000, False)
-        supervisor = SelfHostedNodeSupervisor([target()], lambda _: health)
+        second = target(node_id="eth-node-b", rpc_url="http://10.10.0.12:8545")
+        supervisor = SelfHostedNodeSupervisor([target(), second], lambda _: health)
         self.assertFalse(supervisor.may_accept_orders("ethereum"))
 
     def test_syncing_node_fails_closed(self):
         health = NodeHealth("1", 1000, 995, 1000, True)
-        supervisor = SelfHostedNodeSupervisor([target()], lambda _: health)
+        second = target(node_id="eth-node-b", rpc_url="http://10.10.0.12:8545")
+        supervisor = SelfHostedNodeSupervisor([target(), second], lambda _: health)
         self.assertFalse(supervisor.may_accept_orders("ethereum"))
 
     def test_stale_finality_fails_closed(self):
@@ -68,7 +89,10 @@ class SelfHostedSupervisorTests(unittest.TestCase):
     def test_probe_exception_fails_closed_without_leaking_details(self):
         def fail(_):
             raise RuntimeError("rpc password=do-not-leak")
-        result = SelfHostedNodeSupervisor([target()], fail).check_network("ethereum")
+        second = target(node_id="eth-node-b", rpc_url="http://10.10.0.12:8545")
+        def probe(item):
+            return NodeHealth("1", 1000, 995, 1000, False) if item.node_id == "eth-node-b" else fail(item)
+        result = SelfHostedNodeSupervisor([target(), second], probe).check_network("ethereum")
         self.assertFalse(result.ready)
         self.assertEqual(result.failures, ("eth-node-a: RuntimeError",))
         self.assertNotIn("do-not-leak", str(result))
