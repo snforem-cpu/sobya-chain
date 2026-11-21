@@ -68,6 +68,32 @@ class PricingTests(unittest.TestCase):
                 destination_recipient="0x" + "55"*20,
             )
 
+    def test_vault_available_balance_is_not_double_subtracted(self):
+        total = 50 * 10**18
+        self.ledger.set_solver_inventory(self.solver, total)
+        first = self.pricer.quote(
+            order_id="0x" + "31" * 32, source_chain="ethereum",
+            source_asset="0x" + "33" * 20, source_amount=80_000_000,
+            user="0x" + "22" * 20, solver=self.solver,
+            destination_recipient="0x" + "55" * 20,
+        )
+        self.ledger.register_quote_with_inventory(first, now=1_900_000_000)
+        remaining = total - first.destination_amount
+        pricer = InventoryAwareQuotePricer(
+            self.config, self.ledger, destination_chain_id=357812033857,
+            # The vault view is already net of its on-chain reservation.
+            finalized_balance=lambda _solver: remaining,
+            now=lambda: 1_900_000_000,
+        )
+        second = pricer.quote(
+            order_id="0x" + "32" * 32, source_chain="ethereum",
+            source_asset="0x" + "33" * 20, source_amount=20_000_000,
+            user="0x" + "22" * 20, solver=self.solver,
+            destination_recipient="0x" + "55" * 20,
+        )
+        self.assertEqual(second.destination_amount, 9_900_000_000_000_000_000)
+        self.assertGreaterEqual(remaining, second.destination_amount)
+
     def test_invalid_amount_and_rate_rejected(self):
         with self.assertRaises(PricingError):
             self.pricer.quote(
