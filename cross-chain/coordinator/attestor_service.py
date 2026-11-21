@@ -275,7 +275,10 @@ class AttestorService:
             raise AttestorServiceError("order is not a Solana source escrow")
         self._require_verified(self.verify_destination_payout, evidence, proof)
         if (
-            evidence.destination_chain_id != self.destination_chain_id
+            evidence.source_chain.lower() != "solana"
+            or evidence.source_asset != quote.source_asset
+            or evidence.source_amount != quote.source_amount
+            or evidence.destination_chain_id != self.destination_chain_id
             or evidence.destination_amount != quote.destination_amount
             or evidence.recipient.lower() != quote.destination_recipient.lower()
             or evidence.solver.lower() != quote.solver.lower()
