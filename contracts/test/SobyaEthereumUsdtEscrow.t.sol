@@ -40,6 +40,7 @@ contract SobyaEthereumUsdtEscrowTest {
     uint256 private constant SOLVER_KEY = 0xB0B;
     uint256 private constant ATTESTOR_KEY_1 = 0xC0FFEE;
     uint256 private constant ATTESTOR_KEY_2 = 0xD00D;
+    uint256 private constant ATTESTOR_KEY_3 = 0xBEEF;
 
     MockUsdt private usdt;
     SobyaEthereumUsdtEscrow private escrow;
@@ -47,17 +48,24 @@ contract SobyaEthereumUsdtEscrowTest {
     address private solver;
     address private attestor1;
     address private attestor2;
+    address private attestor3;
 
     function setUp() public {
         user = vm.addr(USER_KEY);
         solver = vm.addr(SOLVER_KEY);
         attestor1 = vm.addr(ATTESTOR_KEY_1);
         attestor2 = vm.addr(ATTESTOR_KEY_2);
-        address[] memory attestors = new address[](2);
-        if (attestor1 < attestor2) {
-            attestors[0] = attestor1; attestors[1] = attestor2;
-        } else {
-            attestors[0] = attestor2; attestors[1] = attestor1;
+        attestor3 = vm.addr(ATTESTOR_KEY_3);
+        address[] memory attestors = new address[](3);
+        attestors[0] = attestor1;
+        attestors[1] = attestor2;
+        attestors[2] = attestor3;
+        for (uint256 i; i < attestors.length; ++i) {
+            for (uint256 j = i + 1; j < attestors.length; ++j) {
+                if (attestors[j] < attestors[i]) {
+                    (attestors[i], attestors[j]) = (attestors[j], attestors[i]);
+                }
+            }
         }
         usdt = new MockUsdt();
         escrow = new SobyaEthereumUsdtEscrow(address(usdt), attestors, 2);
@@ -111,6 +119,18 @@ contract SobyaEthereumUsdtEscrowTest {
             signatures[0] = _signature(ATTESTOR_KEY_2, digest);
             signatures[1] = _signature(ATTESTOR_KEY_1, digest);
         }
+    }
+
+    function testRejectsSingleKeyAttestorConfiguration() public {
+        address[] memory one = new address[](1);
+        one[0] = attestor1;
+        bool deployed;
+        try new SobyaEthereumUsdtEscrow(address(usdt), one, 1) returns (
+            SobyaEthereumUsdtEscrow
+        ) {
+            deployed = true;
+        } catch {}
+        require(!deployed, "single-key escrow configuration accepted");
     }
 
     function testFundAndThresholdAttestedSolverClaim() public {
