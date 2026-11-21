@@ -130,6 +130,11 @@ class Erc20DepositVerifier:
         finalized_height = _quantity(finalized.get("number"), "finalized block number")
         if block_number > finalized_height:
             raise EvmDepositError("deposit is not finalized")
+        canonical = self.rpc.call("eth_getBlockByNumber", [hex(block_number), False])
+        if (not isinstance(canonical, dict)
+                or not isinstance(canonical.get("hash"), str)
+                or canonical["hash"].lower() != block_hash.lower()):
+            raise EvmDepositError("receipt block is not canonical")
 
         token = _address(expected.token_contract, "configured token")
         inventory = _address(expected.inventory_wallet, "inventory wallet")
