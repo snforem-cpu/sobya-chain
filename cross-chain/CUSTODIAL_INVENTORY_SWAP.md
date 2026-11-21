@@ -39,3 +39,14 @@ The pricing module is a calculation component, not a live oracle, quote endpoint
 - The EVM verifier does not create orders, scan the chain, watch continuously, sign, or broadcast payouts. The DEX/API must provide the exact expected transaction and event index, then persist the verified event through the ledger.
 - The existing TRON and Solana observer modules still verify the previous escrow-program model; they are **not** generic shared-inventory deposit watchers. Generic TRON and Solana transfer verification, SOBYA native-coin deposit verification, payout signing/broadcasting, balance reconciliation, API/UI wiring, and full end-to-end tests remain unfinished.
 - Therefore this remains a development prototype. All networks and the overall feature stay disabled; do not accept user deposits or promise automatic payouts.
+
+## Supplied inventory wallet addresses
+
+The operator supplied these public receiving addresses for the inventory configuration:
+
+- Ethereum mainnet: `0xebdb899fFE84a89e1d576964b640491c135651AD`
+- TRON mainnet: `TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx`
+- Solana mainnet-beta: `BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh`
+- SOBYA mainnet: `0xebdb899fFE84a89e1d576964b640491c135651AD`
+
+The Ethereum and SOBYA entries intentionally use the same EVM address, but are separate balances on separate chains. These public addresses are recorded in the example configuration only; all network flags remain disabled. The operator reports that the SOBYA wallet holds 1,000,000 SOBY; that balance has not yet been independently checked by this software. Do not treat a configured address as proof of custody or signing capability: the corresponding private keys must remain under the operator's secure local control and must never be committed to GitHub.
