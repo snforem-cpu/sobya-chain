@@ -13,7 +13,7 @@
 <header class="top"><a class="brand" href="../" style="color:inherit;text-decoration:none">SOBYA<small>DECENTRALIZED EXCHANGE</small></a><button class="btn primary" id="connect">Connect wallet</button></header>
 <div class="tag">SOBYA MAINNET · EVM</div><h1>Swap tokens.<br><span style="color:var(--cyan)">Keep control.</span></h1><p class="muted">A self-custody exchange interface. Trades are sent directly from your wallet to on-chain contracts.</p>
 <div class="status" id="network">Checking network configuration…</div>
-<nav class="tabs"><button class="btn tab active" data-tab="swap">Swap</button><button class="btn tab" data-tab="pool">Liquidity</button><button class="btn tab" data-tab="wrap">Wrap SOBY</button></nav>
+<nav class="tabs"><button class="btn tab active" data-tab="swap">Swap</button><button class="btn tab" data-tab="pool">Liquidity</button><button class="btn tab" data-tab="wrap">Wrap SOBY</button><button class="btn tab" data-tab="crosschain">Cross-chain</button></nav>
 <section class="panel" id="swap">
 <label class="field"><span>From token address</span><input id="fromToken" placeholder="0x…"></label>
 <label class="field"><span>Amount</span><input id="amountIn" type="number" min="0" step="any" placeholder="0.0"></label>
@@ -35,6 +35,20 @@
 <button class="btn" id="removeBtn" disabled>Remove liquidity</button>
 <p class="muted">The wallet must hold the LP tokens for this pool. Set minimum return amounts to protect against unexpected price movement.</p>
 <p class="muted warn">Initial liquidity phase: create and fund the first pool only after verifying both token addresses, token decimals, and amounts. Swaps remain disabled until the funded pool and a controlled swap test are verified.</p>
+</section>
+<section class="panel hidden" id="crosschain">
+<div class="tag">CROSS-CHAIN · QUOTE PREVIEW</div>
+<h2 style="margin:8px 0">USDT → SOBY</h2>
+<p class="muted">One interface for Ethereum, TRON and Solana. The source networks remain on their own infrastructure; SOBYA handles destination settlement.</p>
+<label class="field"><span>Source network</span><select id="ccNetwork" style="width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#07182b;color:white;font:inherit"><option value="ethereum">Ethereum · USDT</option><option value="tron">TRON · USDT</option><option value="solana">Solana · USDT</option></select></label>
+<label class="field"><span>USDT contract / mint address</span><input id="ccAsset" placeholder="Verified USDT contract or mint address"></label>
+<div class="row"><label class="field"><span>USDT amount</span><input id="ccAmount" type="number" min="0.000001" step="0.000001" placeholder="0.0"></label><label class="field"><span>Your source wallet</span><input id="ccSourceWallet" placeholder="Source-chain wallet address"></label></div>
+<label class="field"><span>Solver public address / identity</span><input id="ccSolver" placeholder="Configured SOBYA solver identity"></label>
+<label class="field"><span>Receive SOBY at (SOBYA EVM address)</span><input id="ccRecipient" placeholder="0x…"></label>
+<button class="btn primary" id="ccQuoteBtn">Request indicative quote</button>
+<div class="status" id="ccStatus" aria-live="polite">Quote preview only. No funds are requested or moved.</div>
+<pre id="ccQuote" class="status hidden" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<p class="muted warn">A quote is not an accepted order. Source escrow, finalized deposit verification, signed solver quote, funded SOBYA inventory and payout settlement must all be live before a swap can execute. This panel never asks for a seed phrase or private key.</p>
 </section>
 <section class="panel hidden" id="wrap">
 <div class="tag">NATIVE SOBY ↔ WSOBY</div>
@@ -120,12 +134,37 @@ async function approve(token,spender,amount){const c=new ethers.Contract(token,e
 async function refreshQuote(){try{if(!config||!valid(config.router)||!valid($('fromToken').value.trim())||!valid($('toToken').value.trim())||!$('amountIn').value){$('minOut').value='';$('quoteInfo').textContent='Enter valid token addresses and an amount to calculate a live pool quote.';return}const da=await tokenDecimals($('fromToken').value.trim());const db=await tokenDecimals($('toToken').value.trim());const amount=ethers.parseUnits($('amountIn').value,da);const r=new ethers.Contract(config.router,routerAbi,provider||new ethers.JsonRpcProvider(config.rpcUrl));const path=[$('fromToken').value.trim(),$('toToken').value.trim()];const amounts=await r.getAmountsOut(amount,path);const slip=Number($('slippage').value);if(!Number.isFinite(slip)||slip<0.1||slip>5)throw Error('Slippage must be between 0.1% and 5%.');const minimum=amounts[1]*(10000n-BigInt(Math.round(slip*100)))/10000n;$('minOut').value=ethers.formatUnits(minimum,db);$('quoteInfo').textContent='Estimated output: '+ethers.formatUnits(amounts[1],db)+' · Route: direct pool · Fee: 0.30% per pool';}catch(e){$('minOut').value='';$('quoteInfo').textContent='Quote unavailable: '+(e.shortMessage||e.message||String(e));}}
 for(const id of ['fromToken','toToken','amountIn','slippage'])$(id).addEventListener('change',refreshQuote);
 $('connect').onclick=connect;
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));['swap','pool','wrap'].forEach(x=>$(x).classList.toggle('hidden',x!==b.dataset.tab))});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));['swap','pool','wrap','crosschain'].forEach(x=>$(x).classList.toggle('hidden',x!==b.dataset.tab))});
 $('swapBtn').onclick=async()=>{try{const a=$('fromToken').value.trim(),b=$('toToken').value.trim();const da=await tokenDecimals(a),db=await tokenDecimals(b);const amount=ethers.parseUnits($('amountIn').value,da);if(amount<=0n)throw Error('Amount must be greater than zero.');if(a.toLowerCase()===b.toLowerCase())throw Error('Choose two different tokens.');await refreshQuote();const min=ethers.parseUnits($('minOut').value,db);if(min<=0n)throw Error('No valid quote; check that a liquid pool exists.');await approve(a,config.router,amount);const r=new ethers.Contract(config.router,routerAbi,signer);const tx=await r.swapExactTokensForTokens(amount,min,[a,b],await signer.getAddress(),Math.floor(Date.now()/1000)+600);say('Swap submitted: '+tx.hash);await tx.wait();say('Swap confirmed: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
 $('poolBtn').onclick=async()=>{try{const a=$('tokenA').value.trim(),b=$('tokenB').value.trim();if(!valid(a)||!valid(b)||a.toLowerCase()===b.toLowerCase())throw Error('Enter two different valid token addresses.');const [da,db]=await Promise.all([tokenDecimals(a),tokenDecimals(b)]);const aa=ethers.parseUnits($('liqA').value,da),bb=ethers.parseUnits($('liqB').value,db);if(aa<=0n||bb<=0n)throw Error('Liquidity amounts must be greater than zero.');const f=new ethers.Contract(config.factory,factoryAbi,signer);let pair=await f.getPair(a,b);if(pair===ethers.ZeroAddress){const create=await f.createPair(a,b);say('Creating pool: '+create.hash);await create.wait();pair=await f.getPair(a,b)}await approve(a,config.router,aa);await approve(b,config.router,bb);const r=new ethers.Contract(config.router,routerAbi,signer);const tx=await r.addLiquidity(a,b,aa,bb,aa*98n/100n,bb*98n/100n,await signer.getAddress(),Math.floor(Date.now()/1000)+600);say('Adding liquidity to '+pair+': '+tx.hash);await tx.wait();say('Liquidity added. Pair: '+pair)}catch(e){say(e.shortMessage||e.message||String(e))}};
 $('removeBtn').onclick=async()=>{try{const a=$('tokenA').value.trim(),b=$('tokenB').value.trim();if(!valid(a)||!valid(b)||a.toLowerCase()===b.toLowerCase())throw Error('Enter the two valid pool token addresses used above.');const f=new ethers.Contract(config.factory,factoryAbi,provider);const pairAddress=await f.getPair(a,b);if(pairAddress===ethers.ZeroAddress)throw Error('Pool does not exist.');const pair=new ethers.Contract(pairAddress,pairAbi,signer);const lp=ethers.parseUnits($('lpAmount').value,18);if(lp<=0n)throw Error('Enter a positive LP token amount.');const owner=await signer.getAddress();const bal=await pair.balanceOf(owner);if(bal<lp)throw Error('Wallet LP balance is lower than the requested amount.');const approval=await pair.approve(config.router,lp);say('Approving LP tokens: '+approval.hash);await approval.wait();const [da,db]=await Promise.all([tokenDecimals(a),tokenDecimals(b)]);const minA=ethers.parseUnits($('removeMinA').value||'0',da),minB=ethers.parseUnits($('removeMinB').value||'0',db);const r=new ethers.Contract(config.router,routerAbi,signer);const tx=await r.removeLiquidity(a,b,lp,minA,minB,owner,Math.floor(Date.now()/1000)+600);say('Removing liquidity: '+tx.hash);await tx.wait();say('Liquidity removed. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
 $('wrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive SOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.deposit({value:amount});say('Wrapping SOBY: '+tx.hash);await tx.wait();say('WSOBY minted 1:1. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
 $('unwrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive WSOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.withdraw(amount);say('Unwrapping WSOBY: '+tx.hash);await tx.wait();say('Native SOBY returned. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
+
+$('ccQuoteBtn').onclick=async()=>{
+ const button=$('ccQuoteBtn'),status=$('ccStatus'),output=$('ccQuote');
+ output.classList.add('hidden');output.textContent='';
+ try{
+  const network=$('ccNetwork').value,asset=$('ccAsset').value.trim(),amountText=$('ccAmount').value.trim();
+  const sourceWallet=$('ccSourceWallet').value.trim(),solver=$('ccSolver').value.trim(),recipient=$('ccRecipient').value.trim();
+  if(!asset||!amountText||!sourceWallet||!solver||!recipient)throw Error('Complete all fields. Use verified public addresses only.');
+  if(!/^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,64})$/.test(asset))throw Error('Enter a valid EVM contract or Solana mint address.');
+  if(!/^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,64})$/.test(sourceWallet))throw Error('Enter a valid source wallet address.');
+  if(!/^0x[0-9a-fA-F]{40}$/.test(recipient)||!/^0x[0-9a-fA-F]{40}$/.test(solver))throw Error('Solver and SOBYA recipient must be EVM addresses.');
+  const amount=Number(amountText);
+  if(!Number.isFinite(amount)||amount<=0||!/^\\d+(\\.\\d{1,6})?$/.test(amountText))throw Error('Enter a positive USDT amount with up to 6 decimal places.');
+  const sourceAmount=BigInt(amountText.replace('.','').padEnd(amountText.includes('.')?amountText.indexOf('.')+7:amountText.length+6,'0')).toString();
+  button.disabled=true;status.textContent='Requesting an unsigned, non-reserving quote preview…';
+  const response=await fetch('/api/cross-chain/v1/quote-previews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request:{order_id:crypto.randomUUID(),source_chain:network,source_asset:asset,source_amount:Number(sourceAmount),user:sourceWallet,solver,destination_recipient:recipient}})});
+  const payload=await response.json().catch(()=>({error:'Invalid response from quote gateway'}));
+  if(!response.ok)throw Error(payload.error||('Quote gateway returned HTTP '+response.status));
+  if(payload.signed!==false||payload.reserved!==false||!payload.quote)throw Error('Gateway response did not match the unsigned preview contract. Request rejected.');
+  output.textContent=JSON.stringify(payload.quote,null,2);output.classList.remove('hidden');
+  status.textContent='Indicative quote received. It is unsigned and no inventory has been reserved; no swap has been placed.';
+ }catch(error){status.textContent='Quote unavailable: '+(error.message||String(error))+'. Cross-chain execution remains disabled.'}
+ finally{button.disabled=false}
+};
+
 function watchWalletEvents(raw){
  if(!raw||typeof raw.on!=='function')return;
  raw.on('chainChanged',()=>location.reload());
