@@ -73,7 +73,7 @@ class EvmInventoryPayoutTests(unittest.TestCase):
         prepared = adapter.prepare(intent)
         self.assertEqual(prepared.tx_id, "0x" + "ab" * 32)
         self.assertEqual(web3.eth.last_tx["nonce"], 7)
-        self.assertEqual(web3.eth.last_tx["to"], USDT)
+        self.assertEqual(web3.eth.last_tx["to"].lower(), USDT.lower())
         self.assertEqual(adapter.broadcast(prepared), prepared.tx_id)
         self.assertTrue(adapter.verify_finalized(intent, prepared.tx_id))
 
