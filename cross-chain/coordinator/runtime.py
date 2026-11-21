@@ -58,6 +58,7 @@ def build_local_server(
     sobya_settlement: SobyaSettlementConfig,
     source_identities: dict[str, SourceIdentity],
     quote_pricer: InventoryAwareQuotePricer,
+    reserve_onchain_inventory,
     additional_source_observers: tuple[SourceObserverReplica, ...] = (),
     additional_destination_observers: tuple[DestinationObserverReplica, ...] = (),
     required_observer_quorum: int | None = None,
@@ -206,7 +207,13 @@ def build_local_server(
         return destination_quorum.verify(evidence, proof).value is True
 
     admission = ReadinessAdmissionGuard(monitor, ledger)
-    coordinator = LocalCoordinator(admission, inventory_guard=quote_pricer.assert_quote_inventory)
+    if not callable(reserve_onchain_inventory):
+        raise ValueError("a finalized SOBYA vault reservation adapter is required")
+    coordinator = LocalCoordinator(
+        admission,
+        inventory_guard=quote_pricer.assert_quote_inventory,
+        reserve_onchain_inventory=reserve_onchain_inventory,
+    )
     return create_server(
         host, port, coordinator,
         bearer_token=bearer_token,
