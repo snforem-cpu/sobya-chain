@@ -7,8 +7,8 @@
   "router": "0x9F3B4AeFbCb937227Dac641Bf7b9e8b42d6CA23D",
   "wrappedSoby": "0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c",
   "oracle": "0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4",
-  "deploymentStatus": "verified",
-  "notice": "The four mainnet contract deployments passed read-only receipt, bytecode, deployer and constructor-link verification. Liquidity operations are enabled for owner-controlled initial pool creation and funding. Swaps remain disabled until a funded pool is verified and mainnet swap smoke tests pass. The TWAP oracle is pool-specific, not a global USD price feed.",
-  "liquidityEnabled": true,
+  "deploymentStatus": "pending",
+  "notice": "Mainnet deployment receipts, bytecode, deployer and constructor-link checks have not been verified by the current release gate. Liquidity and swaps remain disabled until the recorded deployments are independently verified, required pools are funded, and mainnet smoke tests pass. Existing address fields are unverified references and must not be treated as proof of deployment.",
+  "liquidityEnabled": false,
   "tradingEnabled": false
 }

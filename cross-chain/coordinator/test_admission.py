@@ -1,0 +1,166 @@
+from concurrent.futures import ThreadPoolExecutor
+import tempfile
+import unittest
+from pathlib import Path
+
+from admission import AdmissionDenied, ReadinessAdmissionGuard
+from order_ledger import (
+    CrossChainOrderLedger, DestinationPayoutEvidence, OrderQuote,
+    SourceDepositEvidence,
+)
+
+
+class FakeMonitor:
+    def __init__(self, ready=True):
+        self.ready = ready
+        self.calls = []
+        self.raise_error = False
+        self.malformed = False
+
+    def admission(self, source, destination):
+        self.calls.append((source, destination))
+        if self.raise_error:
+            raise TimeoutError("local monitor unavailable")
+        if self.malformed:
+            return True, {"admissible": True}
+        state = {"ready": self.ready}
+        return self.ready, {"admissible": self.ready, "source": state, "destination": state}
+
+
+class AdmissionGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.ledger = CrossChainOrderLedger(str(Path(self.temp.name) / "orders.sqlite"))
+        self.monitor = FakeMonitor()
+        self.ledger.set_solver_inventory("0x" + "44"*20, 2 * 10**18)
+        self.guard = ReadinessAdmissionGuard(self.monitor, self.ledger)
+        self.quote = OrderQuote(
+            order_id="order-guard-001", source_chain="ethereum",
+            source_asset="0x" + "33"*20, source_amount=25_000_000,
+            user="0x" + "22"*20, solver="0x" + "44"*20,
+            destination_chain_id=357812033857,
+            destination_recipient="0x" + "55"*20, destination_amount=10**18,
+            quote_expiry=2_000_000_000, refund_after=2_000_003_600,
+        )
+        self.deposit = SourceDepositEvidence(
+            order_id=self.quote.order_id, source_chain="ethereum",
+            transaction_id="0x" + "aa"*32, event_index=1,
+            source_asset=self.quote.source_asset, source_amount=self.quote.source_amount,
+            user=self.quote.user, solver=self.quote.solver,
+            destination_chain_id=self.quote.destination_chain_id,
+            destination_recipient=self.quote.destination_recipient,
+            destination_amount=self.quote.destination_amount,
+            finalized_reference="ethereum:finalized:100",
+        )
+        self.payout = DestinationPayoutEvidence(
+            order_id=self.quote.order_id, transaction_id="0x" + "bb"*32,
+            event_index=2, destination_chain_id=self.quote.destination_chain_id,
+            source_chain="ethereum", source_asset=self.quote.source_asset,
+            source_amount=self.quote.source_amount, recipient=self.quote.destination_recipient,
+            destination_amount=self.quote.destination_amount, solver=self.quote.solver,
+            finalized_reference="sobya:finalized:200",
+        )
+
+    def tearDown(self):
+        self.ledger.close()
+        self.temp.cleanup()
+
+    def test_ready_networks_allow_quote_and_deposit(self):
+        self.guard.register_quote(self.quote, now=1_900_000_000)
+        self.guard.record_source_deposit(self.deposit, now=1_900_000_001)
+        self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "SOURCE_FUNDED")
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
+        self.assertEqual(self.monitor.calls, [("ethereum", "sobya"), ("ethereum", "sobya")])
+
+    def test_insufficient_solver_inventory_denies_quote_atomically(self):
+        self.ledger.set_solver_inventory(self.quote.solver, self.quote.destination_amount - 1)
+        with self.assertRaisesRegex(Exception, "insufficient unreserved SOBY inventory"):
+            self.guard.register_quote(self.quote, now=1_900_000_000)
+        with self.assertRaisesRegex(Exception, "unknown order"):
+            self.ledger.get_order(self.quote.order_id)
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver),
+                         self.quote.destination_amount - 1)
+
+    def test_quote_reserves_inventory_against_concurrent_orders(self):
+        self.guard.register_quote(self.quote, now=1_900_000_000)
+        second = OrderQuote(
+            order_id="order-guard-002", source_chain="ethereum",
+            source_asset=self.quote.source_asset, source_amount=self.quote.source_amount,
+            user=self.quote.user, solver=self.quote.solver,
+            destination_chain_id=self.quote.destination_chain_id,
+            destination_recipient="0x" + "66"*20,
+            destination_amount=10**18 + 1, quote_expiry=self.quote.quote_expiry,
+            refund_after=self.quote.refund_after,
+        )
+        with self.assertRaisesRegex(Exception, "insufficient unreserved SOBY inventory"):
+            self.guard.register_quote(second, now=1_900_000_000)
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
+
+    def test_parallel_quotes_cannot_oversubscribe_solver_inventory(self):
+        self.ledger.set_solver_inventory(self.quote.solver, self.quote.destination_amount)
+        second = OrderQuote(
+            order_id="order-guard-parallel-002", source_chain="ethereum",
+            source_asset=self.quote.source_asset, source_amount=self.quote.source_amount,
+            user=self.quote.user, solver=self.quote.solver,
+            destination_chain_id=self.quote.destination_chain_id,
+            destination_recipient="0x" + "66"*20,
+            destination_amount=self.quote.destination_amount,
+            quote_expiry=self.quote.quote_expiry, refund_after=self.quote.refund_after,
+        )
+        def attempt(quote):
+            try:
+                self.guard.register_quote(quote, now=1_900_000_000)
+                return "accepted"
+            except Exception:
+                return "rejected"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(attempt, [self.quote, second]))
+        self.assertCountEqual(results, ["accepted", "rejected"])
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 0)
+
+    def test_unhealthy_source_or_destination_denies_quote(self):
+        self.monitor.ready = False
+        with self.assertRaises(AdmissionDenied):
+            self.guard.register_quote(self.quote, now=1_900_000_000)
+        with self.assertRaisesRegex(Exception, "unknown order"):
+            self.ledger.get_order(self.quote.order_id)
+
+    def test_readiness_loss_denies_source_deposit(self):
+        self.guard.register_quote(self.quote, now=1_900_000_000)
+        self.monitor.ready = False
+        with self.assertRaises(AdmissionDenied):
+            self.guard.record_source_deposit(self.deposit, now=1_900_000_001)
+        self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "QUOTED")
+
+    def test_monitor_timeout_fails_closed(self):
+        self.monitor.raise_error = True
+        with self.assertRaises(AdmissionDenied):
+            self.guard.register_quote(self.quote, now=1_900_000_000)
+
+    def test_malformed_positive_readiness_fails_closed(self):
+        self.monitor.malformed = True
+        with self.assertRaises(AdmissionDenied):
+            self.guard.register_quote(self.quote, now=1_900_000_000)
+
+    def test_missing_source_fails_closed(self):
+        with self.assertRaises(AdmissionDenied):
+            self.guard._require_ready(" ")
+
+    def test_existing_order_completion_not_blocked_by_admission_pause(self):
+        self.guard.register_quote(self.quote, now=1_900_000_000)
+        self.guard.record_source_deposit(self.deposit, now=1_900_000_001)
+        self.monitor.ready = False
+        self.guard.record_destination_payout(self.payout, now=1_900_000_002)
+        self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "DESTINATION_PAID")
+        self.assertEqual(self.ledger.available_solver_inventory(self.quote.solver), 10**18)
+
+    def test_readiness_exception_does_not_change_existing_order(self):
+        self.guard.register_quote(self.quote, now=1_900_000_000)
+        self.monitor.raise_error = True
+        with self.assertRaises(AdmissionDenied):
+            self.guard.record_source_deposit(self.deposit, now=1_900_000_001)
+        self.assertEqual(self.ledger.get_order(self.quote.order_id)["status"], "QUOTED")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

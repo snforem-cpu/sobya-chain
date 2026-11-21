@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "mode": "custodial-inventory",
+  "featureEnabled": false,
+  "orderAddressPolicy": "shared-inventory-wallet; bind exact submitted transaction hash and event index to order",
+  "networks": {
+    "ethereum": {
+      "enabled": false,
+      "chainId": 1,
+      "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL",
+      "usdtContract": null,
+      "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
+      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE"
+    },
+    "tron": {
+      "enabled": false,
+      "network": "mainnet",
+      "rpcUrlEnv": "SOBYA_TRON_RPC_URL",
+      "usdtContract": null,
+      "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx",
+      "keystorePathEnv": "SOBYA_TRON_KEYSTORE"
+    },
+    "solana": {
+      "enabled": false,
+      "cluster": "mainnet-beta",
+      "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL",
+      "usdtMint": null,
+      "tokenProgram": null,
+      "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh",
+      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE"
+    },
+    "sobya": {
+      "enabled": false,
+      "chainId": 357812033857,
+      "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
+      "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
+      "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE"
+    }
+  },
+  "pricing": {
+    "baseReferencePriceUsdtPerSoby": "0.005",
+    "referenceLiquidityUsdtBaseUnits": null,
+    "upwardDemandSensitivityBps": 10000,
+    "downwardDemandSensitivityBps": 2500,
+    "demandWindowSeconds": 3600,
+    "demandMaxAgeSeconds": 300,
+    "demandSignalSource": "finalized-executed-swaps-only",
+    "priceCeiling": null,
+    "priceFloor": null
+  },
+  "limits": {
+    "maxOrderUsdtBaseUnits": null,
+    "maxDailyUsdtBaseUnitsPerNetwork": null,
+    "minimumInventoryBaseUnits": null,
+    "feeBps": null,
+    "quoteLifetimeSeconds": 120
+  },
+  "safety": {
+    "requireFinalizedDeposit": true,
+    "requireUniqueDepositDestination": true,
+    "requireInventoryBeforeAcceptingOrder": true,
+    "requirePayoutFinalityBeforeComplete": true,
+    "pauseOnWatcherFailure": true,
+    "allowAdminWithdrawal": false
+  },
+  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository."
+}
