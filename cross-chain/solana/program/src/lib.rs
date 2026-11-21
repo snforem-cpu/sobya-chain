@@ -583,7 +583,11 @@ mod tests {
 
     #[test]
     fn attestor_policy_requires_three_keys_and_strict_majority() {
-        let keys = vec![Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique()];
+        let keys = vec![
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+        ];
         assert!(validate_attestor_policy(&keys, 2).is_ok());
         assert!(validate_attestor_policy(&keys, 1).is_err());
         assert!(validate_attestor_policy(&keys[..2], 2).is_err());
