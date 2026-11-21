@@ -78,7 +78,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                         "tron": Eip712QuoteDomain(728126428, "0x" + "12" * 20),
                     },
                     ethereum_sources={
-                        "ethereum": EthereumSourceConfig(1, "0x" + "11" * 20, PrivateRpc())
+                        "ethereum": EthereumSourceConfig(1, "0x" + "11" * 20, PrivateRpc(8551))
                     },
                     tron_sources={},
                     solana_source=None,
