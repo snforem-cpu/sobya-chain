@@ -67,7 +67,7 @@ class EvmInventoryPayoutTests(unittest.TestCase):
         web3 = FakeWeb3(1, "ethereum")
         adapter = EvmInventoryPayoutAdapter(
             network="ethereum", web3=web3, account=FakeAccount(), chain_id=1,
-            inventory_wallet=INVENTORY, confirmations=12, token_contract=USDT,
+            inventory_wallet=INVENTORY, confirmations=10, token_contract=USDT,
         )
         intent = PayoutIntent("order-1", "ethereum", "USDT-ETH", AMOUNT, RECIPIENT)
         prepared = adapter.prepare(intent)
