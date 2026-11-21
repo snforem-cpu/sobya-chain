@@ -4,7 +4,8 @@ from pathlib import Path
 from inventory_deposit_watchers import (
     ExpectedInventoryDeposit, InventoryDepositError, EvmInventoryDepositVerifier,
     JsonRpc, SolanaInventoryDepositVerifier, TronInventoryDepositVerifier,
-    TRANSFER_TOPIC, InventoryDepositRecorder, InventoryDepositService, VerifiedInventoryDeposit,
+    TRANSFER_TOPIC, InventoryDepositRecorder, InventoryDepositService, InventoryDepositWorker,
+    RetryableInventoryDepositError, VerifiedInventoryDeposit,
 )
 from custodial_ledger import CustodialOrderLedger, CustodialOrderError
 
@@ -281,6 +282,32 @@ class InventoryDepositRecorderTests(unittest.TestCase):
         service = InventoryDepositService(self.ledger, {"ethereum": Verifier()})
         service.verify_order_deposit(self.order, TX, 2)
         self.assertEqual(self.ledger.get_order(self.order)["state"], "deposit_final")
+    def test_worker_retries_until_finalized_then_records_once(self):
+        class Verifier:
+            ready = False
+            def verify(inner, expected):
+                if not inner.ready:
+                    raise RetryableInventoryDepositError("deposit is not finalized")
+                return self.verified
+        verifier = Verifier()
+        service = InventoryDepositService(self.ledger, {"ethereum": verifier})
+        worker = InventoryDepositWorker(service, str(Path(self.temp.name) / "orders.sqlite"))
+        worker.submit(self.order, TX, 2)
+        self.assertEqual(worker.run_once(), {"verified": 0, "pending": 1, "failed": 0})
+        verifier.ready = True
+        self.assertEqual(worker.run_once(), {"verified": 1, "pending": 0, "failed": 0})
+        self.assertEqual(self.ledger.get_order(self.order)["state"], "deposit_final")
+        self.assertEqual(worker.run_once(), {"verified": 0, "pending": 0, "failed": 0})
+
+    def test_worker_marks_invalid_proof_failed_without_crediting(self):
+        class Verifier:
+            def verify(inner, expected):
+                raise InventoryDepositError("wrong recipient")
+        service = InventoryDepositService(self.ledger, {"ethereum": Verifier()})
+        worker = InventoryDepositWorker(service, str(Path(self.temp.name) / "orders.sqlite"))
+        worker.submit(self.order, TX, 2)
+        self.assertEqual(worker.run_once(), {"verified": 0, "pending": 0, "failed": 1})
+        self.assertEqual(self.ledger.get_order(self.order)["state"], "created")
     def test_same_chain_event_cannot_be_credited_to_two_orders(self):
         second = self.ledger.create_order(
             direction="usdt_to_soby", source_network="ethereum",
