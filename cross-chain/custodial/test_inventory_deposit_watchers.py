@@ -141,7 +141,7 @@ class TronInventoryWatcherTests(unittest.TestCase):
         # use the project inventory and sender Base58 forms in fixture as constants.
         sender = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
         inventory = "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"
-        token = "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj"
+        token = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
         # Convert Base58Check addresses to 21-byte hex using the module normalizer.
         from inventory_deposit_watchers import _tron_hex_address
         from_hex = _tron_hex_address(sender, "sender")[2:]
@@ -175,7 +175,7 @@ class TronInventoryWatcherTests(unittest.TestCase):
         expected = ExpectedInventoryDeposit(
             "tron", txid, "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
             "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx",
-            "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj", 1000, 0
+            "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", 1000, 0
         )
         with self.assertRaisesRegex(InventoryDepositError, "did not succeed"):
             verifier.verify(expected)
