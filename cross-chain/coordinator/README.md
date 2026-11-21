@@ -148,6 +148,10 @@ python -m unittest -v test_http_api.py
 ```
 
 
+## Same-origin DEX quote gateway
+
+See [BROWSER_GATEWAY.md](BROWSER_GATEWAY.md) for the loopback browser gateway, origin allowlist, reverse-proxy route, process configuration, and focused tests. The gateway exposes only unsigned, non-reserving quote previews; it does not enable deposits or settlement.
+
 ## EIP-712 solver quote verification
 
 `eip712_quote_verifier.py` now implements the escrow's exact `Order` EIP-712
