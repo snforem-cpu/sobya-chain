@@ -120,12 +120,36 @@ def build_local_server(
         ))
     for network in enabled_source_networks:
         urls = []
+        reference_config = (
+            solana_source if network == "solana"
+            else ethereum_sources.get(network) or tron_sources.get(network)
+        )
         for _, eth_nodes, tron_nodes, sol_node in source_configs:
             config = (eth_nodes.get(network) or tron_nodes.get(network))
             if network == "solana":
                 config = sol_node
             if config is None:
                 raise ValueError("source observer replica is missing an enabled network")
+            if isinstance(reference_config, EthereumSourceConfig):
+                if (not isinstance(config, EthereumSourceConfig)
+                        or config.chain_id != reference_config.chain_id
+                        or config.escrow.lower() != reference_config.escrow.lower()):
+                    raise ValueError("Ethereum observer replicas must share the pinned chain ID and escrow")
+            elif isinstance(reference_config, TronSourceConfig):
+                if (not isinstance(config, TronSourceConfig)
+                        or config.escrow.lower() != reference_config.escrow.lower()
+                        or config.genesis_hash.lower() != reference_config.genesis_hash.lower()):
+                    raise ValueError("TRON observer replicas must share the pinned genesis and escrow")
+            elif isinstance(reference_config, SolanaSourceConfig):
+                if (not isinstance(config, SolanaSourceConfig)
+                        or config.program_id != reference_config.program_id
+                        or config.config_authority != reference_config.config_authority
+                        or config.usdt_mint != reference_config.usdt_mint
+                        or config.sobya_chain_id != reference_config.sobya_chain_id
+                        or config.expected_genesis_hash != reference_config.expected_genesis_hash):
+                    raise ValueError("Solana observer replicas must share the pinned program, mint and genesis")
+            else:
+                raise ValueError("source observer has no recognized pinned chain configuration")
             rpc_url = getattr(config.rpc, "url", None)
             if not isinstance(rpc_url, str):
                 raise ValueError("source observer RPC must expose its URL")
