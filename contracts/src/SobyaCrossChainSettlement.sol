@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+interface ISobyaSolverInventoryVault {
+    function reservations(bytes32 orderId) external view returns (
+        address solver, address recipient, uint128 amount, uint64 releaseAfter, bool active
+    );
+    function executePayout(bytes32 orderId) external;
+}
+
 /// @title SOBYA Cross-Chain Settlement
-/// @notice Pays native SOBY to a destination wallet and emits an order-bound
-///         event that independent source-chain attestors can verify.
-/// @dev This contract does not custody USDT, mint tokens, or release source
-///      escrow. Source escrow release remains governed by its own threshold
-///      attestor policy. There is deliberately no owner or withdrawal method.
+/// @notice Executes a payout only from SOBY already reserved in the inventory vault.
+/// @dev Source-chain attestors must still verify this event before releasing USDT.
 contract SobyaCrossChainSettlement {
     enum Status { NONE, PAID }
 
@@ -21,6 +25,7 @@ contract SobyaCrossChainSettlement {
         uint256 destinationChainId;
     }
 
+    ISobyaSolverInventoryVault public immutable inventoryVault;
     mapping(bytes32 => Status) public orderStatus;
     mapping(bytes32 => Payout) public payouts;
     uint256 private entered = 1;
@@ -40,7 +45,7 @@ contract SobyaCrossChainSettlement {
     error InvalidPayout();
     error OrderAlreadyPaid();
     error ReentrantCall();
-    error NativeTransferFailed();
+    error ReservationUnavailable();
 
     modifier nonReentrant() {
         if (entered != 1) revert ReentrantCall();
@@ -49,31 +54,34 @@ contract SobyaCrossChainSettlement {
         entered = 1;
     }
 
-    /// @notice Atomically forwards solver-supplied native SOBY to the user.
-    /// @param orderId Unique cross-chain order identifier shared with source escrow.
-    /// @param sourceChain Canonical bytes32 identifier for TRON/Ethereum/Solana.
-    /// @param sourceEscrow Source escrow address/program identifier, left-padded
-    ///        for 20-byte EVM/TVM addresses or used directly for 32-byte Solana keys.
-    /// @param sourceAsset Source USDT contract/mint identifier.
-    /// @param sourceAmount Exact source-chain USDT amount in its smallest units.
-    /// @param recipient SOBYA EVM address that receives native SOBY.
+    constructor(ISobyaSolverInventoryVault vault) {
+        if (address(vault) == address(0)) revert InvalidPayout();
+        inventoryVault = vault;
+    }
+
+    /// @notice Pays the exact recipient and amount previously locked in the vault.
+    /// @dev Anyone may relay the call; the recipient and solver cannot be changed.
     function executePayout(
         bytes32 orderId,
         bytes32 sourceChain,
         bytes32 sourceEscrow,
         bytes32 sourceAsset,
-        uint256 sourceAmount,
-        address payable recipient
-    ) external payable nonReentrant {
+        uint256 sourceAmount
+    ) external nonReentrant {
         if (
             orderId == bytes32(0) || sourceChain == bytes32(0) ||
             sourceEscrow == bytes32(0) || sourceAsset == bytes32(0) ||
-            sourceAmount == 0 || recipient == address(0) ||
-            msg.value == 0 || msg.value > type(uint128).max
+            sourceAmount == 0
         ) revert InvalidPayout();
         if (orderStatus[orderId] != Status.NONE) revert OrderAlreadyPaid();
 
-        // Effects before interaction; a failed native transfer reverts all state.
+        (address solver, address recipient, uint128 amount, uint64 releaseAfter, bool active) =
+            inventoryVault.reservations(orderId);
+        if (!active || solver == address(0) || recipient == address(0)
+            || amount == 0 || block.timestamp >= releaseAfter) {
+            revert ReservationUnavailable();
+        }
+
         orderStatus[orderId] = Status.PAID;
         payouts[orderId] = Payout({
             sourceChain: sourceChain,
@@ -81,17 +89,16 @@ contract SobyaCrossChainSettlement {
             sourceAsset: sourceAsset,
             sourceAmount: sourceAmount,
             recipient: recipient,
-            sobyAmount: msg.value,
-            solver: msg.sender,
+            sobyAmount: amount,
+            solver: solver,
             destinationChainId: block.chainid
         });
 
-        (bool ok,) = recipient.call{value: msg.value}("");
-        if (!ok) revert NativeTransferFailed();
+        inventoryVault.executePayout(orderId);
 
         emit PayoutExecuted(
             orderId, sourceChain, sourceEscrow, sourceAsset, sourceAmount,
-            recipient, msg.value, msg.sender, block.chainid
+            recipient, amount, solver, block.chainid
         );
     }
 }
