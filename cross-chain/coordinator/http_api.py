@@ -191,6 +191,33 @@ def create_server(
                     )
                     self._send(200, {"accepted": True, "orderId": evidence.order_id, "status": "DESTINATION_PAID"})
                     return
+                if path == "/v1/attestations/source-deposits":
+                    if self.server.attestor_service is None:
+                        self._send(503, {"error": "local attestor signing is not configured"})
+                        return
+                    if set(body) != {"evidence", "proof"} or not isinstance(body["proof"], dict):
+                        raise ValueError("evidence and proof object are required")
+                    evidence = _strict_dataclass(SourceDepositEvidence, body["evidence"])
+                    result = self.server.attestor_service.sign_source_deposit(evidence, body["proof"])
+                    self._send(200, result)
+                    return
+                if path == "/v1/attestations/destination-payouts":
+                    if self.server.attestor_service is None:
+                        self._send(503, {"error": "local attestor signing is not configured"})
+                        return
+                    if set(body) != {"evidence", "proof"} or not isinstance(body["proof"], dict):
+                        raise ValueError("evidence and proof object are required")
+                    evidence = _strict_dataclass(DestinationPayoutEvidence, body["evidence"])
+                    if evidence.source_chain.lower() == "solana":
+                        result = self.server.attestor_service.build_solana_payout_instruction(
+                            evidence, body["proof"]
+                        )
+                    else:
+                        result = self.server.attestor_service.sign_evm_source_payout(
+                            evidence, body["proof"]
+                        )
+                    self._send(200, result)
+                    return
                 self._send(404, {"error": "not found"})
             except OverflowError as exc:
                 self._send(413, {"error": str(exc)})
@@ -220,4 +247,5 @@ def create_server(
     server.verify_source_deposit = verify_source_deposit
     server.verify_destination_payout = verify_destination_payout
     server.quote_pricer = quote_pricer
+    server.attestor_service = None
     return server
