@@ -37,6 +37,13 @@
       "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE"
     }
   },
+  "pricing": {
+    "demandSensitivityBps": 2000,
+    "maxDemandAdjustmentBps": 1500,
+    "demandWindowSeconds": 3600,
+    "demandMaxAgeSeconds": 300,
+    "demandSignalSource": "finalized-executed-swaps-only"
+  },
   "limits": {
     "maxOrderUsdtBaseUnits": null,
     "maxDailyUsdtBaseUnitsPerNetwork": null,
