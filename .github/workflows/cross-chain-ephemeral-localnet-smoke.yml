@@ -87,5 +87,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Assert TRON integration remains explicitly gated
         run: |
-          grep -q "do not execute the contract in the TRON Virtual Machine" cross-chain/tron/README.md
-          grep -q "TRON-distributed Solidity compiler" cross-chain/tron/README.md
+          # Match independent markers so Markdown line wrapping cannot break the guard.
+          grep -Fq "TRON Virtual Machine" cross-chain/tron/README.md
+          grep -Fq "TRON-distributed Solidity compiler" cross-chain/tron/README.md
+          grep -Fq "not a substitute for a TRON-solc build" cross-chain/tron/README.md
