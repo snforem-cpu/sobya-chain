@@ -51,14 +51,18 @@ class InventoryAwareQuotePricer:
         ledger,
         *,
         destination_chain_id: int,
+        finalized_balance: Callable[[str], int],
         now: Callable[[], int] | None = None,
     ):
         config.validate()
         if not isinstance(destination_chain_id, int) or destination_chain_id <= 0:
             raise PricingError("destination chain ID must be positive")
+        if not callable(finalized_balance):
+            raise PricingError("a finalized SOBYA native-balance reader is required")
         self.config = config
         self.ledger = ledger
         self.destination_chain_id = destination_chain_id
+        self.finalized_balance = finalized_balance
         self.now = now or (lambda: int(time.time()))
 
     def quote(
@@ -90,9 +94,21 @@ class InventoryAwareQuotePricer:
         if destination_amount <= 0:
             raise PricingError("source amount is too small to produce a positive SOBY payout")
 
-        available = self.ledger.available_solver_inventory(solver)
-        if not isinstance(available, int) or available < destination_amount:
-            raise PricingError("solver has insufficient unreserved SOBY inventory")
+        total, reserved, ledger_available = self.ledger.solver_inventory_snapshot(solver)
+        try:
+            chain_balance = self.finalized_balance(solver)
+        except Exception as exc:
+            raise PricingError("finalized SOBYA solver balance could not be verified") from exc
+        if (not isinstance(chain_balance, int) or isinstance(chain_balance, bool)
+                or chain_balance < 0):
+            raise PricingError("finalized SOBYA solver balance is invalid")
+        if chain_balance < reserved:
+            raise PricingError("on-chain SOBY balance is below already reserved obligations")
+        # Never quote against an operator-entered inventory figure that exceeds
+        # finalized native SOBY actually held by the solver wallet.
+        available = min(ledger_available, chain_balance - reserved)
+        if total < reserved or available < destination_amount:
+            raise PricingError("solver has insufficient reconciled SOBY inventory")
 
         current = int(self.now())
         quote_expiry = current + c.quote_ttl_seconds
