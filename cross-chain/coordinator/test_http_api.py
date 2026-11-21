@@ -117,6 +117,18 @@ class CoordinatorHttpApiTests(unittest.TestCase):
         connection.close()
         return result
 
+    def test_server_rejects_non_loopback_bind_addresses(self):
+        for host in ("0.0.0.0", "192.0.2.10", "::"):
+            with self.subTest(host=host):
+                with self.assertRaisesRegex(ValueError, "loopback"):
+                    create_server(
+                        host, 0, self.service, bearer_token=TOKEN,
+                        quote_pricer=self.pricer,
+                        verify_quote_signature=lambda *_: True,
+                        verify_source_deposit=lambda *_: True,
+                        verify_destination_payout=lambda *_: True,
+                    )
+
     def test_server_rejects_missing_onchain_vault_reserver(self):
         unsafe = LocalCoordinator(
             ReadinessAdmissionGuard(FakeMonitor(), self.ledger),
