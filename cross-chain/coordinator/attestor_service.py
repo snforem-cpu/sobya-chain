@@ -75,13 +75,18 @@ class EvmSigningBackend:
 
 
 class LocalEvmKeyBackend(EvmSigningBackend):
-    """Convenience adapter for a key already loaded by a local protected wallet.
+    """In-memory secp256k1 signer; load its key from the encrypted local keystore."""
 
-    Key loading/encryption is intentionally delegated to the OS wallet, HSM, or
-    operator's secret manager; no key material is accepted by this repository API.
-    """
-
-    pass
+    def __init__(self, private_key: bytes):
+        try:
+            from eth_keys import keys
+            key = keys.PrivateKey(private_key)
+        except Exception as exc:
+            raise ValueError("local attestor private key is invalid") from exc
+        super().__init__(
+            key.public_key.to_checksum_address(),
+            lambda digest: key.sign_msg_hash(digest).to_bytes(),
+        )
 
 
 class AttestorService:
