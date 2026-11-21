@@ -60,7 +60,7 @@ def build_local_server(
     quote_pricer: InventoryAwareQuotePricer,
     additional_source_observers: tuple[SourceObserverReplica, ...] = (),
     additional_destination_observers: tuple[DestinationObserverReplica, ...] = (),
-    required_observer_quorum: int = 2,
+    required_observer_quorum: int | None = None,
 ):
     """Build, but do not start, the fully wired loopback coordinator HTTP server."""
     balance_reader = getattr(quote_pricer, "finalized_balance", None)
@@ -100,6 +100,8 @@ def build_local_server(
             or len(set(source_ids)) != len(source_ids)
             or len(set(destination_ids)) != len(destination_ids)):
         raise ValueError("at least three uniquely named source and destination observer nodes are required")
+    if any(key != key.lower() for key in (*ethereum_sources.keys(), *tron_sources.keys())):
+        raise ValueError("source observer network keys must be lowercase canonical names")
     enabled_source_networks = set(ethereum_sources) | set(tron_sources)
     if solana_source is not None:
         enabled_source_networks.add("solana")
@@ -134,7 +136,11 @@ def build_local_server(
             urls.append(rpc_url)
         if len(set(urls)) != len(urls):
             raise ValueError(f"source observer RPC URLs must be distinct for {network}")
-    source_quorum = IndependentObserverQuorum(source_routers, required_observer_quorum)
+    source_required = (
+        len(source_routers) // 2 + 1
+        if required_observer_quorum is None else required_observer_quorum
+    )
+    source_quorum = IndependentObserverQuorum(source_routers, source_required)
 
     destination_routers = []
     destination_urls = []
@@ -161,8 +167,12 @@ def build_local_server(
         ))
     if len(set(destination_urls)) != len(destination_urls):
         raise ValueError("destination observer RPC URLs must be distinct")
+    destination_required = (
+        len(destination_routers) // 2 + 1
+        if required_observer_quorum is None else required_observer_quorum
+    )
     destination_quorum = IndependentObserverQuorum(
-        destination_routers, required_observer_quorum
+        destination_routers, destination_required
     )
 
     def verify_source_deposit(evidence, proof):
