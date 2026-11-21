@@ -21,6 +21,7 @@ class FakeRpc:
     def __init__(self, chain_id=357812033857, latest=120):
         self.chain_id = chain_id
         self.latest = latest
+        self.finalized = 120
         self.receipt = None
         self.transaction = None
         self.block_hash = "0x" + "bb" * 32
@@ -36,7 +37,10 @@ class FakeRpc:
         elif method == "eth_getTransactionByHash":
             result = self.transaction
         elif method == "eth_getBlockByNumber":
-            result = {"hash": self.block_hash}
+            if payload["params"][0] == "finalized":
+                result = {"number": hex(self.finalized), "hash": self.block_hash}
+            else:
+                result = {"hash": self.block_hash}
         else:
             raise AssertionError(method)
         return {"jsonrpc": "2.0", "id": payload["id"], "result": result}
@@ -107,6 +111,22 @@ class SettlementObserverTests(unittest.TestCase):
     def test_insufficient_confirmations_rejected(self):
         self.fake.latest = 110
         with self.assertRaisesRegex(VerificationError, "insufficient confirmations"):
+            self.verifier.verify(self.tx_hash, self.expected)
+
+    def test_unfinalized_payout_rejected_even_with_many_confirmations(self):
+        self.fake.finalized = 99
+        self.fake.latest = 120
+        with self.assertRaisesRegex(VerificationError, "not finalized"):
+            self.verifier.verify(self.tx_hash, self.expected)
+
+    def test_missing_finalized_checkpoint_rejected(self):
+        original = self.fake.__call__
+        def without_finalized(url, payload, timeout):
+            if payload["method"] == "eth_getBlockByNumber" and payload["params"][0] == "finalized":
+                return {"jsonrpc": "2.0", "id": payload["id"], "result": None}
+            return original(url, payload, timeout)
+        self.rpc.transport = without_finalized
+        with self.assertRaisesRegex(VerificationError, "finalized checkpoint is unavailable"):
             self.verifier.verify(self.tx_hash, self.expected)
 
     def test_non_canonical_block_rejected(self):
