@@ -65,6 +65,7 @@ class AttestorServiceTests(unittest.TestCase):
             verify_source_deposit=lambda evidence, proof: proof == {"ok": True},
             verify_destination_payout=lambda evidence, proof: proof == {"ok": True},
             finalized_reservation=lambda order_id: self.reservation,
+            attestor_membership=lambda network, contract, address: True,
             settlement_contract="0x" + "cc" * 20,
             destination_chain_id=357812033857,
             source_identities={"ethereum": self.identity},
@@ -86,6 +87,11 @@ class AttestorServiceTests(unittest.TestCase):
             amount=self.quote.destination_amount - 1,
             release_after=self.quote.refund_after, active=True,
         )
+        with self.assertRaises(AttestorServiceError):
+            self.service.sign_source_deposit(self.source_evidence, {"ok": True})
+
+    def test_source_release_requires_onchain_attestor_membership(self):
+        self.service.attestor_membership = lambda network, contract, address: False
         with self.assertRaises(AttestorServiceError):
             self.service.sign_source_deposit(self.source_evidence, {"ok": True})
 
