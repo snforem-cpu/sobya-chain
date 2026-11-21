@@ -58,6 +58,13 @@ own signed Solana transaction; this module does not create or sign one.
 
 `attestor_keystore.py` creates an owner-only encrypted key file using scrypt (N=32768, r=8, p=1) and PyNaCl SecretBox authenticated encryption. It refuses to overwrite an existing file, rejects symlinks and permissive file modes on load, and validates the decrypted key against the stored public address. `evm_signer_from_keystore(path, passphrase)` returns a local EVM signer.
 
-Create each attestor keystore on that attestor's own machine using a fresh, unique key and a strong passphrase. Keep encrypted backups offline. Never commit keystore files, private keys, passphrases, or seed phrases. Do not copy the same private key to multiple attestors: a 2-of-3 policy is meaningful only when the keys are separately controlled. A Python process cannot guarantee memory zeroization; for higher assurance, replace the in-memory signer with a hardware wallet/HSM callback.
+Create each attestor keystore on that attestor's own machine using the interactive CLI (from `cross-chain/coordinator`, with the pinned Python dependencies installed):
+
+```sh
+python attestor_keystore_cli.py create --file ~/.sobya/attestors/attestor-1.json
+python attestor_keystore_cli.py address --file ~/.sobya/attestors/attestor-1.json
+```
+
+The CLI generates a fresh key locally, prompts for a passphrase without echo, and prints only the public address. Run it separately for each attestor identity; do not copy one keystore to multiple instances. Keep encrypted backups offline. Never commit keystore files, private keys, passphrases, or seed phrases. Do not copy the same private key to multiple attestors: a 2-of-3 policy is meaningful only when the keys are separately controlled. A Python process cannot guarantee memory zeroization; for higher assurance, replace the in-memory signer with a hardware wallet/HSM callback.
 
 This is a local signing library exposed by the coordinator only through authenticated loopback routes `/v1/attestations/source-deposits` and `/v1/attestations/destination-payouts`, and only when a local attestor is explicitly configured. It is not a supervised production daemon. There is no automatic Solana transaction construction/submission, signer-to-signer coordination, or key rotation. Do not enable it for mainnet until all three attestor instances are independently operated, observer quorums are connected to independently administered nodes, and end-to-end testnet and security review are complete.
