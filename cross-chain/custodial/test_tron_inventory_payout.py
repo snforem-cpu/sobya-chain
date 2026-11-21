@@ -13,6 +13,8 @@ TXID = "ab" * 32
 
 class FakeSignedTransaction:
     txid = TXID
+    def sign(self, key):
+        return self
     def to_json(self):
         return {"raw_data": {"contract": []}, "signature": ["signed"]}
 
@@ -26,8 +28,6 @@ class FakeBuilder:
         return self
     def build(self):
         return FakeSignedTransaction()
-    def sign(self, key):
-        return self
 
 
 class FakeContract:
