@@ -26,7 +26,10 @@ class CoordinatorHttpApiTests(unittest.TestCase):
         self.ledger = CrossChainOrderLedger(str(Path(self.temp.name) / "orders.sqlite"))
         self.solver = "0x" + "44" * 20
         self.ledger.set_solver_inventory(self.solver, 3 * 10**18)
-        self.service = LocalCoordinator(ReadinessAdmissionGuard(FakeMonitor(), self.ledger))
+        self.service = LocalCoordinator(
+            ReadinessAdmissionGuard(FakeMonitor(), self.ledger),
+            inventory_guard=lambda _quote: True,
+        )
         self.quote = OrderQuote(
             order_id="http-order-001", source_chain="ethereum",
             source_asset="0x" + "33"*20, source_amount=20_000_000,
