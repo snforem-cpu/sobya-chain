@@ -12,6 +12,7 @@ from eip712_quote_verifier import Eip712QuoteDomain
 from source_observer_router import EthereumSourceConfig, TronSourceConfig, SolanaSourceConfig
 from destination_payout_router import SobyaSettlementConfig, SourceIdentity
 from runtime import build_local_server
+from solver_balance_reader import FinalizedNativeBalanceReader
 from test_admission import FakeMonitor
 
 
@@ -22,6 +23,17 @@ class RuntimeCompositionTests(unittest.TestCase):
             try:
                 solver = "0x" + "44" * 20
                 ledger.set_solver_inventory(solver, 150_000_000 * 10**18)
+                class PrivateRpc:
+                    url = "http://127.0.0.1:8545"
+
+                    def call(self, method, _params):
+                        if method == "eth_chainId":
+                            return hex(357812033857)
+                        if method == "eth_getBalance":
+                            return hex(150_000_000 * 10**18)
+                        raise AssertionError(method)
+
+                sobya_rpc = PrivateRpc()
                 pricer = InventoryAwareQuotePricer(
                     PricingConfig(
                         usdt_atoms_numerator=2_000_000,
@@ -30,11 +42,8 @@ class RuntimeCompositionTests(unittest.TestCase):
                     ),
                     ledger,
                     destination_chain_id=357812033857,
-                    finalized_balance=lambda _solver: 150_000_000 * 10**18,
+                    finalized_balance=FinalizedNativeBalanceReader(sobya_rpc, 357812033857),
                 )
-
-                class PrivateRpc:
-                    url = "http://127.0.0.1:8545"
 
                 server = build_local_server(
                     host="127.0.0.1", port=0,
@@ -50,7 +59,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                     tron_sources={},
                     solana_source=None,
                     sobya_settlement=SobyaSettlementConfig(
-                        357812033857, "0x" + "66" * 20, 2, PrivateRpc()
+                        357812033857, "0x" + "66" * 20, 2, sobya_rpc
                     ),
                     source_identities={
                         "ethereum": SourceIdentity(
