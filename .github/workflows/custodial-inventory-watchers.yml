@@ -1,0 +1,35 @@
+name: Custodial inventory deposit watcher tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - "cross-chain/custodial/**"
+      - ".github/workflows/custodial-inventory-watchers.yml"
+  push:
+    branches:
+      - feat/sobya-cross-chain-swap-foundation
+    paths:
+      - "cross-chain/custodial/**"
+      - ".github/workflows/custodial-inventory-watchers.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inventory-watcher-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test shared-inventory deposit verifiers
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_inventory_deposit_watchers.py -v
+      - name: Test custodial ledger and pricing regressions
+        working-directory: cross-chain/custodial
+        run: |
+          python -m unittest test_custodial_ledger.py -v
+          python -m unittest test_demand_pricing.py -v
