@@ -94,10 +94,36 @@ pub fn process_instruction(
     let instruction = EscrowInstruction::try_from_slice(instruction_data)
         .map_err(|_| ProgramError::InvalidInstructionData)?;
     match instruction {
-        EscrowInstruction::Initialize { usdt_mint, sobya_chain_id, attestors, threshold } =>
-            process_initialize(program_id, accounts, usdt_mint, sobya_chain_id, attestors, threshold),
-        EscrowInstruction::Fund { order_id, destination_recipient, destination_amount, source_amount, quote_expiry, refund_after } =>
-            process_fund(program_id, accounts, order_id, destination_recipient, destination_amount, source_amount, quote_expiry, refund_after),
+        EscrowInstruction::Initialize {
+            usdt_mint,
+            sobya_chain_id,
+            attestors,
+            threshold,
+        } => process_initialize(
+            program_id,
+            accounts,
+            usdt_mint,
+            sobya_chain_id,
+            attestors,
+            threshold,
+        ),
+        EscrowInstruction::Fund {
+            order_id,
+            destination_recipient,
+            destination_amount,
+            source_amount,
+            quote_expiry,
+            refund_after,
+        } => process_fund(
+            program_id,
+            accounts,
+            order_id,
+            destination_recipient,
+            destination_amount,
+            source_amount,
+            quote_expiry,
+            refund_after,
+        ),
         EscrowInstruction::AttestPayout { order_id, destination_tx_hash } =>
             process_attest(program_id, accounts, order_id, destination_tx_hash),
         EscrowInstruction::Claim { order_id } =>
@@ -138,14 +164,22 @@ fn process_initialize(
         }
     }
 
-    let (expected_config, bump) = Pubkey::find_program_address(&[CONFIG_SEED, payer.key.as_ref()], program_id);
+    let (expected_config, bump) =
+        Pubkey::find_program_address(&[CONFIG_SEED, payer.key.as_ref()], program_id);
     if config_account.key != &expected_config || config_account.owner != &system_program::id()
         || !config_account.data_is_empty()
     {
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let config = Config { authority: *payer.key, bump, usdt_mint, sobya_chain_id, threshold, attestors };
+    let config = Config {
+        authority: *payer.key,
+        bump,
+        usdt_mint,
+        sobya_chain_id,
+        threshold,
+        attestors,
+    };
     let data = borsh::to_vec(&config).map_err(|_| ProgramError::InvalidAccountData)?;
     let bump_seed = [bump];
     let signer_seeds: &[&[u8]] = &[CONFIG_SEED, payer.key.as_ref(), &bump_seed];
@@ -217,8 +251,23 @@ fn process_fund(
     create_pda_account(user, order_account, system_program_account, program_id, data.len(), signer_seeds)?;
 
     let before = SplAccount::unpack(&escrow_token.data.borrow())?.amount;
-    let transfer_ix = token_instruction::transfer(token_program.key, user_token.key, escrow_token.key, user.key, &[], source_amount)?;
-    invoke(&transfer_ix, &[user_token.clone(), escrow_token.clone(), user.clone(), token_program.clone()])?;
+    let transfer_ix = token_instruction::transfer(
+        token_program.key,
+        user_token.key,
+        escrow_token.key,
+        user.key,
+        &[],
+        source_amount,
+    )?;
+    invoke(
+        &transfer_ix,
+        &[
+            user_token.clone(),
+            escrow_token.clone(),
+            user.clone(),
+            token_program.clone(),
+        ],
+    )?;
     let after = SplAccount::unpack(&escrow_token.data.borrow())?.amount;
     if after.checked_sub(before) != Some(source_amount) {
         return Err(ProgramError::InvalidAccountData);
@@ -247,10 +296,16 @@ fn process_attest(
         return Err(ProgramError::InvalidAccountData);
     }
     let mut order = load_order(order_account)?;
-    if order.order_id != order_id || order.config != *config_account.key || order.status != OrderStatus::Funded {
+    if order.order_id != order_id
+        || order.config != *config_account.key
+        || order.status != OrderStatus::Funded
+    {
         return Err(ProgramError::InvalidAccountData);
     }
-    let index = config.attestors.iter().position(|key| key == attestor.key)
+    let index = config
+        .attestors
+        .iter()
+        .position(|key| key == attestor.key)
         .ok_or(ProgramError::IllegalOwner)?;
     let bit = 1u16.checked_shl(index as u32).ok_or(ProgramError::InvalidArgument)?;
     if order.attested_bitmap & bit != 0 {
@@ -286,9 +341,12 @@ fn process_claim(program_id: &Pubkey, accounts: &[AccountInfo], order_id: [u8; 3
     }
     let mut order = load_order(order_account)?;
     let now = Clock::get()?.unix_timestamp.max(0) as u64;
-    if order.order_id != order_id || order.config != *config_account.key
-        || order.escrow_token_account != *escrow_token.key || order.status != OrderStatus::Funded
-        || order.solver != *solver.key || order.destination_tx_hash == [0; 32]
+    if order.order_id != order_id
+        || order.config != *config_account.key
+        || order.escrow_token_account != *escrow_token.key
+        || order.status != OrderStatus::Funded
+        || order.solver != *solver.key
+        || order.destination_tx_hash == [0; 32]
         || order.attested_bitmap.count_ones() < config.threshold as u32
         || now >= order.refund_after
     {
@@ -320,13 +378,25 @@ fn process_refund(program_id: &Pubkey, accounts: &[AccountInfo], order_id: [u8; 
     }
     let mut order = load_order(order_account)?;
     let now = Clock::get()?.unix_timestamp.max(0) as u64;
-    if order.order_id != order_id || order.config != *config_account.key
-        || order.escrow_token_account != *escrow_token.key || order.status != OrderStatus::Funded
-        || order.user != *user.key || now < order.refund_after
+    if order.order_id != order_id
+        || order.config != *config_account.key
+        || order.escrow_token_account != *escrow_token.key
+        || order.status != OrderStatus::Funded
+        || order.user != *user.key
+        || now < order.refund_after
     {
         return Err(ProgramError::InvalidAccountData);
     }
-    transfer_from_order(program_id, &order, order_account, escrow_token, user_token, user, token_program, &config)?;
+    transfer_from_order(
+        program_id,
+        &order,
+        order_account,
+        escrow_token,
+        user_token,
+        user,
+        token_program,
+        &config,
+    )?;
     order.status = OrderStatus::Refunded;
     save_order(order_account, &order)
 }
@@ -341,19 +411,35 @@ fn transfer_from_order<'a>(
     token_program: &AccountInfo<'a>,
     config: &Config,
 ) -> ProgramResult {
-    let (expected_order, bump) = Pubkey::find_program_address(&[ORDER_SEED, &order.order_id], program_id);
+    let (expected_order, bump) =
+        Pubkey::find_program_address(&[ORDER_SEED, &order.order_id], program_id);
     let escrow_state = SplAccount::unpack(&escrow_token.data.borrow())?;
     let destination_state = SplAccount::unpack(&destination_token.data.borrow())?;
-    if escrow_token.owner != token_program.key || destination_token.owner != token_program.key
-        || escrow_state.owner != expected_order || escrow_state.mint != config.usdt_mint
-        || destination_state.owner != *destination_owner.key || destination_state.mint != config.usdt_mint
+    if escrow_token.owner != token_program.key
+        || destination_token.owner != token_program.key
+        || escrow_state.owner != expected_order
+        || escrow_state.mint != config.usdt_mint
+        || destination_state.owner != *destination_owner.key
+        || destination_state.mint != config.usdt_mint
     {
         return Err(ProgramError::InvalidAccountData);
     }
-    let ix = token_instruction::transfer(token_program.key, escrow_token.key, destination_token.key, order_account.key, &[], order.source_amount)?;
+    let ix = token_instruction::transfer(
+        token_program.key,
+        escrow_token.key,
+        destination_token.key,
+        order_account.key,
+        &[],
+        order.source_amount,
+    )?;
     invoke_signed(
         &ix,
-        &[escrow_token.clone(), destination_token.clone(), order_account.clone(), token_program.clone()],
+        &[
+            escrow_token.clone(),
+            destination_token.clone(),
+            order_account.clone(),
+            token_program.clone(),
+        ],
         &[&[ORDER_SEED, &order.order_id, &[bump]]],
     )
 }
@@ -394,8 +480,10 @@ fn load_config(program_id: &Pubkey, account: &AccountInfo) -> Result<Config, Pro
     if account.owner != program_id {
         return Err(ProgramError::InvalidAccountData);
     }
-    let config = Config::try_from_slice(&account.data.borrow()).map_err(|_| ProgramError::InvalidAccountData)?;
-    let (expected, _) = Pubkey::find_program_address(&[CONFIG_SEED, config.authority.as_ref()], program_id);
+    let config = Config::try_from_slice(&account.data.borrow())
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+    let (expected, _) =
+        Pubkey::find_program_address(&[CONFIG_SEED, config.authority.as_ref()], program_id);
     if account.key != &expected {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -407,7 +495,8 @@ fn load_order(account: &AccountInfo) -> Result<Order, ProgramError> {
 }
 
 fn save_order(account: &AccountInfo, order: &Order) -> ProgramResult {
-    order.serialize(&mut &mut account.data.borrow_mut()[..])
+    order
+        .serialize(&mut &mut account.data.borrow_mut()[..])
         .map_err(|_| ProgramError::AccountDataTooSmall)
 }
 
@@ -433,11 +522,18 @@ mod tests {
     #[test]
     fn order_serialization_round_trips() {
         let order = Order {
-            order_id: [7; 32], user: Pubkey::new_unique(), solver: Pubkey::new_unique(),
-            config: Pubkey::new_unique(), escrow_token_account: Pubkey::new_unique(),
-            destination_recipient: [9; 20], destination_amount: 1_000_000_000_000_000_000,
-            source_amount: 42_000_000, quote_expiry: 100, refund_after: 200,
-            destination_tx_hash: [0; 32], attested_bitmap: 0,
+            order_id: [7; 32],
+            user: Pubkey::new_unique(),
+            solver: Pubkey::new_unique(),
+            config: Pubkey::new_unique(),
+            escrow_token_account: Pubkey::new_unique(),
+            destination_recipient: [9; 20],
+            destination_amount: 1_000_000_000_000_000_000,
+            source_amount: 42_000_000,
+            quote_expiry: 100,
+            refund_after: 200,
+            destination_tx_hash: [0; 32],
+            attested_bitmap: 0,
             status: OrderStatus::Funded, bump: 254,
         };
         let bytes = borsh::to_vec(&order).unwrap();
