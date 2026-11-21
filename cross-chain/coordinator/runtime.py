@@ -63,6 +63,8 @@ def build_local_server(
     additional_source_observers: tuple[SourceObserverReplica, ...] = (),
     additional_destination_observers: tuple[DestinationObserverReplica, ...] = (),
     required_observer_quorum: int | None = None,
+    attestor_backend=None,
+    attestor_source_identities=None,
 ):
     """Build, but do not start, the fully wired loopback coordinator HTTP server."""
     balance_reader = getattr(quote_pricer, "finalized_balance", None)
@@ -222,7 +224,7 @@ def build_local_server(
         inventory_guard=quote_pricer.assert_quote_inventory,
         reserve_onchain_inventory=reserve_onchain_inventory.reserve,
     )
-    return create_server(
+    server = create_server(
         host, port, coordinator,
         bearer_token=bearer_token,
         verify_quote_signature=quote_signatures.verify,
@@ -230,3 +232,35 @@ def build_local_server(
         verify_destination_payout=verify_destination_payout,
         quote_pricer=quote_pricer,
     )
+    server.attestor_service = None
+    if attestor_backend is not None:
+        if not isinstance(attestor_source_identities, dict) or not attestor_source_identities:
+            raise ValueError("explicit attestor source-chain IDs and escrow addresses are required")
+        from attestor_service import (
+            AttestorService, FinalizedReservation, PinnedSourceIdentity,
+        )
+        if any(not isinstance(value, PinnedSourceIdentity)
+               for value in attestor_source_identities.values()):
+            raise ValueError("attestor source identities must be typed and explicitly pinned")
+
+        def finalized_attestor_reservation(order_id):
+            observed = reserve_onchain_inventory._call_reservation(order_id)
+            return FinalizedReservation(
+                solver=observed.solver,
+                recipient=observed.recipient,
+                amount=observed.amount,
+                release_after=observed.release_after,
+                active=observed.active,
+            )
+
+        server.attestor_service = AttestorService(
+            attestor=attestor_backend,
+            quote_lookup=lookup,
+            verify_source_deposit=verify_source_deposit,
+            verify_destination_payout=verify_destination_payout,
+            finalized_reservation=finalized_attestor_reservation,
+            settlement_contract=sobya_settlement.settlement_contract,
+            destination_chain_id=sobya_settlement.destination_chain_id,
+            source_identities=attestor_source_identities,
+        )
+    return server
