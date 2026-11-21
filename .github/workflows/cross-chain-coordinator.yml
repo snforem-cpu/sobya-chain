@@ -1,4 +1,4 @@
-name: Cross-chain coordinator ledger tests
+name: Cross-chain coordinator ledger and pricing tests
 
 on:
   pull_request:
@@ -40,7 +40,7 @@ jobs:
           python-version: "3.12"
       - name: Install pinned Keccak dependency
         run: python -m pip install -r cross-chain/observer/requirements.txt
-      - name: Run durable order ledger tests
+      - name: Run durable order ledger and pricing tests
         working-directory: cross-chain/coordinator
         run: |
           python -m pip install "eth-hash[pycryptodome]==0.7.1"
@@ -49,3 +49,4 @@ jobs:
           python -m unittest -v test_observer_routers.py
           cd ../custodial
           python -m unittest -v test_custodial_ledger.py
+          python -m unittest -v test_demand_pricing.py
