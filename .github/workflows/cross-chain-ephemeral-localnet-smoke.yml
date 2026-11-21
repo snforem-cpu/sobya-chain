@@ -74,8 +74,8 @@ jobs:
         working-directory: cross-chain/solana/program
         run: |
           cargo fmt --all -- --check
-          cargo test --locked
-          cargo check --locked
+          cargo test
+          cargo check
       - name: Stop Solana validator
         if: always()
         run: if [ -f /tmp/solana-validator.pid ]; then kill "$(cat /tmp/solana-validator.pid)" || true; fi
