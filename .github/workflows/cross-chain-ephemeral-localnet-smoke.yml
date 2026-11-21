@@ -1,0 +1,91 @@
+name: Cross-chain ephemeral localnet smoke
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "cross-chain/solana/**"
+      - "cross-chain/observer/**"
+      - "cross-chain/coordinator/**"
+      - ".github/workflows/cross-chain-ephemeral-localnet-smoke.yml"
+  push:
+    branches:
+      - "feat/sobya-cross-chain-swap-foundation"
+    paths:
+      - "contracts/**"
+      - "cross-chain/solana/**"
+      - "cross-chain/observer/**"
+      - "cross-chain/coordinator/**"
+      - ".github/workflows/cross-chain-ephemeral-localnet-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ethereum-anvil:
+    name: Ethereum local EVM (Anvil)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Start ephemeral Anvil node
+        run: |
+          anvil --host 127.0.0.1 --port 8545 > /tmp/anvil.log 2>&1 &
+          echo $! > /tmp/anvil.pid
+          for attempt in $(seq 1 30); do
+            if cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          test "$(cast chain-id --rpc-url http://127.0.0.1:8545)" = "31337"
+      - name: Run escrow state-machine tests against local EVM
+        working-directory: contracts
+        run: forge test -vvv
+      - name: Stop Anvil
+        if: always()
+        run: if [ -f /tmp/anvil.pid ]; then kill "$(cat /tmp/anvil.pid)" || true; fi
+
+  solana-local-validator:
+    name: Solana local validator
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned Agave CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.1.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Start ephemeral Solana validator
+        run: |
+          solana-test-validator --reset --quiet > /tmp/solana-validator.log 2>&1 &
+          echo $! > /tmp/solana-validator.pid
+          for attempt in $(seq 1 60); do
+            if solana cluster-version --url http://127.0.0.1:8899 >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          solana cluster-version --url http://127.0.0.1:8899
+      - name: Run Solana escrow host tests
+        working-directory: cross-chain/solana/program
+        run: |
+          cargo fmt --all -- --check
+          cargo test --locked
+          cargo check --locked
+      - name: Stop Solana validator
+        if: always()
+        run: if [ -f /tmp/solana-validator.pid ]; then kill "$(cat /tmp/solana-validator.pid)" || true; fi
+
+  scope-guard:
+    name: Verify TRON TVM is not misrepresented as EVM-tested
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert TRON integration remains explicitly gated
+        run: |
+          grep -q "do not execute the contract in the TRON Virtual Machine" cross-chain/tron/README.md
+          grep -q "TRON-solc" cross-chain/tron/README.md
