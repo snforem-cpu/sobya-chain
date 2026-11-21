@@ -1,10 +1,13 @@
 import http.client
 import json
 import tempfile
+import sys
 import threading
 import unittest
 from dataclasses import asdict
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "observer"))
 
 from admission import ReadinessAdmissionGuard
 from coordinator import LocalCoordinator
