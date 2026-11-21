@@ -43,6 +43,9 @@ jobs:
       - name: Test durable custodial payout orchestration
         working-directory: cross-chain/custodial
         run: python -m unittest test_payout_executor.py -v
+      - name: Test continuous payout worker and restart recovery
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_payout_worker.py -v
       - name: Test custodial ledger and pricing regressions
         working-directory: cross-chain/custodial
         run: |
