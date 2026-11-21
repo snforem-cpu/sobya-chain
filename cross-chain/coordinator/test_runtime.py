@@ -16,6 +16,7 @@ from runtime import (
 )
 from solver_balance_reader import FinalizedNativeBalanceReader
 from test_admission import FakeMonitor
+from sobya_vault_connector import SobyaVaultReserver
 
 
 class RuntimeCompositionTests(unittest.TestCase):
@@ -92,7 +93,11 @@ class RuntimeCompositionTests(unittest.TestCase):
                         )
                     },
                     quote_pricer=pricer,
-                    reserve_onchain_inventory=lambda _quote: True,
+                    reserve_onchain_inventory=SobyaVaultReserver(
+                        sobya_rpc, expected_chain_id=357812033857,
+                        vault_address="0x" + "77" * 20,
+                        signer=lambda _tx: "0xdeadbeef",
+                    ),
                     additional_source_observers=source_replicas,
                     additional_destination_observers=destination_replicas,
                 )
