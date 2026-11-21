@@ -9,6 +9,7 @@ interface VmCrossChainDeploy {
     function stopBroadcast() external;
     function envAddress(string calldata name) external returns (address);
     function envBool(string calldata name) external returns (bool);
+    function envUint(string calldata name) external returns (uint256);
 }
 
 /// @notice Owner-run deployment of the SOBYA inventory vault and settlement pair.
@@ -22,7 +23,9 @@ contract DeploySobyaCrossChain {
         address attestor1, address attestor2, address attestor3);
 
     function run() external {
-        require(block.chainid == 357812033857, "SOBYA CROSS-CHAIN: WRONG_CHAIN_ID");
+        uint256 expectedChainId = vm.envUint("SOBYA_EXPECTED_CHAIN_ID");
+        require(expectedChainId != 0 && block.chainid == expectedChainId,
+            "SOBYA CROSS-CHAIN: WRONG_CHAIN_ID");
         require(
             vm.envBool("SOBYA_CROSS_CHAIN_DEPLOYMENT_APPROVED"),
             "SOBYA CROSS-CHAIN: OWNER_APPROVAL_REQUIRED"
