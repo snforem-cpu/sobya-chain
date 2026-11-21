@@ -129,9 +129,11 @@ class PayoutJournal:
 
 class InventoryPayoutExecutor:
     """Coordinates an immutable order, a chain adapter, and durable retry journal."""
-    def __init__(self, ledger: Any, journal: PayoutJournal, adapters: dict[str, PayoutAdapter]):
+    def __init__(self, ledger: Any, journal: PayoutJournal, adapters: dict[str, PayoutAdapter],
+                 *, enabled: bool = False):
         self.ledger, self.journal = ledger, journal
         self.adapters = {k.lower(): v for k,v in adapters.items()}
+        self.enabled = enabled is True
         self._lock = threading.RLock()
 
     def _intent(self, order_id: str) -> tuple[dict[str, Any], PayoutIntent, PayoutAdapter]:
@@ -153,6 +155,8 @@ class InventoryPayoutExecutor:
     def execute_or_resume(self, order_id: str) -> str:
         """Prepare once, persist signed bytes, then broadcast the same tx on every retry."""
         with self._lock:
+            if not self.enabled:
+                raise PayoutError("custodial payouts are disabled by the runtime release gate")
             order,intent,adapter = self._intent(order_id)
             row = self.journal.get(order_id)
             if row is None:
@@ -183,6 +187,8 @@ class InventoryPayoutExecutor:
 
     def confirm_finalized(self, order_id: str) -> bool:
         with self._lock:
+            if not self.enabled:
+                raise PayoutError("custodial payouts are disabled by the runtime release gate")
             order,intent,adapter = self._intent(order_id)
             row = self.journal.get(order_id)
             if not row or row["state"] not in {"broadcast","finalized"}:
