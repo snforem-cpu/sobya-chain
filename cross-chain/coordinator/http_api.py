@@ -81,8 +81,8 @@ def create_server(
         raise ValueError("HTTP API requires a finalized on-chain SOBYA vault reservation adapter")
     quote_inventory_guard = getattr(quote_pricer, "assert_quote_inventory", None)
     balance_reader = getattr(quote_pricer, "finalized_balance", None)
-    if not isinstance(balance_reader, FinalizedNativeBalanceReader):
-        raise ValueError("HTTP API requires a pinned finalized SOBYA native-balance reader")
+    if not isinstance(balance_reader, FinalizedVaultInventoryReader):
+        raise ValueError("HTTP API requires a pinned finalized SOBYA vault-inventory reader")
     if balance_reader.expected_chain_id != getattr(quote_pricer, "destination_chain_id", None):
         raise ValueError("quote pricing and finalized balance reader chain IDs differ")
     if not callable(quote_inventory_guard) or inventory_guard != quote_inventory_guard:
