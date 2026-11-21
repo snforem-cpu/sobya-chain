@@ -50,6 +50,8 @@ Anchor program. The program uses PDAs for the immutable config and each order.
 
 ## Build and test
 
+The SBF build pins platform-tools `v1.54` in `Cargo.toml` to avoid silently inheriting an older bundled Cargo that cannot parse newer transitive dependency manifests. CI verifies the exact pinned toolchain by building and deploying the SBF artifact to an ephemeral validator.
+
 From this directory:
 
 ```sh
