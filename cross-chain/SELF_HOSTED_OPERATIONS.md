@@ -196,3 +196,19 @@ preserves reservations. This is required because a token balance in 18-decimal
 base units can exceed SQLite's signed 64-bit integer limit. Inventory remains
 an operator-provisioned ledger value until reconciled against finalized SOBYA
 wallet balances; the code does not claim an on-chain balance oracle.
+
+
+## Additional security prerequisites for any future testnet run
+
+The coordinator runtime now refuses to start unless it is configured with:
+
+- At least three uniquely named source-observer replicas, each covering every enabled source network with a distinct private RPC URL.
+- At least three uniquely named SOBYA destination-observer replicas with the same pinned chain ID, settlement contract and confirmation policy, but distinct private RPC URLs.
+- A strict-majority verifier quorum (derived automatically unless explicitly configured).
+- A finalized native-SOBY balance reader using the same pinned SOBYA node and chain ID as the primary payout observer. The coordinator rechecks that balance immediately before reserving each signed quote.
+
+The self-hosted readiness supervisor also refuses a network with fewer than two configured nodes and compares their observed heads rather than trusting a node's self-reported reference height.
+
+These checks detect disagreement and stale nodes; they do not prove independent operators. Distinct local RPC endpoints can still be controlled by the same SOBYA administrator. Attestor public keys must be at least three distinct keys with a strict-majority threshold, but the software cannot prove that different people or organizations control them. Do not describe this design as decentralized or trustless.
+
+The solver must not withdraw or spend SOBY backing active reservations. The finalized balance reader detects a shortfall and blocks new quotes, but the local SQLite reservation is not an on-chain lock and cannot prevent the solver wallet from transferring funds away. A production-grade custody/escrow mechanism for solver inventory remains a separate release blocker.
