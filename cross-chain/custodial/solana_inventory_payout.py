@@ -41,16 +41,19 @@ class SolanaUsdtPayoutAdapter:
         if source_info is None or str(source_info.owner) != str(self.program):
             raise PayoutError("inventory USDT associated token account is missing or owned by wrong program")
         parsed = source_info.data.parsed if hasattr(source_info.data, "parsed") else None
-        if parsed:
-            info = parsed.get("info", {})
-            if info.get("mint") != self.mint or info.get("owner") != self.inventory:
-                raise PayoutError("inventory USDT token account owner or mint mismatch")
+        if not isinstance(parsed, dict):
+            raise PayoutError("inventory USDT token account did not return parsed ownership evidence")
+        info = parsed.get("info", {})
+        if info.get("mint") != self.mint or info.get("owner") != self.inventory:
+            raise PayoutError("inventory USDT token account owner or mint mismatch")
         return recipient, source_ata, destination_ata
 
     def prepare(self, intent: PayoutIntent) -> PreparedPayout:
         if (intent.network != self.network or intent.amount_base_units <= 0
                 or intent.asset.lower() not in {self.mint.lower(), "usdt-solana", "usdt"}):
             raise PayoutError("Solana payout intent is not the configured USDT asset")
+        if intent.amount_base_units > (1 << 64) - 1:
+            raise PayoutError("SPL transfer amount exceeds the uint64 token amount limit")
         try:
             from solana.rpc.types import TxOpts
             from spl.token.instructions import (
