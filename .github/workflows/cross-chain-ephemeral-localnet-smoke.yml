@@ -76,6 +76,8 @@ jobs:
           cargo fmt --all -- --check
           cargo test
           cargo check
+      - name: Prepare Agave platform-tools cache
+        run: mkdir -p "$HOME/.cache/solana"
       - name: Build deployable Solana BPF program
         working-directory: cross-chain/solana/program
         run: cargo build-sbf --tools-version v1.54
