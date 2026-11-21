@@ -108,6 +108,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                     attestor_backend=EvmSigningBackend(
                         "0x" + "aa" * 20, lambda _digest: bytes(65)
                     ),
+                    attestor_membership_reader=lambda network, contract, address: True,
                     attestor_source_identities={
                         "ethereum": PinnedSourceIdentity(
                             source_chain="ethereum", source_chain_id=1,
