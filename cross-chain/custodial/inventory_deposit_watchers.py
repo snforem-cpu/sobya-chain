@@ -102,9 +102,12 @@ class JsonRpc:
 
     def call(self, method: str, params: list[Any]) -> Any:
         self._id += 1
-        response = self.transport(self.url, {
-            "jsonrpc": "2.0", "id": self._id, "method": method, "params": params,
-        }, self.timeout)
+        try:
+            response = self.transport(self.url, {
+                "jsonrpc": "2.0", "id": self._id, "method": method, "params": params,
+            }, self.timeout)
+        except (TimeoutError, OSError) as exc:
+            raise RetryableInventoryDepositError(f"RPC transport temporarily unavailable: {method}") from exc
         if not isinstance(response, dict) or response.get("id") != self._id:
             raise InventoryDepositError("invalid JSON-RPC response envelope")
         if response.get("error") or "result" not in response:
@@ -233,7 +236,10 @@ class TronInventoryDepositVerifier:
             return json.loads(response.read())
 
     def _call(self, path: str, payload: dict[str, Any]) -> Any:
-        result = self.transport(self.url + path, payload, self.timeout)
+        try:
+            result = self.transport(self.url + path, payload, self.timeout)
+        except (TimeoutError, OSError) as exc:
+            raise RetryableInventoryDepositError(f"TRON Solidity Node temporarily unavailable: {path}") from exc
         if not isinstance(result, dict):
             raise InventoryDepositError("invalid TRON Solidity Node response")
         return result
