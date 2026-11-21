@@ -48,6 +48,7 @@ contract DeploySobyaCrossChain {
         attestors[2] = attestor3;
         SobyaCrossChainSettlement settlement =
             new SobyaCrossChainSettlement(ISobyaSolverInventoryVault(address(vault)), attestors, 2);
+        vault.setSettlement(address(settlement));
         vm.stopBroadcast();
 
         emit CrossChainDeployment(
