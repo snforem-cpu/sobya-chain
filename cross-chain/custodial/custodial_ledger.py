@@ -79,16 +79,22 @@ class CustodialOrderLedger:
                 raise CustodialOrderError("order ID or deposit address already assigned") from exc
         return oid
 
-    def record_deposit(self, order_id, *, tx_id, event_index):
+    def record_deposit(self, order_id, *, tx_id, event_index, observed_amount, observed_recipient, observed_asset):
         tx_id = self._required(tx_id, "deposit transaction ID")
         if not isinstance(event_index, int) or isinstance(event_index, bool) or event_index < 0:
             raise CustodialOrderError("event index must be a non-negative integer")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT state,deposit_tx,deposit_event_index FROM custodial_orders WHERE order_id=?", (order_id,)).fetchone()
+            row = db.execute("SELECT state,deposit_tx,deposit_event_index,deposit_address,source_asset,source_amount FROM custodial_orders WHERE order_id=?", (order_id,)).fetchone()
             if row is None:
                 db.rollback()
                 raise CustodialOrderError("unknown order")
+            if not isinstance(observed_amount, int) or isinstance(observed_amount, bool) or observed_amount <= 0:
+                db.rollback()
+                raise CustodialOrderError("observed deposit amount must be a positive integer")
+            if observed_amount != int(row["source_amount"]) or observed_recipient != row["deposit_address"] or observed_asset != row["source_asset"]:
+                db.rollback()
+                raise CustodialOrderError("deposit amount, recipient, or asset does not match the order")
             if row["deposit_tx"] == tx_id and row["deposit_event_index"] == event_index:
                 db.commit()
                 return False
@@ -128,9 +134,17 @@ class CustodialOrderLedger:
                 updated_at=CURRENT_TIMESTAMP WHERE order_id=?""", (payout_tx,order_id))
             db.commit()
 
-    def confirm_payout_final(self, order_id, *, verified):
+    def confirm_payout_final(self, order_id, *, verified, observed_amount, observed_recipient, observed_asset):
         if verified is not True:
             raise CustodialOrderError("payout requires positive finalized-chain verification")
+        row = self.get_order(order_id)
+        if row is None:
+            raise CustodialOrderError("unknown order")
+        if (not isinstance(observed_amount, int) or isinstance(observed_amount, bool)
+                or observed_amount != int(row["destination_amount"])
+                or observed_recipient != row["destination_wallet"]
+                or observed_asset != row["destination_asset"]):
+            raise CustodialOrderError("payout amount, recipient, or asset does not match the order")
         self._transition(order_id, "payout_submitted", "complete")
 
     def reject(self, order_id):
