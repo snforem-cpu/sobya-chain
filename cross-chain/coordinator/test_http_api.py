@@ -113,6 +113,20 @@ class CoordinatorHttpApiTests(unittest.TestCase):
         connection.close()
         return result
 
+    def test_server_rejects_missing_onchain_vault_reserver(self):
+        unsafe = LocalCoordinator(
+            ReadinessAdmissionGuard(FakeMonitor(), self.ledger),
+            inventory_guard=self.pricer.assert_quote_inventory,
+        )
+        with self.assertRaisesRegex(ValueError, "vault reservation adapter"):
+            create_server(
+                "127.0.0.1", 0, unsafe, bearer_token=TOKEN,
+                quote_pricer=self.pricer,
+                verify_quote_signature=lambda *_: True,
+                verify_source_deposit=lambda *_: True,
+                verify_destination_payout=lambda *_: True,
+            )
+
     def test_authentication_required(self):
         status, _ = self.post("/v1/quotes", {}, token=None)
         self.assertEqual(status, 401)
