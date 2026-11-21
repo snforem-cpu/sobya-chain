@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "mode": "custodial-inventory",
+  "featureEnabled": false,
+  "orderAddressPolicy": "unique-per-order",
+  "networks": {
+    "ethereum": {
+      "enabled": false,
+      "chainId": 1,
+      "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL",
+      "usdtContract": null,
+      "inventoryWallet": null,
+      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE"
+    },
+    "tron": {
+      "enabled": false,
+      "network": "mainnet",
+      "rpcUrlEnv": "SOBYA_TRON_RPC_URL",
+      "usdtContract": null,
+      "inventoryWallet": null,
+      "keystorePathEnv": "SOBYA_TRON_KEYSTORE"
+    },
+    "solana": {
+      "enabled": false,
+      "cluster": "mainnet-beta",
+      "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL",
+      "usdtMint": null,
+      "tokenProgram": null,
+      "inventoryWallet": null,
+      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE"
+    },
+    "sobya": {
+      "enabled": false,
+      "chainId": 357812033857,
+      "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
+      "inventoryWallet": null,
+      "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE"
+    }
+  },
+  "limits": {
+    "maxOrderUsdtBaseUnits": null,
+    "maxDailyUsdtBaseUnitsPerNetwork": null,
+    "minimumInventoryBaseUnits": null,
+    "feeBps": null,
+    "quoteLifetimeSeconds": 120
+  },
+  "safety": {
+    "requireFinalizedDeposit": true,
+    "requireUniqueDepositDestination": true,
+    "requireInventoryBeforeAcceptingOrder": true,
+    "requirePayoutFinalityBeforeComplete": true,
+    "pauseOnWatcherFailure": true,
+    "allowAdminWithdrawal": false
+  },
+  "notice": "Template only. All networks are disabled. Fill only verified public wallet/token identities and private RPC endpoints. Keystore paths are local environment settings; never put private keys or seed phrases in this file or the repository."
+}
