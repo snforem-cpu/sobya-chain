@@ -1,39 +1,91 @@
-# SOBYA destination settlement contract
+# SOBYA destination settlement and inventory custody
 
-`SobyaCrossChainSettlement` is the SOBYA-side native-SOBY payout endpoint for
-the intent-based cross-chain flow.
+`SobyaSolverInventoryVault` and `SobyaCrossChainSettlement` are deployed as a
+pair on the SOBYA EVM network. The vault holds native SOBY deposited by a
+solver, tracks the solver's available and reserved balances, and locks a fixed
+amount to one order and recipient. The settlement contract can execute only
+that exact reservation after a strict-majority source-deposit attestation.
 
-A solver submits the source order identifiers and the exact source USDT amount,
-and sends native SOBY as `msg.value`. The contract forwards that SOBY to the
-user's SOBYA EVM address in the same transaction, marks the order paid, and
-emits `PayoutExecuted`. The event binds the order ID, source-chain key, source
-escrow identifier, source USDT contract/mint identifier, source amount,
-destination recipient, SOBY amount, solver, and SOBYA chain ID.
+## Order flow
 
-Independent source-chain attestors must inspect the successful SOBYA
-transaction/event and only then authorize the solver's source-escrow claim.
-The settlement contract itself does not release source USDT and does not
-cryptographically prove anything about TRON, Ethereum, or Solana.
+1. The solver deposits native SOBY into `SobyaSolverInventoryVault`.
+2. The local coordinator verifies the signed quote, finalized solver balance,
+   and dual-chain readiness.
+3. The concrete `SobyaVaultReserver` submits
+   `reserve(orderId, recipient, amount, releaseAfter)` using a signer supplied
+   by the local operator. It checks the SOBYA chain ID, deployed vault code,
+   transaction fields, successful receipt, canonical block, finalized
+   checkpoint, exact `InventoryReserved` event, and reservation readback.
+4. The source-chain user funds the matching USDT escrow on Ethereum, TRON, or
+   Solana.
+5. The source attestors independently verify the finalized source deposit and
+   sign the EIP-712 or Solana attestation for the exact order.
+6. The settlement contract verifies the strict-majority signatures, reads the
+   fixed vault reservation, and calls `executePayout(orderId)`. The vault
+   sends native SOBY only to the reserved recipient.
+7. Source-chain attestors may then authorize the solver's source escrow claim
+   after independently verifying the finalized `PayoutExecuted` event.
+8. An unused reservation can be released only after its deadline. The
+   source-chain escrow refund path remains governed by its own deadline.
 
-## Safety properties
+The source escrow and destination settlement do not provide atomic
+cross-chain execution. The attestor threshold is a trust boundary, not a
+trustless light client. In the self-hosted model, SOBYA controls the nodes and
+attestor infrastructure; multiple processes do not imply independent
+operators.
 
-- One successful payout per order ID; duplicate order IDs revert.
-- Native SOBY is forwarded atomically; failed recipient transfers revert the
-  order state and the entire transaction.
-- No owner, admin withdrawal, token mint, arbitrary release, or rescue method.
-- The contract never accepts or represents source USDT; source escrow balances
-  remain on their original chains.
-- This is a prototype. It has not been deployed to SOBYA, audited, or integrated
-  with a production solver/attestor service or DEX UI.
+## Deployment preparation
 
-## Identifier encoding
+An owner-run Foundry script is provided at
+`contracts/script/DeploySobyaCrossChain.s.sol`. It deploys the vault first and
+then deploys settlement with that exact vault address. It requires:
 
-Use canonical 32-byte chain keys (for example, hashes of documented network
-identifiers). EVM/TVM 20-byte source escrow and token addresses must be
-left-padded to 32 bytes. Solana program IDs and mint addresses are already
-32-byte values. The source amount is expressed in the source token's smallest
-units; the SOBY payout uses native SOBY's 18-decimal base units.
+- `SOBYA_EXPECTED_CHAIN_ID`: explicitly pinned chain ID for the target network.
+- `SOBYA_CROSS_CHAIN_DEPLOYMENT_APPROVED=true`: local explicit deployment
+  approval; absent or false values block deployment.
+- `SOBYA_ATTESTOR_1`, `SOBYA_ATTESTOR_2`, and `SOBYA_ATTESTOR_3`: three
+  distinct nonzero public addresses. The deployed threshold is 2 of 3.
+- A local Foundry keystore selected with `--account`; no private key belongs in
+  environment variables, repository files, CI, or this chat.
 
-The source escrow and this destination contract do not provide atomic
-cross-chain execution. The fixed threshold attestor model remains a trust and
-liveness assumption.
+Example after successful compilation, testnet validation, and review:
+
+```sh
+cd contracts
+export SOBYA_EXPECTED_CHAIN_ID=<verified-target-chain-id>
+export SOBYA_CROSS_CHAIN_DEPLOYMENT_APPROVED=true
+export SOBYA_ATTESTOR_1=<attestor-public-address-1>
+export SOBYA_ATTESTOR_2=<attestor-public-address-2>
+export SOBYA_ATTESTOR_3=<attestor-public-address-3>
+forge script script/DeploySobyaCrossChain.s.sol:DeploySobyaCrossChain \
+  --rpc-url "$SOBYA_RPC" --account sobya-owner --broadcast
+```
+
+The environment approval is a deployment gate, not evidence that the deployment
+is safe. Review the target chain ID, RPC endpoint, attestor addresses, wallet,
+gas estimate, and deployment receipt before broadcasting. Record and verify
+both emitted contract addresses from the actual receipt; never copy or invent
+addresses from source code.
+
+## Current status and release blockers
+
+- Solidity vault and settlement source plus Foundry tests are present.
+- The Python vault adapter is implemented and has mock-based tests; runtime
+  composition requires that concrete adapter and the same pinned SOBYA RPC
+  used by the payout observer.
+- The deployment script is preparation only. Neither contract is confirmed
+  deployed by this repository, and no live deployment receipt/address is
+  recorded here.
+- No production local signer/attestor daemon or secure key lifecycle is
+  provisioned. The adapter accepts a local signer callback; the operator must
+  supply a secure signer implementation outside the repository.
+- No live testnet end-to-end swap, source-escrow claim automation, or refund
+  automation has been demonstrated.
+- No DEX frontend/order API production deployment is wired to this flow.
+- No independent security audit of the complete cross-chain system is claimed.
+
+Do not enable deposits, quotes, or public trading until all source-chain
+contracts/programs are deployed and verified on test networks, the local nodes
+and attestors are running, full end-to-end deposit-to-payout-to-claim tests
+pass, and the security review signs off. No mainnet deployment or funds
+movement is performed by CI.
