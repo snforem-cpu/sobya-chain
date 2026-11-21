@@ -15,6 +15,7 @@ from order_ledger import (
     SourceDepositEvidence,
 )
 from test_admission import FakeMonitor
+from solver_balance_reader import FinalizedNativeBalanceReader
 
 
 TOKEN = "local-test-token-that-is-longer-than-32-bytes"
@@ -52,6 +53,17 @@ class CoordinatorHttpApiTests(unittest.TestCase):
             destination_amount=self.quote.destination_amount, solver=self.quote.solver,
             finalized_reference="sobya:finalized:200",
         )
+        class BalanceRpc:
+            url = "http://127.0.0.1:8545"
+
+            def call(self, method, _params):
+                if method == "eth_chainId":
+                    return hex(357812033857)
+                if method == "eth_getBalance":
+                    return hex(3 * 10**18)
+                raise AssertionError(method)
+
+        self.balance_rpc = BalanceRpc()
         self.pricer = InventoryAwareQuotePricer(
             PricingConfig(
                 usdt_atoms_numerator=2_000_000, fee_bps=100,
@@ -59,7 +71,7 @@ class CoordinatorHttpApiTests(unittest.TestCase):
                 quote_ttl_seconds=60, refund_grace_seconds=3600,
             ),
             self.ledger, destination_chain_id=357812033857,
-            finalized_balance=lambda _solver: 3 * 10**18,
+            finalized_balance=FinalizedNativeBalanceReader(self.balance_rpc, 357812033857),
             now=lambda: 1_900_000_000,
         )
         self.service = LocalCoordinator(
