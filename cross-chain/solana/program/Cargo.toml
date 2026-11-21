@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[package.metadata.solana]
+tools-version = "v1.54"
+
 [lib]
 crate-type = ["cdylib", "lib"]
 
