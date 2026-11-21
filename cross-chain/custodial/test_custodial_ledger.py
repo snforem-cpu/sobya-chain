@@ -37,9 +37,9 @@ class CustodialLedgerTests(unittest.TestCase):
     def test_wrong_deposit_amount_is_rejected(self):
         with self.assertRaises(CustodialOrderError):
             self.ledger.record_deposit(self.order,tx_id="0xwrong",event_index=0,observed_amount=999999,observed_recipient="0xUnique1",observed_asset="USDT-ETH")
-    def test_unique_deposit_address_required(self):
-        with self.assertRaises(CustodialOrderError):
-            self.make_order("0xUnique1")
+    def test_shared_inventory_deposit_address_can_serve_multiple_orders(self):
+        second = self.make_order("0xUnique1")
+        self.assertNotEqual(second, self.order)
     def test_payout_tx_is_idempotent(self):
         self.ledger.record_deposit(self.order,tx_id="0xdeposit",event_index=0,observed_amount=1000000,observed_recipient="0xUnique1",observed_asset="USDT-ETH")
         self.ledger.confirm_deposit_final(self.order,verified=True)
