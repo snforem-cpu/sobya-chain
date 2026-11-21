@@ -35,6 +35,8 @@ def _quantity(value: Any, field: str) -> int:
             return int(value, 16)
         except ValueError as exc:
             raise PayoutError(f"{field} is malformed") from exc
+    if isinstance(value, (bytes, bytearray)):
+        return int.from_bytes(value, "big")
     if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
         return value
     raise PayoutError(f"{field} is malformed")
