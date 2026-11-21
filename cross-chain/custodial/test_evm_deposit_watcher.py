@@ -1,5 +1,7 @@
-import unittest
+import unittest, tempfile
+from pathlib import Path
 
+from custodial_ledger import CustodialOrderLedger
 from evm_deposit_watcher import (
     EvmDepositError, Erc20DepositVerifier, ExpectedErc20Deposit, TRANSFER_TOPIC,
 )
@@ -95,6 +97,20 @@ class Erc20DepositVerifierTests(unittest.TestCase):
         from evm_deposit_watcher import EvmRpc
         with self.assertRaisesRegex(ValueError, "HTTPS"):
             EvmRpc("http://127.0.0.1:8545")
+
+    def test_verified_event_advances_matching_order_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = CustodialOrderLedger(Path(tmp) / "orders.sqlite")
+            order_id = ledger.create_order(
+                direction="usdt_to_soby", source_network="ethereum",
+                destination_network="sobya", deposit_address=INVENTORY.upper().replace("0X", "0x"),
+                source_wallet=SENDER, destination_wallet="soby1recipient",
+                source_asset=TOKEN.upper().replace("0X", "0x"),
+                destination_asset="SOBY", source_amount=1000, destination_amount=2000,
+            )
+            verifier = Erc20DepositVerifier(FakeRpc(fixture()))
+            verifier.verify_and_record(ledger, order_id, self.expected)
+            self.assertEqual(ledger.get_order(order_id)["state"], "deposit_final")
 
 
 if __name__ == "__main__":
