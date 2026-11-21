@@ -53,12 +53,21 @@ class PayoutJournal:
     def __init__(self, path: str | os.PathLike[str]):
         self.path = Path(path).expanduser()
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if self.path.exists():
+        if self.path.exists() or self.path.is_symlink():
             info = self.path.lstat()
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
                 raise PayoutError("payout journal must be a regular non-symlink file")
             if info.st_mode & 0o077:
                 raise PayoutError("payout journal permissions must be owner-only (0600)")
+        else:
+            flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            try:
+                fd = os.open(self.path, flags, 0o600)
+                os.close(fd)
+            except FileExistsError:
+                raise PayoutError("payout journal was concurrently created; reopen it safely")
         self._lock = threading.RLock()
         with self._connect() as db:
             db.execute("""CREATE TABLE IF NOT EXISTS payout_journal (
