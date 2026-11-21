@@ -60,7 +60,7 @@ def calculate_demand_price(*, base_price_usdt_per_soby,
     age = now_epoch - snapshot.observed_at_epoch
     if age < 0 or age > max_snapshot_age_seconds:
         raise PricingError("snapshot is future-dated or stale")
-    if upward_sensitivity_bps == 0 or downward_sensitivity_bps > upward_sensitivity_bps:
+    if upward_sensitivity_bps == 0 or downward_sensitivity_bps >= upward_sensitivity_bps:
         raise PricingError("upward sensitivity must be positive and exceed downward sensitivity")
     net = snapshot.buy_usdt_base_units - snapshot.sell_usdt_base_units
     with localcontext() as ctx:
