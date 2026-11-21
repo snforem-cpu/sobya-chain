@@ -12,7 +12,7 @@ from solana_source_observer import _b58encode
 
 class SolanaQuoteVerifierTests(unittest.TestCase):
     def setUp(self):
-        self.signing_key = SigningKey.generate()
+        self.signing_key = SigningKey(bytes(range(32)))
         self.solver = _b58encode(bytes(self.signing_key.verify_key))
         self.user = _b58encode(bytes([21]) * 32)
         self.mint = _b58encode(bytes([22]) * 32)
