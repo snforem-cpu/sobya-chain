@@ -68,17 +68,18 @@ class InventoryAwareQuotePricer:
     def _reconciled_available_inventory(self, solver: str) -> int:
         total, reserved, ledger_available = self.ledger.solver_inventory_snapshot(solver)
         try:
-            chain_balance = self.finalized_balance(solver)
+            chain_available = self.finalized_balance(solver)
         except Exception as exc:
-            raise PricingError("finalized SOBYA solver balance could not be verified") from exc
-        if (not isinstance(chain_balance, int) or isinstance(chain_balance, bool)
-                or chain_balance < 0):
-            raise PricingError("finalized SOBYA solver balance is invalid")
-        if chain_balance < reserved:
-            raise PricingError("on-chain SOBY balance is below already reserved obligations")
+            raise PricingError("finalized SOBYA vault inventory could not be verified") from exc
+        if (not isinstance(chain_available, int) or isinstance(chain_available, bool)
+                or chain_available < 0):
+            raise PricingError("finalized SOBYA vault available inventory is invalid")
         if total < reserved:
             raise PricingError("solver inventory accounting is inconsistent")
-        return min(ledger_available, chain_balance - reserved)
+        # The pinned vault's available(solver) view already subtracts its
+        # on-chain reservations. The ledger independently subtracts its local
+        # reservations. Taking the minimum is conservative without double subtraction.
+        return min(ledger_available, chain_available)
 
     def assert_quote_inventory(self, quote: OrderQuote) -> bool:
         """Reconcile finalized native SOBY again immediately before reservation."""
@@ -122,8 +123,8 @@ class InventoryAwareQuotePricer:
         if destination_amount <= 0:
             raise PricingError("source amount is too small to produce a positive SOBY payout")
 
-        # Never quote against an operator-entered inventory figure that exceeds
-        # finalized native SOBY actually held by the solver wallet.
+        # Never quote against operator-entered inventory exceeding the finalized
+        # spendable balance in the pinned SOBYA inventory vault.
         available = self._reconciled_available_inventory(solver)
         if available < destination_amount:
             raise PricingError("solver has insufficient reconciled SOBY inventory")
