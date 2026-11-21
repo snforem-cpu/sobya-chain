@@ -1,6 +1,7 @@
 """Idempotent order ledger for SOBYA's custodial inventory swap model."""
 from __future__ import annotations
 import sqlite3, threading, uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -29,12 +30,16 @@ class CustodialOrderLedger:
                 UNIQUE(source_network, deposit_tx, deposit_event_index))""")
             db.execute("CREATE INDEX IF NOT EXISTS custodial_orders_state_idx ON custodial_orders(state)")
 
+    @contextmanager
     def _connect(self):
         db = sqlite3.connect(self.database, timeout=15, isolation_level=None)
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA busy_timeout=15000")
-        return db
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("PRAGMA busy_timeout=15000")
+            yield db
+        finally:
+            db.close()
 
     @staticmethod
     def _required(value, field):
