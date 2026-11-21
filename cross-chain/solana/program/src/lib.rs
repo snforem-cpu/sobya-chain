@@ -148,22 +148,10 @@ fn process_initialize(
     if system_program_account.key != &system_program::id() {
         return Err(ProgramError::IncorrectProgramId);
     }
-    if usdt_mint == Pubkey::default()
-        || sobya_chain_id == 0
-        || attestors.is_empty()
-        || attestors.len() > MAX_ATTESTORS
-        || threshold == 0
-        || threshold as usize > attestors.len()
-    {
+    if usdt_mint == Pubkey::default() || sobya_chain_id == 0 {
         return Err(ProgramError::InvalidArgument);
     }
-    for i in 0..attestors.len() {
-        if attestors[i] == Pubkey::default()
-            || attestors[..i].iter().any(|prior| prior == &attestors[i])
-        {
-            return Err(ProgramError::InvalidArgument);
-        }
-    }
+    validate_attestor_policy(&attestors, threshold)?;
 
     let (expected_config, bump) =
         Pubkey::find_program_address(&[CONFIG_SEED, payer.key.as_ref()], program_id);
@@ -194,6 +182,24 @@ fn process_initialize(
         signer_seeds,
     )?;
     config_account.data.borrow_mut().copy_from_slice(&data);
+    Ok(())
+}
+
+fn validate_attestor_policy(attestors: &[Pubkey], threshold: u8) -> ProgramResult {
+    if attestors.len() < 3
+        || attestors.len() > MAX_ATTESTORS
+        || threshold as usize <= attestors.len() / 2
+        || threshold as usize > attestors.len()
+    {
+        return Err(ProgramError::InvalidArgument);
+    }
+    for i in 0..attestors.len() {
+        if attestors[i] == Pubkey::default()
+            || attestors[..i].iter().any(|prior| prior == &attestors[i])
+        {
+            return Err(ProgramError::InvalidArgument);
+        }
+    }
     Ok(())
 }
 
@@ -573,6 +579,21 @@ mod tests {
         bitmap |= 1 << 3;
         assert_eq!(bitmap.count_ones(), 2);
         assert_ne!(bitmap & (1 << 3), 0);
+    }
+
+    #[test]
+    fn attestor_policy_requires_three_keys_and_strict_majority() {
+        let keys = vec![Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique()];
+        assert!(validate_attestor_policy(&keys, 2).is_ok());
+        assert!(validate_attestor_policy(&keys, 1).is_err());
+        assert!(validate_attestor_policy(&keys[..2], 2).is_err());
+    }
+
+    #[test]
+    fn attestor_policy_rejects_duplicate_keys() {
+        let key = Pubkey::new_unique();
+        let keys = vec![key, Pubkey::new_unique(), key];
+        assert!(validate_attestor_policy(&keys, 2).is_err());
     }
 
     #[test]
