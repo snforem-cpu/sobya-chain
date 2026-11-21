@@ -212,3 +212,18 @@ The self-hosted readiness supervisor also refuses a network with fewer than two 
 These checks detect disagreement and stale nodes; they do not prove independent operators. Distinct local RPC endpoints can still be controlled by the same SOBYA administrator. Attestor public keys must be at least three distinct keys with a strict-majority threshold, but the software cannot prove that different people or organizations control them. Do not describe this design as decentralized or trustless.
 
 The solver must not withdraw or spend SOBY backing active reservations. The finalized balance reader detects a shortfall and blocks new quotes, but the local SQLite reservation is not an on-chain lock and cannot prevent the solver wallet from transferring funds away. A production-grade custody/escrow mechanism for solver inventory remains a separate release blocker.
+
+
+
+## On-chain solver inventory custody (implementation added; deployment pending)
+
+The SOBYA destination now includes:
+- `contracts/src/SobyaSolverInventoryVault.sol`: solver deposits native SOBY, reserves a fixed amount for a unique order and recipient, and can withdraw only unreserved inventory. A reservation can be paid only to its fixed recipient before its deadline, or released after the deadline. A settled/released order ID cannot be reused.
+- `contracts/src/SobyaCrossChainSettlement.sol`: settlement now reads the immutable reservation from the vault and executes that exact payout. It no longer accepts arbitrary `msg.value` as an untracked one-off payout. The existing `PayoutExecuted` event remains the source-chain attestors' payout evidence.
+- Foundry tests cover over-reservation, blocked withdrawal of locked funds, fixed-recipient settlement, duplicate payout rejection, expiry, release, and rollback on failed recipient transfer.
+
+This closes the specific gap where a solver could transfer away SOBY that had only been reserved in SQLite. The coordinator still needs a production transaction adapter to create vault reservations before accepting signed quotes and reconcile the vault's finalized `available(solver)` value; its current ledger reservation is not itself the on-chain reservation. Do not enable quote admission until that adapter is implemented and tested.
+
+The vault and settlement must be deployed together on the SOBYA EVM network, with the settlement constructor pinned to the deployed vault address. Existing settlement deployments are not upgraded by this source change. No deployment, migration, solver deposit, or mainnet transaction has occurred.
+
+The vault protects the solver's reserved inventory, but does not prove that the user funded USDT on Ethereum/TRON/Solana. Source-chain escrow attestors must continue to independently verify the finalized `PayoutExecuted` event before releasing source USDT. The signer service, secure key provisioning, live testnet deployments, full end-to-end swap tests, independent audit, and explicit mainnet enablement remain release gates.
