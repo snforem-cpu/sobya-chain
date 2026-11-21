@@ -96,7 +96,7 @@ jobs:
             --url http://127.0.0.1:8899
           PROGRAM_ID="$(solana address --keypair /tmp/sobya-solana-program.json)"
           solana program show "$PROGRAM_ID" --keypair /tmp/sobya-solana-payer.json --url http://127.0.0.1:8899
-          solana program show "$PROGRAM_ID" --keypair /tmp/sobya-solana-payer.json --url http://127.0.0.1:8899 | grep -Fq "Executable: Yes"
+          solana account "$PROGRAM_ID" --output json --url http://127.0.0.1:8899 | jq -e '.account.executable == true' >/dev/null
       - name: Stop Solana validator
         if: always()
         run: if [ -f /tmp/solana-validator.pid ]; then kill "$(cat /tmp/solana-validator.pid)" || true; fi
