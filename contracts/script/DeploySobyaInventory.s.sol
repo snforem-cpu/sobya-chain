@@ -7,6 +7,7 @@ import "../src/SobyaCrossChainSettlement.sol";
 interface VmDeploy {
     function envUint(string calldata key) external returns (uint256);
     function envAddress(string calldata key) external returns (address);
+    function addr(uint256 privateKey) external returns (address);
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
 }
@@ -27,10 +28,18 @@ contract DeploySobyaInventory {
         require(block.chainid == SOBYA_EVM_CHAIN_ID, "wrong SOBYA EVM chain");
 
         uint256 deployerKey = vm.envUint("SOBYA_DEPLOYER_PRIVATE_KEY");
+        address expectedDeployer = vm.envAddress("SOBYA_EXPECTED_DEPLOYER");
+        require(expectedDeployer != address(0), "expected deployer missing");
+        require(vm.addr(deployerKey) == expectedDeployer, "deployer key/address mismatch");
+
         address[] memory attestors = new address[](3);
         attestors[0] = vm.envAddress("SOBYA_ATTESTOR_1");
         attestors[1] = vm.envAddress("SOBYA_ATTESTOR_2");
         attestors[2] = vm.envAddress("SOBYA_ATTESTOR_3");
+        require(attestors[0] != address(0) && attestors[1] != address(0)
+            && attestors[2] != address(0), "zero attestor");
+        require(attestors[0] != attestors[1] && attestors[0] != attestors[2]
+            && attestors[1] != attestors[2], "attestors must be distinct");
 
         vm.startBroadcast(deployerKey);
         vault = new SobyaSolverInventoryVault();
@@ -42,7 +51,7 @@ contract DeploySobyaInventory {
         vault.setSettlement(address(settlement));
         vm.stopBroadcast();
 
-        require(vault.owner() != address(0), "vault owner missing");
+        require(vault.owner() == expectedDeployer, "vault owner mismatch");
         require(vault.settlement() == address(settlement), "vault settlement link mismatch");
         require(address(settlement.inventoryVault()) == address(vault), "settlement vault link mismatch");
         require(settlement.attestationThreshold() == 2, "unexpected attestor threshold");
