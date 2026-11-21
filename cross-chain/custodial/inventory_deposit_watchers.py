@@ -312,7 +312,11 @@ class SolanaInventoryDepositVerifier:
         slot = tx.get("slot")
         if not isinstance(slot, int) or slot <= 0:
             raise InventoryDepositError("Solana finalized slot is invalid")
-        message = tx.get("transaction", {}).get("message", {})
+        transaction = tx.get("transaction", {})
+        signatures = transaction.get("signatures", [])
+        if not signatures or signatures[0] != expected.tx_id:
+            raise InventoryDepositError("Solana transaction signature does not match submitted signature")
+        message = transaction.get("message", {})
         keys = message.get("accountKeys", [])
         pubkeys = [item.get("pubkey") if isinstance(item, dict) else item for item in keys]
         instructions = message.get("instructions", [])
