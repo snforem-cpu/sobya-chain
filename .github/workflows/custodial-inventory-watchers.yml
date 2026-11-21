@@ -22,6 +22,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install custodial chain SDK dependencies
+        working-directory: cross-chain/custodial
+        run: python -m pip install -r requirements.txt
+      - name: Compile custodial modules
+        working-directory: cross-chain/custodial
+        run: python -m compileall -q .
       - name: Test shared-inventory deposit verifiers
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_deposit_watchers.py -v
