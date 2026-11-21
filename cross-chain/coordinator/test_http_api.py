@@ -18,7 +18,7 @@ from order_ledger import (
     SourceDepositEvidence,
 )
 from test_admission import FakeMonitor
-from solver_balance_reader import FinalizedNativeBalanceReader
+from solver_balance_reader import FinalizedVaultInventoryReader
 
 
 TOKEN = "local-test-token-that-is-longer-than-32-bytes"
@@ -62,8 +62,10 @@ class CoordinatorHttpApiTests(unittest.TestCase):
             def call(self, method, _params):
                 if method == "eth_chainId":
                     return hex(357812033857)
-                if method == "eth_getBalance":
-                    return hex(3 * 10**18)
+                if method == "eth_getCode":
+                    return "0x60006000"
+                if method == "eth_call":
+                    return "0x" + (3 * 10**18).to_bytes(32, "big").hex()
                 raise AssertionError(method)
 
         self.balance_rpc = BalanceRpc()
@@ -74,7 +76,9 @@ class CoordinatorHttpApiTests(unittest.TestCase):
                 quote_ttl_seconds=60, refund_grace_seconds=3600,
             ),
             self.ledger, destination_chain_id=357812033857,
-            finalized_balance=FinalizedNativeBalanceReader(self.balance_rpc, 357812033857),
+            finalized_balance=FinalizedVaultInventoryReader(
+                self.balance_rpc, 357812033857, "0x" + "77" * 20
+            ),
             now=lambda: 1_900_000_000,
         )
         self.service = LocalCoordinator(
