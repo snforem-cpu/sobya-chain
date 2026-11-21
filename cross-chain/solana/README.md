@@ -58,7 +58,4 @@ cargo test
 cargo check
 ```
 
-These checks compile and test the Rust program locally. They do not execute it
-inside a Solana validator. Before testnet deployment, add validator-based
-integration tests covering PDA/ATA derivation, SPL Token CPI, account ownership,
-attestor replay, wrong-mint rejection, and refund-versus-claim races.
+These checks compile and test the Rust program locally. The CI localnet smoke job additionally builds the deployable SBF artifact, starts an ephemeral Solana validator, deploys the program, and verifies that the resulting program account is executable. This is a real validator deployment smoke test, but it does **not** yet initialize the config PDA, create/fund an escrow order, execute SPL Token CPI, collect threshold attestations, claim, or refund inside the validator. Those instruction-level validator integration tests remain mandatory before testnet deployment.
