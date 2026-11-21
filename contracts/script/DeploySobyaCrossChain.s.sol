@@ -19,7 +19,7 @@ contract DeploySobyaCrossChain {
         VmCrossChainDeploy(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     event CrossChainDeployment(address indexed inventoryVault, address indexed settlement,
-        address indexed deployer, address attestor1, address attestor2, address attestor3);
+        address attestor1, address attestor2, address attestor3);
 
     function run() external {
         require(block.chainid == 357812033857, "SOBYA CROSS-CHAIN: WRONG_CHAIN_ID");
@@ -44,12 +44,11 @@ contract DeploySobyaCrossChain {
         attestors[1] = attestor2;
         attestors[2] = attestor3;
         SobyaCrossChainSettlement settlement =
-            new SobyaCrossChainSettlement(vault, attestors, 2);
+            new SobyaCrossChainSettlement(ISobyaSolverInventoryVault(address(vault)), attestors, 2);
         vm.stopBroadcast();
 
         emit CrossChainDeployment(
-            address(vault), address(settlement), msg.sender,
-            attestor1, attestor2, attestor3
+            address(vault), address(settlement), attestor1, attestor2, attestor3
         );
     }
 }
