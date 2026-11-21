@@ -66,7 +66,7 @@ contract SobyaSolverInventoryVaultTest {
         require(!ok, "oversubscription accepted");
     }
 
-    function testFailedRecipientTransferRollsBackReservation() public {
+    function testRecipientRevertRollsBackReservation() public {
         vault.deposit{value: 2 ether}();
         RejectInventoryRecipient recipient = new RejectInventoryRecipient();
         bytes32 orderId = keccak256("order-4");
