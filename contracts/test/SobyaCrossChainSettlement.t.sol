@@ -35,6 +35,7 @@ contract SobyaCrossChainSettlementTest {
         settlement = new SobyaCrossChainSettlement(
             ISobyaSolverInventoryVault(address(vault)), attestors, 2
         );
+        vault.setSettlement(address(settlement));
         vm.deal(address(this), 10 ether);
         vault.deposit{value: 5 ether}();
     }
