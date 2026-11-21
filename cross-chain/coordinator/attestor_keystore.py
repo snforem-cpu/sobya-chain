@@ -97,8 +97,8 @@ def load_encrypted_keystore(path: str | os.PathLike[str], passphrase: str) -> by
     """Decrypt and validate a local keystore; never logs or returns the passphrase."""
     target = Path(path).expanduser()
     try:
-        info = target.stat()
-        if not target.is_file() or info.st_mode & 0o077:
+        info = target.lstat()
+        if target.is_symlink() or not target.is_file() or info.st_mode & 0o077:
             raise KeystoreError("keystore must be a regular file with owner-only permissions")
         if info.st_size > 16_384:
             raise KeystoreError("keystore file exceeds the allowed size")
