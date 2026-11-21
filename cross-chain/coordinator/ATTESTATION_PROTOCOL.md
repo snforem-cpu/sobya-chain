@@ -44,3 +44,20 @@ own signed Solana transaction; this module does not create or sign one.
   redeployment/migration plan.
 - External security review and chain-specific integration tests remain
   mandatory before any live signing or escrow claim.
+
+## Local attestor signing service
+
+`attestor_service.py` is the evidence-gated signing boundary:
+
+- `sign_source_deposit` first invokes the configured source observer/quorum, then reads the exact active order reservation from finalized SOBYA vault state. It signs only when solver, recipient, SOBY amount, and release deadline match the immutable registered quote. Its EIP-712 domain is the SOBYA chain ID and exact settlement contract.
+- `sign_evm_source_payout` first invokes the configured SOBYA destination observer/quorum and signs the source escrow's EIP-712 `Payout` only when the finalized receipt matches the immutable quote and pinned source escrow identity.
+- `build_solana_payout_instruction` returns the Borsh `AttestPayout` instruction bytes after payout verification. Solana requires an attestor-signed transaction; this helper deliberately does not pretend instruction bytes are a signature or submit a transaction.
+- The service accepts no caller-supplied digest or typed payload. Every signing path requires literal `True` from its independent verifier. EVM signatures are recovered locally and must match the configured attestor address.
+
+### Encrypted EVM attestor key
+
+`attestor_keystore.py` creates an owner-only encrypted key file using scrypt (N=32768, r=8, p=1) and PyNaCl SecretBox authenticated encryption. It refuses to overwrite an existing file, rejects symlinks and permissive file modes on load, and validates the decrypted key against the stored public address. `evm_signer_from_keystore(path, passphrase)` returns a local EVM signer.
+
+Create each attestor keystore on that attestor's own machine using a fresh, unique key and a strong passphrase. Keep encrypted backups offline. Never commit keystore files, private keys, passphrases, or seed phrases. Do not copy the same private key to multiple attestors: a 2-of-3 policy is meaningful only when the keys are separately controlled. A Python process cannot guarantee memory zeroization; for higher assurance, replace the in-memory signer with a hardware wallet/HSM callback.
+
+This is a signing library, not yet a supervised production daemon. It has no HTTP signing endpoint, no automatic Solana transaction construction/submission, no signer-to-signer coordination, and no key rotation. Do not enable it for mainnet until all three attestor instances are independently operated, observer quorums are connected to independently administered nodes, and end-to-end testnet and security review are complete.
