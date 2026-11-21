@@ -163,6 +163,15 @@ class SobyaVaultReserver:
         tx_hash = self.rpc.call("eth_sendRawTransaction", [raw_signed])
         if not isinstance(tx_hash, str) or len(tx_hash) != 66 or not tx_hash.startswith("0x"):
             raise VerificationError("SOBYA RPC returned an invalid transaction hash")
+        submitted = self.rpc.call("eth_getTransactionByHash", [tx_hash])
+        if (not isinstance(submitted, dict)
+                or submitted.get("from", "").lower() != solver
+                or submitted.get("to", "").lower() != self.vault
+                or submitted.get("input", submitted.get("data", "")).lower() != calldata.lower()
+                or int(submitted.get("value", "0x0"), 16) != 0
+                or (submitted.get("chainId") is not None
+                    and int(submitted["chainId"], 16) != self.chain_id)):
+            raise VerificationError("broadcast transaction does not match the signed vault reservation")
 
         receipt = self.rpc.call("eth_getTransactionReceipt", [tx_hash])
         if receipt is None:
