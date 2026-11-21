@@ -31,3 +31,11 @@ Order lifecycle: CREATED -> DEPOSIT_SEEN -> DEPOSIT_FINAL -> PAYOUT_SUBMITTED ->
 - Count only finalized, deduplicated completed swaps. Exclude pending deposits, quotes, cancelled orders, failed payouts, replayed events, and wash trading.
 
 The pricing module is a calculation component, not a live oracle, quote endpoint, or production volume aggregator. A production adapter must build authenticated snapshots from finalized ledger events and connect the calculation to the quote API and DEX UI. Watchers, reconciliation, local signing, payout broadcasters, and end-to-end tests remain required. All networks stay disabled until completed and tested.
+
+## Implementation status (2026-11-21)
+
+- The SQLite order ledger and asymmetric demand-pricing calculation have unit tests.
+- A read-only EVM ERC-20 deposit verifier now checks configured chain ID, successful receipt, finalized-block height, canonical receipt block hash, exact token contract, sender, inventory recipient, amount, and log index. The same adapter can be configured for Ethereum or an EVM-compatible network only after its RPC's `finalized` block-tag behavior is verified.
+- The EVM verifier does not create orders, scan the chain, watch continuously, sign, or broadcast payouts. The DEX/API must provide the exact expected transaction and event index, then persist the verified event through the ledger.
+- The existing TRON and Solana observer modules still verify the previous escrow-program model; they are **not** generic shared-inventory deposit watchers. Generic TRON and Solana transfer verification, SOBYA native-coin deposit verification, payout signing/broadcasting, balance reconciliation, API/UI wiring, and full end-to-end tests remain unfinished.
+- Therefore this remains a development prototype. All networks and the overall feature stay disabled; do not accept user deposits or promise automatic payouts.
