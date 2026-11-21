@@ -78,7 +78,7 @@ class TronUsdtPayoutAdapter:
     def verify_finalized(self, intent: PayoutIntent, tx_id: str) -> bool:
         try:
             info = self.client.get_solid_transaction_info(tx_id)
-            if not info or not info.get("blockNumber"):
+            if not info or not info.get("blockNumber") or str(info.get("id", "")).lower() != tx_id.lower():
                 return False
             receipt = info.get("receipt", {})
             if receipt.get("result") != "SUCCESS":
