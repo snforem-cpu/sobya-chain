@@ -47,6 +47,12 @@ class CustodialOrderLedger:
             raise CustodialOrderError(f"{field} is required")
         return value.strip()
 
+    @staticmethod
+    def _same_chain_value(network, observed, expected):
+        if network in {"ethereum", "sobya"} and isinstance(observed, str) and isinstance(expected, str):
+            return observed.lower() == expected.lower()
+        return observed == expected
+
     def create_order(self, *, direction, source_network, destination_network,
                      deposit_address, source_wallet, destination_wallet,
                      source_asset, destination_asset, source_amount,
@@ -89,14 +95,16 @@ class CustodialOrderLedger:
             raise CustodialOrderError("event index must be a non-negative integer")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT state,deposit_tx,deposit_event_index,deposit_address,source_asset,source_amount FROM custodial_orders WHERE order_id=?", (order_id,)).fetchone()
+            row = db.execute("SELECT state,deposit_tx,deposit_event_index,deposit_address,source_asset,source_amount,source_network FROM custodial_orders WHERE order_id=?", (order_id,)).fetchone()
             if row is None:
                 db.rollback()
                 raise CustodialOrderError("unknown order")
             if not isinstance(observed_amount, int) or isinstance(observed_amount, bool) or observed_amount <= 0:
                 db.rollback()
                 raise CustodialOrderError("observed deposit amount must be a positive integer")
-            if observed_amount != int(row["source_amount"]) or observed_recipient != row["deposit_address"] or observed_asset != row["source_asset"]:
+            if (observed_amount != int(row["source_amount"])
+                    or not self._same_chain_value(row["source_network"], observed_recipient, row["deposit_address"])
+                    or not self._same_chain_value(row["source_network"], observed_asset, row["source_asset"])):
                 db.rollback()
                 raise CustodialOrderError("deposit amount, recipient, or asset does not match the order")
             if row["deposit_tx"] == tx_id and row["deposit_event_index"] == event_index:
@@ -146,8 +154,8 @@ class CustodialOrderLedger:
             raise CustodialOrderError("unknown order")
         if (not isinstance(observed_amount, int) or isinstance(observed_amount, bool)
                 or observed_amount != int(row["destination_amount"])
-                or observed_recipient != row["destination_wallet"]
-                or observed_asset != row["destination_asset"]):
+                or not self._same_chain_value(row["destination_network"], observed_recipient, row["destination_wallet"])
+                or not self._same_chain_value(row["destination_network"], observed_asset, row["destination_asset"])):
             raise CustodialOrderError("payout amount, recipient, or asset does not match the order")
         self._transition(order_id, "payout_submitted", "complete")
 
