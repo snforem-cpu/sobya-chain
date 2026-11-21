@@ -208,13 +208,13 @@ def build_local_server(
         return destination_quorum.verify(evidence, proof).value is True
 
     admission = ReadinessAdmissionGuard(monitor, ledger)
-    # Accept either a reserve(quote) callable or the concrete vault adapter.
-    if not callable(reserve_onchain_inventory):
-        reserve_method = getattr(reserve_onchain_inventory, "reserve", None)
-        if callable(reserve_method):
-            reserve_onchain_inventory = reserve_method
-    if not callable(reserve_onchain_inventory):
-        raise ValueError("a finalized SOBYA vault reservation adapter is required")
+    from sobya_vault_connector import SobyaVaultReserver
+    if not isinstance(reserve_onchain_inventory, SobyaVaultReserver):
+        raise ValueError("runtime requires the concrete finalized SOBYA vault adapter")
+    if reserve_onchain_inventory.chain_id != sobya_settlement.destination_chain_id:
+        raise ValueError("vault adapter and payout observer chain IDs differ")
+    if reserve_onchain_inventory.rpc.url != settlement_rpc_url:
+        raise ValueError("vault adapter must use the pinned SOBYA RPC endpoint")
     coordinator = LocalCoordinator(
         admission,
         inventory_guard=quote_pricer.assert_quote_inventory,
