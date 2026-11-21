@@ -5,7 +5,7 @@ A deployment supplies a probe adapter for its locally operated node processes.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import ipaddress
 from typing import Callable, Iterable
 from urllib.parse import urlsplit
@@ -118,18 +118,46 @@ class SelfHostedNodeSupervisor:
         selected = tuple(t for t in self.targets if t.network.lower() == network.lower())
         if not selected:
             return NetworkReadiness(network, False, (), ("no self-hosted node is configured",))
+        if len(selected) < 2:
+            return NetworkReadiness(
+                network, False, tuple(t.node_id for t in selected),
+                ("at least two self-hosted nodes are required for head cross-checking",),
+            )
+
         checked: list[str] = []
         failures: list[str] = []
+        observations: list[tuple[NodeTarget, NodeHealth]] = []
         for target in selected:
             checked.append(target.node_id)
             try:
                 result = self.probe(target)
                 if not isinstance(result, NodeHealth):
                     raise NodeHealthError("probe returned an invalid health result")
-                validate_health(target, result)
+                observations.append((target, result))
             except Exception as exc:
                 # Never return raw exception details that may contain local credentials.
                 failures.append(f"{target.node_id}: {type(exc).__name__}")
+
+        # Do not trust a probe's self-reported reference height: a single node
+        # previously supplied its own head as the reference, making lag checks
+        # vacuous. Cross-check every configured node against the highest head
+        # independently observed from the other configured local nodes.
+        valid_heads = [
+            health.head_height for _, health in observations
+            if isinstance(health.head_height, int) and health.head_height >= 0
+        ]
+        if valid_heads:
+            reference_head = max(valid_heads)
+            for target, health in observations:
+                try:
+                    validate_health(
+                        target, replace(health, reference_head_height=reference_head)
+                    )
+                except Exception as exc:
+                    failures.append(f"{target.node_id}: {type(exc).__name__}")
+        elif observations:
+            failures.extend(f"{target.node_id}: NodeHealthError" for target, _ in observations)
+
         return NetworkReadiness(network, not failures, tuple(checked), tuple(failures))
 
     def all_ready(self) -> tuple[NetworkReadiness, ...]:
