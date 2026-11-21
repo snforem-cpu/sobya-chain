@@ -115,9 +115,13 @@ class EvmInventoryPayoutAdapter:
         except PayoutError:
             raise
         except Exception as exc:
-            # A timeout or "already known" is uncertain; caller retries the exact
-            # same signed bytes. Do not construct or sign a replacement transaction.
-            raise PayoutError("EVM broadcast outcome is uncertain; safe retry required") from exc
+            # A timeout or "already known" is uncertain. If the exact locally
+            # derived hash is already visible, treat it as the same broadcast.
+            try:
+                self.w3.eth.get_transaction(prepared.tx_id)
+                return prepared.tx_id
+            except Exception:
+                raise PayoutError("EVM broadcast outcome is uncertain; safe retry required") from exc
 
     def verify_finalized(self, intent: PayoutIntent, tx_id: str) -> bool:
         try:
@@ -132,6 +136,12 @@ class EvmInventoryPayoutAdapter:
             block_hash = "0x" + block_hash
         latest = int(self.w3.eth.block_number)
         if latest - block_number + 1 < self.confirmations:
+            return False
+        try:
+            finalized = self.w3.eth.get_block("finalized")
+        except Exception:
+            return False
+        if int(finalized["number"]) < block_number:
             return False
         canonical = self.w3.eth.get_block(block_number)
         canonical_hash = canonical["hash"].hex()
@@ -161,7 +171,7 @@ class EvmInventoryPayoutAdapter:
             expected_sender = "0x" + self.inventory[2:].lower().rjust(64, "0")
             if (topics[1].lower() == expected_sender.lower()
                     and topics[2].lower() == expected_topic.lower()
-                    and int(log["data"].hex(), 16) == intent.amount_base_units):
+                    and _quantity(log["data"], "Transfer event amount") == intent.amount_base_units):
                 matches.append(log)
         return len(matches) == 1
 
