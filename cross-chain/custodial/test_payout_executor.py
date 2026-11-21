@@ -47,7 +47,7 @@ class PayoutExecutorTests(unittest.TestCase):
         self.adapter = MockAdapter()
         self.journal = PayoutJournal(root / "payout.sqlite")
         self.executor = InventoryPayoutExecutor(
-            self.ledger, self.journal, {"sobya": self.adapter}
+            self.ledger, self.journal, {"sobya": self.adapter}, enabled=True
         )
 
     def tearDown(self):
