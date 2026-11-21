@@ -7,8 +7,8 @@ on:
       - "cross-chain/custodial/**"
       - ".github/workflows/custodial-inventory-watchers.yml"
 concurrency:
-  group: custodial-inventory-watchers-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: custodial-inventory-watchers-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
