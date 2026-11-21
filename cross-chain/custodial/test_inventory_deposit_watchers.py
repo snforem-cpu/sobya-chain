@@ -1,9 +1,12 @@
 import unittest
+import tempfile
+from pathlib import Path
 from inventory_deposit_watchers import (
     ExpectedInventoryDeposit, InventoryDepositError, EvmInventoryDepositVerifier,
     JsonRpc, SolanaInventoryDepositVerifier, TronInventoryDepositVerifier,
-    TRANSFER_TOPIC,
+    TRANSFER_TOPIC, InventoryDepositRecorder, VerifiedInventoryDeposit,
 )
+from custodial_ledger import CustodialOrderLedger, CustodialOrderError
 
 TOKEN = "0x" + "a1" * 20
 INVENTORY = "0x" + "b2" * 20
@@ -232,6 +235,54 @@ class SolanaInventoryWatcherTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(InventoryDepositError, "failed"):
             verifier.verify(expected)
+
+
+class InventoryDepositRecorderTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.ledger = CustodialOrderLedger(Path(self.temp.name) / "orders.sqlite")
+        self.order = self.ledger.create_order(
+            direction="usdt_to_soby", source_network="ethereum",
+            destination_network="sobya", deposit_address=INVENTORY,
+            source_wallet=SENDER, destination_wallet="0x" + "dd" * 20,
+            source_asset=TOKEN, destination_asset="SOBY",
+            source_amount=1000, destination_amount=2000,
+        )
+        self.expected = ExpectedInventoryDeposit(
+            "ethereum", TX, SENDER, INVENTORY, TOKEN, 1000, 2
+        )
+        self.verified = VerifiedInventoryDeposit(
+            "ethereum", TX, SENDER, INVENTORY, TOKEN, 1000, 2,
+            "ethereum:finalized:80",
+        )
+
+    def test_verified_event_is_credited_and_retry_is_idempotent(self):
+        class Verifier:
+            def verify(inner, expected):
+                return self.verified
+        recorder = InventoryDepositRecorder(self.ledger)
+        recorder.verify_and_record(Verifier(), self.order, self.expected)
+        self.assertEqual(self.ledger.get_order(self.order)["state"], "deposit_final")
+        # Simulate a worker restart after DB commit but before HTTP response.
+        recorder.verify_and_record(Verifier(), self.order, self.expected)
+        self.assertEqual(self.ledger.get_order(self.order)["state"], "deposit_final")
+
+    def test_same_chain_event_cannot_be_credited_to_two_orders(self):
+        second = self.ledger.create_order(
+            direction="usdt_to_soby", source_network="ethereum",
+            destination_network="sobya", deposit_address=INVENTORY,
+            source_wallet=SENDER, destination_wallet="0x" + "ee" * 20,
+            source_asset=TOKEN, destination_asset="SOBY",
+            source_amount=1000, destination_amount=2000,
+        )
+        class Verifier:
+            def verify(inner, expected):
+                return self.verified
+        recorder = InventoryDepositRecorder(self.ledger)
+        recorder.verify_and_record(Verifier(), self.order, self.expected)
+        with self.assertRaises(CustodialOrderError):
+            recorder.verify_and_record(Verifier(), second, self.expected)
 
 
 if __name__ == "__main__":
