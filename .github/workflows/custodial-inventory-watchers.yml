@@ -2,13 +2,13 @@ name: Custodial inventory deposit watcher tests
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
     paths:
       - "cross-chain/custodial/**"
       - ".github/workflows/custodial-inventory-watchers.yml"
 concurrency:
-  group: custodial-inventory-watchers-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
-  cancel-in-progress: false
+  group: custodial-inventory-watchers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
