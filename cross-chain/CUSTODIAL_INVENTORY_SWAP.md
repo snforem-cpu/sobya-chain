@@ -72,3 +72,19 @@ The shared-inventory payout path now has a durable execution layer and network a
 - Dependencies and unit/compile checks are declared in `custodial/requirements.txt` and the dedicated CI workflow.
 
 **Release status:** this is code-level implementation under CI validation, not a live-money release. All `featureEnabled` and per-network `enabled` flags remain false. No mainnet transaction has been signed or broadcast by this development work. Before enabling payouts, the operator must import and verify each existing inventory key locally, configure HTTPS RPCs and passphrases on the runtime host, check live inventory balances/fees, and complete small-value controlled live-chain tests with separate explicit approval. The hosted runtime and DEX/API integration are later release steps.
+
+
+### Local key import (operator machine only)
+
+Run the hidden-input CLI from `cross-chain/custodial`, using a separate file for each network:
+
+```sh
+python inventory_keystore_cli.py --network ethereum --file ~/.sobya/keys/ethereum.json
+python inventory_keystore_cli.py --network sobya --file ~/.sobya/keys/sobya.json
+python inventory_keystore_cli.py --network tron --file ~/.sobya/keys/tron.json
+python inventory_keystore_cli.py --network solana --file ~/.sobya/keys/solana.json
+```
+
+The CLI asks for the existing wallet private key without echoing it, then asks for a new keystore passphrase twice. It prints only the derived public address. Confirm that address matches the configured inventory address before using the file. The same EVM public address on Ethereum and SOBYA still requires two separately network-bound keystore files. Never upload these files or enter their contents in chat.
+
+At runtime, set each `SOBYA_*_KEYSTORE` variable to its local file path and the matching `SOBYA_*_KEYSTORE_PASSPHRASE` variable in the host's private environment. Set the four `SOBYA_*_RPC_URL` variables to operator-controlled HTTPS RPC endpoints. These variables are deliberately absent from the repository.
