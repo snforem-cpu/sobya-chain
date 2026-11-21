@@ -142,7 +142,7 @@ class TronInventoryWatcherTests(unittest.TestCase):
         from inventory_deposit_watchers import _tron_hex_address
         from_hex = _tron_hex_address(sender, "sender")[2:]
         to_hex = _tron_hex_address(inventory, "inventory")[2:]
-        token_hex = _tron_hex_address(token, "token")[2:]
+        token_hex = _tron_hex_address(token, "token")
         txid = "ab" * 32
         def transport(url, payload, timeout):
             if url.endswith("/walletsolidity/gettransactioninfobyid"):
