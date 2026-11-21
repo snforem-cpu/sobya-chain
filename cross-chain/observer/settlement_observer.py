@@ -154,6 +154,19 @@ class SettlementVerifier:
         canonical_block = self.rpc.call("eth_getBlockByNumber", [hex(block_number), False])
         if canonical_block is None or canonical_block.get("hash", "").lower() != receipt.get("blockHash", "").lower():
             raise VerificationError("receipt block is not canonical (possible reorg)")
+        # A confirmation count is not finality. Require the chain's finalized
+        # checkpoint to cover this receipt, then retain the configured depth as
+        # an additional conservative policy check.
+        finalized_block = self.rpc.call("eth_getBlockByNumber", ["finalized", False])
+        if not isinstance(finalized_block, dict):
+            raise VerificationError("destination finalized checkpoint is unavailable")
+        try:
+            finalized_number = int(finalized_block["number"], 16)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise VerificationError("destination finalized checkpoint is malformed") from exc
+        if finalized_number < block_number:
+            raise VerificationError("destination payout is not finalized")
+
         latest = int(self.rpc.call("eth_blockNumber", []), 16)
         if latest < block_number or latest - block_number + 1 < self.confirmations:
             raise VerificationError("destination payout has insufficient confirmations")
