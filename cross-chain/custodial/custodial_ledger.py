@@ -172,6 +172,23 @@ class CustodialOrderLedger:
                 raise CustodialOrderError(f"order must be in {expected} state")
             db.commit()
 
+    def list_orders(self, *, states=("deposit_final", "payout_submitted"), limit=100):
+        """Return a bounded, stable batch of orders requiring payout/recovery."""
+        allowed = {"deposit_final", "payout_submitted"}
+        if not isinstance(states, (tuple, list, set)) or not states or not set(states) <= allowed:
+            raise CustodialOrderError("unsupported payout recovery states")
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+            raise CustodialOrderError("order batch limit must be between 1 and 1000")
+        placeholders = ",".join("?" for _ in states)
+        with self._connect() as db:
+            rows = db.execute(
+                f"""SELECT * FROM custodial_orders
+                    WHERE state IN ({placeholders})
+                    ORDER BY created_at, order_id LIMIT ?""",
+                (*tuple(sorted(states)), limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def get_order(self, order_id):
         with self._connect() as db:
             row = db.execute("SELECT * FROM custodial_orders WHERE order_id=?", (order_id,)).fetchone()
