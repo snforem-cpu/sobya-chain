@@ -46,7 +46,13 @@ class ReadinessAdmissionGuard:
                 or not isinstance(destination_state, dict) or destination_state.get("ready") is not True):
             raise AdmissionDenied("readiness response is malformed; new order admission is closed")
 
+    def assert_quote_admissible(self, quote: OrderQuote) -> None:
+        """Check both networks before any external inventory reservation is attempted."""
+        self._require_ready(quote.source_chain)
+
     def register_quote(self, quote: OrderQuote, now: int | None = None) -> None:
+        # Recheck after the vault transaction to avoid accepting a quote if
+        # readiness was lost while the on-chain reservation was confirming.
         self._require_ready(quote.source_chain)
         self.ledger.register_quote_with_inventory(quote, now=now)
 
