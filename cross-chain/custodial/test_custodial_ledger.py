@@ -33,7 +33,10 @@ class CustodialLedgerTests(unittest.TestCase):
         other=self.make_order("0xUnique2")
         self.ledger.record_deposit(self.order,tx_id="0xshared",event_index=1,observed_amount=1000000,observed_recipient="0xUnique1",observed_asset="USDT-ETH")
         with self.assertRaises(CustodialOrderError):
-            self.ledger.record_deposit(other,tx_id="0xshared",event_index=1,observed_amount=1000000,observed_recipient="0xUnique1",observed_asset="USDT-ETH")
+            self.ledger.record_deposit(other,tx_id="0xshared",event_index=1,observed_amount=1000000,observed_recipient="0xUnique2",observed_asset="USDT-ETH")
+    def test_wrong_deposit_amount_is_rejected(self):
+        with self.assertRaises(CustodialOrderError):
+            self.ledger.record_deposit(self.order,tx_id="0xwrong",event_index=0,observed_amount=999999,observed_recipient="0xUnique1",observed_asset="USDT-ETH")
     def test_unique_deposit_address_required(self):
         with self.assertRaises(CustodialOrderError):
             self.make_order("0xUnique1")
