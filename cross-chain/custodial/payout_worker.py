@@ -87,8 +87,7 @@ def main() -> int:
     executor = build_inventory_payout_executor(config, ledger, journal_path)
     worker = InventoryPayoutWorker(ledger, executor)
     if not executor.enabled:
-        LOG.error("payout worker is disabled by configuration; no wallet adapters were loaded")
-        return 2
+        LOG.info("custodial payouts are disabled; staying idle without wallet adapters")
     stop = threading.Event()
 
     def request_stop(_signum, _frame):
