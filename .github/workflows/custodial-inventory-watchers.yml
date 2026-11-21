@@ -25,6 +25,9 @@ jobs:
       - name: Test shared-inventory deposit verifiers
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_deposit_watchers.py -v
+      - name: Test durable custodial payout orchestration
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_payout_executor.py -v
       - name: Test custodial ledger and pricing regressions
         working-directory: cross-chain/custodial
         run: |
