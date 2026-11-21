@@ -182,7 +182,7 @@ def build_local_server(
         return destination_quorum.verify(evidence, proof).value is True
 
     admission = ReadinessAdmissionGuard(monitor, ledger)
-    coordinator = LocalCoordinator(admission)
+    coordinator = LocalCoordinator(admission, inventory_guard=quote_pricer.assert_quote_inventory)
     return create_server(
         host, port, coordinator,
         bearer_token=bearer_token,
