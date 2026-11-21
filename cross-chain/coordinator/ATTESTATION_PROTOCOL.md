@@ -52,7 +52,7 @@ own signed Solana transaction; this module does not create or sign one.
 - `sign_source_deposit` first invokes the configured source observer/quorum, then reads the exact active order reservation from finalized SOBYA vault state. It signs only when solver, recipient, SOBY amount, and release deadline match the immutable registered quote. Its EIP-712 domain is the SOBYA chain ID and exact settlement contract.
 - `sign_evm_source_payout` first invokes the configured SOBYA destination observer/quorum and signs the source escrow's EIP-712 `Payout` only when the finalized receipt matches the immutable quote and pinned source escrow identity.
 - `build_solana_payout_instruction` returns the Borsh `AttestPayout` instruction bytes after payout verification. Solana requires an attestor-signed transaction; this helper deliberately does not pretend instruction bytes are a signature or submit a transaction.
-- The service accepts no caller-supplied digest or typed payload. Every signing path requires literal `True` from its independent verifier. EVM signatures are recovered locally and must match the configured attestor address.
+- The runtime requires an explicit finalized membership reader for the SOBYA settlement and source escrow before enabling signing. The service accepts no caller-supplied digest or typed payload. Every signing path requires literal `True` from its independent verifier and a positive finalized on-chain attestor-membership callback for the exact contract/address. EVM signatures are recovered locally and must match the configured attestor address.
 
 ### Encrypted EVM attestor key
 
