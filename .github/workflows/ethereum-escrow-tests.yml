@@ -26,6 +26,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+      - name: Compile contracts, tests, and deployment scripts
+        working-directory: contracts
+        run: forge build --sizes
       - name: Run Solidity state-machine tests (local EVM only)
         working-directory: contracts
         run: forge test -vvv
