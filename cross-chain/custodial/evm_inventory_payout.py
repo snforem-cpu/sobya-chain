@@ -166,20 +166,14 @@ class EvmInventoryPayoutAdapter:
         return len(matches) == 1
 
 
-def load_evm_account_from_keystore(path: str, passphrase_env: str):
-    """Decrypt an existing owner-only local EVM keystore; never accepts key text."""
-    variable = os.environ.get(passphrase_env)
-    if not variable or len(variable) < 16:
-        raise PayoutError("local keystore passphrase environment variable is missing or too short")
-    module_path = Path(__file__).resolve().parents[1] / "coordinator" / "attestor_keystore.py"
-    spec = importlib.util.spec_from_file_location("sobya_local_attestor_keystore", module_path)
-    if spec is None or spec.loader is None:
-        raise PayoutError("shared encrypted local keystore module is unavailable")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+def load_evm_account_from_keystore(path: str, network: str, passphrase_env: str):
+    """Unlock the network-bound encrypted local inventory key; never accepts key text."""
+    from inventory_keystore import load_inventory_keystore_from_env
+    if network not in {"ethereum", "sobya"}:
+        raise PayoutError("EVM inventory keystore network must be ethereum or sobya")
     try:
-        raw = module.load_encrypted_keystore(path, variable)
+        raw = load_inventory_keystore_from_env(path, network, passphrase_env)
         from eth_account import Account
         return Account.from_key(raw)
     except Exception as exc:
-        raise PayoutError("could not unlock configured local EVM keystore") from exc
+        raise PayoutError("could not unlock configured local EVM inventory keystore") from exc
