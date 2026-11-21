@@ -35,10 +35,15 @@ The pricing module is a calculation component, not a live oracle, quote endpoint
 ## Implementation status (2026-11-21)
 
 - The SQLite order ledger and asymmetric demand-pricing calculation have unit tests.
-- A read-only EVM ERC-20 deposit verifier now checks configured chain ID, successful receipt, finalized-block height, canonical receipt block hash, exact token contract, sender, inventory recipient, amount, and log index. The same adapter can be configured for Ethereum or an EVM-compatible network only after its RPC's `finalized` block-tag behavior is verified.
-- The EVM verifier does not create orders, scan the chain, watch continuously, sign, or broadcast payouts. The DEX/API must provide the exact expected transaction and event index, then persist the verified event through the ledger.
-- The existing TRON and Solana observer modules still verify the previous escrow-program model; they are **not** generic shared-inventory deposit watchers. Generic TRON and Solana transfer verification, SOBYA native-coin deposit verification, payout signing/broadcasting, balance reconciliation, API/UI wiring, and full end-to-end tests remain unfinished.
-- Therefore this remains a development prototype. All networks and the overall feature stay disabled; do not accept user deposits or promise automatic payouts.
+- The new `custodial/inventory_deposit_watchers.py` module adds read-only direct-inventory deposit verifiers for all four selected networks:
+  - Ethereum: ERC-20 Transfer log, exact token contract, sender, inventory wallet, amount, receipt success, canonical block hash, and finalized block height.
+  - TRON: TRC-20 Transfer log from the Solidity Node, exact contract/sender/inventory/amount, successful receipt, and solidified block identity.
+  - Solana: finalized SPL Token transfer instruction, exact signature and instruction index, sender authority, configured USDT mint, amount, and destination token-account mint/owner.
+  - SOBYA: native EVM transfer, exact chain ID, sender, inventory recipient, amount, successful receipt, canonical block, and finalized height.
+- `InventoryDepositRecorder` passes verified evidence into the existing SQLite ledger. The ledger's unique (network, transaction, event-index) constraint prevents replaying one chain event into multiple orders, and its exact asset/amount/recipient checks remain in force.
+- Unit tests and a dedicated GitHub Actions workflow have been added for the new verifier module. Their CI result must pass before this work can be marked complete.
+- These are transaction verifiers, not yet autonomous continuous scanners. The API/order service must accept an order-bound transaction ID/signature and event index, invoke the configured verifier, then persist the result. A background scanner/reconciliation loop, production RPC configuration, official asset-identity verification, and live-chain integration tests remain release requirements.
+- The example config intentionally leaves every network and the feature disabled. No user deposits should be accepted and no payouts should be promised until the API integration, watcher liveness/restart recovery, and all release gates pass.
 
 ## Supplied inventory wallet addresses
 
