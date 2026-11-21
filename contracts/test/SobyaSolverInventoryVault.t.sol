@@ -8,6 +8,12 @@ interface VmInventoryVault {
     function warp(uint256 timestamp) external;
 }
 
+contract UnauthorizedVaultPayoutCaller {
+    function payout(SobyaSolverInventoryVault vault, bytes32 orderId) external {
+        vault.executePayout(orderId);
+    }
+}
+
 contract RejectInventoryRecipient {
     receive() external payable { revert("reject"); }
 }
@@ -18,6 +24,7 @@ contract SobyaSolverInventoryVaultTest {
 
     function setUp() public {
         vault = new SobyaSolverInventoryVault();
+        vault.setSettlement(address(this));
         vm.deal(address(this), 20 ether);
     }
 
@@ -30,7 +37,7 @@ contract SobyaSolverInventoryVaultTest {
         require(vault.reserved(address(this)) == 3 ether, "reservation lost");
     }
 
-    function testAnyoneCanSettleOnlyToReservedRecipient() public {
+    function testConfiguredSettlementCanPayOnlyReservedRecipient() public {
         address payable recipient = payable(address(0xBEEF));
         vault.deposit{value: 5 ether}();
         bytes32 orderId = keccak256("order-2");
@@ -42,6 +49,25 @@ contract SobyaSolverInventoryVaultTest {
         require(vault.reserved(address(this)) == 0, "reservation not consumed");
         (bool ok,) = address(vault).call(abi.encodeWithSelector(vault.executePayout.selector, orderId));
         require(!ok, "duplicate payout accepted");
+    }
+
+    function testUnconfiguredCallerCannotExecutePayout() public {
+        vault.deposit{value: 2 ether}();
+        bytes32 orderId = keccak256("unauthorized-payout");
+        vault.reserve(orderId, payable(address(0xBEEF)), 1 ether, uint64(block.timestamp + 1 days));
+        UnauthorizedVaultPayoutCaller attacker = new UnauthorizedVaultPayoutCaller();
+        (bool ok,) = address(attacker).call(abi.encodeWithSelector(
+            attacker.payout.selector, vault, orderId
+        ));
+        require(!ok, "unauthorized caller executed payout");
+        require(vault.reserved(address(this)) == 1 ether, "unauthorized call changed reservation");
+    }
+
+    function testSettlementCanOnlyBeConfiguredOnce() public {
+        (bool ok,) = address(vault).call(abi.encodeWithSelector(
+            vault.setSettlement.selector, address(0xCAFE)
+        ));
+        require(!ok, "settlement address was changed");
     }
 
     function testExpiredReservationCanBeReleasedButNotPaid() public {
