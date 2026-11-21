@@ -27,6 +27,7 @@ contract SobyaSolverInventoryVault {
     event InventoryReserved(bytes32 indexed orderId, address indexed solver, address indexed recipient, uint256 amount, uint64 releaseAfter);
     event ReservationSettled(bytes32 indexed orderId, address indexed solver, address indexed recipient, uint256 amount);
     event ReservationReleased(bytes32 indexed orderId, address indexed solver, uint256 amount);
+    event SettlementConfigured(address indexed settlement);
 
     error InvalidAmount();
     error InvalidReservation();
@@ -52,6 +53,7 @@ contract SobyaSolverInventoryVault {
         if (settlement != address(0)) revert SettlementAlreadySet();
         if (settlementAddress == address(0)) revert InvalidReservation();
         settlement = settlementAddress;
+        emit SettlementConfigured(settlementAddress);
     }
 
     modifier nonReentrant() {
@@ -103,8 +105,8 @@ contract SobyaSolverInventoryVault {
         emit InventoryReserved(orderId, msg.sender, recipient, amount, releaseAfter);
     }
 
-    /// @notice Anyone may trigger payout, but funds can only go to the reserved recipient.
-    ///         This intentionally allows a funded order to complete if the solver is offline.
+    /// @notice Only the configured settlement contract may execute a reserved payout.
+    ///         The recipient and amount are immutable reservation fields.
     function executePayout(bytes32 orderId) external nonReentrant {
         if (msg.sender != settlement || settlement == address(0)) revert UnauthorizedSettlement();
         Reservation storage r = reservations[orderId];
