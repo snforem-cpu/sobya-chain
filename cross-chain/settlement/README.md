@@ -16,16 +16,17 @@ that exact reservation after a strict-majority source-deposit attestation.
    by the local operator. It checks the SOBYA chain ID, deployed vault code,
    transaction fields, successful receipt, canonical block, finalized
    checkpoint, exact `InventoryReserved` event, and reservation readback.
-4. The source-chain user funds the matching USDT escrow on Ethereum, TRON, or
+4. The vault's one-time owner configuration binds the deployed settlement contract. The vault rejects direct payout calls from every other address; only that settlement contract can execute a reservation.
+5. The source-chain user funds the matching USDT escrow on Ethereum, TRON, or
    Solana.
-5. The source attestors independently verify the finalized source deposit and
+6. The source attestors independently verify the finalized source deposit and
    sign the EIP-712 or Solana attestation for the exact order.
-6. The settlement contract verifies the strict-majority signatures, reads the
+7. The settlement contract verifies the strict-majority signatures, reads the
    fixed vault reservation, and calls `executePayout(orderId)`. The vault
    sends native SOBY only to the reserved recipient.
-7. Source-chain attestors may then authorize the solver's source escrow claim
+8. Source-chain attestors may then authorize the solver's source escrow claim
    after independently verifying the finalized `PayoutExecuted` event.
-8. An unused reservation can be released only after its deadline. The
+9. An unused reservation can be released only after its deadline. The
    source-chain escrow refund path remains governed by its own deadline.
 
 The source escrow and destination settlement do not provide atomic
