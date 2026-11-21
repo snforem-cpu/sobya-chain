@@ -29,3 +29,12 @@ No payout can be submitted before positive finalized-deposit verification. Repla
 The custodial ledger module is the order-state core. It does not itself connect to RPCs, hold keys, sign, or broadcast. Chain-specific watchers and payout adapters must be connected and tested before enabling deposits. The sample deployment remains disabled until the four inventory wallet addresses, exact USDT contract/mint identities, node endpoints, and local keystore paths are configured.
 
 This model does not require source-chain escrow contracts, an attestor quorum, a solver marketplace, or separate bridge deployments. It still requires project-operated chain connectivity and secure signing.
+
+
+## Demand-responsive SOBY reference price
+
+The quote pricer can adjust the operator-published base reference rate using only finalized, executed swap volume over a rolling one-hour window. Net USDT demand for SOBY raises the quoted USDT-per-SOBY rate; net SOBY sales lower it. Pending quotes, unfinalized deposits, cancelled orders, and failed payouts are not demand.
+
+The adjustment is bounded by configuration (example ceiling: +/- 15%). A stale, unavailable, mismatched-window, or non-finalized demand snapshot causes quote creation to fail closed rather than silently using stale market pressure. The configured base rate remains an explicit economic policy input; the demand formula does not invent a starting market price or guarantee a market value.
+
+The production adapter must supply authenticated, deduplicated, finalized executed volume from the custodial order ledger. This change adds the bounded calculation and quote-pricer hook; it does not claim that the production volume aggregator or all chain watchers are already deployed.
