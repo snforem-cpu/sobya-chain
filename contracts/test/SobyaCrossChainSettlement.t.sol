@@ -142,8 +142,8 @@ contract SobyaCrossChainSettlementTest {
         bytes32 chain = keccak256("ETHEREUM_MAINNET");
         bytes32 escrow = bytes32(uint256(uint160(address(0x1234))));
         bytes32 asset = bytes32(uint256(uint160(address(0x5678))));
-        _execute(orderId, chain, escrow, asset, 10_000_000);
         bytes[] memory signatures = _signatures(orderId, chain, escrow, asset, 10_000_000);
+        settlement.executePayout(orderId, chain, escrow, asset, 10_000_000, signatures);
         (bool ok,) = address(settlement).call(abi.encodeWithSelector(
             settlement.executePayout.selector, orderId, chain, escrow, asset, 10_000_000, signatures
         ));
