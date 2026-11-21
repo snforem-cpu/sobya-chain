@@ -158,3 +158,18 @@ class Erc20DepositVerifier:
             raise EvmDepositError("exact expected ERC-20 Transfer log not found")
         return VerifiedErc20Deposit(chain_id, tx_hash, token, inventory, sender,
             expected.amount_base_units, expected.log_index, block_number, block_hash.lower())
+
+    def verify_and_record(self, ledger: Any, order_id: str,
+                          expected: ExpectedErc20Deposit) -> VerifiedErc20Deposit:
+        """Verify on-chain evidence, then idempotently advance the matching order."""
+        verified = self.verify(expected)
+        ledger.record_deposit(
+            order_id,
+            tx_id=verified.tx_hash,
+            event_index=verified.log_index,
+            observed_amount=verified.amount_base_units,
+            observed_recipient=verified.inventory_wallet,
+            observed_asset=verified.token_contract,
+        )
+        ledger.confirm_deposit_final(order_id, verified=True)
+        return verified
