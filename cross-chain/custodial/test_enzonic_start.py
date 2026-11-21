@@ -21,12 +21,7 @@ class EnzonicLauncherTests(unittest.TestCase):
             }), encoding="utf-8")
             old_cwd = Path.cwd()
             with patch.object(enzonic_start, "HERE", root), patch.dict(
-                os.environ,
-                {
-                    "SOBYA_CUSTODIAL_CONFIG": "",
-                    "SOBYA_CUSTODIAL_DB": "",
-                    "SOBYA_PAYOUT_JOURNAL": "",
-                },
+                os.environ, {}, clear=True
             ), patch("payout_worker.main", return_value=0):
                 try:
                     self.assertEqual(enzonic_start.main(), 0)
@@ -54,12 +49,7 @@ class EnzonicLauncherTests(unittest.TestCase):
             config_path.write_text('{"operatorConfig": true}', encoding="utf-8")
             old_cwd = Path.cwd()
             with patch.object(enzonic_start, "HERE", root), patch.dict(
-                os.environ,
-                {
-                    "SOBYA_CUSTODIAL_CONFIG": str(config_path),
-                    "SOBYA_CUSTODIAL_DB": "",
-                    "SOBYA_PAYOUT_JOURNAL": "",
-                },
+                os.environ, {"SOBYA_CUSTODIAL_CONFIG": str(config_path)}, clear=True
             ), patch("payout_worker.main", return_value=0):
                 try:
                     self.assertEqual(enzonic_start.main(), 0)
