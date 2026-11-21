@@ -76,6 +76,24 @@ jobs:
           cargo fmt --all -- --check
           cargo test
           cargo check
+      - name: Build deployable Solana BPF program
+        working-directory: cross-chain/solana/program
+        run: cargo build-sbf
+      - name: Deploy program to the ephemeral validator and verify executable account
+        working-directory: cross-chain/solana/program
+        run: |
+          set -euo pipefail
+          solana config set --url http://127.0.0.1:8899
+          solana-keygen new --no-bip39-passphrase --silent --force --outfile /tmp/sobya-solana-program.json
+          solana-keygen new --no-bip39-passphrase --silent --force --outfile /tmp/sobya-solana-payer.json
+          solana airdrop 5 --keypair /tmp/sobya-solana-payer.json
+          solana program deploy target/deploy/sobya_solana_usdt_escrow.so \
+            --program-id /tmp/sobya-solana-program.json \
+            --keypair /tmp/sobya-solana-payer.json \
+            --url http://127.0.0.1:8899
+          PROGRAM_ID="$(solana address --keypair /tmp/sobya-solana-program.json)"
+          solana program show "$PROGRAM_ID" --url http://127.0.0.1:8899
+          solana program show "$PROGRAM_ID" --url http://127.0.0.1:8899 | grep -Fq "Executable: Yes"
       - name: Stop Solana validator
         if: always()
         run: if [ -f /tmp/solana-validator.pid ]; then kill "$(cat /tmp/solana-validator.pid)" || true; fi
