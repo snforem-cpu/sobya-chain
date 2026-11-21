@@ -60,6 +60,7 @@ class CoordinatorHttpApiTests(unittest.TestCase):
                 quote_ttl_seconds=60, refund_grace_seconds=3600,
             ),
             self.ledger, destination_chain_id=357812033857,
+            finalized_balance=lambda _solver: 3 * 10**18,
             now=lambda: 1_900_000_000,
         )
         self.server = create_server(
