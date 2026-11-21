@@ -76,6 +76,9 @@ def create_server(
     )):
         raise ValueError("all cryptographic and observer verifiers are required")
     inventory_guard = getattr(coordinator, "inventory_guard", None)
+    vault_reserver = getattr(coordinator, "reserve_onchain_inventory", None)
+    if not callable(vault_reserver):
+        raise ValueError("HTTP API requires a finalized on-chain SOBYA vault reservation adapter")
     quote_inventory_guard = getattr(quote_pricer, "assert_quote_inventory", None)
     balance_reader = getattr(quote_pricer, "finalized_balance", None)
     if not isinstance(balance_reader, FinalizedNativeBalanceReader):
