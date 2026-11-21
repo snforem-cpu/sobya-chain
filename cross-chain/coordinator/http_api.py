@@ -74,6 +74,10 @@ def create_server(
         verify_quote_signature, verify_source_deposit, verify_destination_payout
     )):
         raise ValueError("all cryptographic and observer verifiers are required")
+    inventory_guard = getattr(coordinator, "inventory_guard", None)
+    quote_inventory_guard = getattr(quote_pricer, "assert_quote_inventory", None)
+    if not callable(quote_inventory_guard) or inventory_guard != quote_inventory_guard:
+        raise ValueError("HTTP API must use the quote pricer's finalized inventory guard")
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "SOBYA-Coordinator"
