@@ -28,7 +28,7 @@ This is a **single-operator trust model**. The processes and keys are controlled
    - The intended self-operated profile uses separately provisioned signing instances and distinct keys, all administered by SOBYA. No outside person is required to hold an attestor key.
    - Keep each key outside the repository and outside the observer process. Do not expose keys to the DEX browser or quote API.
    - An attestor signs only after it has independently queried the local chain data and verified the SOBYA payout against the complete order commitment.
-   - The current prototype has no signer daemon, key provisioning, secure key store, or signing automation. These must be implemented and tested before any source escrow is enabled.
+   - A local EVM attestor library, encrypted owner-only keystore, authenticated loopback signing routes, and finalized on-chain membership gates now exist in the PR. This is not yet a supervised signer daemon or a production key lifecycle: independent per-attestor provisioning, encrypted backup/rotation/revocation procedures, hardware-backed signing, and operational monitoring remain outstanding. Solana currently returns verified instruction bytes; it does not yet construct, sign, or submit the Solana transaction.
 
 4. **Local coordinator and risk controller**
    - The coordinator stores immutable quotes and verified evidence.
@@ -82,11 +82,11 @@ The monitor clears its snapshot if a refresh operation raises, and stale snapsho
 
 ## Implementation gates
 
-1. Implemented: independent config/order PDA derivation and forged-PDA rejection tests in the Solana source observer. Still pending: validator-based integration tests.
+1. Implemented: independent config/order PDA derivation and forged-PDA rejection tests in the Solana source observer. CI now builds the SBF artifact, deploys it to an ephemeral Solana validator, and verifies the executable program account. Still pending: instruction-level validator tests for initialization, SPL Token funding/CPI, threshold attestations, claim, refund, and replay/race cases.
 2. Added a self-hosted node configuration template with public-RPC fallback disabled; all networks remain disabled and example identities must be pinned before use.
 3. Added a fail-closed supervisor library and read-only probe adapters for Ethereum/SOBYA EVM, TRON FullNode+SolidityNode, and Solana JSON-RPC. The adapters check EVM chain ID/head/finalized tag/syncing, TRON genesis/head/solidified height, and Solana genesis/health/processed+finalized slots. They use bounded HTTP responses/timeouts and reject public RPC URLs. Mocked unit tests cover adapter behavior; no live-node connection or testnet integration has been performed. Current adapters use each node's own head as the reference height, so cross-node peer-head comparison is not yet supplied by the adapters. They do not independently verify consensus or act as light clients. The config-to-supervisor factory is implemented, but deployment and wiring into a running supervisor service remain pending.
-4. Implement separately isolated SOBYA-controlled attestor processes and key lifecycle; keep all signing disabled by default.
-5. Add coordinator/risk-controller integration, strict caps, pause and refund-preservation tests.
+4. Partially implemented: local EVM signing library, encrypted keystore, authenticated loopback routes, observer-gated signing, and finalized contract-membership checks. Still pending: three independently provisioned signer processes, key lifecycle/rotation/recovery, production process supervision, and Solana transaction signing/submission. Signing remains disabled unless explicitly configured.
+5. Partially implemented: coordinator admission, inventory reservations, observer quorum composition, and fail-closed health checks. Still pending: enforced global/per-source risk caps, durable operational pause controls, rate limiting, automated recovery, and end-to-end API integration.
 6. Run end-to-end tests on each source-chain test network and SOBYA test environment.
 7. Review the single-operator trust model and publish it honestly in the DEX UI.
 8. Enable any network only after explicit owner approval. No mainnet deployment, signing, escrow claim, or funds movement is authorized by this document.
