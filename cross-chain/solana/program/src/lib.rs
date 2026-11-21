@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::program_pack::Pack;
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     clock::Clock,
@@ -11,7 +12,6 @@ use solana_program::{
     system_instruction, system_program,
     sysvar::Sysvar,
 };
-use solana_program::program_pack::Pack;
 use spl_token::{instruction as token_instruction, state::Account as SplAccount};
 
 entrypoint!(process_instruction);
@@ -220,8 +220,7 @@ fn process_fund(
     if !user.is_signer || !user.is_writable || !solver.is_signer || !order_account.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if token_program.key != &spl_token::id()
-        || system_program_account.key != &system_program::id()
+    if token_program.key != &spl_token::id() || system_program_account.key != &system_program::id()
     {
         return Err(ProgramError::IncorrectProgramId);
     }
