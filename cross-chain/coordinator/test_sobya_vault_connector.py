@@ -51,6 +51,19 @@ class FakeRpc:
             return "0x5208"
         if method == "eth_sendRawTransaction":
             return TX_HASH
+        if method == "eth_getTransactionByHash":
+            calldata = (
+                "0x" + keccak(b"reserve(bytes32,address,uint128,uint64)")[:4].hex()
+                + ORDER_ID[2:] + address_word(RECIPIENT)
+                + word(123) + word(200)
+            )
+            return {
+                "from": SOLVER,
+                "to": VAULT,
+                "input": calldata,
+                "value": "0x0",
+                "chainId": hex(CHAIN_ID),
+            }
         if method == "eth_getTransactionReceipt":
             return self.receipt
         if method == "eth_getBlockByNumber":
