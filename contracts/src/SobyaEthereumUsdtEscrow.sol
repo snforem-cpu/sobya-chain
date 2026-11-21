@@ -65,7 +65,12 @@ contract SobyaEthereumUsdtEscrow {
     }
 
     constructor(address token_, address[] memory attestors_, uint256 threshold_) {
-        if (token_ == address(0) || threshold_ == 0 || threshold_ > attestors_.length) {
+        // A 1-of-1 or 1-of-2 signer set is too fragile for custody.
+        // Require at least three distinct keys and a strict-majority threshold.
+        if (
+            token_ == address(0) || attestors_.length < 3 || attestors_.length > 32 ||
+            threshold_ <= attestors_.length / 2 || threshold_ > attestors_.length
+        ) {
             revert InvalidConfiguration();
         }
         token = token_;
