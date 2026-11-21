@@ -7,6 +7,10 @@ and verifies exact finalized receipt contents before allowing ledger completion.
 from __future__ import annotations
 
 from typing import Any
+import importlib.util
+import os
+from pathlib import Path
+
 
 from payout_executor import PayoutError, PayoutIntent, PreparedPayout
 
@@ -160,3 +164,22 @@ class EvmInventoryPayoutAdapter:
                     and int(log["data"].hex(), 16) == intent.amount_base_units):
                 matches.append(log)
         return len(matches) == 1
+
+
+def load_evm_account_from_keystore(path: str, passphrase_env: str):
+    """Decrypt an existing owner-only local EVM keystore; never accepts key text."""
+    variable = os.environ.get(passphrase_env)
+    if not variable or len(variable) < 16:
+        raise PayoutError("local keystore passphrase environment variable is missing or too short")
+    module_path = Path(__file__).resolve().parents[1] / "coordinator" / "attestor_keystore.py"
+    spec = importlib.util.spec_from_file_location("sobya_local_attestor_keystore", module_path)
+    if spec is None or spec.loader is None:
+        raise PayoutError("shared encrypted local keystore module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        raw = module.load_encrypted_keystore(path, variable)
+        from eth_account import Account
+        return Account.from_key(raw)
+    except Exception as exc:
+        raise PayoutError("could not unlock configured local EVM keystore") from exc
