@@ -224,15 +224,7 @@ def build_local_server(
         inventory_guard=quote_pricer.assert_quote_inventory,
         reserve_onchain_inventory=reserve_onchain_inventory.reserve,
     )
-    server = create_server(
-        host, port, coordinator,
-        bearer_token=bearer_token,
-        verify_quote_signature=quote_signatures.verify,
-        verify_source_deposit=verify_source_deposit,
-        verify_destination_payout=verify_destination_payout,
-        quote_pricer=quote_pricer,
-    )
-    server.attestor_service = None
+    attestor_service = None
     if attestor_backend is not None:
         if not isinstance(attestor_source_identities, dict) or not attestor_source_identities:
             raise ValueError("explicit attestor source-chain IDs and escrow addresses are required")
@@ -253,7 +245,7 @@ def build_local_server(
                 active=observed.active,
             )
 
-        server.attestor_service = AttestorService(
+        attestor_service = AttestorService(
             attestor=attestor_backend,
             quote_lookup=lookup,
             verify_source_deposit=verify_source_deposit,
@@ -263,4 +255,13 @@ def build_local_server(
             destination_chain_id=sobya_settlement.destination_chain_id,
             source_identities=attestor_source_identities,
         )
+    server = create_server(
+        host, port, coordinator,
+        bearer_token=bearer_token,
+        verify_quote_signature=quote_signatures.verify,
+        verify_source_deposit=verify_source_deposit,
+        verify_destination_payout=verify_destination_payout,
+        quote_pricer=quote_pricer,
+    )
+    server.attestor_service = attestor_service
     return server
