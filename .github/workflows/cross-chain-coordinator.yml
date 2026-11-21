@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened, edited]
     paths:
       - "cross-chain/coordinator/**"
+      - "cross-chain/custodial/**"
+      - "cross-chain/CUSTODIAL_INVENTORY_SWAP.md"
       - "cross-chain/observer/source_observer_router.py"
       - "cross-chain/observer/destination_payout_router.py"
       - "cross-chain/observer/test_observer_routers.py"
@@ -15,6 +17,8 @@ on:
       - feat/sobya-cross-chain-swap-foundation
     paths:
       - "cross-chain/coordinator/**"
+      - "cross-chain/custodial/**"
+      - "cross-chain/CUSTODIAL_INVENTORY_SWAP.md"
       - "cross-chain/observer/source_observer_router.py"
       - "cross-chain/observer/destination_payout_router.py"
       - "cross-chain/observer/test_observer_routers.py"
@@ -43,3 +47,5 @@ jobs:
           python -m unittest discover -s . -p 'test_*.py' -v
           cd ../observer
           python -m unittest -v test_observer_routers.py
+          cd ../custodial
+          python -m unittest -v test_custodial_ledger.py
