@@ -115,6 +115,16 @@ class BrowserGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "positive integer"):
             _validate_request(json.dumps(payload).encode())
 
+    def test_chain_specific_address_formats_are_enforced(self):
+        payload = {"request": {
+            "order_id": "order-1", "source_chain": "ethereum",
+            "source_asset": "not-an-ethereum-address", "source_amount": 1,
+            "user": "0x" + "22" * 20, "solver": "0x" + "33" * 20,
+            "destination_recipient": "0x" + "44" * 20,
+        }}
+        with self.assertRaisesRegex(ValueError, "EVM addresses"):
+            _validate_request(json.dumps(payload).encode())
+
     def test_sliding_window_limiter(self):
         limiter = SlidingWindowLimiter(limit=2, window_seconds=60)
         self.assertTrue(limiter.allow("client", now=0))
