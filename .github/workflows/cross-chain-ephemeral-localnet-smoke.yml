@@ -80,7 +80,7 @@ jobs:
         run: mkdir -p "$HOME/.cache/solana"
       - name: Build deployable Solana BPF program
         working-directory: cross-chain/solana/program
-        run: cargo build-sbf --tools-version v1.54
+        run: cargo build-sbf --force-tools-install --tools-version v1.54
       - name: Deploy program to the ephemeral validator and verify executable account
         working-directory: cross-chain/solana/program
         run: |
