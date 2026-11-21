@@ -38,6 +38,7 @@
     }
   },
   "pricing": {
+    "baseReferencePriceUsdtPerSoby": null,
     "demandSensitivityBps": 2000,
     "maxDemandAdjustmentBps": 1500,
     "demandWindowSeconds": 3600,
@@ -59,5 +60,5 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks are disabled. Fill only verified public wallet/token identities and private RPC endpoints. Keystore paths are local environment settings; never put private keys or seed phrases in this file or the repository."
+  "notice": "Template only. All networks are disabled. Set an explicitly approved base reference price before quote creation. Fill only verified public wallet/token identities and private RPC endpoints. Keystore paths are local environment settings; never put private keys or seed phrases in this file or the repository."
 }
