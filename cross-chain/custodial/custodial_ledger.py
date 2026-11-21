@@ -26,7 +26,6 @@ class CustodialOrderLedger:
                 deposit_tx TEXT, deposit_event_index INTEGER, payout_tx TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(source_network, deposit_address),
                 UNIQUE(source_network, deposit_tx, deposit_event_index))""")
             db.execute("CREATE INDEX IF NOT EXISTS custodial_orders_state_idx ON custodial_orders(state)")
 
@@ -76,7 +75,7 @@ class CustodialOrderLedger:
                 db.commit()
             except sqlite3.IntegrityError as exc:
                 db.rollback()
-                raise CustodialOrderError("order ID or deposit address already assigned") from exc
+                raise CustodialOrderError("order ID already assigned") from exc
         return oid
 
     def record_deposit(self, order_id, *, tx_id, event_index, observed_amount, observed_recipient, observed_asset):
