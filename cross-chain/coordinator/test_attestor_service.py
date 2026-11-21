@@ -112,6 +112,44 @@ class AttestorServiceTests(unittest.TestCase):
         with self.assertRaises(AttestorServiceError):
             self.service.sign_evm_source_payout(changed, {"ok": True})
 
+    def test_solana_instruction_uses_pinned_solana_attestor_not_evm_key(self):
+        from dataclasses import replace
+        solana_quote = replace(
+            self.quote, source_chain="solana",
+            source_asset="TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        )
+        solana_evidence = replace(
+            self.destination_evidence, source_chain="solana",
+            source_asset=solana_quote.source_asset,
+        )
+        solana_attestor = "11111111111111111111111111111111"
+        program_id = "11111111111111111111111111111111"
+        calls = []
+        service = AttestorService(
+            attestor=self.backend,
+            quote_lookup=lambda order_id: solana_quote,
+            verify_source_deposit=lambda *_: True,
+            verify_destination_payout=lambda *_: True,
+            finalized_reservation=lambda _: self.reservation,
+            attestor_membership=lambda network, contract, address: (
+                calls.append((network, contract, address)) or True
+            ),
+            settlement_contract="0x" + "cc" * 20,
+            destination_chain_id=357812033857,
+            source_identities={"solana": PinnedSourceIdentity(
+                source_chain="solana", source_chain_id=0,
+                source_chain_hash="0x" + "88" * 32,
+                source_escrow_id="0x" + "99" * 32,
+                source_asset_id="0x" + "aa" * 32,
+                source_program_id=program_id,
+                solana_attestor_pubkey=solana_attestor,
+            )},
+        )
+        result = service.build_solana_payout_instruction(solana_evidence, {"ok": True})
+        self.assertEqual(result["attestor"], solana_attestor)
+        self.assertEqual(calls, [("solana", program_id, solana_attestor)])
+        self.assertEqual(len(bytes.fromhex(result["instruction_data"][2:])), 65)
+
     def test_signature_backend_must_recover_configured_attestor(self):
         wrong = keys.PrivateKey(bytes.fromhex("12" * 32))
         backend = EvmSigningBackend(
