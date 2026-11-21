@@ -65,6 +65,34 @@ class InventoryAwareQuotePricer:
         self.finalized_balance = finalized_balance
         self.now = now or (lambda: int(time.time()))
 
+    def _reconciled_available_inventory(self, solver: str) -> int:
+        total, reserved, ledger_available = self.ledger.solver_inventory_snapshot(solver)
+        try:
+            chain_balance = self.finalized_balance(solver)
+        except Exception as exc:
+            raise PricingError("finalized SOBYA solver balance could not be verified") from exc
+        if (not isinstance(chain_balance, int) or isinstance(chain_balance, bool)
+                or chain_balance < 0):
+            raise PricingError("finalized SOBYA solver balance is invalid")
+        if chain_balance < reserved:
+            raise PricingError("on-chain SOBY balance is below already reserved obligations")
+        if total < reserved:
+            raise PricingError("solver inventory accounting is inconsistent")
+        return min(ledger_available, chain_balance - reserved)
+
+    def assert_quote_inventory(self, quote: OrderQuote) -> bool:
+        """Reconcile finalized native SOBY again immediately before reservation."""
+        if not isinstance(quote, OrderQuote):
+            raise PricingError("a registered quote is required for inventory verification")
+        if (not isinstance(quote.destination_amount, int)
+                or isinstance(quote.destination_amount, bool)
+                or quote.destination_amount <= 0):
+            raise PricingError("quote destination amount is invalid")
+        available = self._reconciled_available_inventory(quote.solver)
+        if available < quote.destination_amount:
+            raise PricingError("solver has insufficient reconciled SOBY inventory")
+        return True
+
     def quote(
         self,
         *,
@@ -94,20 +122,10 @@ class InventoryAwareQuotePricer:
         if destination_amount <= 0:
             raise PricingError("source amount is too small to produce a positive SOBY payout")
 
-        total, reserved, ledger_available = self.ledger.solver_inventory_snapshot(solver)
-        try:
-            chain_balance = self.finalized_balance(solver)
-        except Exception as exc:
-            raise PricingError("finalized SOBYA solver balance could not be verified") from exc
-        if (not isinstance(chain_balance, int) or isinstance(chain_balance, bool)
-                or chain_balance < 0):
-            raise PricingError("finalized SOBYA solver balance is invalid")
-        if chain_balance < reserved:
-            raise PricingError("on-chain SOBY balance is below already reserved obligations")
         # Never quote against an operator-entered inventory figure that exceeds
         # finalized native SOBY actually held by the solver wallet.
-        available = min(ledger_available, chain_balance - reserved)
-        if total < reserved or available < destination_amount:
+        available = self._reconciled_available_inventory(solver)
+        if available < destination_amount:
             raise PricingError("solver has insufficient reconciled SOBY inventory")
 
         current = int(self.now())
