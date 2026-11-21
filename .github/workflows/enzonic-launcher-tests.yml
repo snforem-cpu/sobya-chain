@@ -1,0 +1,33 @@
+name: Enzonic launcher safety tests
+
+on:
+  pull_request:
+    paths:
+      - "cross-chain/custodial/**"
+      - ".github/workflows/enzonic-launcher-tests.yml"
+  push:
+    branches:
+      - "enzonic-safe-start"
+    paths:
+      - "cross-chain/custodial/**"
+      - ".github/workflows/enzonic-launcher-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enzonic-launcher-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cross-chain/custodial
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Enzonic launcher safety tests
+        run: python -m unittest -v test_enzonic_start.py
