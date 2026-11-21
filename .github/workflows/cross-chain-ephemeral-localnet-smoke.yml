@@ -89,6 +89,7 @@ jobs:
           solana-keygen new --no-bip39-passphrase --silent --force --outfile /tmp/sobya-solana-program.json
           solana-keygen new --no-bip39-passphrase --silent --force --outfile /tmp/sobya-solana-payer.json
           solana airdrop 5 --keypair /tmp/sobya-solana-payer.json
+          solana config set --keypair /tmp/sobya-solana-payer.json
           solana program deploy target/deploy/sobya_solana_usdt_escrow.so \
             --program-id /tmp/sobya-solana-program.json \
             --keypair /tmp/sobya-solana-payer.json \
