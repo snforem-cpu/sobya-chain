@@ -109,7 +109,7 @@ class PricingTests(unittest.TestCase):
         config = PricingConfig(2_000_000, demand_sensitivity_bps=2_000,
                                max_demand_adjustment_bps=1_500)
         snapshot = DemandSnapshot(900_000_000, 100_000_000, 3600, 1_900_000_000)
-        self.assertEqual(demand_adjustment_bps(snapshot, config, 1_900_000_010), 1_600 if False else 1_500)
+        self.assertEqual(demand_adjustment_bps(snapshot, config, 1_900_000_010), 1_500)
 
     def test_finalized_net_sell_demand_reduces_reference_price(self):
         config = PricingConfig(2_000_000, demand_sensitivity_bps=2_000,
