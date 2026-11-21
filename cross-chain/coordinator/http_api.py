@@ -21,7 +21,7 @@ from order_ledger import (
     OrderQuote,
     SourceDepositEvidence,
 )
-from solver_balance_reader import FinalizedNativeBalanceReader
+from solver_balance_reader import FinalizedVaultInventoryReader
 
 LOG = logging.getLogger("sobya.coordinator.http")
 
