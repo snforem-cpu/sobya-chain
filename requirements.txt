@@ -1,0 +1,3 @@
+# Enzonic installs dependencies from the repository root.
+# Keep the canonical custodial dependency list in one place.
+-r cross-chain/custodial/requirements.txt
