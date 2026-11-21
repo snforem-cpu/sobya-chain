@@ -280,6 +280,21 @@ class CrossChainOrderLedger:
         return 0 if row is None else int(row["total_units"]) - int(row["reserved_units"])
 
     @_synchronized
+    def solver_inventory_snapshot(self, solver: str) -> tuple[int, int, int]:
+        """Return (operator-provisioned total, active reservations, available)."""
+        row = self.db.execute(
+            "SELECT total_units,reserved_units FROM solver_inventory WHERE solver=?",
+            (solver,),
+        ).fetchone()
+        if row is None:
+            return 0, 0, 0
+        total = int(row["total_units"])
+        reserved = int(row["reserved_units"])
+        if total < 0 or reserved < 0 or reserved > total:
+            raise LedgerError("solver inventory accounting is inconsistent")
+        return total, reserved, total - reserved
+
+    @_synchronized
     def register_quote_with_inventory(self, quote: OrderQuote, now: int | None = None) -> None:
         """Atomically register a quote and reserve its exact SOBY payout amount."""
         now = int(time.time()) if now is None else now
