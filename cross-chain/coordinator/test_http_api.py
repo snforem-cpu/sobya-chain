@@ -135,6 +135,37 @@ class CoordinatorHttpApiTests(unittest.TestCase):
         status, _ = self.post("/v1/quotes", {}, token=None)
         self.assertEqual(status, 401)
 
+    def test_attestor_routes_are_disabled_without_local_signer(self):
+        status, body = self.post("/v1/attestations/source-deposits", {
+            "evidence": asdict(self.deposit), "proof": {"finalized": True},
+        })
+        self.assertEqual(status, 503, body)
+        status, body = self.post("/v1/attestations/destination-payouts", {
+            "evidence": asdict(self.payout), "proof": {"finalized": True},
+        })
+        self.assertEqual(status, 503, body)
+
+    def test_attestor_routes_call_only_configured_local_service(self):
+        class FakeAttestor:
+            def sign_source_deposit(self, evidence, proof):
+                return {"purpose": "SOBYA_SOURCE_DEPOSIT_RELEASE", "order_id": evidence.order_id}
+
+            def sign_evm_source_payout(self, evidence, proof):
+                return {"purpose": "SOURCE_ESCROW_SOLVER_PAYOUT", "order_id": evidence.order_id}
+
+        self.server.attestor_service = FakeAttestor()
+        status, body = self.post("/v1/attestations/source-deposits", {
+            "evidence": asdict(self.deposit), "proof": {"finalized": True},
+        })
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)["purpose"], "SOBYA_SOURCE_DEPOSIT_RELEASE")
+        status, body = self.post("/v1/attestations/destination-payouts", {
+            "evidence": asdict(self.payout), "proof": {"finalized": True},
+        })
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)["purpose"], "SOURCE_ESCROW_SOLVER_PAYOUT")
+
+
     def test_unsigned_quote_preview_uses_pricing_and_does_not_reserve(self):
         status, body = self.post("/v1/quote-previews", {"request": {
             "order_id": "0x" + "01"*32,
