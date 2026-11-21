@@ -154,6 +154,9 @@ class EvmInventoryPayoutAdapter:
             address = _address(log["address"], "log token")
             if address.lower() != self.token.lower() or len(topics) != 3 or topics[0].lower() != TRANSFER_TOPIC:
                 continue
-            if topics[2].lower() == expected_topic.lower() and int(log["data"].hex(), 16) == intent.amount_base_units:
+            expected_sender = "0x" + self.inventory[2:].lower().rjust(64, "0")
+            if (topics[1].lower() == expected_sender.lower()
+                    and topics[2].lower() == expected_topic.lower()
+                    and int(log["data"].hex(), 16) == intent.amount_base_units):
                 matches.append(log)
         return len(matches) == 1
