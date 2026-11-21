@@ -7,13 +7,13 @@ from evm_deposit_watcher import (
 )
 
 
-TOKEN = "0x" + "11" * 20
-INVENTORY = "0x" + "22" * 20
-SENDER = "0x" + "33" * 20
+TOKEN = "0x" + "a1" * 20
+INVENTORY = "0x" + "b2" * 20
+SENDER = "0x" + "c3" * 20
 TX = "0x" + "aa" * 32
 BLOCK_HASH = "0x" + "bb" * 32
-TOPIC_FROM = "0x" + "00" * 12 + "33" * 20
-TOPIC_TO = "0x" + "00" * 12 + "22" * 20
+TOPIC_FROM = "0x" + "00" * 12 + "c3" * 20
+TOPIC_TO = "0x" + "00" * 12 + "b2" * 20
 
 
 class FakeRpc:
