@@ -56,7 +56,7 @@ def create_encrypted_keystore(path: str | os.PathLike[str], private_key: bytes,
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     salt = secrets.token_bytes(16)
     encryption_key = _derive(passphrase, salt)
-    encrypted = SecretBox(encryption_key).encrypt(bytes(key), secrets.token_bytes(SecretBox.NONCE_SIZE))
+    encrypted = SecretBox(encryption_key).encrypt(key.to_bytes(), secrets.token_bytes(SecretBox.NONCE_SIZE))
     document = {
         "version": VERSION,
         "cipher": "xsalsa20-poly1305",
@@ -128,7 +128,7 @@ def load_encrypted_keystore(path: str | os.PathLike[str], passphrase: str) -> by
     key = _private_key(raw)
     if key.public_key.to_checksum_address().lower() != str(document["address"]).lower():
         raise KeystoreError("keystore public address does not match decrypted key")
-    return bytes(key)
+    return key.to_bytes()
 
 
 def evm_signer_from_keystore(path: str | os.PathLike[str], passphrase: str):
