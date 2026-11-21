@@ -18,7 +18,10 @@ class LocalCoordinatorTests(unittest.TestCase):
         self.solver = "0x" + "44" * 20
         self.ledger.set_solver_inventory(self.solver, 3 * 10**18)
         self.monitor = FakeMonitor()
-        self.service = LocalCoordinator(ReadinessAdmissionGuard(self.monitor, self.ledger))
+        self.service = LocalCoordinator(
+            ReadinessAdmissionGuard(self.monitor, self.ledger),
+            inventory_guard=lambda _quote: True,
+        )
         self.quote = OrderQuote(
             order_id="coordinator-order-001", source_chain="ethereum",
             source_asset="0x" + "33"*20, source_amount=20_000_000,
@@ -50,6 +53,13 @@ class LocalCoordinatorTests(unittest.TestCase):
         self.service.issue_quote(self.quote, b"sig", lambda q, sig: q == self.quote and sig == b"sig",
                                  now=1_900_000_000)
         self.assertEqual(self.ledger.available_solver_inventory(self.solver), 2 * 10**18)
+
+    def test_quote_fails_closed_without_inventory_reconciliation(self):
+        service = LocalCoordinator(ReadinessAdmissionGuard(self.monitor, self.ledger))
+        with self.assertRaises(VerificationRejected):
+            service.issue_quote(
+                self.quote, b"sig", lambda *_: True, now=1_900_000_000
+            )
 
     def test_source_deposit_requires_positive_observer_verification(self):
         self.service.issue_quote(self.quote, b"sig", lambda *_: True, now=1_900_000_000)
