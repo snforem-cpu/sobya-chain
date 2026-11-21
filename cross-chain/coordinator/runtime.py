@@ -28,6 +28,7 @@ from destination_payout_router import (
 from solver_balance_reader import FinalizedNativeBalanceReader
 from observer_quorum import IndependentObserverQuorum, ObserverSource
 from self_hosted_supervisor import validate_self_hosted_url, SupervisorConfigError
+from settlement_observer import JsonRpc
 
 
 @dataclass(frozen=True)
@@ -207,7 +208,14 @@ def build_local_server(
         return destination_quorum.verify(evidence, proof).value is True
 
     admission = ReadinessAdmissionGuard(monitor, ledger)
-    # Accept either a narrow reserve(quote) callable or the concrete\n    # SobyaVaultReserver object. The latter performs local signing, broadcast,\n    # finalized receipt checks, and reservation readback.\n    if not callable(reserve_onchain_inventory):\n        reserve_method = getattr(reserve_onchain_inventory, "reserve", None)\n        if callable(reserve_method):\n            reserve_onchain_inventory = reserve_method\n    if not callable(reserve_onchain_inventory):\n        raise ValueError("a finalized SOBYA vault reservation adapter is required")\n    coordinator = LocalCoordinator(
+    # Accept either a reserve(quote) callable or the concrete vault adapter.
+    if not callable(reserve_onchain_inventory):
+        reserve_method = getattr(reserve_onchain_inventory, "reserve", None)
+        if callable(reserve_method):
+            reserve_onchain_inventory = reserve_method
+    if not callable(reserve_onchain_inventory):
+        raise ValueError("a finalized SOBYA vault reservation adapter is required")
+    coordinator = LocalCoordinator(
         admission,
         inventory_guard=quote_pricer.assert_quote_inventory,
         reserve_onchain_inventory=reserve_onchain_inventory,
