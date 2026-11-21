@@ -11,7 +11,9 @@ from pricing import InventoryAwareQuotePricer, PricingConfig
 from eip712_quote_verifier import Eip712QuoteDomain
 from source_observer_router import EthereumSourceConfig, TronSourceConfig, SolanaSourceConfig
 from destination_payout_router import SobyaSettlementConfig, SourceIdentity
-from runtime import build_local_server
+from runtime import (
+    build_local_server, SourceObserverReplica, DestinationObserverReplica,
+)
 from solver_balance_reader import FinalizedNativeBalanceReader
 from test_admission import FakeMonitor
 
@@ -24,7 +26,8 @@ class RuntimeCompositionTests(unittest.TestCase):
                 solver = "0x" + "44" * 20
                 ledger.set_solver_inventory(solver, 150_000_000 * 10**18)
                 class PrivateRpc:
-                    url = "http://127.0.0.1:8545"
+                    def __init__(self, port):
+                        self.url = f"http://127.0.0.1:{port}"
 
                     def call(self, method, _params):
                         if method == "eth_chainId":
@@ -33,7 +36,28 @@ class RuntimeCompositionTests(unittest.TestCase):
                             return hex(150_000_000 * 10**18)
                         raise AssertionError(method)
 
-                sobya_rpc = PrivateRpc()
+                sobya_rpc = PrivateRpc(8545)
+                source_replicas = tuple(
+                    SourceObserverReplica(
+                        observer_id=f"source-{index}",
+                        ethereum_sources={
+                            "ethereum": EthereumSourceConfig(
+                                1, "0x" + "11" * 20, PrivateRpc(8545 + index)
+                            )
+                        },
+                        tron_sources={}, solana_source=None,
+                    )
+                    for index in (1, 2)
+                )
+                destination_replicas = tuple(
+                    DestinationObserverReplica(
+                        observer_id=f"destination-{index}",
+                        settlement=SobyaSettlementConfig(
+                            357812033857, "0x" + "66" * 20, 2, PrivateRpc(8545 + index)
+                        ),
+                    )
+                    for index in (3, 4)
+                )
                 pricer = InventoryAwareQuotePricer(
                     PricingConfig(
                         usdt_atoms_numerator=2_000_000,
@@ -68,6 +92,8 @@ class RuntimeCompositionTests(unittest.TestCase):
                         )
                     },
                     quote_pricer=pricer,
+                    additional_source_observers=source_replicas,
+                    additional_destination_observers=destination_replicas,
                 )
                 try:
                     self.assertEqual(server.server_address[0], "127.0.0.1")
