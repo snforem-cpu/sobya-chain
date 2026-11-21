@@ -59,6 +59,9 @@ def _validate_request(body: bytes) -> dict:
         raise ValueError("quote request fields do not match the required schema")
     if request["source_chain"] not in ALLOWED_NETWORKS:
         raise ValueError("unsupported source network")
+    amount = request["source_amount"]
+    if not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
+        raise ValueError("source_amount must be a positive integer token base-unit amount")
     import re
     evm = r"^0x[0-9a-fA-F]{40}$"
     base58 = r"^[1-9A-HJ-NP-Za-km-z]{32,44}$"
@@ -74,9 +77,6 @@ def _validate_request(body: bytes) -> dict:
             raise ValueError("Solana USDT mint and wallet must be Base58 addresses")
     if not re.fullmatch(evm, request["solver"]) or not re.fullmatch(evm, request["destination_recipient"]):
         raise ValueError("SOBYA solver and recipient must be EVM addresses")
-    amount = request["source_amount"]
-    if not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
-        raise ValueError("source_amount must be a positive integer token base-unit amount")
     for field in required - {"source_amount"}:
         item = request[field]
         if not isinstance(item, str) or not item.strip() or len(item) > 256:
