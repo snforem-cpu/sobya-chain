@@ -47,6 +47,19 @@ def main() -> int:
         os.chmod(config_path, stat.S_IRUSR | stat.S_IWUSR)
         print("Created local config.json from the disabled example; all payouts remain disabled.")
 
+    # The first Enzonic deployment is an idle-only validation. Refuse to
+    # start if a pre-existing local config has any live payout gate enabled.
+    active_config = json.loads(config_path.read_text(encoding="utf-8"))
+    if active_config.get("featureEnabled") is not False:
+        raise SystemExit("live custodial payouts are not authorized for the Enzonic idle-start stage")
+    active_networks = active_config.get("networks", {})
+    if not isinstance(active_networks, dict) or any(
+        not isinstance(active_networks.get(name), dict)
+        or active_networks[name].get("enabled") is not False
+        for name in ("ethereum", "tron", "solana", "sobya")
+    ):
+        raise SystemExit("all four network payout gates must remain disabled for the Enzonic idle-start stage")
+
     os.environ["SOBYA_CUSTODIAL_CONFIG"] = str(config_path.resolve())
     os.environ.setdefault("SOBYA_CUSTODIAL_DB", str(HERE / "data" / "orders.sqlite3"))
     os.environ.setdefault("SOBYA_PAYOUT_JOURNAL", str(HERE / "data" / "payout-journal.sqlite3"))
