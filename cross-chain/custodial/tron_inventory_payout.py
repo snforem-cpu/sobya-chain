@@ -99,3 +99,12 @@ class TronUsdtPayoutAdapter:
             return len(matches) == 1
         except Exception:
             return False
+
+
+def load_tron_private_key_from_keystore(path: str, passphrase_env: str):
+    from inventory_keystore import load_inventory_keystore_from_env
+    from tronpy.keys import PrivateKey
+    try:
+        return PrivateKey(load_inventory_keystore_from_env(path, "tron", passphrase_env))
+    except Exception as exc:
+        raise PayoutError("could not unlock configured local TRON inventory keystore") from exc
