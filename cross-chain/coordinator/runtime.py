@@ -25,7 +25,7 @@ from source_observer_router import (
 from destination_payout_router import (
     DestinationPayoutRouter, SobyaSettlementConfig, SourceIdentity,
 )
-from solver_balance_reader import FinalizedNativeBalanceReader
+from solver_balance_reader import FinalizedVaultInventoryReader
 from observer_quorum import IndependentObserverQuorum, ObserverSource
 from self_hosted_supervisor import validate_self_hosted_url, SupervisorConfigError
 from settlement_observer import JsonRpc
@@ -66,8 +66,8 @@ def build_local_server(
 ):
     """Build, but do not start, the fully wired loopback coordinator HTTP server."""
     balance_reader = getattr(quote_pricer, "finalized_balance", None)
-    if not isinstance(balance_reader, FinalizedNativeBalanceReader):
-        raise ValueError("runtime requires a pinned finalized SOBYA native-balance reader")
+    if not isinstance(balance_reader, FinalizedVaultInventoryReader):
+        raise ValueError("runtime requires a pinned finalized SOBYA vault-inventory reader")
     if balance_reader.expected_chain_id != sobya_settlement.destination_chain_id:
         raise ValueError("solver balance reader and payout observer chain IDs differ")
     settlement_rpc_url = getattr(sobya_settlement.rpc, "url", None)
@@ -215,6 +215,8 @@ def build_local_server(
         raise ValueError("vault adapter and payout observer chain IDs differ")
     if reserve_onchain_inventory.rpc.url != settlement_rpc_url:
         raise ValueError("vault adapter must use the pinned SOBYA RPC endpoint")
+    if reserve_onchain_inventory.vault != balance_reader.vault:
+        raise ValueError("vault inventory reader and transaction adapter must pin the same vault address")
     coordinator = LocalCoordinator(
         admission,
         inventory_guard=quote_pricer.assert_quote_inventory,
