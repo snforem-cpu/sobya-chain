@@ -53,6 +53,15 @@ class PayoutExecutorTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_runtime_payout_gate_defaults_to_disabled(self):
+        disabled = InventoryPayoutExecutor(
+            self.ledger, PayoutJournal(Path(self.tmp.name) / "disabled.sqlite"),
+            {"sobya": self.adapter},
+        )
+        with self.assertRaises(PayoutError):
+            disabled.execute_or_resume(self.order)
+        self.assertEqual(self.adapter.prepares, 0)
+
     def test_prepare_persist_broadcast_and_finalize(self):
         tx = self.executor.execute_or_resume(self.order)
         self.assertEqual(tx, "0x" + "ab" * 32)
