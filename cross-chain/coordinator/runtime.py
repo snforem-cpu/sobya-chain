@@ -218,7 +218,7 @@ def build_local_server(
     coordinator = LocalCoordinator(
         admission,
         inventory_guard=quote_pricer.assert_quote_inventory,
-        reserve_onchain_inventory=reserve_onchain_inventory,
+        reserve_onchain_inventory=reserve_onchain_inventory.reserve,
     )
     return create_server(
         host, port, coordinator,
