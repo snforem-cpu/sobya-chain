@@ -20,6 +20,7 @@ class PricingTests(unittest.TestCase):
         )
         self.pricer = InventoryAwareQuotePricer(
             self.config, self.ledger, destination_chain_id=357812033857,
+            finalized_balance=lambda _solver: 150_000_000 * 10**18,
             now=lambda: 1_900_000_000,
         )
 
@@ -47,6 +48,21 @@ class PricingTests(unittest.TestCase):
         with self.assertRaises(PricingError):
             self.pricer.quote(
                 order_id="0x" + "01"*32, source_chain="ethereum",
+                source_asset="0x" + "33"*20, source_amount=20_000_000,
+                user="0x" + "22"*20, solver=self.solver,
+                destination_recipient="0x" + "55"*20,
+            )
+
+    def test_quote_rejected_when_finalized_chain_balance_is_below_reservations(self):
+        self.ledger.set_solver_inventory(self.solver, 150_000_000 * 10**18)
+        pricer = InventoryAwareQuotePricer(
+            self.config, self.ledger, destination_chain_id=357812033857,
+            finalized_balance=lambda _solver: 0,
+            now=lambda: 1_900_000_000,
+        )
+        with self.assertRaisesRegex(PricingError, "insufficient reconciled"):
+            pricer.quote(
+                order_id="0x" + "02"*32, source_chain="ethereum",
                 source_asset="0x" + "33"*20, source_amount=20_000_000,
                 user="0x" + "22"*20, solver=self.solver,
                 destination_recipient="0x" + "55"*20,
