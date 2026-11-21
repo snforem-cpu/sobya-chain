@@ -60,8 +60,10 @@ class TronUsdtPayoutAdapter:
 
     def broadcast(self, prepared: PreparedPayout) -> str:
         try:
+            from tronpy.tron import Transaction
             document = json.loads(prepared.signed_payload.decode("utf-8"))
-            result = self.client.provider.make_request("wallet/broadcasttransaction", document)
+            transaction = Transaction.from_json(document, client=self.client)
+            result = transaction.broadcast()
             if not isinstance(result, dict) or result.get("result") is not True:
                 raise PayoutError("TRON node did not accept signed transaction")
             observed = str(result.get("txid", "")).lower()
@@ -75,11 +77,8 @@ class TronUsdtPayoutAdapter:
 
     def verify_finalized(self, intent: PayoutIntent, tx_id: str) -> bool:
         try:
-            info = self.client.get_transaction_info(tx_id)
+            info = self.client.get_solid_transaction_info(tx_id)
             if not info or not info.get("blockNumber"):
-                return False
-            solid_height = self.client.get_latest_solid_block_number()
-            if int(solid_height) < int(info["blockNumber"]):
                 return False
             receipt = info.get("receipt", {})
             if receipt.get("result") != "SUCCESS":
