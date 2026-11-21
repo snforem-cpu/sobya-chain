@@ -4,8 +4,8 @@ This is the selected initial product model, replacing the earlier per-order escr
 
 ## User flows
 
-- USDT to SOBY: select Ethereum, TRON, or Solana; receive a unique deposit destination for the order; the watcher verifies the correct USDT asset, amount, recipient, transaction success, and finality; the service checks the quoted SOBY amount against available inventory; a local payout worker sends native SOBY to the user's SOBYA wallet.
-- SOBY to USDT: receive a unique SOBYA deposit destination/order; after finality, the payout worker sends USDT from the selected Ethereum, TRON, or Solana inventory wallet to the user's destination address.
+- USDT to SOBY: select Ethereum, TRON, or Solana; receive a dedicated network inventory wallet for the order; the watcher verifies the correct USDT asset, amount, recipient, transaction success, and finality; the service checks the quoted SOBY amount against available inventory; a local payout worker sends native SOBY to the user's SOBYA wallet.
+- SOBY to USDT: deposit SOBY to the dedicated SOBYA inventory wallet and the DEX binds the exact transaction hash to the order; after finality, the payout worker sends USDT from the selected Ethereum, TRON, or Solana inventory wallet to the user's destination address.
 
 The platform is custodial: project-controlled wallets hold the assets. This avoids source-chain escrow contracts and a solver marketplace, but users must be told that custody and payout availability depend on the platform's wallets and controls.
 
