@@ -17,6 +17,7 @@ from runtime import (
 from solver_balance_reader import FinalizedVaultInventoryReader
 from test_admission import FakeMonitor
 from sobya_vault_connector import SobyaVaultReserver
+from attestor_service import EvmSigningBackend, PinnedSourceIdentity
 
 
 class RuntimeCompositionTests(unittest.TestCase):
@@ -104,6 +105,18 @@ class RuntimeCompositionTests(unittest.TestCase):
                     ),
                     additional_source_observers=source_replicas,
                     additional_destination_observers=destination_replicas,
+                    attestor_backend=EvmSigningBackend(
+                        "0x" + "aa" * 20, lambda _digest: bytes(65)
+                    ),
+                    attestor_source_identities={
+                        "ethereum": PinnedSourceIdentity(
+                            source_chain="ethereum", source_chain_id=1,
+                            source_chain_hash="0x" + "01" * 32,
+                            source_escrow_id="0x" + "00" * 12 + "11" * 20,
+                            source_asset_id="0x" + "00" * 12 + "33" * 20,
+                            source_escrow_address="0x" + "11" * 20,
+                        )
+                    },
                 )
                 try:
                     self.assertEqual(server.server_address[0], "127.0.0.1")
@@ -111,6 +124,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                     self.assertTrue(callable(server.verify_source_deposit))
                     self.assertTrue(callable(server.verify_destination_payout))
                     self.assertIs(server.quote_pricer, pricer)
+                    self.assertIsNotNone(server.attestor_service)
                 finally:
                     server.server_close()
             finally:
