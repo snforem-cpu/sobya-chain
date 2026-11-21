@@ -12,7 +12,11 @@ from typing import Any, Callable
 
 from eth_hash.auto import keccak
 from order_ledger import OrderQuote
-from settlement_observer import JsonRpc, VerificationError
+class VaultConnectorError(RuntimeError):
+    """Raised when the pinned SOBYA vault cannot be safely reserved."""
+
+
+VerificationError = VaultConnectorError
 
 
 def _selector(signature: str) -> str:
