@@ -30,11 +30,19 @@ The custodial ledger module is the order-state core. It does not itself connect 
 
 This model does not require source-chain escrow contracts, an attestor quorum, a solver marketplace, or separate bridge deployments. It still requires project-operated chain connectivity and secure signing.
 
-
 ## Demand-responsive SOBY reference price
 
-The quote pricer can adjust the operator-published base reference rate using only finalized, executed swap volume over a rolling one-hour window. Net USDT demand for SOBY raises the quoted USDT-per-SOBY rate; net SOBY sales lower it. Pending quotes, unfinalized deposits, cancelled orders, and failed payouts are not demand.
+The operator-approved base reference rate is an explicit configuration input named baseReferencePriceUsdtPerSoby. It is deliberately unset in the example configuration; quote creation must fail closed until the project explicitly sets it. This prevents code from inventing a starting market price.
 
-The adjustment is bounded by configuration (example ceiling: +/- 15%). A stale, unavailable, mismatched-window, or non-finalized demand snapshot causes quote creation to fail closed rather than silently using stale market pressure. The configured base rate remains an explicit economic policy input; the demand formula does not invent a starting market price or guarantee a market value.
+The new deterministic pricing module adjusts that base rate using finalized, executed swap volume over a rolling one-hour window, normalized to USDT base units:
+- Net USDT -> SOBY buy pressure raises the USDT-per-SOBY quote.
+- Net SOBY -> USDT sell pressure lowers it.
+- Balanced flow leaves the base rate unchanged.
+- The adjustment is capped at +/- 15% by default, with 20% sensitivity before the cap.
+- Stale, future-dated, unfinalized, or wrong-window snapshots are rejected.
 
-The production adapter must supply authenticated, deduplicated, finalized executed volume from the custodial order ledger. This change adds the bounded calculation and quote-pricer hook; it does not claim that the production volume aggregator or all chain watchers are already deployed.
+Only completed, finalized swaps may enter the demand snapshot. Quotes, pending deposits, cancelled orders, and failed payouts are not demand. The module has unit tests and is added to coordinator CI.
+
+## Remaining integration boundary
+
+The pricing module is a tested calculation component, not yet connected to the live quote endpoint or a production volume aggregator. A production adapter must build authenticated, deduplicated, finalized volume snapshots from the order ledger, then call this module before a quote is issued. The chain-specific watchers, inventory reconciliation, local signing, payout broadcasters, and DEX quote/UI integration also remain required. All networks stay disabled until those components and end-to-end tests are complete.
