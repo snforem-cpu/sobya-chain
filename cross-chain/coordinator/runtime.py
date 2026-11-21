@@ -65,6 +65,7 @@ def build_local_server(
     required_observer_quorum: int | None = None,
     attestor_backend=None,
     attestor_source_identities=None,
+    attestor_membership_reader=None,
 ):
     """Build, but do not start, the fully wired loopback coordinator HTTP server."""
     balance_reader = getattr(quote_pricer, "finalized_balance", None)
@@ -228,6 +229,8 @@ def build_local_server(
     if attestor_backend is not None:
         if not isinstance(attestor_source_identities, dict) or not attestor_source_identities:
             raise ValueError("explicit attestor source-chain IDs and escrow addresses are required")
+        if not callable(attestor_membership_reader):
+            raise ValueError("finalized on-chain attestor membership reader is required")
         from attestor_service import (
             AttestorService, FinalizedReservation, PinnedSourceIdentity,
         )
@@ -251,6 +254,7 @@ def build_local_server(
             verify_source_deposit=verify_source_deposit,
             verify_destination_payout=verify_destination_payout,
             finalized_reservation=finalized_attestor_reservation,
+            attestor_membership=attestor_membership_reader,
             settlement_contract=sobya_settlement.settlement_contract,
             destination_chain_id=sobya_settlement.destination_chain_id,
             source_identities=attestor_source_identities,
