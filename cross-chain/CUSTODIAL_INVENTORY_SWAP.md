@@ -57,3 +57,18 @@ The operator supplied these public receiving addresses for the inventory configu
 - SOBYA mainnet: `0xebdb899fFE84a89e1d576964b640491c135651AD`
 
 The Ethereum and SOBYA entries intentionally use the same EVM address, but are separate balances on separate chains. These public addresses are recorded in the example configuration only; all network flags remain disabled. The operator reports that the SOBYA wallet holds 1,000,000 SOBY; that balance has not yet been independently checked by this software. Do not treat a configured address as proof of custody or signing capability: the corresponding private keys must remain under the operator's secure local control and must never be committed to GitHub.
+
+
+## Payout implementation status (2026-11-21)
+
+The shared-inventory payout path now has a durable execution layer and network adapters:
+
+- `payout_executor.py`: immutable order-bound payout intent; owner-only SQLite journal; signed transaction bytes are persisted before broadcast; uncertain outcomes retry by rebroadcasting the exact same signed bytes, never by signing a second transfer; ledger completion requires adapter-confirmed finality.
+- `evm_inventory_payout.py`: local signing and native SOBY transfer on SOBYA, and fixed ERC-20 `transfer(address,uint256)` USDT transfer on Ethereum. It validates chain ID, signer/inventory address, fee estimate, exact receipt sender/recipient/amount, successful receipt, canonical block and finalized block.
+- `tron_inventory_payout.py`: locally signed TRC-20 USDT transfer using TronPy; exact token contract, inventory signer, transfer amount, destination and solid transaction receipt are checked.
+- `solana_inventory_payout.py`: locally signed legacy SPL `TransferChecked` for the pinned USDT mint (6 decimals), inventory-owned source ATA, idempotent destination ATA creation, finalized signature and parsed transfer details.
+- `inventory_keystore.py` and `inventory_keystore_cli.py`: network-bound encrypted key files (scrypt + XSalsa20-Poly1305), owner-only file permissions, hidden terminal input, and passphrases supplied only through local environment variables. Key material must not be placed in GitHub, API requests, logs, or chat.
+- `payout_runtime.py`: creates only adapters explicitly enabled by operator configuration. The executor itself defaults to disabled and requires an explicit runtime enable flag.
+- Dependencies and unit/compile checks are declared in `custodial/requirements.txt` and the dedicated CI workflow.
+
+**Release status:** this is code-level implementation under CI validation, not a live-money release. All `featureEnabled` and per-network `enabled` flags remain false. No mainnet transaction has been signed or broadcast by this development work. Before enabling payouts, the operator must import and verify each existing inventory key locally, configure HTTPS RPCs and passphrases on the runtime host, check live inventory balances/fees, and complete small-value controlled live-chain tests with separate explicit approval. The hosted runtime and DEX/API integration are later release steps.
