@@ -126,9 +126,9 @@ contract SobyaEthereumUsdtEscrowTest {
         one[0] = attestor1;
         bool deployed;
         try new SobyaEthereumUsdtEscrow(address(usdt), one, 1) returns (
-            SobyaEthereumUsdtEscrow
+            SobyaEthereumUsdtEscrow created
         ) {
-            deployed = true;
+            deployed = address(created) != address(0);
         } catch {}
         require(!deployed, "single-key escrow configuration accepted");
     }
