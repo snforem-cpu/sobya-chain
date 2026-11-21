@@ -11,7 +11,6 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
-TRANSFER_TOPIC = "0xddf252ad1be2c69b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 # Canonical ERC-20/TRC-20 Transfer(address,address,uint256) topic.
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
