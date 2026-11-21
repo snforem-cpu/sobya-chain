@@ -14,7 +14,7 @@ from destination_payout_router import SobyaSettlementConfig, SourceIdentity
 from runtime import (
     build_local_server, SourceObserverReplica, DestinationObserverReplica,
 )
-from solver_balance_reader import FinalizedNativeBalanceReader
+from solver_balance_reader import FinalizedVaultInventoryReader
 from test_admission import FakeMonitor
 from sobya_vault_connector import SobyaVaultReserver
 
@@ -33,8 +33,10 @@ class RuntimeCompositionTests(unittest.TestCase):
                     def call(self, method, _params):
                         if method == "eth_chainId":
                             return hex(357812033857)
-                        if method == "eth_getBalance":
-                            return hex(150_000_000 * 10**18)
+                        if method == "eth_getCode":
+                            return "0x60006000"
+                        if method == "eth_call":
+                            return "0x" + (150_000_000 * 10**18).to_bytes(32, "big").hex()
                         raise AssertionError(method)
 
                 sobya_rpc = PrivateRpc(8545)
@@ -67,7 +69,9 @@ class RuntimeCompositionTests(unittest.TestCase):
                     ),
                     ledger,
                     destination_chain_id=357812033857,
-                    finalized_balance=FinalizedNativeBalanceReader(sobya_rpc, 357812033857),
+                    finalized_balance=FinalizedVaultInventoryReader(
+                        sobya_rpc, 357812033857, "0x" + "77" * 20
+                    ),
                 )
 
                 server = build_local_server(
