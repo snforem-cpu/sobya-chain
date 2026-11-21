@@ -100,6 +100,7 @@ class AttestorService:
         verify_source_deposit: Callable[[SourceDepositEvidence, Any], bool],
         verify_destination_payout: Callable[[DestinationPayoutEvidence, Any], bool],
         finalized_reservation: Callable[[str], FinalizedReservation],
+        attestor_membership: Callable[[str, str, str], bool],
         settlement_contract: str,
         destination_chain_id: int,
         source_identities: dict[str, PinnedSourceIdentity],
@@ -108,8 +109,9 @@ class AttestorService:
             raise ValueError("a local EVM signing backend is required")
         if not callable(quote_lookup) or not callable(verify_source_deposit):
             raise ValueError("quote lookup and source observer are mandatory")
-        if not callable(verify_destination_payout) or not callable(finalized_reservation):
-            raise ValueError("destination observer and finalized vault reader are mandatory")
+        if (not callable(verify_destination_payout) or not callable(finalized_reservation)
+                or not callable(attestor_membership)):
+            raise ValueError("destination observer, finalized vault reader, and on-chain attestor membership reader are mandatory")
         if not isinstance(settlement_contract, str) or len(settlement_contract) != 42:
             raise ValueError("pinned SOBYA settlement contract is required")
         if destination_chain_id <= 0:
@@ -119,6 +121,7 @@ class AttestorService:
         self.verify_source_deposit = verify_source_deposit
         self.verify_destination_payout = verify_destination_payout
         self.finalized_reservation = finalized_reservation
+        self.attestor_membership = attestor_membership
         self.settlement_contract = settlement_contract
         self.destination_chain_id = destination_chain_id
         self.source_identities = {k.lower(): v for k, v in source_identities.items()}
@@ -143,6 +146,14 @@ class AttestorService:
         if identity is None or identity.source_chain.lower() != quote.source_chain.lower():
             raise AttestorServiceError("source chain deployment identity is not pinned")
         return identity
+
+    def _require_attestor_membership(self, network: str, contract: str) -> None:
+        try:
+            approved = self.attestor_membership(network, contract, self.attestor.address)
+        except Exception as exc:
+            raise AttestorServiceError("finalized on-chain attestor membership lookup failed") from exc
+        if approved is not True:
+            raise AttestorServiceError("configured attestor key is not active in the pinned on-chain contract")
 
     def _reservation(self, quote: OrderQuote) -> FinalizedReservation:
         try:
@@ -169,6 +180,7 @@ class AttestorService:
         quote = self._quote(evidence.order_id)
         self._require_verified(self.verify_source_deposit, evidence, proof)
         self._reservation(quote)
+        self._require_attestor_membership("sobya", self.settlement_contract)
         identity = self._identity(quote)
         if (
             evidence.source_chain.lower() != quote.source_chain.lower()
@@ -217,6 +229,7 @@ class AttestorService:
         identity = self._identity(quote)
         if identity.source_escrow_address is None:
             raise AttestorServiceError("source escrow EVM/TVM address is not pinned")
+        self._require_attestor_membership(quote.source_chain.lower(), identity.source_escrow_address)
         if (
             evidence.source_chain.lower() != quote.source_chain.lower()
             or evidence.source_asset.lower() != quote.source_asset.lower()
