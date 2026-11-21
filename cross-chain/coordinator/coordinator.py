@@ -19,8 +19,10 @@ class VerificationRejected(RuntimeError):
 class LocalCoordinator:
     """Orchestrate verified evidence through readiness and inventory gates."""
 
-    def __init__(self, admission: ReadinessAdmissionGuard):
+    def __init__(self, admission: ReadinessAdmissionGuard,
+                 inventory_guard: Callable[[OrderQuote], bool] | None = None):
         self.admission = admission
+        self.inventory_guard = inventory_guard
 
     @staticmethod
     def _verify(verifier: Callable[..., Any], *args: Any) -> None:
@@ -40,6 +42,10 @@ class LocalCoordinator:
         if not isinstance(signature, bytes) or not signature:
             raise VerificationRejected("signed quote bytes are required")
         self._verify(verify_quote_signature, quote, signature)
+        # A quote preview may be stale or inventory may have been moved since
+        # it was generated. Reconcile finalized on-chain inventory again just
+        # before the atomic local reservation; missing guard fails closed.
+        self._verify(self.inventory_guard, quote)
         self.admission.register_quote(quote, now=now)
 
     def expire_unfunded_quote(self, order_id: str, now: int | None = None) -> None:
