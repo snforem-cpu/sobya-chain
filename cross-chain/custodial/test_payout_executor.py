@@ -62,6 +62,23 @@ class PayoutExecutorTests(unittest.TestCase):
             disabled.execute_or_resume(self.order)
         self.assertEqual(self.adapter.prepares, 0)
 
+    def test_missing_journal_for_submitted_payout_never_creates_replacement(self):
+        self.ledger.submit_payout(self.order, payout_tx="0x" + "99" * 32)
+        with self.assertRaises(PayoutError):
+            self.executor.execute_or_resume(self.order)
+        self.assertEqual(self.adapter.prepares, 0)
+        self.assertEqual(self.adapter.broadcasts, [])
+
+    def test_completed_order_without_journal_cannot_pay_again(self):
+        self.ledger.submit_payout(self.order, payout_tx="0x" + "88" * 32)
+        self.ledger.confirm_payout_final(
+            self.order, verified=True, observed_amount=200_000_000_000_000_000,
+            observed_recipient="0xRecipient", observed_asset="SOBY",
+        )
+        with self.assertRaises(PayoutError):
+            self.executor.execute_or_resume(self.order)
+        self.assertEqual(self.adapter.prepares, 0)
+
     def test_prepare_persist_broadcast_and_finalize(self):
         tx = self.executor.execute_or_resume(self.order)
         self.assertEqual(tx, "0x" + "ab" * 32)
