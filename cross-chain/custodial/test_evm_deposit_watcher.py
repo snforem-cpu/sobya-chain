@@ -38,7 +38,10 @@ def fixture(*, chain="0x1", status="0x1", finalized="0x64",
     return {
         "eth_chainId": chain,
         "eth_getTransactionReceipt": receipt,
-        "eth_getBlockByNumber": {"number": finalized},
+        "eth_getBlockByNumber": lambda tag, full: (
+            {"number": finalized} if tag == "finalized"
+            else {"number": tag, "hash": BLOCK_HASH}
+        ),
     }
 
 
