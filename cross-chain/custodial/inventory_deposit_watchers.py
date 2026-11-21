@@ -365,6 +365,39 @@ class SolanaInventoryDepositVerifier:
             expected.event_index, f"solana:finalized:{slot}")
 
 
+class InventoryDepositService:
+    """Order-bound deposit entry point used by the DEX/API.
+
+    The caller supplies only the submitted tx/signature and transfer index. All
+    expected sender, asset, amount, and inventory values come from the persisted
+    order, never from untrusted request fields.
+    """
+
+    def __init__(self, ledger: Any, verifiers: dict[str, Any]):
+        self.ledger = ledger
+        self.verifiers = {str(key).lower(): value for key, value in verifiers.items()}
+        self.recorder = InventoryDepositRecorder(ledger)
+
+    def verify_order_deposit(self, order_id: str, tx_id: str,
+                             event_index: int) -> VerifiedInventoryDeposit:
+        order = self.ledger.get_order(order_id)
+        if order is None:
+            raise InventoryDepositError("unknown order")
+        network = order.get("source_network", "").lower()
+        if network not in {"ethereum", "tron", "solana", "sobya"}:
+            raise InventoryDepositError("order has unsupported source network")
+        verifier = self.verifiers.get(network)
+        if verifier is None:
+            raise InventoryDepositError("source network verifier is not configured")
+        if order.get("state") not in {"created", "deposit_seen", "deposit_final"}:
+            raise InventoryDepositError("order is not awaiting deposit verification")
+        expected = ExpectedInventoryDeposit(
+            network=network, tx_id=tx_id, sender=order["source_wallet"],
+            inventory_wallet=order["deposit_address"], asset=order["source_asset"],
+            amount_base_units=int(order["source_amount"]), event_index=event_index,
+        )
+        return self.recorder.verify_and_record(verifier, order_id, expected)
+
 class InventoryDepositRecorder:
     """The only bridge from verified chain evidence into the custodial order ledger."""
 
