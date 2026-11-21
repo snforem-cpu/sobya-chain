@@ -154,6 +154,7 @@ $('ccQuoteBtn').onclick=async()=>{
   const amount=Number(amountText);
   if(!Number.isFinite(amount)||amount<=0||!/^\\d+(\\.\\d{1,6})?$/.test(amountText))throw Error('Enter a positive USDT amount with up to 6 decimal places.');
   const sourceAmount=BigInt(amountText.replace('.','').padEnd(amountText.includes('.')?amountText.indexOf('.')+7:amountText.length+6,'0')).toString();
+  if(BigInt(sourceAmount)>BigInt(Number.MAX_SAFE_INTEGER))throw Error('Amount is above the safe quote-preview limit. Split it into smaller orders.');
   button.disabled=true;status.textContent='Requesting an unsigned, non-reserving quote preview…';
   const response=await fetch('/api/cross-chain/v1/quote-previews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request:{order_id:crypto.randomUUID(),source_chain:network,source_asset:asset,source_amount:Number(sourceAmount),user:sourceWallet,solver,destination_recipient:recipient}})});
   const payload=await response.json().catch(()=>({error:'Invalid response from quote gateway'}));
