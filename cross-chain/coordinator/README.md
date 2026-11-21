@@ -305,3 +305,24 @@ python -m unittest -v test_sobya_vault_connector.py
 
 This adapter closes the transaction-submission interface in code; it does
 not mean a vault has been deployed, funded, or configured on SOBYA Mainnet.
+
+
+## Finalized SOBYA vault inventory reconciliation
+
+The coordinator's inventory reader must query the **pinned
+`SobyaSolverInventoryVault.available(solver)`** view at the EVM `finalized`
+block tag. Reading `eth_getBalance(solver)` is not sufficient: native SOBY
+held in the solver wallet is not necessarily deposited in the inventory vault
+and cannot be paid by the settlement contract.
+
+`observer/solver_balance_reader.py` therefore validates the configured SOBYA
+chain ID and deployed vault code, then reads the vault's spendable inventory.
+The runtime requires this reader and the transaction adapter to use the same
+vault address and SOBYA RPC endpoint. The pricing layer takes the minimum of
+the finalized on-chain spendable amount and the local ledger's spendable
+amount. Because the vault view already subtracts on-chain reservations, the
+pricing layer does not subtract those reservations a second time.
+
+A solver must deposit native SOBY into the vault before its inventory can be
+quoted. A wallet balance, an operator-entered ledger total, or a successful
+unit test is not evidence that vault inventory is funded.
