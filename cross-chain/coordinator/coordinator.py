@@ -20,9 +20,14 @@ class LocalCoordinator:
     """Orchestrate verified evidence through readiness and inventory gates."""
 
     def __init__(self, admission: ReadinessAdmissionGuard,
-                 inventory_guard: Callable[[OrderQuote], bool] | None = None):
+                 inventory_guard: Callable[[OrderQuote], bool] | None = None,
+                 reserve_onchain_inventory: Callable[[OrderQuote], bool] | None = None):
         self.admission = admission
         self.inventory_guard = inventory_guard
+        # This callback must submit reserve(orderId, recipient, amount, releaseAfter)
+        # to the pinned SOBYA vault and return literal True only after the
+        # reservation is observed at finalized state. No default is provided.
+        self.reserve_onchain_inventory = reserve_onchain_inventory
 
     @staticmethod
     def _verify(verifier: Callable[..., Any], *args: Any) -> None:
@@ -46,6 +51,9 @@ class LocalCoordinator:
         # it was generated. Reconcile finalized on-chain inventory again just
         # before the atomic local reservation; missing guard fails closed.
         self._verify(self.inventory_guard, quote)
+        # A SQLite reservation cannot custody native SOBY. Require a real
+        # on-chain vault reservation before the quote becomes admissible.
+        self._verify(self.reserve_onchain_inventory, quote)
         self.admission.register_quote(quote, now=now)
 
     def expire_unfunded_quote(self, order_id: str, now: int | None = None) -> None:
