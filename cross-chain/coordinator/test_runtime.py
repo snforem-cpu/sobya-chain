@@ -30,6 +30,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                     ),
                     ledger,
                     destination_chain_id=357812033857,
+                    finalized_balance=lambda _solver: 150_000_000 * 10**18,
                 )
 
                 class PrivateRpc:
