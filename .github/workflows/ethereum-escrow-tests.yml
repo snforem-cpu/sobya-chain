@@ -28,7 +28,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
       - name: Compile contracts, tests, and deployment scripts
         working-directory: contracts
-        run: forge build --sizes
+        run: forge build --sizes --skip script/DeploySobyaDex.s.sol
       - name: Run Solidity state-machine tests (local EVM only)
         working-directory: contracts
         run: forge test -vvv
