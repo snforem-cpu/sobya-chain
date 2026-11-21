@@ -21,6 +21,7 @@ from order_ledger import (
     OrderQuote,
     SourceDepositEvidence,
 )
+from solver_balance_reader import FinalizedNativeBalanceReader
 
 LOG = logging.getLogger("sobya.coordinator.http")
 
@@ -76,6 +77,11 @@ def create_server(
         raise ValueError("all cryptographic and observer verifiers are required")
     inventory_guard = getattr(coordinator, "inventory_guard", None)
     quote_inventory_guard = getattr(quote_pricer, "assert_quote_inventory", None)
+    balance_reader = getattr(quote_pricer, "finalized_balance", None)
+    if not isinstance(balance_reader, FinalizedNativeBalanceReader):
+        raise ValueError("HTTP API requires a pinned finalized SOBYA native-balance reader")
+    if balance_reader.expected_chain_id != getattr(quote_pricer, "destination_chain_id", None):
+        raise ValueError("quote pricing and finalized balance reader chain IDs differ")
     if not callable(quote_inventory_guard) or inventory_guard != quote_inventory_guard:
         raise ValueError("HTTP API must use the quote pricer's finalized inventory guard")
 
