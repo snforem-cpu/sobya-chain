@@ -7,6 +7,7 @@ Chain-specific adapters must implement prepare/broadcast/verify_finalized.
 from __future__ import annotations
 
 import base64
+from contextlib import contextmanager
 import json
 import os
 import sqlite3
@@ -75,11 +76,15 @@ class PayoutJournal:
             )""")
         os.chmod(self.path, 0o600)
 
+    @contextmanager
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=20, isolation_level=None)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA busy_timeout=20000")
-        return db
+        try:
+            yield db
+        finally:
+            db.close()
 
     def get(self, order_id: str):
         with self._connect() as db:
