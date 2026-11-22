@@ -19,6 +19,12 @@ class EnzonicLauncherTests(unittest.TestCase):
                     for name in ("ethereum", "tron", "solana", "sobya")
                 },
             }), encoding="utf-8")
+            template = json.loads((root / "config.example.json").read_text(encoding="utf-8"))
+            template["networks"]["sobya"].update({
+                "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE",
+                "keystorePassphraseEnv": "SOBYA_SOBYA_KEYSTORE_PASSPHRASE",
+            })
+            (root / "config.example.json").write_text(json.dumps(template), encoding="utf-8")
             old_cwd = Path.cwd()
             with patch.object(enzonic_start, "HERE", root), patch.dict(
                 os.environ, {}, clear=True
@@ -53,6 +59,10 @@ class EnzonicLauncherTests(unittest.TestCase):
                 "operatorConfig": True,
             }
             (root / "config.example.json").write_text("{}", encoding="utf-8")
+            disabled["networks"]["sobya"].update({
+                "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE",
+                "keystorePassphraseEnv": "SOBYA_SOBYA_KEYSTORE_PASSPHRASE",
+            })
             config_path = root / "config.json"
             config_path.write_text(json.dumps(disabled), encoding="utf-8")
             old_cwd = Path.cwd()
