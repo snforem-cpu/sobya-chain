@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from inventory_keystore_cli import _addresses_match
 from inventory_keystore import (
     InventoryKeystoreError, create_inventory_keystore, load_inventory_keystore,
 )
@@ -10,6 +11,15 @@ from payout_executor import InventoryPayoutExecutor, PayoutError, PayoutJournal
 
 
 class InventoryKeystoreTests(unittest.TestCase):
+    def test_import_requires_exact_network_address_match(self):
+        evm = "0xebdb899fFE84a89e1d576964b640491c135651AD"
+        self.assertTrue(_addresses_match("ethereum", evm.lower(), evm))
+        self.assertTrue(_addresses_match("sobya", evm, evm.lower()))
+        self.assertFalse(_addresses_match("ethereum", evm, "0x0000000000000000000000000000000000000001"))
+        self.assertTrue(_addresses_match("tron", "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx", "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"))
+        self.assertFalse(_addresses_match("tron", "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx", "tq8tu9bjjc67mlvick7mp24hsmhpcd6kzx"))
+        self.assertFalse(_addresses_match("solana", "derived", ""))
+
     def test_network_bound_encrypted_key_round_trip(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "eth.key"
