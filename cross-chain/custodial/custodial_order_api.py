@@ -291,8 +291,13 @@ def create_server(
                         raise OrderApiError("this swap direction is not currently enabled")
                     network_config = config.get("networks", {})
                     destination_config = network_config.get(destination_network, {})
-                    if destination_config.get("payoutInventoryVerified") is not True:
-                        raise OrderApiError("destination payout inventory has not been verified")
+                    # SOBYA native payout inventory is checked live by the quote
+                    # provider at a finalized block for every USDT-to-SOBY quote.
+                    # External USDT destinations still require separately verified
+                    # funded payout inventory before any reverse-direction quote.
+                    if not (direction == "usdt_to_soby" and destination_network == "sobya"):
+                        if destination_config.get("payoutInventoryVerified") is not True:
+                            raise OrderApiError("destination payout inventory has not been verified")
                     source = _amount_to_units(body["amount"], assets[source_network]["decimals"]) if source_network in assets else 0
                     if source <= 0:
                         raise OrderApiError("unsupported source network or amount")
