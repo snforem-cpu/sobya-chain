@@ -56,7 +56,8 @@ class CustodialOrderLedger:
     def create_order(self, *, direction, source_network, destination_network,
                      deposit_address, source_wallet, destination_wallet,
                      source_asset, destination_asset, source_amount,
-                     destination_amount, order_id: Optional[str] = None):
+                     destination_amount, order_id: Optional[str] = None,
+                     db: Optional[sqlite3.Connection] = None):
         if direction not in DIRECTIONS:
             raise CustodialOrderError("unsupported swap direction")
         if source_network not in NETWORKS or destination_network not in NETWORKS or source_network == destination_network:
@@ -73,20 +74,30 @@ class CustodialOrderLedger:
             (destination_wallet, "destination wallet"), (source_asset, "source asset"),
             (destination_asset, "destination asset"))]
         oid = order_id or str(uuid.uuid4())
-        with self._lock, self._connect() as db:
+        def insert_order(connection):
+            connection.execute("""INSERT INTO custodial_orders
+                (order_id,direction,source_network,destination_network,deposit_address,
+                 source_wallet,destination_wallet,source_asset,destination_asset,
+                 source_amount,destination_amount,state)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,'created')""",
+                (oid,direction,source_network,destination_network,*fields,
+                 str(source_amount),str(destination_amount)))
+        if db is not None:
+            # Reuse the caller's BEGIN IMMEDIATE transaction to make quote checks
+            # and order reservation atomic across multiple API processes.
             try:
-                db.execute("BEGIN IMMEDIATE")
-                db.execute("""INSERT INTO custodial_orders
-                    (order_id,direction,source_network,destination_network,deposit_address,
-                     source_wallet,destination_wallet,source_asset,destination_asset,
-                     source_amount,destination_amount,state)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,'created')""",
-                    (oid,direction,source_network,destination_network,*fields,
-                     str(source_amount),str(destination_amount)))
-                db.commit()
+                insert_order(db)
             except sqlite3.IntegrityError as exc:
-                db.rollback()
                 raise CustodialOrderError("order ID already assigned") from exc
+        else:
+            with self._lock, self._connect() as connection:
+                try:
+                    connection.execute("BEGIN IMMEDIATE")
+                    insert_order(connection)
+                    connection.commit()
+                except sqlite3.IntegrityError as exc:
+                    connection.rollback()
+                    raise CustodialOrderError("order ID already assigned") from exc
         return oid
 
     def record_deposit(self, order_id, *, tx_id, event_index, observed_amount, observed_recipient, observed_asset):
