@@ -100,15 +100,15 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
     for value, label in ((liquidity, "reference liquidity"), (max_order, "maximum order"),
                          (daily_cap, "daily network cap"), (minimum_inventory, "minimum SOBY inventory"),
                          (inventory_balance, "verified SOBY payout inventory")):
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-            raise DepositRuntimeConfigurationError(f"positive operator-approved {label} is required")
+        if not isinstance(value, int) or isinstance(value, bool) or not 0 < value <= 2**256 - 1:
+            raise DepositRuntimeConfigurationError(f"positive uint256 operator-approved {label} is required")
     if not isinstance(inventory_observed, int) or isinstance(inventory_observed, bool):
         raise DepositRuntimeConfigurationError("verified SOBY inventory observation timestamp is required")
     inventory_max_age = pricing.get("inventorySnapshotMaxAgeSeconds", 300)
     if not isinstance(inventory_max_age, int) or isinstance(inventory_max_age, bool) or not 30 <= inventory_max_age <= 900:
         raise DepositRuntimeConfigurationError("inventorySnapshotMaxAgeSeconds must be between 30 and 900")
     if int(time.time()) - inventory_observed not in range(0, inventory_max_age + 1):
-        raise DepositRuntimeConfigurationError("verified SOBY inventory snapshot is future-dated or older than 300 seconds")
+        raise DepositRuntimeConfigurationError(f"verified SOBY inventory snapshot is future-dated or older than {inventory_max_age} seconds")
     if inventory_balance <= minimum_inventory:
         raise DepositRuntimeConfigurationError("verified SOBY inventory must exceed the protected minimum reserve")
     if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps <= 1000:
@@ -162,9 +162,11 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
             daily_rows = db.execute("""SELECT source_amount FROM custodial_orders
                 WHERE source_network=? AND direction='usdt_to_soby'
                 AND created_at >= date('now')""", (source_network,)).fetchall()
+            inventory_snapshot_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(inventory_observed))
             reserved_rows = db.execute("""SELECT destination_amount FROM custodial_orders
-                WHERE direction='usdt_to_soby'
-                AND state IN ('created','deposit_seen','deposit_final','payout_submitted')""").fetchall()
+                WHERE direction='usdt_to_soby' AND created_at >= ?
+                AND state IN ('created','deposit_seen','deposit_final','payout_submitted','complete')""",
+                (inventory_snapshot_time,)).fetchall()
         # Amounts are uint256 decimal strings; never aggregate them through SQLite's int64 CAST/SUM.
         daily = sum(int(row[0]) for row in daily_rows)
         reserved = sum(int(row[0]) for row in reserved_rows)
