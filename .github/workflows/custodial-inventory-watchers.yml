@@ -31,6 +31,9 @@ jobs:
       - name: Test shared-inventory deposit verifiers
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_deposit_watchers.py -v
+      - name: Test order and quote API with durable deposit proof submission
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_order_api.py -v
       - name: Test unified deposit-to-payout runtime wiring
         working-directory: cross-chain/custodial
         run: python -m unittest test_custodial_runtime.py -v
