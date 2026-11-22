@@ -124,9 +124,19 @@ class OrderApiTests(unittest.TestCase):
         self.assertEqual(status,400)
         self.assertIn("not currently enabled",result["error"])
 
-    def test_unverified_destination_inventory_blocks_quote(self):
+    def test_sobya_quote_uses_live_inventory_check_not_static_config_flag(self):
+        # The quote provider checks the SOBYA balance against a finalized RPC
+        # block; a stale static boolean must not block or replace that check.
         self.config["networks"]["sobya"]["payoutInventoryVerified"] = False
         status,result=self.post("/api/quote",self.request())
+        self.assertEqual(status,200,result)
+
+    def test_external_payout_still_requires_verified_inventory(self):
+        self.config["enabledSwapDirections"].append("soby_to_usdt")
+        self.config["networks"]["tron"]["payoutInventoryVerified"] = False
+        payload=self.request(direction="soby_to_usdt",source_network="sobya",
+                             destination_network="tron",amount="1")
+        status,result=self.post("/api/quote",payload)
         self.assertEqual(status,400)
         self.assertIn("inventory has not been verified",result["error"])
 
