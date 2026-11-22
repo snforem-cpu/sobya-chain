@@ -116,6 +116,11 @@ def create_server(
     if not 1 <= rate_limit_per_minute <= 600:
         raise ValueError("rate limit must be between 1 and 600 requests per minute")
     assets = _network_assets(config)
+    enabled_source_networks = config.get("enabledSourceNetworks", ["ethereum"])
+    if (not isinstance(enabled_source_networks, list) or not enabled_source_networks
+            or any(item not in EXTERNAL for item in enabled_source_networks)
+            or len(set(enabled_source_networks)) != len(enabled_source_networks)):
+        raise ValueError("enabledSourceNetworks must be a non-empty unique list of supported external networks")
     enabled_directions = config.get("enabledSwapDirections", ["usdt_to_soby"])
     if (not isinstance(enabled_directions, list) or not enabled_directions
             or any(item not in {"usdt_to_soby", "soby_to_usdt"} for item in enabled_directions)
@@ -136,8 +141,8 @@ def create_server(
     def quote(direction: str, source_network: str, source_amount: int) -> dict[str, Any]:
         if direction not in enabled_directions:
             raise OrderApiError("this swap direction is not currently enabled")
-        if direction == "usdt_to_soby" and source_network not in EXTERNAL:
-            raise OrderApiError("USDT-to-SOBY source must be Ethereum, TRON, or Solana")
+        if direction == "usdt_to_soby" and source_network not in enabled_source_networks:
+            raise OrderApiError("USDT-to-SOBY deposits are not enabled on this network")
         if direction == "soby_to_usdt" and source_network != "sobya":
             raise OrderApiError("SOBY-to-USDT source must be SOBYA")
         result = server.quote_provider(direction, source_network, source_amount)
@@ -222,10 +227,12 @@ def create_server(
                 self.wfile.write(page)
                 return
             if path == "/api/networks":
+                visible_networks = tuple(enabled_source_networks) + ("sobya",)
                 self.send_json(200, {"networks": {
                     name: {"symbol": assets[name]["symbol"], "decimals": assets[name]["decimals"]}
-                    for name in NETWORKS
-                }, "directions": list(enabled_directions)})
+                    for name in visible_networks
+                }, "sourceNetworks": list(enabled_source_networks),
+                    "directions": list(enabled_directions)})
                 return
             if path == "/api/health":
                 self.send_json(200, {"ok": True, "service": "sobya-order-api"})

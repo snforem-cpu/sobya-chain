@@ -15,12 +15,12 @@ button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;backg
 .hidden{display:none}.notice{border-left:3px solid #d6a84c;padding:8px 12px;background:#17243a}
 </style></head>
 <body><main>
-<h1>SOBYA Swap</h1><p>Swap USDT and SOBY using the project's inventory wallets across Ethereum, TRON, Solana, and SOBYA.</p>
+<h1>SOBYA Swap</h1><p>Exchange Ethereum USDT for SOBY delivered on the SOBYA network. TRON and Solana are not available in this launch.</p>
 <p class="notice muted">Always verify the network and receiving address before sending. The service is custodial; deposits are held in project-controlled inventory wallets.</p>
 <form id="swap">
 <label for="direction">Swap direction</label><select id="direction"></select>
 <label for="network">Network</label><select id="network"></select>
-<div id="destNetworkWrap" class="hidden"><label for="destNetwork">Receive USDT on</label><select id="destNetwork"><option value="ethereum">Ethereum</option><option value="tron">TRON</option><option value="solana">Solana</option></select></div>
+<div id="destNetworkWrap" class="hidden"><label for="destNetwork">Receive USDT on</label><select id="destNetwork"><option value="ethereum">Ethereum</option></select></div>
 <label for="amount">Amount to exchange</label><input id="amount" inputmode="decimal" autocomplete="off" placeholder="e.g. 25.00" required>
 <label for="sourceWallet">Your sending wallet address</label><input id="sourceWallet" autocomplete="off" required>
 <label for="destinationWallet">Your receiving wallet address</label><input id="destinationWallet" autocomplete="off" required>
@@ -38,7 +38,7 @@ button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;backg
 <script>
 const $=id=>document.getElementById(id);let networkInfo={},enabledDirections=[],lastRequest=null,currentOrder=null;
 const api=async(path,body,token)=>{const headers={"Content-Type":"application/json"};if(token)headers.Authorization="Bearer "+token;const r=await fetch(path,{method:body?"POST":"GET",headers,body:body?JSON.stringify(body):undefined,cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.error||"Request failed");return j};
-function updateNetworks(){const dir=$("direction").value;const choices=dir==="usdt_to_soby"?["ethereum","tron","solana"]:["sobya"];$("network").innerHTML=choices.map(n=>'<option value="'+n+'">'+n.toUpperCase()+'</option>').join("");$("destNetworkWrap").classList.toggle("hidden",dir!=="soby_to_usdt");$("amount").placeholder=dir==="usdt_to_soby"?"USDT amount":"SOBY amount";}
+function updateNetworks(){const dir=$("direction").value;const choices=dir==="usdt_to_soby"?(networkInfo.sourceNetworks||[]):["sobya"];$("network").innerHTML=choices.map(n=>'<option value="'+n+'">'+n.toUpperCase()+'</option>').join("");$("destNetworkWrap").classList.toggle("hidden",dir!=="soby_to_usdt");$("amount").placeholder=dir==="usdt_to_soby"?"USDT amount":"SOBY amount";}
 function requestBody(){const direction=$("direction").value;const body={direction,source_network:$("network").value,amount:$("amount").value.trim(),source_wallet:$("sourceWallet").value.trim(),destination_wallet:$("destinationWallet").value.trim()};if(direction==="soby_to_usdt")body.destination_network=$("destNetwork").value;return body}
 $("direction").addEventListener("change",updateNetworks);
 $("preview").addEventListener("click",async()=>{try{$("message").textContent="Calculating quote…";lastRequest=requestBody();const r=await api("/api/quote",lastRequest);$("quoteText").textContent=JSON.stringify(r.quote,null,2);$("quoteBox").classList.remove("hidden");$("message").textContent="Quote is available. Create the order only if the details are correct."}catch(e){$("message").textContent=e.message}});

@@ -21,7 +21,8 @@ class OrderApiTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.ledger = CustodialOrderLedger(self.temp.name + "/orders.sqlite")
         self.worker = FakeDepositWorker()
-        self.config = {"enabledSwapDirections": ["usdt_to_soby"], "networks": {
+        self.config = {"enabledSwapDirections": ["usdt_to_soby"],
+            "enabledSourceNetworks": ["ethereum"], "networks": {
             "ethereum": {"inventoryWallet":"0x"+"11"*20,"usdtContract":"0x"+"22"*20,"payoutInventoryVerified":True},
             "tron": {"inventoryWallet":"T"+"1"*33,"usdtContract":"T"+"2"*33,"payoutInventoryVerified":True},
             "solana": {"inventoryWallet":"S"*44,"usdtMint":"M"*44,"payoutInventoryVerified":True},
@@ -69,6 +70,19 @@ class OrderApiTests(unittest.TestCase):
         oid,token=created["order_id"],created["order_token"]
         status,order=self.get("/api/orders/"+oid,token)
         self.assertEqual(status,200); self.assertEqual(order["order"]["state"],"created")
+
+    def test_launch_exposes_only_ethereum_as_usdt_source(self):
+        status, result = self.get("/api/networks")
+        self.assertEqual(status, 200)
+        self.assertEqual(result["sourceNetworks"], ["ethereum"])
+        self.assertEqual(set(result["networks"]), {"ethereum", "sobya"})
+
+    def test_tron_and_solana_usdt_quotes_and_orders_are_rejected(self):
+        for network in ("tron", "solana"):
+            for path in ("/api/quote", "/api/orders"):
+                status, result = self.post(path, self.request(source_network=network))
+                self.assertEqual(status, 400, (network, path, result))
+                self.assertIn("not enabled", result["error"])
 
     def test_quote_and_create_reject_invalid_direction(self):
         for path in ("/api/quote","/api/orders"):
