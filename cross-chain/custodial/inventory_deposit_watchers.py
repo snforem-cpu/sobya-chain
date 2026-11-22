@@ -447,8 +447,23 @@ class InventoryDepositWorker:
                 (order_id,),
             ).fetchone()
             if existing:
-                if existing[:3] != (network, tx_id, event_index):
-                    raise InventoryDepositError("order already has a different submitted deposit proof")
+                if existing[:3] == (network, tx_id, event_index):
+                    return
+                if existing[3] != "failed":
+                    raise InventoryDepositError("order already has a different pending or verified deposit proof")
+                # A failed proof never credited the ledger. Permit the user/API to
+                # correct it, while the UNIQUE constraint still prevents reusing an
+                # event already queued for another order.
+                try:
+                    db.execute(
+                        """UPDATE pending_inventory_deposits
+                           SET network=?,tx_id=?,event_index=?,status='pending',
+                               attempts=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP
+                           WHERE order_id=? AND status='failed'""",
+                        (network, tx_id, event_index, order_id),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise InventoryDepositError("deposit event is already assigned to another order") from exc
                 return
             db.execute(
                 "INSERT INTO pending_inventory_deposits(order_id,network,tx_id,event_index) VALUES (?,?,?,?)",
