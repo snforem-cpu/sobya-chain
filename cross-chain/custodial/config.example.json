@@ -75,8 +75,7 @@
     "requireInventoryBeforeAcceptingOrder": true,
     "requirePayoutFinalityBeforeComplete": true,
     "pauseOnWatcherFailure": true,
-    "allowAdminWithdrawal": false,
-    "notice": "Shared inventory wallets are intentionally reused across orders. Every order is bound to its own exact transaction hash/signature and event/instruction index; unique deposit addresses are not required and balance deltas are never used."
+    "allowAdminWithdrawal": false
   },
   "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order. The order API is implemented in order_api.py and remains disabled by default. It creates durable quotes/orders, accepts exact transaction_id plus event_index proofs, and exposes order status. Set api.enabled=true only after configuring the required source-network deposit watchers and a protected public HTTPS endpoint. Fees default to zero until step 3 explicitly configures feeBps. Shared inventory wallets are reused across orders; unique per-order deposit addresses are not required.",
   "depositWatchEnabled": false,
