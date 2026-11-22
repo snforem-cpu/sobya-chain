@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - "enzonic-safe-start"
+      - "enzonic-swap-worker"
     paths:
       - "cross-chain/custodial/**"
       - ".github/workflows/enzonic-launcher-tests.yml"
