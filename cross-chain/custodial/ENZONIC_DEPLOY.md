@@ -29,7 +29,7 @@ The repository now includes a small browser order page at `cross-chain/custodial
 - `GET /` serves the order page; `GET /api/networks` returns supported networks and decimals.
 - `POST /api/quote` returns a preview from the injected quote provider; it does not create an order or reserve inventory.
 - `POST /api/orders` recalculates the quote and creates the order in SQLite. The response includes the exact shared inventory address, exact amount, order ID, and a per-order access token.
-- `GET /api/orders/{order_id}` and `POST /api/orders/{order_id}/deposit-proof` require that per-order token. Deposit proof submission accepts only the transaction ID/signature and exact event/instruction index; the verifier derives all other expected fields from the stored order.
+- `GET /api/orders/{order_id}` and `POST /api/orders/{order_id}/deposit-proof` require that per-order token. The order's quote expiry is persisted; deposit proofs submitted after expiry are rejected. Deposit proof submission accepts only the transaction ID/signature and exact event/instruction index; the verifier derives all other expected fields from the stored order.
 - Requests are size-limited and rate-limited. The API refuses non-loopback binds and must only be exposed through a trusted TLS reverse proxy.
 
 To enable it, set `orderApiEnabled=true`, set `SOBYA_ORDER_API_ACCESS_SECRET` to a random secret of at least 32 bytes, and configure the quote provider inputs. Quote creation intentionally fails closed until the finalized demand snapshot, verified reference liquidity, and operator-approved `feeBps` are present. The example configuration leaves the API disabled. Do not accept deposits or expose the page publicly until the pricing inputs and TLS proxy are configured and verified.

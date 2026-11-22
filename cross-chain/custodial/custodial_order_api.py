@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
 import re
+import sqlite3
 import threading
 import time
 from collections import defaultdict, deque
@@ -115,6 +116,10 @@ def create_server(
     if not 1 <= rate_limit_per_minute <= 600:
         raise ValueError("rate limit must be between 1 and 600 requests per minute")
     assets = _network_assets(config)
+    with sqlite3.connect(ledger.database) as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS custodial_order_quote_expiry (
+            order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL
+        )""")
     hits: dict[str, deque[float]] = defaultdict(deque)
     hit_lock = threading.Lock()
 
@@ -135,6 +140,11 @@ def create_server(
             raise OrderApiError("quote provider did not return a positive integer destination amount")
         if result.get("executable") is not True:
             raise OrderApiError("quote is not executable")
+        expires_at = result.get("expires_at")
+        now = int(time.time())
+        if (not isinstance(expires_at, int) or isinstance(expires_at, bool)
+                or not now < expires_at <= now + 3600):
+            raise OrderApiError("quote provider returned an expired or invalid expiry")
         return result
 
     def token_for(order_id: str) -> str:
@@ -230,6 +240,12 @@ def create_server(
                 )}
                 safe["source_amount"] = str(safe["source_amount"])
                 safe["destination_amount"] = str(safe["destination_amount"])
+                with sqlite3.connect(ledger.database) as db:
+                    expiry = db.execute(
+                        "SELECT expires_at FROM custodial_order_quote_expiry WHERE order_id=?",
+                        (order_id,),
+                    ).fetchone()
+                safe["quote_expires_at"] = expiry[0] if expiry else None
                 self.send_json(200, {"order": safe})
                 return
             self.send_json(404, {"error": "not found"})
@@ -297,6 +313,15 @@ def create_server(
                         destination_asset=destination_asset, source_amount=source,
                         destination_amount=result["destination_amount"],
                     )
+                    try:
+                        with sqlite3.connect(ledger.database) as db:
+                            db.execute(
+                                "INSERT INTO custodial_order_quote_expiry(order_id,expires_at) VALUES(?,?)",
+                                (order_id, result["expires_at"]),
+                            )
+                    except Exception:
+                        ledger.reject(order_id)
+                        raise
                     self.send_json(201, {
                         "order_id": order_id, "order_token": token_for(order_id),
                         "state": "created", "deposit_address": deposit_address,
@@ -312,6 +337,13 @@ def create_server(
                     if not self.authorized_order(order_id):
                         self.send_json(401, {"error": "order access token required"})
                         return
+                    with sqlite3.connect(ledger.database) as db:
+                        expiry = db.execute(
+                            "SELECT expires_at FROM custodial_order_quote_expiry WHERE order_id=?",
+                            (order_id,),
+                        ).fetchone()
+                    if expiry is None or int(time.time()) >= expiry[0]:
+                        raise OrderApiError("quote expired or order quote metadata is missing")
                     if set(body) != {"tx_id", "event_index"}:
                         raise OrderApiError("tx_id and event_index are required")
                     tx_id = _required_text(body["tx_id"], "transaction ID", 180)
