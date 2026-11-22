@@ -69,7 +69,7 @@ def main() -> int:
     elif keystore_status == "not_configured":
         print("SOBYA keystore not configured yet; payouts remain disabled.")
 
-    os.environ["SOBYA_CUSTODIAL_CONFIG"] = str(config_path.resolve())
+    # Read-only connectivity check for Ethereum and SOBYA. This never unlocks\n    # wallets or broadcasts transactions; the release gates above remain closed.\n    from rpc_preflight import run_preflight\n    run_preflight()\n\n    os.environ["SOBYA_CUSTODIAL_CONFIG"] = str(config_path.resolve())
     os.environ.setdefault("SOBYA_CUSTODIAL_DB", str(HERE / "data" / "orders.sqlite3"))
     os.environ.setdefault("SOBYA_PAYOUT_JOURNAL", str(HERE / "data" / "payout-journal.sqlite3"))
 
