@@ -1,27 +1,45 @@
+import os
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from custodial_ledger import CustodialOrderLedger
 from custodial_runtime import build_order_quote_provider, DepositRuntimeConfigurationError
+
+
+class FakeSobyaRpc:
+    observed_at = None
+    balance = 1_000_000 * 10**18
+
+    def __init__(self, url):
+        self.url = url
+
+    def call(self, method, params):
+        if method == "eth_chainId":
+            return hex(357812033857)
+        if method == "eth_getBlockByNumber":
+            return {"number": "0x100", "timestamp": hex(self.observed_at or int(time.time()))}
+        if method == "eth_getBalance":
+            return hex(self.balance)
+        raise AssertionError("unexpected RPC method: " + method)
 
 
 class OrderPricingPolicyTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.ledger = CustodialOrderLedger(self.temp.name + "/orders.sqlite")
-        now = int(time.time())
+        os.environ["TEST_SOBYA_RPC"] = "https://rpc.example.invalid"
+        FakeSobyaRpc.observed_at = int(time.time())
+        FakeSobyaRpc.balance = 1_000_000 * 10**18
         self.config = {
             "pricing": {
                 "baseReferencePriceUsdtPerSoby": "0.005",
                 "referenceLiquidityUsdtBaseUnits": 5_000_000_000,
-                "demandSnapshot": {
-                    "buyUsdtBaseUnits": 0, "sellUsdtBaseUnits": 0,
-                    "windowSeconds": 3600, "observedAtEpoch": now, "finalized": True,
-                },
                 "demandWindowSeconds": 3600, "demandMaxAgeSeconds": 300,
                 "upwardDemandSensitivityBps": 10000, "downwardDemandSensitivityBps": 2500,
                 "priceFloor": "0.004", "priceCeiling": "0.01",
+                "inventorySnapshotMaxAgeSeconds": 300,
             },
             "limits": {
                 "maxOrderUsdtBaseUnits": 100_000_000,
@@ -30,16 +48,19 @@ class OrderPricingPolicyTests(unittest.TestCase):
                 "feeBps": 100, "quoteLifetimeSeconds": 120,
             },
             "networks": {"sobya": {
-                "verifiedPayoutInventoryBaseUnits": 1_000_000 * 10**18,
-                "inventoryObservedAtEpoch": now,
+                "chainId": 357812033857,
+                "rpcUrlEnv": "TEST_SOBYA_RPC",
+                "inventoryWallet": "0x" + "33" * 20,
             }},
         }
 
     def tearDown(self):
+        os.environ.pop("TEST_SOBYA_RPC", None)
         self.temp.cleanup()
 
     def provider(self):
-        return build_order_quote_provider(self.config, self.ledger)
+        with patch("custodial_runtime.JsonRpc", FakeSobyaRpc):
+            return build_order_quote_provider(self.config, self.ledger)
 
     def test_quote_applies_fee_and_returns_expiry(self):
         quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
@@ -47,6 +68,7 @@ class OrderPricingPolicyTests(unittest.TestCase):
         self.assertEqual(quote["destination_amount"], 198 * 10**18)
         self.assertTrue(quote["expires_at"] > int(time.time()))
         self.assertTrue(quote["executable"])
+        self.assertEqual(quote["inventory_block"], "0x100")
 
     def test_rejects_order_above_per_order_limit(self):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "maximum"):
@@ -63,15 +85,15 @@ class OrderPricingPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "daily USDT intake"):
             self.provider()("usdt_to_soby", "ethereum", 1_000_000)
 
-    def test_rejects_inventory_reserve_breach(self):
-        self.config["networks"]["sobya"]["verifiedPayoutInventoryBaseUnits"] = 101 * 10**18
+    def test_rejects_live_inventory_reserve_breach(self):
+        FakeSobyaRpc.balance = 101 * 10**18
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "protected minimum"):
             self.provider()("usdt_to_soby", "ethereum", 1_000_000)
 
-    def test_rejects_stale_inventory_snapshot(self):
-        self.config["networks"]["sobya"]["inventoryObservedAtEpoch"] = int(time.time()) - 301
-        with self.assertRaisesRegex(DepositRuntimeConfigurationError, "inventory snapshot"):
-            self.provider()
+    def test_rejects_stale_live_inventory(self):
+        FakeSobyaRpc.observed_at = int(time.time()) - 301
+        with self.assertRaisesRegex(DepositRuntimeConfigurationError, "inventory observation is stale"):
+            self.provider()("usdt_to_soby", "ethereum", 1_000_000)
 
     def test_rejects_missing_operational_limits(self):
         self.config["limits"]["maxOrderUsdtBaseUnits"] = None
@@ -79,7 +101,16 @@ class OrderPricingPolicyTests(unittest.TestCase):
             self.provider()
 
     def test_rejects_out_of_bounds_demand_price(self):
-        self.config["pricing"]["demandSnapshot"]["buyUsdtBaseUnits"] = 5_000_000_000
+        # Only finalized, completed swaps are included in the demand signal.
+        self.ledger.create_order(
+            direction="usdt_to_soby", source_network="ethereum", destination_network="sobya",
+            deposit_address="0x" + "11" * 20, source_wallet="0x" + "22" * 20,
+            destination_wallet="0x" + "33" * 20, source_asset="0x" + "44" * 20,
+            destination_asset="native", source_amount=5_000_000_000,
+            destination_amount=1 * 10**18,
+        )
+        with self.ledger._connect() as db:
+            db.execute("UPDATE custodial_orders SET state='complete'")
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "price bounds"):
             self.provider()("usdt_to_soby", "ethereum", 1_000_000)
 
@@ -87,6 +118,13 @@ class OrderPricingPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "only USDT-to-SOBY"):
             self.provider()("soby_to_usdt", "sobya", 10**18)
 
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    def test_demand_ignores_uncompleted_orders(self):
+        self.ledger.create_order(
+            direction="usdt_to_soby", source_network="ethereum", destination_network="sobya",
+            deposit_address="0x" + "11" * 20, source_wallet="0x" + "22" * 20,
+            destination_wallet="0x" + "33" * 20, source_asset="0x" + "44" * 20,
+            destination_asset="native", source_amount=5_000_000_000,
+            destination_amount=1 * 10**18,
+        )
+        quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
+        self.assertEqual(quote["rate"], "0.005")
