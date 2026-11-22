@@ -22,7 +22,7 @@ class EnzonicLauncherTests(unittest.TestCase):
             old_cwd = Path.cwd()
             with patch.object(enzonic_start, "HERE", root), patch.dict(
                 os.environ, {}, clear=True
-            ), patch("payout_worker.main", return_value=0):
+            ), patch("custodial_runtime.main", return_value=0):
                 try:
                     self.assertEqual(enzonic_start.main(), 0)
                     config = json.loads((root / "config.json").read_text(encoding="utf-8"))
@@ -58,7 +58,7 @@ class EnzonicLauncherTests(unittest.TestCase):
             old_cwd = Path.cwd()
             with patch.object(enzonic_start, "HERE", root), patch.dict(
                 os.environ, {"SOBYA_CUSTODIAL_CONFIG": str(config_path)}, clear=True
-            ), patch("payout_worker.main", return_value=0):
+            ), patch("custodial_runtime.main", return_value=0):
                 try:
                     self.assertEqual(enzonic_start.main(), 0)
                     self.assertEqual(

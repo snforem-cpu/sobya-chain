@@ -64,9 +64,9 @@ def main() -> int:
     os.environ.setdefault("SOBYA_CUSTODIAL_DB", str(HERE / "data" / "orders.sqlite3"))
     os.environ.setdefault("SOBYA_PAYOUT_JOURNAL", str(HERE / "data" / "payout-journal.sqlite3"))
 
-    from payout_worker import main as worker_main
+    from custodial_runtime import main as runtime_main
 
-    return worker_main()
+    return runtime_main()
 
 
 if __name__ == "__main__":

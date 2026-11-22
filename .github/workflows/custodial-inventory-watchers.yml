@@ -31,6 +31,12 @@ jobs:
       - name: Test shared-inventory deposit verifiers
         working-directory: cross-chain/custodial
         run: python -m unittest test_inventory_deposit_watchers.py -v
+      - name: Test unified deposit-to-payout runtime wiring
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_custodial_runtime.py -v
+      - name: Test Enzonic unified runtime launcher
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_enzonic_start.py -v
       - name: Test payout runtime release gates
         working-directory: cross-chain/custodial
         run: python -m unittest test_payout_runtime.py -v
