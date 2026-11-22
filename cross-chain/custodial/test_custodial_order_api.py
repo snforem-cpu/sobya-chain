@@ -21,11 +21,11 @@ class OrderApiTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.ledger = CustodialOrderLedger(self.temp.name + "/orders.sqlite")
         self.worker = FakeDepositWorker()
-        self.config = {"networks": {
-            "ethereum": {"inventoryWallet":"0x"+"11"*20,"usdtContract":"0x"+"22"*20},
-            "tron": {"inventoryWallet":"T"+"1"*33,"usdtContract":"T"+"2"*33},
-            "solana": {"inventoryWallet":"S"*44,"usdtMint":"M"*44},
-            "sobya": {"inventoryWallet":"0x"+"33"*20},
+        self.config = {"enabledSwapDirections": ["usdt_to_soby"], "networks": {
+            "ethereum": {"inventoryWallet":"0x"+"11"*20,"usdtContract":"0x"+"22"*20,"payoutInventoryVerified":True},
+            "tron": {"inventoryWallet":"T"+"1"*33,"usdtContract":"T"+"2"*33,"payoutInventoryVerified":True},
+            "solana": {"inventoryWallet":"S"*44,"usdtMint":"M"*44,"payoutInventoryVerified":True},
+            "sobya": {"inventoryWallet":"0x"+"33"*20,"payoutInventoryVerified":True},
         }}
         def price(direction, network, amount):
             return {"destination_amount": amount * 2, "rate":"2", "fee_bps":25,
@@ -80,6 +80,7 @@ class OrderApiTests(unittest.TestCase):
         self.assertEqual(status,400)
 
     def test_soby_to_usdt_requires_external_destination(self):
+        self.config["enabledSwapDirections"].append("soby_to_usdt")
         payload=self.request(direction="soby_to_usdt",source_network="sobya",destination_network="tron",amount="1")
         status,result=self.post("/api/quote",payload)
         self.assertEqual(status,200,result)
@@ -116,6 +117,18 @@ class OrderApiTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("quote expired", result["error"])
         self.assertEqual(self.worker.submitted, [])
+
+    def test_soby_to_usdt_is_disabled_by_default(self):
+        payload=self.request(direction="soby_to_usdt",source_network="sobya",destination_network="tron",amount="1")
+        status,result=self.post("/api/quote",payload)
+        self.assertEqual(status,400)
+        self.assertIn("not currently enabled",result["error"])
+
+    def test_unverified_destination_inventory_blocks_quote(self):
+        self.config["networks"]["sobya"]["payoutInventoryVerified"] = False
+        status,result=self.post("/api/quote",self.request())
+        self.assertEqual(status,400)
+        self.assertIn("inventory has not been verified",result["error"])
 
     def test_api_never_binds_public_interface(self):
         with self.assertRaisesRegex(ValueError,"loopback"):
