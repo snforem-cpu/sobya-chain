@@ -116,6 +116,11 @@ def create_server(
     if not 1 <= rate_limit_per_minute <= 600:
         raise ValueError("rate limit must be between 1 and 600 requests per minute")
     assets = _network_assets(config)
+    enabled_directions = config.get("enabledSwapDirections", ["usdt_to_soby"])
+    if (not isinstance(enabled_directions, list) or not enabled_directions
+            or any(item not in {"usdt_to_soby", "soby_to_usdt"} for item in enabled_directions)
+            or len(set(enabled_directions)) != len(enabled_directions)):
+        raise ValueError("enabledSwapDirections must be a non-empty unique list of supported directions")
     with sqlite3.connect(ledger.database) as db:
         db.execute("""CREATE TABLE IF NOT EXISTS custodial_order_quote_expiry (
             order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL
@@ -126,8 +131,8 @@ def create_server(
     server: ThreadingHTTPServer | None = None
 
     def quote(direction: str, source_network: str, source_amount: int) -> dict[str, Any]:
-        if direction not in {"usdt_to_soby", "soby_to_usdt"}:
-            raise OrderApiError("unsupported swap direction")
+        if direction not in enabled_directions:
+            raise OrderApiError("this swap direction is not currently enabled")
         if direction == "usdt_to_soby" and source_network not in EXTERNAL:
             raise OrderApiError("USDT-to-SOBY source must be Ethereum, TRON, or Solana")
         if direction == "soby_to_usdt" and source_network != "sobya":
@@ -217,7 +222,7 @@ def create_server(
                 self.send_json(200, {"networks": {
                     name: {"symbol": assets[name]["symbol"], "decimals": assets[name]["decimals"]}
                     for name in NETWORKS
-                }, "directions": ["usdt_to_soby", "soby_to_usdt"]})
+                }, "directions": list(enabled_directions)})
                 return
             if path == "/api/health":
                 self.send_json(200, {"ok": True, "service": "sobya-order-api"})
@@ -271,19 +276,26 @@ def create_server(
                     source_network = body["source_network"]
                     if not isinstance(direction, str) or not isinstance(source_network, str):
                         raise OrderApiError("direction and source network are required")
+                    if direction == "usdt_to_soby":
+                        destination_network = "sobya"
+                    elif direction == "soby_to_usdt":
+                        destination_network = body.get("destination_network")
+                        if destination_network not in EXTERNAL:
+                            raise OrderApiError("destination_network must be Ethereum, TRON, or Solana")
+                    else:
+                        raise OrderApiError("unsupported swap direction")
+                    if direction not in enabled_directions:
+                        raise OrderApiError("this swap direction is not currently enabled")
+                    network_config = config.get("networks", {})
+                    destination_config = network_config.get(destination_network, {})
+                    if destination_config.get("payoutInventoryVerified") is not True:
+                        raise OrderApiError("destination payout inventory has not been verified")
                     source = _amount_to_units(body["amount"], assets[source_network]["decimals"]) if source_network in assets else 0
                     if source <= 0:
                         raise OrderApiError("unsupported source network or amount")
                     source_wallet = _required_text(body["source_wallet"], "source wallet")
                     destination_wallet = _required_text(body["destination_wallet"], "destination wallet")
                     result = quote(direction, source_network, source)
-                    destination_network = "sobya" if direction == "usdt_to_soby" else source_network
-                    if direction == "soby_to_usdt":
-                        destination_network = body.get("destination_network")
-                        if destination_network not in EXTERNAL:
-                            raise OrderApiError("destination_network must be Ethereum, TRON, or Solana")
-                    elif direction != "usdt_to_soby":
-                        raise OrderApiError("unsupported swap direction")
                     source_meta, destination_meta = assets[source_network], assets[destination_network]
                     response_quote = {
                         "direction": direction, "source_network": source_network,
