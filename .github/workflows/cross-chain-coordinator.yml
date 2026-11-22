@@ -55,3 +55,5 @@ jobs:
           python -m unittest -v test_demand_pricing.py
           python -m unittest -v test_order_pricing_policy.py
           python -m unittest -v test_evm_deposit_watcher.py
+          python -m unittest -v test_inventory_keystore.py
+          python -m unittest -v test_payout_runtime.py
