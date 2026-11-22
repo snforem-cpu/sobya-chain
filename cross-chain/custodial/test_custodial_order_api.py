@@ -1,6 +1,7 @@
 import json
 import threading
 import unittest
+from unittest.mock import patch
 from http.client import HTTPConnection
 
 from custodial_ledger import CustodialOrderLedger
@@ -93,6 +94,27 @@ class OrderApiTests(unittest.TestCase):
         status,result=self.post("/api/orders/"+oid+"/deposit-proof",{"tx_id":"0xabc","event_index":0},token)
         self.assertEqual(status,202,result)
         self.assertEqual(self.worker.submitted,[(oid,"0xabc",0)])
+
+    def test_quote_expiry_must_be_future_and_bounded(self):
+        self.server.quote_provider = lambda *_: {
+            "destination_amount": 100, "rate": "2", "fee_bps": 25,
+            "expires_at": 1, "executable": True,
+        }
+        status, _ = self.post("/api/quote", self.request())
+        self.assertEqual(status, 400)
+
+    def test_deposit_proof_is_rejected_after_order_quote_expiry(self):
+        status, created = self.post("/api/orders", self.request())
+        self.assertEqual(status, 201)
+        order_id, token = created["order_id"], created["order_token"]
+        with patch("custodial_order_api.time.time", return_value=2_000_000_001):
+            status, result = self.post(
+                "/api/orders/" + order_id + "/deposit-proof",
+                {"tx_id": "0xabc", "event_index": 0}, token,
+            )
+        self.assertEqual(status, 400)
+        self.assertIn("quote expired", result["error"])
+        self.assertEqual(self.worker.submitted, [])
 
     def test_api_never_binds_public_interface(self):
         with self.assertRaisesRegex(ValueError,"loopback"):
