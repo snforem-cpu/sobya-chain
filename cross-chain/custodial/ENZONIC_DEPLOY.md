@@ -31,7 +31,7 @@ Quote request fields:
 }
 ```
 
-For the reverse direction use `direction=soby_to_usdt`, `source_network=sobya`, and select `ethereum`, `tron`, or `solana` as `destination_network`. Amounts are integer base units: USDT uses 6 decimals and native SOBY uses 18 decimals. The quote response supplies the shared inventory deposit address, destination amount, fee field, price, expiry, and order ID. The current fee defaults to zero until the fee policy is completed in step 3.
+For the reverse direction use `direction=soby_to_usdt`, `source_network=sobya`, and select `ethereum`, `tron`, or `solana` as `destination_network`. Amounts are integer base units: USDT uses 6 decimals and native SOBY uses 18 decimals. The quote response supplies the shared inventory deposit address, destination amount, fee field, price, expiry, and order ID. The API refuses to quote unless the destination network has `inventoryVerified=true`, which the operator may set only after independently checking the executable payout balance. The current fee defaults to zero until the fee policy is completed in step 3.
 
 The deposit endpoint accepts:
 
@@ -54,6 +54,6 @@ For a first process check, leave all wallet, RPC, and passphrase environment var
 
 ## Before accepting real customer orders or enabling payouts
 
-Do not publish the API or accept real deposits until the operator has configured and verified each source-chain RPC, exact inventory addresses, chain/token identities, quote price, limits and fee policy, HTTPS ingress, and durable backups. Do not enable `featureEnabled` or any network payout flag until encrypted keystores and passphrases are installed as runtime secrets, fee balances and inventory are verified, and controlled end-to-end tests pass.
+Do not publish the API or accept real deposits until the operator has configured and verified each source-chain RPC, exact inventory addresses, chain/token identities, destination balances (then set the matching `inventoryVerified=true` flag), quote price, limits and fee policy, HTTPS ingress, and durable backups. Do not enable `featureEnabled` or any network payout flag until encrypted keystores and passphrases are installed as runtime secrets, fee balances and inventory are verified, and controlled end-to-end tests pass.
 
 This code implementation is not a live exchange launch. The Enzonic process must still be deployed and verified in step 5; live deposits and payouts remain disabled until the later release gates are completed.
