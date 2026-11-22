@@ -118,6 +118,8 @@ def create_server(
     hits: dict[str, deque[float]] = defaultdict(deque)
     hit_lock = threading.Lock()
 
+    server: ThreadingHTTPServer | None = None
+
     def quote(direction: str, source_network: str, source_amount: int) -> dict[str, Any]:
         if direction not in {"usdt_to_soby", "soby_to_usdt"}:
             raise OrderApiError("unsupported swap direction")
@@ -125,7 +127,7 @@ def create_server(
             raise OrderApiError("USDT-to-SOBY source must be Ethereum, TRON, or Solana")
         if direction == "soby_to_usdt" and source_network != "sobya":
             raise OrderApiError("SOBY-to-USDT source must be SOBYA")
-        result = self.server.quote_provider(direction, source_network, source_amount)
+        result = server.quote_provider(direction, source_network, source_amount)
         if not isinstance(result, dict):
             raise OrderApiError("quote provider returned an invalid quote")
         destination_amount = result.get("destination_amount")
