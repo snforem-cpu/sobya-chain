@@ -1,8 +1,8 @@
 """One-time, address-checked SOBYA EVM keystore bootstrap for Enzonic.
 
-The private key is read only from the Enzonic process environment. It is never
-logged, written to the repository, or included in the keystore. Remove the
-one-time private-key environment variable from the Enzonic panel after success.
+The private key is read only from the Enzonic process environment when a new
+keystore must be created. Existing keystores are authenticated and address-
+checked on every startup. Secrets are never logged or written to the repository.
 """
 from __future__ import annotations
 
@@ -49,7 +49,22 @@ def bootstrap_sobya_keystore(config: dict[str, Any], repository_root: Path) -> s
     os.environ[path_env] = str(target)
 
     if target.exists() or target.is_symlink():
-        os.environ.pop(PRIVATE_KEY_ENV, None)
+        # An existing file is never replaced. Authenticate it on every startup
+        # and ensure it still controls the configured inventory wallet.
+        from eth_account import Account
+        from inventory_keystore import load_inventory_keystore
+
+        passphrase = os.environ.get(passphrase_env)
+        if not passphrase or len(passphrase) < 16:
+            raise ValueError("existing SOBYA keystore cannot be verified: passphrase unavailable")
+        try:
+            recovered = load_inventory_keystore(str(target), "sobya", passphrase)
+            recovered_address = _normal_address(Account.from_key(recovered).address)
+            expected = _normal_address(sobya.get("inventoryWallet"))
+            if recovered_address.lower() != expected.lower():
+                raise ValueError("address mismatch")
+        except Exception as exc:
+            raise ValueError("existing SOBYA keystore failed authentication or wallet verification") from exc
         return "existing"
 
     key_text = os.environ.get(PRIVATE_KEY_ENV)
