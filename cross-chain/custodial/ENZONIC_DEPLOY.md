@@ -19,7 +19,7 @@ For a first process check, leave all wallet, RPC, and passphrase environment var
 
 Do not enable `featureEnabled` or any network flag until the full coordinator/API and deposit-watcher processes are deployed and supervised, the exact inventory addresses and chain IDs are verified, RPC endpoints respond correctly, encrypted keystores and passphrases are installed as environment/runtime secrets, fee balances and inventory are verified, and an end-to-end controlled test passes.
 
-The example config is a template, not production configuration. The payout worker is invoked only after the deposit queue has been processed in each cycle; it can therefore see a newly finalized deposit in the same cycle. The quote provider now requires an operator-approved reference depth, finalized demand snapshot, price floor/ceiling, per-order cap, per-network daily cap, fee (0–1000 bps), protected minimum SOBY reserve, and a fresh independently verified SOBYA payout-inventory balance/timestamp. Missing, stale, or inconsistent values fail closed. The reference depth is a pricing input only; it is not an external USDT payout balance and does not require funding USDT inventory. Do not enable live payouts with null or guessed values.
+The example config is a template, not production configuration. The payout worker is invoked only after the deposit queue has been processed in each cycle; it can therefore see a newly finalized deposit in the same cycle. The quote provider requires an operator-approved reference depth, price floor/ceiling, per-order cap, per-network daily cap, fee (0–1000 bps), and protected minimum SOBY reserve. It reads the native SOBY balance directly from the configured SOBYA HTTPS RPC at a finalized block for every quote, verifies the chain ID and freshness, and derives the demand snapshot from ledger orders only after both deposit and payout finality have been recorded. No manually copied inventory balance or demand snapshot is accepted. Missing, stale, or inconsistent values fail closed. The reference depth is a pricing input only; it is not an external USDT payout balance and does not require funding USDT inventory. Do not enable live payouts with null or guessed values.
 
 
 
@@ -29,7 +29,7 @@ The example config is a template, not production configuration. The payout worke
 - `referenceLiquidityUsdtBaseUnits` and all USDT order/daily limits use 6-decimal USDT base units. This is reference pricing depth, not an external USDT balance.
 - `minimumInventoryBaseUnits` and `verifiedPayoutInventoryBaseUnits` use 18-decimal SOBY base units.
 - `feeBps` is basis points (100 = 1%); the runtime rejects values above 1000 (10%).
-- `demandSnapshot` must contain finalized executed buy/sell USDT base-unit totals, a 3600-second window, and its Unix observation timestamp. Stale, future-dated, or unfinalized snapshots are rejected.
+- Demand uses only `complete` ledger orders, a state reached after the exact destination payout is independently verified final; source USDT base units are counted over a rolling 3600-second window. Uncompleted orders never influence demand.
 - `inventoryObservedAtEpoch` is a Unix timestamp; the inventory snapshot must be no older than `inventorySnapshotMaxAgeSeconds`.
 
 ## Customer order page and quote API
