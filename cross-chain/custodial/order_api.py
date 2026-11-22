@@ -44,7 +44,14 @@ class CustodialOrderApi:
             raise OrderApiError("quote lifetime must be between 30 and 3600 seconds")
         self.database = str(ledger.database)
         with sqlite3.connect(self.database) as db:
-            db.execute("""CREATE TABLE IF NOT EXISTS pending_inventory_deposits (\n                order_id TEXT PRIMARY KEY, network TEXT NOT NULL, tx_id TEXT NOT NULL,\n                event_index INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',\n                attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,\n                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n                UNIQUE(network, tx_id, event_index))""")\n            db.execute("""CREATE TABLE IF NOT EXISTS custodial_api_quotes (
+            db.execute("""CREATE TABLE IF NOT EXISTS pending_inventory_deposits (
+                order_id TEXT PRIMARY KEY, network TEXT NOT NULL, tx_id TEXT NOT NULL,
+                event_index INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+                attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(network, tx_id, event_index))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS custodial_api_quotes (
                 order_id TEXT PRIMARY KEY,
                 price_usdt_per_soby TEXT NOT NULL,
                 gross_destination_amount TEXT NOT NULL,
