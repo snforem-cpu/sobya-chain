@@ -104,7 +104,10 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
             raise DepositRuntimeConfigurationError(f"positive operator-approved {label} is required")
     if not isinstance(inventory_observed, int) or isinstance(inventory_observed, bool):
         raise DepositRuntimeConfigurationError("verified SOBY inventory observation timestamp is required")
-    if int(time.time()) - inventory_observed not in range(0, 301):
+    inventory_max_age = pricing.get("inventorySnapshotMaxAgeSeconds", 300)
+    if not isinstance(inventory_max_age, int) or isinstance(inventory_max_age, bool) or not 30 <= inventory_max_age <= 900:
+        raise DepositRuntimeConfigurationError("inventorySnapshotMaxAgeSeconds must be between 30 and 900")
+    if int(time.time()) - inventory_observed not in range(0, inventory_max_age + 1):
         raise DepositRuntimeConfigurationError("verified SOBY inventory snapshot is future-dated or older than 300 seconds")
     if inventory_balance <= minimum_inventory:
         raise DepositRuntimeConfigurationError("verified SOBY inventory must exceed the protected minimum reserve")
