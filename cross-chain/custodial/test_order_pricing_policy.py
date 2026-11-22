@@ -93,7 +93,7 @@ class OrderPricingPolicyTests(unittest.TestCase):
             destination_amount=900_000 * 10**18,
         )
         with self.ledger._connect() as db:
-            db.execute("CREATE TABLE custodial_order_quote_expiry (order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS custodial_order_quote_expiry (order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
             db.execute("INSERT INTO custodial_order_quote_expiry(order_id, expires_at) VALUES (?, ?)",
                        (order_id, int(time.time()) - 1))
         quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
