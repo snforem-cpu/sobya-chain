@@ -108,6 +108,8 @@ class EnzonicLauncherTests(unittest.TestCase):
     def test_existing_keystore_is_authenticated_and_address_checked(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = root / "checkout"
+            checkout.mkdir()
             account = Account.create()
             key = bytes(account.key)
             keystore = root / "sobya-keystore.json"
@@ -123,12 +125,14 @@ class EnzonicLauncherTests(unittest.TestCase):
                 "SOBYA_SOBYA_KEYSTORE": str(keystore),
                 "SOBYA_SOBYA_KEYSTORE_PASSPHRASE": passphrase,
             }, clear=True):
-                self.assertEqual(bootstrap_sobya_keystore(config, root), "existing")
+                self.assertEqual(bootstrap_sobya_keystore(config, checkout), "existing")
                 self.assertEqual(keystore.read_bytes(), original)
 
     def test_existing_keystore_rejects_wrong_passphrase(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = root / "checkout"
+            checkout.mkdir()
             account = Account.create()
             keystore = root / "sobya-keystore.json"
             create_inventory_keystore(str(keystore), "sobya", bytes(account.key), "correct-passphrase-123")
@@ -142,11 +146,13 @@ class EnzonicLauncherTests(unittest.TestCase):
                 "SOBYA_SOBYA_KEYSTORE_PASSPHRASE": "incorrect-passphrase-123",
             }, clear=True):
                 with self.assertRaisesRegex(ValueError, "failed authentication"):
-                    bootstrap_sobya_keystore(config, root)
+                    bootstrap_sobya_keystore(config, checkout)
 
     def test_existing_keystore_rejects_wallet_address_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = root / "checkout"
+            checkout.mkdir()
             account = Account.create()
             other = Account.create()
             keystore = root / "sobya-keystore.json"
@@ -162,7 +168,7 @@ class EnzonicLauncherTests(unittest.TestCase):
                 "SOBYA_SOBYA_KEYSTORE_PASSPHRASE": "correct-passphrase-123",
             }, clear=True):
                 with self.assertRaisesRegex(ValueError, "failed authentication"):
-                    bootstrap_sobya_keystore(config, root)
+                    bootstrap_sobya_keystore(config, checkout)
             self.assertEqual(keystore.read_bytes(), original)
 
 
