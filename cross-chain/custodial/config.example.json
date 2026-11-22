@@ -58,7 +58,7 @@
     }
   },
   "pricing": {
-    "baseReferencePriceUsdtPerSoby": "0.005",
+    "baseReferencePriceUsdtPerSoby": null,
     "referenceLiquidityUsdtBaseUnits": null,
     "demandSnapshot": null,
     "upwardDemandSensitivityBps": 10000,
