@@ -1,6 +1,7 @@
 import os
 import tempfile
 import time
+from decimal import Decimal
 import unittest
 from unittest.mock import patch
 
@@ -35,10 +36,8 @@ class OrderPricingPolicyTests(unittest.TestCase):
         self.config = {
             "pricing": {
                 "baseReferencePriceUsdtPerSoby": "0.005",
-                "referenceLiquidityUsdtBaseUnits": 5_000_000_000,
                 "demandWindowSeconds": 3600, "demandMaxAgeSeconds": 300,
                 "upwardDemandSensitivityBps": 10000, "downwardDemandSensitivityBps": 2500,
-                "priceFloor": "0.004", "priceCeiling": "0.01",
                 "inventorySnapshotMaxAgeSeconds": 300,
             },
             "limits": {
@@ -115,8 +114,8 @@ class OrderPricingPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "maximum order"):
             self.provider()
 
-    def test_rejects_out_of_bounds_demand_price(self):
-        # Only finalized, completed swaps are included in the demand signal.
+    def test_demand_price_has_no_configured_upper_ceiling(self):
+        # Completed demand can raise the quote above the former 0.01 ceiling.
         self.ledger.create_order(
             direction="usdt_to_soby", source_network="ethereum", destination_network="sobya",
             deposit_address="0x" + "11" * 20, source_wallet="0x" + "22" * 20,
@@ -126,8 +125,8 @@ class OrderPricingPolicyTests(unittest.TestCase):
         )
         with self.ledger._connect() as db:
             db.execute("UPDATE custodial_orders SET state='complete'")
-        with self.assertRaisesRegex(DepositRuntimeConfigurationError, "price bounds"):
-            self.provider()("usdt_to_soby", "ethereum", 1_000_000)
+        quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
+        self.assertGreater(Decimal(quote["rate"]), Decimal("0.01"))
 
     def test_rejects_reverse_direction(self):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "only USDT-to-SOBY"):
