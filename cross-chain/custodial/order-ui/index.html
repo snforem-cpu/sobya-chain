@@ -18,7 +18,7 @@ button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;backg
 <h1>SOBYA Swap</h1><p>Swap USDT and SOBY using the project's inventory wallets across Ethereum, TRON, Solana, and SOBYA.</p>
 <p class="notice muted">Always verify the network and receiving address before sending. The service is custodial; deposits are held in project-controlled inventory wallets.</p>
 <form id="swap">
-<label for="direction">Swap direction</label><select id="direction"><option value="usdt_to_soby">USDT → SOBY</option><option value="soby_to_usdt">SOBY → USDT</option></select>
+<label for="direction">Swap direction</label><select id="direction"></select>
 <label for="network">Network</label><select id="network"></select>
 <div id="destNetworkWrap" class="hidden"><label for="destNetwork">Receive USDT on</label><select id="destNetwork"><option value="ethereum">Ethereum</option><option value="tron">TRON</option><option value="solana">Solana</option></select></div>
 <label for="amount">Amount to exchange</label><input id="amount" inputmode="decimal" autocomplete="off" placeholder="e.g. 25.00" required>
@@ -36,7 +36,7 @@ button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;backg
 <p id="message" role="status" aria-live="polite"></p><p class="muted">Never share your order access token. The browser stores it only for this page session.</p>
 </main>
 <script>
-const $=id=>document.getElementById(id);let networkInfo={},lastRequest=null,currentOrder=null;
+const $=id=>document.getElementById(id);let networkInfo={},enabledDirections=[],lastRequest=null,currentOrder=null;
 const api=async(path,body,token)=>{const headers={"Content-Type":"application/json"};if(token)headers.Authorization="Bearer "+token;const r=await fetch(path,{method:body?"POST":"GET",headers,body:body?JSON.stringify(body):undefined,cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.error||"Request failed");return j};
 function updateNetworks(){const dir=$("direction").value;const choices=dir==="usdt_to_soby"?["ethereum","tron","solana"]:["sobya"];$("network").innerHTML=choices.map(n=>'<option value="'+n+'">'+n.toUpperCase()+'</option>').join("");$("destNetworkWrap").classList.toggle("hidden",dir!=="soby_to_usdt");$("amount").placeholder=dir==="usdt_to_soby"?"USDT amount":"SOBY amount";}
 function requestBody(){const direction=$("direction").value;const body={direction,source_network:$("network").value,amount:$("amount").value.trim(),source_wallet:$("sourceWallet").value.trim(),destination_wallet:$("destinationWallet").value.trim()};if(direction==="soby_to_usdt")body.destination_network=$("destNetwork").value;return body}
@@ -45,5 +45,5 @@ $("preview").addEventListener("click",async()=>{try{$("message").textContent="Ca
 $("create").addEventListener("click",async()=>{try{if(!lastRequest)throw new Error("Request a quote first");$("message").textContent="Creating order…";const r=await api("/api/orders",lastRequest);currentOrder={id:r.order_id,token:r.order_token};$("orderId").value=r.order_id;$("orderText").textContent=JSON.stringify({state:r.state,deposit_asset:r.deposit_asset,deposit_amount:r.deposit_amount,deposit_address:r.deposit_address,quote:r.quote},null,2);$("orderBox").classList.remove("hidden");$("message").textContent="Order created. Send only the exact amount to the displayed inventory address."}catch(e){$("message").textContent=e.message}});
 $("submitProof").addEventListener("click",async()=>{try{if(!currentOrder)throw new Error("This page has no active order token");const event_index=Number($("eventIndex").value);if(!Number.isSafeInteger(event_index)||event_index<0)throw new Error("Invalid event index");const r=await api("/api/orders/"+currentOrder.id+"/deposit-proof",{tx_id:$("tx").value.trim(),event_index},currentOrder.token);$("message").textContent="Deposit proof accepted for verification."; $("status").textContent=JSON.stringify(r,null,2)}catch(e){$("message").textContent=e.message}});
 $("refresh").addEventListener("click",async()=>{try{if(!currentOrder)throw new Error("This page has no active order token");const r=await api("/api/orders/"+currentOrder.id,null,currentOrder.token);$("status").textContent=JSON.stringify(r.order,null,2)}catch(e){$("message").textContent=e.message}});
-api("/api/networks").then(r=>{networkInfo=r.networks;updateNetworks()}).catch(e=>$("message").textContent=e.message);
+api("/api/networks").then(r=>{networkInfo=r.networks;enabledDirections=r.directions||[];$("direction").innerHTML=enabledDirections.map(d=>'<option value="'+d+'">'+(d==="usdt_to_soby"?"USDT → SOBY":"SOBY → USDT")+"</option>").join("");updateNetworks()}).catch(e=>$("message").textContent=e.message);
 </script></body></html>
