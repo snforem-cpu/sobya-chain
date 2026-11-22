@@ -29,6 +29,9 @@ class CustodialOrderLedger:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(source_network, deposit_tx, deposit_event_index))""")
             db.execute("CREATE INDEX IF NOT EXISTS custodial_orders_state_idx ON custodial_orders(state)")
+            db.execute("""CREATE TABLE IF NOT EXISTS custodial_order_quote_expiry (
+                order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL
+            )""")
 
     @contextmanager
     def _connect(self):
