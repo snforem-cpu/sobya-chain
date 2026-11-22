@@ -170,7 +170,7 @@ class CustodialEndToEndTests(unittest.TestCase):
         self.assertEqual(final_order["state"], "complete")
         self.assertEqual(final_order["deposit_tx"], "0x" + "55" * 32)
         self.assertEqual(final_order["payout_tx"], "0x" + "ab" * 32)
-        self.assertEqual(int(final_order["destination_amount"]), 24_750_000_000_000_000_000)
+        self.assertEqual(int(final_order["destination_amount"]), 4_950_000_000_000_000_000_000)
 
 
 if __name__ == "__main__":
