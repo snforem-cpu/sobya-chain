@@ -77,76 +77,114 @@ def build_inventory_deposit_verifiers(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
-    """Build bounded, fail-closed USDT-to-SOBY quotes against verified SOBY inventory."""
+    """Build fail-closed USDT-to-SOBY quotes from finalized orders and live SOBYA balance."""
     import sqlite3
+    from datetime import datetime, timezone, timedelta
 
     pricing = config.get("pricing")
     limits = config.get("limits")
-    if not isinstance(pricing, dict) or not isinstance(limits, dict):
-        raise DepositRuntimeConfigurationError("order API pricing and limits configuration is required")
-    snapshot_data = pricing.get("demandSnapshot")
-    liquidity = pricing.get("referenceLiquidityUsdtBaseUnits")
+    networks = config.get("networks")
+    if not isinstance(pricing, dict) or not isinstance(limits, dict) or not isinstance(networks, dict):
+        raise DepositRuntimeConfigurationError("pricing, limits, and network configuration are required")
+    sobya = networks.get("sobya")
+    if not isinstance(sobya, dict):
+        raise DepositRuntimeConfigurationError("SOBYA inventory configuration is missing")
+    rpc_env = sobya.get("rpcUrlEnv")
+    rpc_url = os.environ.get(rpc_env, "") if isinstance(rpc_env, str) else ""
+    wallet = sobya.get("inventoryWallet")
+    chain_id = sobya.get("chainId")
+    if not isinstance(rpc_url, str) or not rpc_url.startswith("https://"):
+        raise DepositRuntimeConfigurationError("SOBYA HTTPS RPC endpoint is required for live inventory verification")
+    if not isinstance(wallet, str) or len(wallet) != 42 or not wallet.startswith("0x"):
+        raise DepositRuntimeConfigurationError("valid SOBYA inventory wallet is required")
+    if not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id <= 0:
+        raise DepositRuntimeConfigurationError("SOBYA chain ID is invalid")
+    if ledger is None or not getattr(ledger, "database", None):
+        raise DepositRuntimeConfigurationError("durable order ledger is required for demand and inventory limits")
+
     fee_bps = limits.get("feeBps")
     max_order = limits.get("maxOrderUsdtBaseUnits")
     daily_cap = limits.get("maxDailyUsdtBaseUnitsPerNetwork")
     minimum_inventory = limits.get("minimumInventoryBaseUnits")
-    ceiling = pricing.get("priceCeiling")
-    floor = pricing.get("priceFloor")
-    inventory = config.get("networks", {}).get("sobya", {})
-    inventory_balance = inventory.get("verifiedPayoutInventoryBaseUnits")
-    inventory_observed = inventory.get("inventoryObservedAtEpoch")
-    if not isinstance(snapshot_data, dict):
-        raise DepositRuntimeConfigurationError("finalized demand snapshot is not configured")
+    liquidity = pricing.get("referenceLiquidityUsdtBaseUnits")
     for value, label in ((liquidity, "reference liquidity"), (max_order, "maximum order"),
-                         (daily_cap, "daily network cap"), (minimum_inventory, "minimum SOBY inventory"),
-                         (inventory_balance, "verified SOBY payout inventory")):
+                         (daily_cap, "daily network cap"), (minimum_inventory, "minimum SOBY inventory")):
         if not isinstance(value, int) or isinstance(value, bool) or not 0 < value <= 2**256 - 1:
             raise DepositRuntimeConfigurationError(f"positive uint256 operator-approved {label} is required")
-    if not isinstance(inventory_observed, int) or isinstance(inventory_observed, bool):
-        raise DepositRuntimeConfigurationError("verified SOBY inventory observation timestamp is required")
-    inventory_max_age = pricing.get("inventorySnapshotMaxAgeSeconds", 300)
-    if not isinstance(inventory_max_age, int) or isinstance(inventory_max_age, bool) or not 30 <= inventory_max_age <= 900:
-        raise DepositRuntimeConfigurationError("inventorySnapshotMaxAgeSeconds must be between 30 and 900")
-    if int(time.time()) - inventory_observed not in range(0, inventory_max_age + 1):
-        raise DepositRuntimeConfigurationError(f"verified SOBY inventory snapshot is future-dated or older than {inventory_max_age} seconds")
-    if inventory_balance <= minimum_inventory:
-        raise DepositRuntimeConfigurationError("verified SOBY inventory must exceed the protected minimum reserve")
     if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps <= 1000:
         raise DepositRuntimeConfigurationError("feeBps must be operator-approved and between 0 and 1000 (10%)")
     try:
-        floor_d, ceiling_d = Decimal(str(floor)), Decimal(str(ceiling))
+        floor_d, ceiling_d = Decimal(str(pricing.get("priceFloor"))), Decimal(str(pricing.get("priceCeiling")))
+        base_price = Decimal(str(pricing.get("baseReferencePriceUsdtPerSoby")))
     except Exception as exc:
-        raise DepositRuntimeConfigurationError("positive priceFloor and priceCeiling are required") from exc
-    if not floor_d.is_finite() or not ceiling_d.is_finite() or floor_d <= 0 or floor_d >= ceiling_d:
-        raise DepositRuntimeConfigurationError("price bounds must be finite, positive, and floor < ceiling")
-    if not isinstance(snapshot_data, dict):
-        raise DepositRuntimeConfigurationError("finalized demand snapshot is not configured")
-    try:
-        snapshot = DemandSnapshot(
-            buy_usdt_base_units=snapshot_data["buyUsdtBaseUnits"],
-            sell_usdt_base_units=snapshot_data["sellUsdtBaseUnits"],
-            window_seconds=snapshot_data["windowSeconds"],
-            observed_at_epoch=snapshot_data["observedAtEpoch"],
-            finalized=snapshot_data["finalized"],
-        )
-    except (KeyError, TypeError) as exc:
-        raise DepositRuntimeConfigurationError("finalized demand snapshot schema is invalid") from exc
+        raise DepositRuntimeConfigurationError("base price and positive price floor/ceiling are required") from exc
+    if (not all(x.is_finite() for x in (floor_d, ceiling_d, base_price))
+            or base_price <= 0 or floor_d <= 0 or floor_d >= ceiling_d):
+        raise DepositRuntimeConfigurationError("base price and bounds must be finite and positive; floor < ceiling")
+    lifetime = limits.get("quoteLifetimeSeconds", 120)
+    if not isinstance(lifetime, int) or isinstance(lifetime, bool) or not 15 <= lifetime <= 900:
+        raise DepositRuntimeConfigurationError("quote lifetime must be between 15 and 900 seconds")
+    window = pricing.get("demandWindowSeconds", 3600)
+    max_demand_age = pricing.get("demandMaxAgeSeconds", 300)
+    max_inventory_age = pricing.get("inventorySnapshotMaxAgeSeconds", 300)
+    up_sensitivity = pricing.get("upwardDemandSensitivityBps", 10000)
+    down_sensitivity = pricing.get("downwardDemandSensitivityBps", 2500)
+    if not isinstance(window, int) or isinstance(window, bool) or window != 3600:
+        raise DepositRuntimeConfigurationError("demandWindowSeconds must be 3600")
+    if not isinstance(max_demand_age, int) or not 1 <= max_demand_age <= 900:
+        raise DepositRuntimeConfigurationError("demandMaxAgeSeconds must be between 1 and 900")
+    if not isinstance(max_inventory_age, int) or not 1 <= max_inventory_age <= 900:
+        raise DepositRuntimeConfigurationError("inventorySnapshotMaxAgeSeconds must be between 1 and 900")
+
+    rpc = JsonRpc(rpc_url)
 
     def provide(direction: str, source_network: str, source_amount: int) -> dict[str, Any]:
         if direction != "usdt_to_soby" or source_network not in ("ethereum", "tron", "solana"):
             raise DepositRuntimeConfigurationError("only USDT-to-SOBY quotes are supported in this release")
         if not isinstance(source_amount, int) or isinstance(source_amount, bool) or not 0 < source_amount <= max_order:
             raise DepositRuntimeConfigurationError("order amount exceeds the configured positive maximum")
-        if ledger is None:
-            raise DepositRuntimeConfigurationError("durable order ledger is required for daily and inventory limits")
+        try:
+            observed_chain = int(rpc.call("eth_chainId", []), 16)
+            if observed_chain != chain_id:
+                raise DepositRuntimeConfigurationError("SOBYA RPC chain ID does not match configured chain ID")
+            finalized_block = rpc.call("eth_getBlockByNumber", ["finalized", False])
+            if not isinstance(finalized_block, dict) or not isinstance(finalized_block.get("number"), str):
+                raise DepositRuntimeConfigurationError("SOBYA RPC does not provide a finalized block")
+            block_number = int(finalized_block["number"], 16)
+            observed_at = int(finalized_block["timestamp"], 16)
+            inventory_balance = int(rpc.call("eth_getBalance", [wallet, hex(block_number)]), 16)
+        except DepositRuntimeConfigurationError:
+            raise
+        except Exception as exc:
+            raise DepositRuntimeConfigurationError("could not verify SOBYA native balance at finalized block") from exc
+        now = int(time.time())
+        if observed_at > now or now - observed_at > max_inventory_age:
+            raise DepositRuntimeConfigurationError("finalized SOBYA inventory observation is stale or future-dated")
+        if inventory_balance <= minimum_inventory:
+            raise DepositRuntimeConfigurationError("live SOBY inventory must exceed the protected minimum reserve")
+
+        # Demand is derived only from completed orders: the ledger reaches complete
+        # only after the destination payout has independently passed chain finality.
+        cutoff = datetime.fromtimestamp(now - window, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with sqlite3.connect(ledger.database, timeout=15) as db:
+            demand_rows = db.execute("""SELECT direction, source_amount FROM custodial_orders
+                WHERE state='complete' AND created_at >= ? AND direction IN ('usdt_to_soby','soby_to_usdt')""",
+                (cutoff,)).fetchall()
+            daily_rows = db.execute("""SELECT source_amount FROM custodial_orders
+                WHERE source_network=? AND direction='usdt_to_soby'
+                AND created_at >= date('now')""", (source_network,)).fetchall()
+            reserved_rows = db.execute("""SELECT destination_amount FROM custodial_orders
+                WHERE direction='usdt_to_soby'
+                AND state IN ('created','deposit_seen','deposit_final','payout_submitted')""").fetchall()
+        buy_volume = sum(int(amount) for direction, amount in demand_rows if direction == "usdt_to_soby")
+        sell_volume = sum(int(amount) for direction, amount in demand_rows if direction == "soby_to_usdt")
+        snapshot = DemandSnapshot(buy_volume, sell_volume, window, now, True)
         price = calculate_demand_price(
-            base_price_usdt_per_soby=pricing.get("baseReferencePriceUsdtPerSoby"),
+            base_price_usdt_per_soby=base_price,
             reference_liquidity_usdt_base_units=liquidity,
-            snapshot=snapshot, now_epoch=int(time.time()),
-            expected_window_seconds=pricing.get("demandWindowSeconds", 3600),
-            max_snapshot_age_seconds=pricing.get("demandMaxAgeSeconds", 300),
-            upward_sensitivity_bps=pricing.get("upwardDemandSensitivityBps", 10000),
-            downward_sensitivity_bps=pricing.get("downwardDemandSensitivityBps", 2500),
+            snapshot=snapshot, now_epoch=now,
+            expected_window_seconds=window, max_snapshot_age_seconds=max_demand_age,
+            upward_sensitivity_bps=up_sensitivity, downward_sensitivity_bps=down_sensitivity,
         )
         if not floor_d <= price.quoted_price_usdt_per_soby <= ceiling_d:
             raise DepositRuntimeConfigurationError("demand-adjusted price is outside operator-approved price bounds")
@@ -154,20 +192,6 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
         net = int((gross * Decimal(10000 - fee_bps) / Decimal(10000)).to_integral_value(rounding=ROUND_DOWN))
         if net <= 0:
             raise DepositRuntimeConfigurationError("quoted destination amount rounds to zero")
-        lifetime = limits.get("quoteLifetimeSeconds", 120)
-        if not isinstance(lifetime, int) or isinstance(lifetime, bool) or not 15 <= lifetime <= 900:
-            raise DepositRuntimeConfigurationError("quote lifetime must be between 15 and 900 seconds")
-        # Check daily intake and outstanding SOBY obligations against the same durable ledger.
-        with sqlite3.connect(ledger.database, timeout=15) as db:
-            daily_rows = db.execute("""SELECT source_amount FROM custodial_orders
-                WHERE source_network=? AND direction='usdt_to_soby'
-                AND created_at >= date('now')""", (source_network,)).fetchall()
-            inventory_snapshot_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(inventory_observed))
-            reserved_rows = db.execute("""SELECT destination_amount FROM custodial_orders
-                WHERE direction='usdt_to_soby' AND created_at >= ?
-                AND state IN ('created','deposit_seen','deposit_final','payout_submitted','complete')""",
-                (inventory_snapshot_time,)).fetchall()
-        # Amounts are uint256 decimal strings; never aggregate them through SQLite's int64 CAST/SUM.
         daily = sum(int(row[0]) for row in daily_rows)
         reserved = sum(int(row[0]) for row in reserved_rows)
         if daily + source_amount > daily_cap:
@@ -176,11 +200,10 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
             raise DepositRuntimeConfigurationError("SOBY payout would breach the protected minimum inventory reserve")
         return {
             "destination_amount": net, "rate": str(price.quoted_price_usdt_per_soby),
-            "fee_bps": fee_bps, "expires_at": int(time.time()) + lifetime,
-            "executable": True,
+            "fee_bps": fee_bps, "expires_at": now + lifetime,
+            "executable": True, "inventory_block": hex(block_number),
         }
     return provide
-
 
 class CustodialDepositPayoutRuntime:
     """Run deposit verification before payout processing on every poll cycle."""
