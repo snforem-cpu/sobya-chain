@@ -13,7 +13,8 @@
       "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE",
       "usdtDecimals": 6,
       "keystorePassphraseEnv": "SOBYA_ETHEREUM_KEYSTORE_PASSPHRASE",
-      "confirmations": 64
+      "confirmations": 64,
+      "depositWatchEnabled": false
     },
     "tron": {
       "enabled": false,
@@ -24,7 +25,8 @@
       "keystorePathEnv": "SOBYA_TRON_KEYSTORE",
       "usdtDecimals": 6,
       "keystorePassphraseEnv": "SOBYA_TRON_KEYSTORE_PASSPHRASE",
-      "feeLimitSun": 100000000
+      "feeLimitSun": 100000000,
+      "depositWatchEnabled": false
     },
     "solana": {
       "enabled": false,
@@ -35,7 +37,8 @@
       "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh",
       "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE",
       "usdtDecimals": 6,
-      "keystorePassphraseEnv": "SOBYA_SOLANA_KEYSTORE_PASSPHRASE"
+      "keystorePassphraseEnv": "SOBYA_SOLANA_KEYSTORE_PASSPHRASE",
+      "depositWatchEnabled": false
     },
     "sobya": {
       "enabled": false,
@@ -44,7 +47,8 @@
       "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE",
       "rpcUrlEnv": "SOBYA_SOBYA_RPC_URL",
       "keystorePassphraseEnv": "SOBYA_SOBYA_KEYSTORE_PASSPHRASE",
-      "confirmations": 2
+      "confirmations": 2,
+      "depositWatchEnabled": false
     }
   },
   "pricing": {
@@ -73,5 +77,6 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only."
+  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order.",
+  "depositWatchEnabled": false
 }
