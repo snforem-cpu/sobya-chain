@@ -159,12 +159,15 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
             raise DepositRuntimeConfigurationError("quote lifetime must be between 15 and 900 seconds")
         # Check daily intake and outstanding SOBY obligations against the same durable ledger.
         with sqlite3.connect(ledger.database, timeout=15) as db:
-            daily = db.execute("""SELECT COALESCE(SUM(CAST(source_amount AS INTEGER)),0)
-                FROM custodial_orders WHERE source_network=? AND direction='usdt_to_soby'
-                AND created_at >= date('now')""", (source_network,)).fetchone()[0]
-            reserved = db.execute("""SELECT COALESCE(SUM(CAST(destination_amount AS INTEGER)),0)
-                FROM custodial_orders WHERE direction='usdt_to_soby'
-                AND state IN ('created','deposit_seen','deposit_final','payout_submitted')""").fetchone()[0]
+            daily_rows = db.execute("""SELECT source_amount FROM custodial_orders
+                WHERE source_network=? AND direction='usdt_to_soby'
+                AND created_at >= date('now')""", (source_network,)).fetchall()
+            reserved_rows = db.execute("""SELECT destination_amount FROM custodial_orders
+                WHERE direction='usdt_to_soby'
+                AND state IN ('created','deposit_seen','deposit_final','payout_submitted')""").fetchall()
+        # Amounts are uint256 decimal strings; never aggregate them through SQLite's int64 CAST/SUM.
+        daily = sum(int(row[0]) for row in daily_rows)
+        reserved = sum(int(row[0]) for row in reserved_rows)
         if daily + source_amount > daily_cap:
             raise DepositRuntimeConfigurationError("daily USDT intake limit for this network would be exceeded")
         if inventory_balance - reserved - net < minimum_inventory:
