@@ -15,6 +15,14 @@ This entry point starts the **unified custodial runtime**: the durable order-bou
 
 For a first process check, leave all wallet, RPC, and passphrase environment variables unset. The launcher creates a local config from the disabled example. Deposit watching and payouts both remain disabled. To configure read-only deposit verification later, set top-level `depositWatchEnabled=true`, then enable only the required per-network `depositWatchEnabled` flags and provide their HTTPS RPC environment variables. This does not enable payout signing.
 
+## Four-network inventory and key preparation
+
+The four shared inventory networks are Ethereum mainnet (USDT ERC-20, 6 decimals), TRON mainnet (USDT TRC-20, 6 decimals), Solana mainnet-beta (USDT SPL mint, 6 decimals, legacy Token Program), and SOBYA Mainnet (native SOBY, 18 decimals; EVM chain ID 357812033857). The configured Ethereum USDT contract, TRON USDT contract, and Solana USDT mint are pinned in `config.example.json`; do not substitute token contracts or mints.
+
+Each network has its own encrypted keystore file and passphrase environment variable. Create each file locally with `python -m cross-chain.custodial.inventory_keystore_cli` only if the repository is installed as a package; otherwise run the CLI from `cross-chain/custodial` with `python inventory_keystore_cli.py --network NETWORK --file /secure/path/NETWORK.key`. The CLI prompts for the private key without echoing it, derives and prints only the public address, then encrypts the key with scrypt + XSalsa20-Poly1305 and writes an owner-only 0600 file. Use a distinct keystore per network, compare its printed public address character-for-character with that network's `inventoryWallet`, and keep encrypted files outside Git. Never send private keys, seed phrases, keystore files, or passphrases in chat or GitHub.
+
+The operator's custody policy requires four different inventory wallet addresses. When `featureEnabled=true`, startup now rejects a missing wallet or any duplicate address before constructing payout adapters. This is deliberate: Ethereum and SOBYA are separate inventory roles even though both use EVM address formats. Keep all four networks disabled until the addresses, keystores, RPC chain identities, token balances, and native fee balances have been independently verified.
+
 ## Before enabling real payouts
 
 Do not enable `featureEnabled` or any network flag until the full coordinator/API and deposit-watcher processes are deployed and supervised, the exact inventory addresses and chain IDs are verified, RPC endpoints respond correctly, encrypted keystores and passphrases are installed as environment/runtime secrets, fee balances and inventory are verified, and an end-to-end controlled test passes.
