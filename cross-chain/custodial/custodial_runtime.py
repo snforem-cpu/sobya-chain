@@ -76,8 +76,10 @@ def build_inventory_deposit_verifiers(config: dict[str, Any]) -> dict[str, Any]:
 
 
 
-def build_order_quote_provider(config: dict[str, Any]):
-    """Build fail-closed quotes from an operator-fed finalized demand snapshot."""
+def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
+    """Build bounded, fail-closed USDT-to-SOBY quotes against verified SOBY inventory."""
+    import sqlite3
+
     pricing = config.get("pricing")
     limits = config.get("limits")
     if not isinstance(pricing, dict) or not isinstance(limits, dict):
@@ -85,12 +87,40 @@ def build_order_quote_provider(config: dict[str, Any]):
     snapshot_data = pricing.get("demandSnapshot")
     liquidity = pricing.get("referenceLiquidityUsdtBaseUnits")
     fee_bps = limits.get("feeBps")
+    max_order = limits.get("maxOrderUsdtBaseUnits")
+    daily_cap = limits.get("maxDailyUsdtBaseUnitsPerNetwork")
+    minimum_inventory = limits.get("minimumInventoryBaseUnits")
+    ceiling = pricing.get("priceCeiling")
+    floor = pricing.get("priceFloor")
+    inventory = config.get("networks", {}).get("sobya", {})
+    inventory_balance = inventory.get("verifiedPayoutInventoryBaseUnits")
+    inventory_observed = inventory.get("inventoryObservedAtEpoch")
     if not isinstance(snapshot_data, dict):
         raise DepositRuntimeConfigurationError("finalized demand snapshot is not configured")
-    if not isinstance(liquidity, int) or isinstance(liquidity, bool) or liquidity <= 0:
-        raise DepositRuntimeConfigurationError("verified reference liquidity is not configured")
-    if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps < 10000:
-        raise DepositRuntimeConfigurationError("operator-approved feeBps is not configured")
+    for value, label in ((liquidity, "reference liquidity"), (max_order, "maximum order"),
+                         (daily_cap, "daily network cap"), (minimum_inventory, "minimum SOBY inventory"),
+                         (inventory_balance, "verified SOBY payout inventory")):
+        if not isinstance(value, int) or isinstance(value, bool) or not 0 < value <= 2**256 - 1:
+            raise DepositRuntimeConfigurationError(f"positive uint256 operator-approved {label} is required")
+    if not isinstance(inventory_observed, int) or isinstance(inventory_observed, bool):
+        raise DepositRuntimeConfigurationError("verified SOBY inventory observation timestamp is required")
+    inventory_max_age = pricing.get("inventorySnapshotMaxAgeSeconds", 300)
+    if not isinstance(inventory_max_age, int) or isinstance(inventory_max_age, bool) or not 30 <= inventory_max_age <= 900:
+        raise DepositRuntimeConfigurationError("inventorySnapshotMaxAgeSeconds must be between 30 and 900")
+    if int(time.time()) - inventory_observed not in range(0, inventory_max_age + 1):
+        raise DepositRuntimeConfigurationError(f"verified SOBY inventory snapshot is future-dated or older than {inventory_max_age} seconds")
+    if inventory_balance <= minimum_inventory:
+        raise DepositRuntimeConfigurationError("verified SOBY inventory must exceed the protected minimum reserve")
+    if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps <= 1000:
+        raise DepositRuntimeConfigurationError("feeBps must be operator-approved and between 0 and 1000 (10%)")
+    try:
+        floor_d, ceiling_d = Decimal(str(floor)), Decimal(str(ceiling))
+    except Exception as exc:
+        raise DepositRuntimeConfigurationError("positive priceFloor and priceCeiling are required") from exc
+    if not floor_d.is_finite() or not ceiling_d.is_finite() or floor_d <= 0 or floor_d >= ceiling_d:
+        raise DepositRuntimeConfigurationError("price bounds must be finite, positive, and floor < ceiling")
+    if not isinstance(snapshot_data, dict):
+        raise DepositRuntimeConfigurationError("finalized demand snapshot is not configured")
     try:
         snapshot = DemandSnapshot(
             buy_usdt_base_units=snapshot_data["buyUsdtBaseUnits"],
@@ -103,6 +133,12 @@ def build_order_quote_provider(config: dict[str, Any]):
         raise DepositRuntimeConfigurationError("finalized demand snapshot schema is invalid") from exc
 
     def provide(direction: str, source_network: str, source_amount: int) -> dict[str, Any]:
+        if direction != "usdt_to_soby" or source_network not in ("ethereum", "tron", "solana"):
+            raise DepositRuntimeConfigurationError("only USDT-to-SOBY quotes are supported in this release")
+        if not isinstance(source_amount, int) or isinstance(source_amount, bool) or not 0 < source_amount <= max_order:
+            raise DepositRuntimeConfigurationError("order amount exceeds the configured positive maximum")
+        if ledger is None:
+            raise DepositRuntimeConfigurationError("durable order ledger is required for daily and inventory limits")
         price = calculate_demand_price(
             base_price_usdt_per_soby=pricing.get("baseReferencePriceUsdtPerSoby"),
             reference_liquidity_usdt_base_units=liquidity,
@@ -112,18 +148,32 @@ def build_order_quote_provider(config: dict[str, Any]):
             upward_sensitivity_bps=pricing.get("upwardDemandSensitivityBps", 10000),
             downward_sensitivity_bps=pricing.get("downwardDemandSensitivityBps", 2500),
         )
-        if direction == "usdt_to_soby":
-            gross = (Decimal(source_amount) / Decimal(10**6) / price.quoted_price_usdt_per_soby) * Decimal(10**18)
-        elif direction == "soby_to_usdt":
-            gross = (Decimal(source_amount) / Decimal(10**18) * price.quoted_price_usdt_per_soby) * Decimal(10**6)
-        else:
-            raise ValueError("unsupported swap direction")
+        if not floor_d <= price.quoted_price_usdt_per_soby <= ceiling_d:
+            raise DepositRuntimeConfigurationError("demand-adjusted price is outside operator-approved price bounds")
+        gross = (Decimal(source_amount) / Decimal(10**6) / price.quoted_price_usdt_per_soby) * Decimal(10**18)
         net = int((gross * Decimal(10000 - fee_bps) / Decimal(10000)).to_integral_value(rounding=ROUND_DOWN))
         if net <= 0:
-            raise ValueError("quoted destination amount rounds to zero")
+            raise DepositRuntimeConfigurationError("quoted destination amount rounds to zero")
         lifetime = limits.get("quoteLifetimeSeconds", 120)
         if not isinstance(lifetime, int) or isinstance(lifetime, bool) or not 15 <= lifetime <= 900:
-            raise ValueError("quote lifetime must be between 15 and 900 seconds")
+            raise DepositRuntimeConfigurationError("quote lifetime must be between 15 and 900 seconds")
+        # Check daily intake and outstanding SOBY obligations against the same durable ledger.
+        with sqlite3.connect(ledger.database, timeout=15) as db:
+            daily_rows = db.execute("""SELECT source_amount FROM custodial_orders
+                WHERE source_network=? AND direction='usdt_to_soby'
+                AND created_at >= date('now')""", (source_network,)).fetchall()
+            inventory_snapshot_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(inventory_observed))
+            reserved_rows = db.execute("""SELECT destination_amount FROM custodial_orders
+                WHERE direction='usdt_to_soby' AND created_at >= ?
+                AND state IN ('created','deposit_seen','deposit_final','payout_submitted','complete')""",
+                (inventory_snapshot_time,)).fetchall()
+        # Amounts are uint256 decimal strings; never aggregate them through SQLite's int64 CAST/SUM.
+        daily = sum(int(row[0]) for row in daily_rows)
+        reserved = sum(int(row[0]) for row in reserved_rows)
+        if daily + source_amount > daily_cap:
+            raise DepositRuntimeConfigurationError("daily USDT intake limit for this network would be exceeded")
+        if inventory_balance - reserved - net < minimum_inventory:
+            raise DepositRuntimeConfigurationError("SOBY payout would breach the protected minimum inventory reserve")
         return {
             "destination_amount": net, "rate": str(price.quoted_price_usdt_per_soby),
             "fee_bps": fee_bps, "expires_at": int(time.time()) + lifetime,
@@ -181,7 +231,7 @@ def main() -> int:
     if config.get("orderApiEnabled") is True:
         secret_env = config.get("orderApiAccessSecretEnv", "SOBYA_ORDER_API_ACCESS_SECRET")
         secret = os.environ.get(secret_env, "") if isinstance(secret_env, str) else ""
-        quote_provider = build_order_quote_provider(config)
+        quote_provider = build_order_quote_provider(config, ledger)
         order_api = create_order_api_server(
             config.get("orderApiHost", "127.0.0.1"),
             int(config.get("orderApiPort", 8765)), ledger, deposit_worker,
