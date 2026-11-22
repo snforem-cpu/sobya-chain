@@ -15,6 +15,7 @@ on:
     branches:
       - main
       - feat/sobya-cross-chain-swap-foundation
+      - enzonic-swap-worker
     paths:
       - "cross-chain/coordinator/**"
       - "cross-chain/custodial/**"
@@ -52,4 +53,5 @@ jobs:
           python -m unittest -v test_custodial_order_api.py
           python -m unittest -v test_custodial_runtime.py
           python -m unittest -v test_demand_pricing.py
+          python -m unittest -v test_order_pricing_policy.py
           python -m unittest -v test_evm_deposit_watcher.py
