@@ -6,6 +6,7 @@ RPC endpoint, signing key, or payout capability is guessed by this HTTP layer.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 import hashlib
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -124,7 +125,7 @@ def create_server(
             raise OrderApiError("USDT-to-SOBY source must be Ethereum, TRON, or Solana")
         if direction == "soby_to_usdt" and source_network != "sobya":
             raise OrderApiError("SOBY-to-USDT source must be SOBYA")
-        result = quote_provider(direction, source_network, source_amount)
+        result = self.server.quote_provider(direction, source_network, source_amount)
         if not isinstance(result, dict):
             raise OrderApiError("quote provider returned an invalid quote")
         destination_amount = result.get("destination_amount")
@@ -191,6 +192,15 @@ def create_server(
 
         def do_GET(self) -> None:
             path = urlsplit(self.path).path
+            if path == "/":
+                page = (Path(__file__).with_name("order-ui") / "index.html").read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(page)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(page)
+                return
             if path == "/api/networks":
                 self.send_json(200, {"networks": {
                     name: {"symbol": assets[name]["symbol"], "decimals": assets[name]["decimals"]}
@@ -236,7 +246,8 @@ def create_server(
                 body = self.read_body()
                 if path in {"/api/quote", "/api/orders"}:
                     required = {"direction", "source_network", "amount", "source_wallet", "destination_wallet"}
-                    if set(body) != required:
+                    allowed = required | ({"destination_network"} if body.get("direction") == "soby_to_usdt" else set())
+                    if set(body) != allowed:
                         raise OrderApiError("request fields do not match the required schema")
                     direction = body["direction"]
                     source_network = body["source_network"]
@@ -320,5 +331,6 @@ def create_server(
             self.send_json(405, {"error": "method not allowed"})
 
     server = ThreadingHTTPServer((host, port), Handler)
+    server.quote_provider = quote_provider
     server.daemon_threads = True
     return server
