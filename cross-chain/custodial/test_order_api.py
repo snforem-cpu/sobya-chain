@@ -17,6 +17,7 @@ class FakeDepositWorker:
 def api_config():
     return {
         "mode": "custodial-inventory",
+        "depositWatchEnabled": True,
         "networks": {
             "ethereum": {"depositWatchEnabled": True, "usdtContract": "0x" + "11" * 20,
                          "inventoryWallet": "0x" + "22" * 20},
