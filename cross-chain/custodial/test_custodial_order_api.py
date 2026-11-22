@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 import unittest
 from unittest.mock import patch
 from http.client import HTTPConnection
@@ -28,7 +29,7 @@ class OrderApiTests(unittest.TestCase):
         }}
         def price(direction, network, amount):
             return {"destination_amount": amount * 2, "rate":"2", "fee_bps":25,
-                    "expires_at":2000000000,"executable":True}
+                    "expires_at":int(time.time()) + 300,"executable":True}
         self.server = create_server("127.0.0.1",0,self.ledger,self.worker,
             config=self.config,quote_provider=price,access_secret="x"*48)
         self.thread = threading.Thread(target=self.server.serve_forever,daemon=True)
