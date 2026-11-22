@@ -132,6 +132,8 @@ class CustodialOrderApi:
         else:
             raise OrderApiError("unsupported swap direction")
 
+        if destination_cfg.get("inventoryVerified") is not True:
+            raise OrderApiError("destination inventory has not passed operator balance verification")
         if gross <= 0:
             raise OrderApiError("quoted destination amount rounds to zero base units")
         fee = (gross * fee_bps) // 10000
