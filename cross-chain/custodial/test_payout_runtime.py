@@ -24,6 +24,38 @@ class PayoutRuntimeGateTests(unittest.TestCase):
             self.assertFalse(executor.enabled)
             self.assertEqual(executor.adapters, {})
 
+    def test_enabled_custody_requires_four_distinct_inventory_wallets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = {
+                "mode": "custodial-inventory",
+                "featureEnabled": True,
+                "networks": {
+                    "ethereum": {"enabled": False, "inventoryWallet": "0x1111111111111111111111111111111111111111"},
+                    "tron": {"enabled": False, "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"},
+                    "solana": {"enabled": False, "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh"},
+                    "sobya": {"enabled": False, "inventoryWallet": "0x1111111111111111111111111111111111111111"},
+                },
+            }
+            ledger = CustodialOrderLedger(Path(directory) / "orders.sqlite")
+            with self.assertRaisesRegex(ValueError, "duplicates"):
+                build_inventory_payout_executor(
+                    config, ledger, str(Path(directory) / "payout.sqlite")
+                )
+
+    def test_enabled_custody_requires_every_inventory_wallet(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = {
+                "mode": "custodial-inventory",
+                "featureEnabled": True,
+                "networks": {name: {"enabled": False, "inventoryWallet": "wallet-" + name}
+                             for name in ("ethereum", "tron", "solana")},
+            }
+            ledger = CustodialOrderLedger(Path(directory) / "orders.sqlite")
+            with self.assertRaisesRegex(ValueError, "sobya inventory wallet"):
+                build_inventory_payout_executor(
+                    config, ledger, str(Path(directory) / "payout.sqlite")
+                )
+
     def test_wrong_mode_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(ValueError):
