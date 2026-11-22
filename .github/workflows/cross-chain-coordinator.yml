@@ -15,6 +15,7 @@ on:
     branches:
       - main
       - feat/sobya-cross-chain-swap-foundation
+      - enzonic-swap-worker
     paths:
       - "cross-chain/coordinator/**"
       - "cross-chain/custodial/**"
