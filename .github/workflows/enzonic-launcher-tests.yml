@@ -34,5 +34,7 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Run Enzonic launcher safety tests
         run: python -m unittest -v test_enzonic_start.py
+      - name: Run read-only RPC preflight tests
+        run: python -m unittest -v test_rpc_preflight.py
       - name: Run offline end-to-end order lifecycle test
         run: python -m unittest -v test_custodial_e2e.py
