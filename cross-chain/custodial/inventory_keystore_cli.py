@@ -37,14 +37,25 @@ def _public_address(network: str, raw: bytes) -> str:
     return str(Keypair.from_bytes(raw).pubkey())
 
 
+def _addresses_match(network: str, derived: str, expected: str) -> bool:
+    if not isinstance(expected, str) or not expected.strip():
+        return False
+    if network in {"ethereum", "sobya"}:
+        return derived.lower() == expected.strip().lower()
+    return derived == expected.strip()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Create an encrypted local SOBYA inventory keystore")
     parser.add_argument("--network", choices=("ethereum","sobya","tron","solana"), required=True)
     parser.add_argument("--file", required=True, help="path outside the Git repository")
+    parser.add_argument("--expected-address", required=True, help="configured public inventory address; key import aborts on mismatch")
     args = parser.parse_args(argv)
     try:
         raw = _read_key(args.network)
         address = _public_address(args.network, raw)
+        if not _addresses_match(args.network, address, args.expected_address):
+            raise InventoryKeystoreError("derived public address does not match configured inventory wallet; no keystore was written")
         first = getpass.getpass("New keystore passphrase (16+ characters): ")
         second = getpass.getpass("Confirm passphrase: ")
         if first != second:
