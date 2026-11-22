@@ -125,6 +125,9 @@ class OrderPricingPolicyTests(unittest.TestCase):
         )
         with self.ledger._connect() as db:
             db.execute("UPDATE custodial_orders SET state='complete'")
+        # Keep this test focused on uncapped price behavior rather than the
+        # separate per-network daily intake protection.
+        self.config["limits"]["maxDailyUsdtBaseUnitsPerNetwork"] = 10_000_000_000
         quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
         self.assertGreater(Decimal(quote["rate"]), Decimal("0.01"))
 
