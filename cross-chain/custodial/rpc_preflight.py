@@ -14,6 +14,7 @@ DEFAULTS = {
     "ethereum": "https://ethereum-rpc.publicnode.com",
     "sobya": "https://sobya-evm-rpc.nodesafe-app.xyz",
 }
+SOBYA_FALLBACKS = ("https://sobya-rpc.bonynode.online",)
 EXPECTED = {
     "ethereum": 1,
     "sobya": 357812033857,
@@ -108,22 +109,38 @@ def check_network(name: str, url: str | None = None) -> dict[str, Any]:
 def run_preflight() -> list[dict[str, Any]]:
     results = []
     for name in ("ethereum", "sobya"):
-        try:
-            result = check_network(name)
-            print(
-                f"RPC PREFLIGHT OK: {name} chain_id={result['chain_id']} "
-                f"latest={result['latest_block']} finalized={result['finalized_block']}"
-            )
-            if name == "ethereum":
-                print("RPC PREFLIGHT OK: Ethereum USDT contract code is present.")
-            else:
-                print(f"RPC PREFLIGHT OK: SOBYA inventory balance={result['inventory_balance_wei']} wei.")
-            results.append({"network": name, "ok": True, **result})
-        except Exception as exc:
-            print(f"RPC PREFLIGHT FAILED: {name}: {type(exc).__name__}: {exc}")
-            results.append({"network": name, "ok": False, "error": str(exc)})
+        primary_env = "SOBYA_ETHEREUM_RPC_URL" if name == "ethereum" else "SOBYA_SOBYA_RPC_URL"
+        candidates = [os.environ.get(primary_env, DEFAULTS[name])]
+        if name == "sobya":
+            fallback = os.environ.get("SOBYA_SOBYA_RPC_FALLBACK_URL")
+            candidates.extend([fallback] if fallback else list(SOBYA_FALLBACKS))
+        last_error = None
+        for index, endpoint in enumerate(candidates):
+            try:
+                result = check_network(name, endpoint)
+                if index:
+                    print(f"RPC PREFLIGHT INFO: {name} using fallback endpoint #{index + 1}.")
+                print(
+                    f"RPC PREFLIGHT OK: {name} chain_id={result['chain_id']} "
+                    f"latest={result['latest_block']} finalized={result['finalized_block']}"
+                )
+                if name == "ethereum":
+                    print("RPC PREFLIGHT OK: Ethereum USDT contract code is present.")
+                else:
+                    print(f"RPC PREFLIGHT OK: SOBYA inventory balance={result['inventory_balance_wei']} wei.")
+                results.append({"network": name, "ok": True, **result})
+                last_error = None
+                break
+            except Exception as exc:
+                last_error = exc
+                print(
+                    f"RPC PREFLIGHT ATTEMPT FAILED: {name} endpoint #{index + 1}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+        if last_error is not None:
+            print(f"RPC PREFLIGHT FAILED: {name}: all configured endpoints failed.")
+            results.append({"network": name, "ok": False, "error": str(last_error)})
     return results
-
 
 if __name__ == "__main__":
     run_preflight()
