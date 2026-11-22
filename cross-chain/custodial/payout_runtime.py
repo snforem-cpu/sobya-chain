@@ -47,5 +47,22 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
                 network="sobya", web3=web3, account=account, chain_id=int(item["chainId"]),
                 inventory_wallet=item["inventoryWallet"], confirmations=int(item.get("confirmations", 2)),
             )
+        if network_cfg.get("solana", {}).get("enabled") is True:
+            from solana.rpc.api import Client
+            from solana_inventory_payout import SolanaUsdtPayoutAdapter, load_solana_keypair_from_keystore
+            item = network_cfg["solana"]
+            rpc_url = os.environ.get(item.get("rpcUrlEnv", ""))
+            if not rpc_url or not rpc_url.startswith("https://"):
+                raise PayoutConfigurationError("Solana HTTPS RPC endpoint is missing")
+            client = Client(rpc_url, timeout=20)
+            keypair = load_solana_keypair_from_keystore(
+                os.environ.get(item.get("keystorePathEnv", ""), ""),
+                item.get("keystorePassphraseEnv", ""),
+            )
+            adapters["solana"] = SolanaUsdtPayoutAdapter(
+                client=client, keypair=keypair, inventory_wallet=item["inventoryWallet"],
+                usdt_mint=item["usdtMint"], token_program=item["tokenProgram"],
+                decimals=int(item.get("usdtDecimals", 6)),
+            )
     enabled = feature_enabled and network_cfg.get("sobya", {}).get("enabled") is True
     return InventoryPayoutExecutor(ledger, PayoutJournal(journal_path), adapters, enabled=enabled)

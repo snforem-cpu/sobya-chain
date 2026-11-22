@@ -57,3 +57,5 @@ jobs:
           python -m unittest -v test_evm_deposit_watcher.py
           python -m unittest -v test_inventory_keystore.py
           python -m unittest -v test_payout_runtime.py
+          python -m unittest -v test_payout_executor.py
+          python -m unittest -v test_evm_inventory_payout.py
