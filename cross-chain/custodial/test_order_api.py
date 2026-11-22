@@ -95,6 +95,17 @@ class OrderApiTests(unittest.TestCase):
         with self.assertRaisesRegex(OrderApiError, "event_index"):
             self.api.submit_deposit(quote["order_id"], {"transaction_id": "0x" + "aa" * 32, "event_index": -1})
 
+    def test_unverified_destination_inventory_rejects_quote(self):
+        cfg = api_config()
+        cfg["networks"]["sobya"]["inventoryVerified"] = False
+        api = CustodialOrderApi(self.ledger, self.worker, cfg, clock=lambda: self.now[0])
+        with self.assertRaisesRegex(OrderApiError, "inventory has not passed"):
+            api.create_quote({
+                "direction": "usdt_to_soby", "source_network": "ethereum",
+                "destination_network": "sobya", "source_wallet": "0x" + "44" * 20,
+                "destination_wallet": "0x" + "55" * 20, "source_amount_base_units": 1_000_000,
+            })
+
     def test_disabled_source_watcher_rejects_quote(self):
         cfg = api_config()
         cfg["networks"]["solana"]["depositWatchEnabled"] = False
