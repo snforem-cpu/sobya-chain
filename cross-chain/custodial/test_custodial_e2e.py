@@ -106,7 +106,7 @@ class CustodialEndToEndTests(unittest.TestCase):
 
         def quote(_direction, _network, _amount):
             return {
-                "destination_amount": 24_750_000_000_000_000_000,
+                "destination_amount": 4_950_000_000_000_000_000_000,
                 "rate": "0.005",
                 "fee_bps": 100,
                 "expires_at": int(time.time()) + 300,
