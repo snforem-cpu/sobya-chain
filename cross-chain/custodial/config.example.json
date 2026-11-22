@@ -47,8 +47,6 @@
       "enabled": false,
       "chainId": 357812033857,
       "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
-      "verifiedPayoutInventoryBaseUnits": null,
-      "inventoryObservedAtEpoch": null,
       "keystorePathEnv": "SOBYA_SOBYA_KEYSTORE",
       "rpcUrlEnv": "SOBYA_SOBYA_RPC_URL",
       "keystorePassphraseEnv": "SOBYA_SOBYA_KEYSTORE_PASSPHRASE",
@@ -60,7 +58,6 @@
   "pricing": {
     "baseReferencePriceUsdtPerSoby": "0.005",
     "referenceLiquidityUsdtBaseUnits": null,
-    "demandSnapshot": null,
     "upwardDemandSensitivityBps": 10000,
     "downwardDemandSensitivityBps": 2500,
     "demandWindowSeconds": 3600,
@@ -85,7 +82,7 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits to an operator-approved USDT-equivalent pricing depth; this is a pricing reference, not a requirement to fund an external USDT payout wallet. Set a finalized demandSnapshot, positive priceFloor/priceCeiling, positive order/daily limits, feeBps (0-1000), minimumInventoryBaseUnits, and a freshly verified SOBYA verifiedPayoutInventoryBaseUnits plus inventoryObservedAtEpoch before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order; per-order unique deposit addresses are not required. Customer order UI and loopback API are available when orderApiEnabled is explicitly true; they require SOBYA_ORDER_API_ACCESS_SECRET (32+ bytes), a live quote provider with a fresh finalized demandSnapshot, verified non-zero reference depth, bounded price floor/ceiling, finalized demand snapshot, operator-approved order/daily limits and feeBps, and a fresh verified SOBYA inventory snapshot above the protected minimum reserve. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy.  Initial public order direction is USDT-to-SOBY only. A destination network must have payoutInventoryVerified=true before any quote is issued. Keep SOBY-to-USDT disabled until each selected external USDT inventory wallet has been funded and independently verified; then explicitly add that direction to enabledSwapDirections.",
+  "notice": "Template only. All networks and payout signing remain disabled. The base reference price is the agreed starting price of 0.005 USDT per SOBY; demand adjustments use only completed orders whose deposits and payouts have both reached chain finality. referenceLiquidityUsdtBaseUnits is an operator-approved pricing-depth parameter, not an external USDT balance and does not require funding a USDT payout wallet. Before quote creation, set positive priceFloor/priceCeiling, positive per-order and per-network daily caps, feeBps (0-1000), and minimumInventoryBaseUnits. The quote provider reads the SOBYA native SOBY balance at a finalized RPC block on every quote and checks the RPC chain ID and observation age; it does not trust a balance copied into this file. Never put private keys or seed phrases in this file or repository. Store network-bound encrypted key files outside the repository and supply passphrases through local environment variables only. Deposit verification runs only when depositWatchEnabled and the relevant per-network flags are explicitly true. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy. Initial order direction is USDT-to-SOBY only; reverse direction remains disabled until each external USDT payout inventory is funded and independently verified.",
   "depositWatchEnabled": false,
   "orderApiEnabled": false,
   "orderApiHost": "127.0.0.1",
