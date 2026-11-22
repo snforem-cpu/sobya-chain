@@ -19,8 +19,10 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
     adapters = {}
     feature_enabled = config.get("featureEnabled") is True
     if feature_enabled:
-        # The operator's custody model requires four distinct shared inventory
-        # wallets; never let an EVM address accidentally serve both chains.
+        # Ethereum and SOBYA are separate EVM chains and may intentionally use
+        # the same address when derived from the same private key. TRON and
+        # Solana inventory addresses must remain distinct from each other and
+        # from the EVM inventory address.
         required = ("ethereum", "tron", "solana", "sobya")
         wallets = {}
         for name in required:
@@ -30,10 +32,13 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
                 raise PayoutConfigurationError(f"{name} inventory wallet is required")
             normalized = address.strip().lower()
             if normalized in wallets:
-                raise PayoutConfigurationError(
-                    f"{name} inventory wallet duplicates the {wallets[normalized]} wallet"
-                )
-            wallets[normalized] = name
+                previous = wallets[normalized]
+                if {name, previous} != {"ethereum", "sobya"}:
+                    raise PayoutConfigurationError(
+                        f"{name} inventory wallet duplicates the {previous} wallet"
+                    )
+            else:
+                wallets[normalized] = name
         if network_cfg.get("ethereum", {}).get("enabled") is True:
             from web3 import Web3
             from evm_inventory_payout import EvmInventoryPayoutAdapter, load_evm_account_from_keystore
