@@ -43,7 +43,7 @@ class OrderPricingPolicyTests(unittest.TestCase):
             "limits": {
                 "maxOrderUsdtBaseUnits": 500_000_000,
                 "maxDailyUsdtBaseUnitsPerNetwork": 10_000_000_000,
-                "minimumInventoryBaseUnits": 100 * 10**18,
+                "minimumInventoryBaseUnits": 100_000 * 10**18,
                 "feeBps": 100, "quoteLifetimeSeconds": 120,
             },
             "networks": {"sobya": {
@@ -100,7 +100,7 @@ class OrderPricingPolicyTests(unittest.TestCase):
         self.assertEqual(quote["destination_amount"], 198 * 10**18)
 
     def test_rejects_live_inventory_reserve_breach(self):
-        FakeSobyaRpc.balance = 101 * 10**18
+        FakeSobyaRpc.balance = 100_000 * 10**18
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "protected minimum"):
             self.provider()("usdt_to_soby", "ethereum", 1_000_000)
 
