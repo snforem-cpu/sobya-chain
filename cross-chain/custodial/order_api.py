@@ -66,13 +66,13 @@ class CustodialOrderApi:
             raise OrderApiError(field + " is required")
         return value.strip()
 
-    def _network(self, name: str) -> dict[str, Any]:
+    def _network(self, name: str, *, require_watch: bool = True) -> dict[str, Any]:
         if name not in {"ethereum", "tron", "solana", "sobya"}:
             raise OrderApiError("unsupported network")
         item = self.networks.get(name)
         if not isinstance(item, dict):
             raise OrderApiError("network configuration is missing")
-        if item.get("depositWatchEnabled") is not True:
+        if require_watch and item.get("depositWatchEnabled") is not True:
             raise OrderApiError("deposit verification is not enabled for " + name)
         return item
 
@@ -104,7 +104,7 @@ class CustodialOrderApi:
             if source_network not in {"ethereum", "tron", "solana"} or destination_network != "sobya":
                 raise OrderApiError("USDT-to-SOBY requires Ethereum/TRON/Solana source and SOBYA destination")
             source_cfg = self._network(source_network)
-            destination_cfg = self._network("sobya")
+            destination_cfg = self._network("sobya", require_watch=False)
             source_asset = self._required(source_cfg.get("usdtContract") if source_network != "sobya" else None, "USDT asset")
             destination_asset = "asobya"
             deposit_address = self._required(source_cfg.get("inventoryWallet"), "source inventory wallet")
@@ -114,7 +114,7 @@ class CustodialOrderApi:
             if source_network != "sobya" or destination_network not in {"ethereum", "tron", "solana"}:
                 raise OrderApiError("SOBY-to-USDT requires SOBYA source and Ethereum/TRON/Solana destination")
             source_cfg = self._network("sobya")
-            destination_cfg = self._network(destination_network)
+            destination_cfg = self._network(destination_network, require_watch=False)
             source_asset = "asobya"
             destination_asset = self._required(destination_cfg.get("usdtContract"), "USDT asset")
             deposit_address = self._required(source_cfg.get("inventoryWallet"), "SOBYA inventory wallet")
@@ -123,7 +123,6 @@ class CustodialOrderApi:
         else:
             raise OrderApiError("unsupported swap direction")
 
-        self._network(destination_network)
         if gross <= 0:
             raise OrderApiError("quoted destination amount rounds to zero base units")
         fee = (gross * fee_bps) // 10000
