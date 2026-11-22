@@ -14,7 +14,8 @@
       "usdtDecimals": 6,
       "keystorePassphraseEnv": "SOBYA_ETHEREUM_KEYSTORE_PASSPHRASE",
       "confirmations": 64,
-      "depositWatchEnabled": false
+      "depositWatchEnabled": false,
+      "payoutInventoryVerified": false
     },
     "tron": {
       "enabled": false,
@@ -26,7 +27,8 @@
       "usdtDecimals": 6,
       "keystorePassphraseEnv": "SOBYA_TRON_KEYSTORE_PASSPHRASE",
       "feeLimitSun": 100000000,
-      "depositWatchEnabled": false
+      "depositWatchEnabled": false,
+      "payoutInventoryVerified": false
     },
     "solana": {
       "enabled": false,
@@ -38,7 +40,8 @@
       "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE",
       "usdtDecimals": 6,
       "keystorePassphraseEnv": "SOBYA_SOLANA_KEYSTORE_PASSPHRASE",
-      "depositWatchEnabled": false
+      "depositWatchEnabled": false,
+      "payoutInventoryVerified": false
     },
     "sobya": {
       "enabled": false,
@@ -48,7 +51,8 @@
       "rpcUrlEnv": "SOBYA_SOBYA_RPC_URL",
       "keystorePassphraseEnv": "SOBYA_SOBYA_KEYSTORE_PASSPHRASE",
       "confirmations": 2,
-      "depositWatchEnabled": false
+      "depositWatchEnabled": false,
+      "payoutInventoryVerified": false
     }
   },
   "pricing": {
@@ -77,10 +81,13 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order; per-order unique deposit addresses are not required. Customer order UI and loopback API are available when orderApiEnabled is explicitly true; they require SOBYA_ORDER_API_ACCESS_SECRET (32+ bytes), a live quote provider with a fresh finalized demandSnapshot, verified non-zero reference liquidity, and operator-approved feeBps. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy. ",
+  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order; per-order unique deposit addresses are not required. Customer order UI and loopback API are available when orderApiEnabled is explicitly true; they require SOBYA_ORDER_API_ACCESS_SECRET (32+ bytes), a live quote provider with a fresh finalized demandSnapshot, verified non-zero reference liquidity, and operator-approved feeBps. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy.  Initial public order direction is USDT-to-SOBY only. A destination network must have payoutInventoryVerified=true before any quote is issued. Keep SOBY-to-USDT disabled until each selected external USDT inventory wallet has been funded and independently verified; then explicitly add that direction to enabledSwapDirections.",
   "depositWatchEnabled": false,
   "orderApiEnabled": false,
   "orderApiHost": "127.0.0.1",
   "orderApiPort": 8765,
-  "orderApiAccessSecretEnv": "SOBYA_ORDER_API_ACCESS_SECRET"
+  "orderApiAccessSecretEnv": "SOBYA_ORDER_API_ACCESS_SECRET",
+  "enabledSwapDirections": [
+    "usdt_to_soby"
+  ]
 }
