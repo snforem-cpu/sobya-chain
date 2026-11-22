@@ -60,6 +60,15 @@ def main() -> int:
     ):
         raise SystemExit("all four network payout gates must remain disabled for the Enzonic idle-start stage")
 
+    # Bootstrap the SOBYA keystore only when an operator supplies the one-time
+    # Enzonic secret. This does not enable deposits, orders, or payouts.
+    from inventory_keystore_bootstrap import bootstrap_sobya_keystore
+    keystore_status = bootstrap_sobya_keystore(active_config, ROOT)
+    if keystore_status == "created":
+        print("Created and address-verified the encrypted SOBYA keystore outside the Git checkout.")
+    elif keystore_status == "not_configured":
+        print("SOBYA keystore not configured yet; payouts remain disabled.")
+
     os.environ["SOBYA_CUSTODIAL_CONFIG"] = str(config_path.resolve())
     os.environ.setdefault("SOBYA_CUSTODIAL_DB", str(HERE / "data" / "orders.sqlite3"))
     os.environ.setdefault("SOBYA_PAYOUT_JOURNAL", str(HERE / "data" / "payout-journal.sqlite3"))
