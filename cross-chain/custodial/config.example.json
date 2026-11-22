@@ -57,14 +57,11 @@
   },
   "pricing": {
     "baseReferencePriceUsdtPerSoby": "0.005",
-    "referenceLiquidityUsdtBaseUnits": null,
     "upwardDemandSensitivityBps": 10000,
     "downwardDemandSensitivityBps": 2500,
     "demandWindowSeconds": 3600,
     "demandMaxAgeSeconds": 300,
     "demandSignalSource": "finalized-completed-ledger-orders",
-    "priceCeiling": null,
-    "priceFloor": null,
     "inventorySnapshotMaxAgeSeconds": 300
   },
   "limits": {
@@ -82,7 +79,7 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks and payout signing remain disabled. The base reference price is the agreed starting price of 0.005 USDT per SOBY; demand adjustments use only completed orders whose deposits and payouts have both reached chain finality. referenceLiquidityUsdtBaseUnits is an operator-approved pricing-depth parameter, not an external USDT balance and does not require funding a USDT payout wallet. Before quote creation, set positive priceFloor/priceCeiling, positive per-order and per-network daily caps, feeBps (0-1000), and minimumInventoryBaseUnits. The quote provider reads the SOBYA native SOBY balance at a finalized RPC block on every quote and checks the RPC chain ID and observation age; it does not trust a balance copied into this file. Never put private keys or seed phrases in this file or repository. Store network-bound encrypted key files outside the repository and supply passphrases through local environment variables only. Deposit verification runs only when depositWatchEnabled and the relevant per-network flags are explicitly true. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy. Initial order direction is USDT-to-SOBY only; reverse direction remains disabled until each external USDT payout inventory is funded and independently verified.",
+  "notice": "Template only. All networks and payout signing remain disabled. The base reference price is the agreed starting price of 0.005 USDT per SOBY. Demand adjustments use only completed orders whose deposits and payouts have both reached chain finality. Upward sensitivity is four times downward sensitivity by default, so price rises faster than it falls. There is deliberately no upper price ceiling. Reference depth is derived from live spendable SOBY inventory at the agreed base price; no external USDT liquidity deposit is required. Before quote creation, set positive per-order and per-network daily caps, feeBps (0-1000), and minimumInventoryBaseUnits. The quote provider reads the SOBYA native SOBY balance at a finalized RPC block on every quote and checks the RPC chain ID and observation age; it does not trust a balance copied into this file. Never put private keys or seed phrases in this file or repository. Store network-bound encrypted key files outside the repository and supply passphrases through local environment variables only. Deposit verification runs only when depositWatchEnabled and the relevant per-network flags are explicitly true. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy. Initial order direction is USDT-to-SOBY only; reverse direction remains disabled until each external USDT payout inventory is funded and independently verified.",
   "depositWatchEnabled": false,
   "orderApiEnabled": false,
   "orderApiHost": "127.0.0.1",
