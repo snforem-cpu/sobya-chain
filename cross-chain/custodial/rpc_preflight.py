@@ -38,7 +38,17 @@ def _rpc(url: str, method: str, params: list[Any]) -> Any:
         with urllib.request.urlopen(request, timeout=15) as response:
             body = json.loads(response.read())
     except Exception as exc:
-        raise RpcPreflightError(f"{method}: network request failed") from exc
+        # Keep diagnostics useful without printing the endpoint (which may
+        # contain credentials in operator-provided URLs).
+        if isinstance(exc, urllib.error.HTTPError):
+            detail = f"HTTP {exc.code}"
+        elif isinstance(exc, urllib.error.URLError):
+            reason = getattr(exc, "reason", "connection error")
+            detail = f"{type(reason).__name__}: {reason}"
+        else:
+            detail = f"{type(exc).__name__}: {exc}"
+        detail = " ".join(str(detail).split())[:180]
+        raise RpcPreflightError(f"{method}: network request failed ({detail})") from exc
     if not isinstance(body, dict) or body.get("id") != 1 or body.get("error") or "result" not in body:
         raise RpcPreflightError(f"{method}: invalid JSON-RPC response")
     return body["result"]
