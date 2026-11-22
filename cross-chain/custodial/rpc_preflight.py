@@ -11,7 +11,7 @@ import urllib.request
 from typing import Any
 
 DEFAULTS = {
-    "ethereum": "https://cloudflare-eth.com",
+    "ethereum": "https://ethereum-rpc.publicnode.com",
     "sobya": "https://sobya-evm-rpc.nodesafe-app.xyz",
 }
 EXPECTED = {
