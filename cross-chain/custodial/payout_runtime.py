@@ -19,43 +19,18 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
     adapters = {}
     feature_enabled = config.get("featureEnabled") is True
     if feature_enabled:
-        # Ethereum and SOBYA are separate EVM chains and may intentionally use
-        # the same address when derived from the same private key. TRON and
-        # Solana inventory addresses must remain distinct from each other and
-        # from the EVM inventory address.
-        required = ("ethereum", "tron", "solana", "sobya")
-        wallets = {}
-        for name in required:
-            item = network_cfg.get(name)
-            address = item.get("inventoryWallet") if isinstance(item, dict) else None
-            if not isinstance(address, str) or not address.strip():
-                raise PayoutConfigurationError(f"{name} inventory wallet is required")
-            normalized = address.strip().lower()
-            if normalized in wallets:
-                previous = wallets[normalized]
-                if {name, previous} != {"ethereum", "sobya"}:
-                    raise PayoutConfigurationError(
-                        f"{name} inventory wallet duplicates the {previous} wallet"
-                    )
-            else:
-                wallets[normalized] = name
-        if network_cfg.get("ethereum", {}).get("enabled") is True:
-            from web3 import Web3
-            from evm_inventory_payout import EvmInventoryPayoutAdapter, load_evm_account_from_keystore
-            item = network_cfg["ethereum"]
-            rpc_url = os.environ.get(item.get("rpcUrlEnv", ""))
-            if not rpc_url or not rpc_url.startswith("https://"):
-                raise PayoutConfigurationError("Ethereum HTTPS RPC endpoint is missing")
-            web3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 20}))
-            account = load_evm_account_from_keystore(
-                os.environ.get(item.get("keystorePathEnv", ""), ""),
-                "ethereum", item.get("keystorePassphraseEnv", ""),
-            )
-            adapters["ethereum"] = EvmInventoryPayoutAdapter(
-                network="ethereum", web3=web3, account=account, chain_id=int(item["chainId"]),
-                inventory_wallet=item["inventoryWallet"], confirmations=int(item.get("confirmations", 64)),
-                token_contract=item["usdtContract"],
-            )
+        # Initial release pays only native SOBY from the SOBYA inventory.
+        # Ethereum is deposit-only; TRON and Solana are deferred entirely.
+        for name in ("ethereum", "tron", "solana"):
+            item = network_cfg.get(name, {})
+            if isinstance(item, dict) and item.get("enabled") is True:
+                raise PayoutConfigurationError(
+                    f"{name} payouts are not supported in the Ethereum-to-SOBYA launch"
+                )
+        sobya_item = network_cfg.get("sobya")
+        sobya_wallet = sobya_item.get("inventoryWallet") if isinstance(sobya_item, dict) else None
+        if not isinstance(sobya_wallet, str) or not sobya_wallet.strip():
+            raise PayoutConfigurationError("sobya inventory wallet is required")
         if network_cfg.get("sobya", {}).get("enabled") is True:
             from web3 import Web3
             from evm_inventory_payout import EvmInventoryPayoutAdapter, load_evm_account_from_keystore
@@ -71,23 +46,6 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
             adapters["sobya"] = EvmInventoryPayoutAdapter(
                 network="sobya", web3=web3, account=account, chain_id=int(item["chainId"]),
                 inventory_wallet=item["inventoryWallet"], confirmations=int(item.get("confirmations", 2)),
-            )
-        if network_cfg.get("tron", {}).get("enabled") is True:
-            from tronpy import Tron
-            from tronpy.providers import HTTPProvider
-            from tron_inventory_payout import TronUsdtPayoutAdapter, load_tron_private_key_from_keystore
-            item = network_cfg["tron"]
-            rpc_url = os.environ.get(item.get("rpcUrlEnv", ""))
-            if not rpc_url or not rpc_url.startswith("https://"):
-                raise PayoutConfigurationError("TRON HTTPS RPC endpoint is missing")
-            client = Tron(HTTPProvider(endpoint_uri=rpc_url))
-            private_key = load_tron_private_key_from_keystore(
-                os.environ.get(item.get("keystorePathEnv", ""), ""),
-                item.get("keystorePassphraseEnv", ""),
-            )
-            adapters["tron"] = TronUsdtPayoutAdapter(
-                client=client, private_key=private_key, inventory_wallet=item["inventoryWallet"],
-                usdt_contract=item["usdtContract"], fee_limit_sun=int(item.get("feeLimitSun", 100_000_000)),
             )
         if network_cfg.get("solana", {}).get("enabled") is True:
             from solana.rpc.api import Client
@@ -106,7 +64,5 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
                 usdt_mint=item["usdtMint"], token_program=item["tokenProgram"],
                 decimals=int(item.get("usdtDecimals", 6)),
             )
-    enabled = feature_enabled and any(
-        network_cfg.get(name, {}).get("enabled") is True for name in ("ethereum","tron","solana","sobya")
-    )
+    enabled = feature_enabled and network_cfg.get("sobya", {}).get("enabled") is True
     return InventoryPayoutExecutor(ledger, PayoutJournal(journal_path), adapters, enabled=enabled)
