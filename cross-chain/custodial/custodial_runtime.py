@@ -26,6 +26,7 @@ from inventory_deposit_watchers import (
 )
 from payout_runtime import build_inventory_payout_executor
 from payout_worker import InventoryPayoutWorker
+from order_api import CustodialOrderApi, start_order_api
 
 LOG = logging.getLogger("sobya.custodial.runtime")
 NETWORK_NAMES = ("ethereum", "tron", "solana", "sobya")
@@ -115,6 +116,24 @@ def main() -> int:
     payout_worker = InventoryPayoutWorker(ledger, payout_executor)
     runtime = CustodialDepositPayoutRuntime(ledger, deposit_worker, payout_worker)
 
+    api_server = None
+    api_thread = None
+    api_config = config.get("api", {})
+    if not isinstance(api_config, dict):
+        raise SystemExit("custodial API configuration is malformed")
+    if api_config.get("enabled") is True:
+        api = CustodialOrderApi(ledger, deposit_worker, config)
+        api_server = start_order_api(
+            api, api_config.get("host", "127.0.0.1"), api_config.get("port", 8080)
+        )
+        api_thread = threading.Thread(
+            target=api_server.serve_forever, name="sobya-order-api", daemon=True
+        )
+        api_thread.start()
+        LOG.info("SOBYA order API listening on %s:%s", *api_server.server_address)
+    else:
+        LOG.info("SOBYA order API is disabled; set api.enabled=true after operator configuration")
+
     if not verifiers:
         LOG.info("deposit verification is disabled; no deposit RPC clients were created")
     if not payout_executor.enabled:
@@ -131,6 +150,11 @@ def main() -> int:
     try:
         runtime.run_forever(stop, interval_seconds=interval)
     finally:
+        if api_server is not None:
+            api_server.shutdown()
+            api_server.server_close()
+        if api_thread is not None:
+            api_thread.join(timeout=5)
         LOG.info("SOBYA unified custodial runtime stopped")
     return 0
 
