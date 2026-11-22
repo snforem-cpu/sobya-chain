@@ -304,54 +304,65 @@ def create_server(
                     source_wallet = _required_text(body["source_wallet"], "source wallet")
                     destination_wallet = _required_text(body["destination_wallet"], "destination wallet")
                     with order_creation_lock:
-                        result = quote(direction, source_network, source)
-                        source_meta, destination_meta = assets[source_network], assets[destination_network]
-                        response_quote = {
-                            "direction": direction, "source_network": source_network,
-                            "destination_network": destination_network,
-                            "source_symbol": source_meta["symbol"],
-                            "destination_symbol": destination_meta["symbol"],
-                            "source_amount_base_units": str(source),
-                            "destination_amount_base_units": str(result["destination_amount"]),
-                            "destination_amount": format(Decimal(result["destination_amount"]) / (Decimal(10) ** destination_meta["decimals"]), "f"),
-                            "rate": str(result.get("rate", "")),
-                            "fee_bps": result.get("fee_bps"),
-                            "expires_at": result.get("expires_at"),
-                        }
-                        if path == "/api/quote":
-                            self.send_json(200, {"quote": response_quote, "executable": True})
-                            return
-                        if direction == "usdt_to_soby":
-                            source_asset, destination_asset = source_meta["asset"], "native"
-                        else:
-                            source_asset, destination_asset = "native", destination_meta["asset"]
-                        deposit_address = source_meta["inventory_wallet"]
-                        order_id = ledger.create_order(
-                            direction=direction, source_network=source_network,
-                            destination_network=destination_network,
-                            deposit_address=deposit_address, source_wallet=source_wallet,
-                            destination_wallet=destination_wallet, source_asset=source_asset,
-                            destination_asset=destination_asset, source_amount=source,
-                            destination_amount=result["destination_amount"],
-                        )
+                        reservation_db = None
                         try:
-                            with sqlite3.connect(ledger.database) as db:
-                                db.execute(
-                                    "INSERT INTO custodial_order_quote_expiry(order_id,expires_at) VALUES(?,?)",
-                                    (order_id, result["expires_at"]),
+                            if path == "/api/orders":
+                                # SQLite's cross-process write reservation serializes
+                                # quote checks and order creation even if multiple API
+                                # workers are accidentally started against this ledger.
+                                reservation_db = sqlite3.connect(
+                                    ledger.database, timeout=15, isolation_level=None
                                 )
-                        except Exception:
-                            ledger.reject(order_id)
-                            raise
-                        self.send_json(201, {
-                            "order_id": order_id, "order_token": token_for(order_id),
-                            "state": "created", "deposit_address": deposit_address,
-                            "deposit_asset": source_meta["symbol"],
-                            "deposit_amount_base_units": str(source),
-                            "deposit_amount": body["amount"],
-                            "quote": response_quote,
-                        })
-                        return
+                                reservation_db.execute("BEGIN IMMEDIATE")
+                            result = quote(direction, source_network, source)
+                            source_meta, destination_meta = assets[source_network], assets[destination_network]
+                            response_quote = {
+                                "direction": direction, "source_network": source_network,
+                                "destination_network": destination_network,
+                                "source_symbol": source_meta["symbol"],
+                                "destination_symbol": destination_meta["symbol"],
+                                "source_amount_base_units": str(source),
+                                "destination_amount_base_units": str(result["destination_amount"]),
+                                "destination_amount": format(Decimal(result["destination_amount"]) / (Decimal(10) ** destination_meta["decimals"]), "f"),
+                                "rate": str(result.get("rate", "")),
+                                "fee_bps": result.get("fee_bps"),
+                                "expires_at": result.get("expires_at"),
+                            }
+                            if path == "/api/quote":
+                                self.send_json(200, {"quote": response_quote, "executable": True})
+                                return
+                            if direction == "usdt_to_soby":
+                                source_asset, destination_asset = source_meta["asset"], "native"
+                            else:
+                                source_asset, destination_asset = "native", destination_meta["asset"]
+                            deposit_address = source_meta["inventory_wallet"]
+                            order_id = ledger.create_order(
+                                direction=direction, source_network=source_network,
+                                destination_network=destination_network,
+                                deposit_address=deposit_address, source_wallet=source_wallet,
+                                destination_wallet=destination_wallet, source_asset=source_asset,
+                                destination_asset=destination_asset, source_amount=source,
+                                destination_amount=result["destination_amount"], db=reservation_db,
+                            )
+                            reservation_db.execute(
+                                "INSERT INTO custodial_order_quote_expiry(order_id,expires_at) VALUES(?,?)",
+                                (order_id, result["expires_at"]),
+                            )
+                            reservation_db.commit()
+                            self.send_json(201, {
+                                "order_id": order_id, "order_token": token_for(order_id),
+                                "state": "created", "deposit_address": deposit_address,
+                                "deposit_asset": source_meta["symbol"],
+                                "deposit_amount_base_units": str(source),
+                                "deposit_amount": body["amount"],
+                                "quote": response_quote,
+                            })
+                            return
+                        finally:
+                            if reservation_db is not None:
+                                if reservation_db.in_transaction:
+                                    reservation_db.rollback()
+                                reservation_db.close()
                 match = re.fullmatch(r"/api/orders/([A-Za-z0-9-]{8,80})/deposit-proof", path)
                 if match:
                     order_id = match.group(1)
