@@ -36,7 +36,7 @@ class OrderApiTests(unittest.TestCase):
 
     def tearDown(self):
         self.server.shutdown(); self.server.server_close(); self.thread.join(timeout=2)
-        self.ledger.close(); self.temp.cleanup()
+        self.temp.cleanup()
 
     def post(self,path,payload,token=None):
         c=HTTPConnection("127.0.0.1",self.port,timeout=3)
