@@ -40,7 +40,10 @@ class PayoutRuntimeGateTests(unittest.TestCase):
             executor = build_inventory_payout_executor(
                 config, ledger, str(Path(directory) / "payout.sqlite")
             )
-            self.assertTrue(executor.enabled)
+            # Global enablement alone must not start a worker while every
+            # network remains disabled; the accepted EVM address pair is
+            # validated above without creating signing adapters.
+            self.assertFalse(executor.enabled)
             self.assertEqual(executor.adapters, {})
 
     def test_enabled_custody_rejects_duplicate_non_evm_inventory_wallets(self):
