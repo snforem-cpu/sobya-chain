@@ -123,7 +123,7 @@ class OrderPricingPolicyTests(unittest.TestCase):
             direction="usdt_to_soby", source_network="ethereum", destination_network="sobya",
             deposit_address="0x" + "11" * 20, source_wallet="0x" + "22" * 20,
             destination_wallet="0x" + "33" * 20, source_asset="0x" + "44" * 20,
-            destination_asset="native", source_amount=5_000_000_000,
+            destination_asset="native", source_amount=1_000_000,
             destination_amount=1 * 10**18,
         )
         quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
