@@ -171,9 +171,6 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
         # only after the destination payout has independently passed chain finality.
         cutoff = datetime.fromtimestamp(now - window, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with sqlite3.connect(ledger.database, timeout=15) as db:
-            db.execute("""CREATE TABLE IF NOT EXISTS custodial_order_quote_expiry (
-                order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL
-            )""")
             demand_rows = db.execute("""SELECT direction, source_amount FROM custodial_orders
                 WHERE state='complete' AND created_at >= ? AND direction IN ('usdt_to_soby','soby_to_usdt')""",
                 (cutoff,)).fetchall()
