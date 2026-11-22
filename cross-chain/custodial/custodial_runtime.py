@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from decimal import Decimal, ROUND_DOWN
 import os
 import signal
 import threading
@@ -26,6 +28,8 @@ from inventory_deposit_watchers import (
 )
 from payout_runtime import build_inventory_payout_executor
 from payout_worker import InventoryPayoutWorker
+from demand_pricing import DemandSnapshot, calculate_demand_price
+from custodial_order_api import create_server as create_order_api_server
 
 LOG = logging.getLogger("sobya.custodial.runtime")
 NETWORK_NAMES = ("ethereum", "tron", "solana", "sobya")
@@ -69,6 +73,63 @@ def build_inventory_deposit_verifiers(config: dict[str, Any]) -> dict[str, Any]:
                 raise DepositRuntimeConfigurationError("Solana token program is missing")
             verifiers[name] = SolanaInventoryDepositVerifier(JsonRpc(rpc_url), token_program)
     return verifiers
+
+
+
+def build_order_quote_provider(config: dict[str, Any]):
+    """Build fail-closed quotes from an operator-fed finalized demand snapshot."""
+    pricing = config.get("pricing")
+    limits = config.get("limits")
+    if not isinstance(pricing, dict) or not isinstance(limits, dict):
+        raise DepositRuntimeConfigurationError("order API pricing and limits configuration is required")
+    snapshot_data = pricing.get("demandSnapshot")
+    liquidity = pricing.get("referenceLiquidityUsdtBaseUnits")
+    fee_bps = limits.get("feeBps")
+    if not isinstance(snapshot_data, dict):
+        raise DepositRuntimeConfigurationError("finalized demand snapshot is not configured")
+    if not isinstance(liquidity, int) or isinstance(liquidity, bool) or liquidity <= 0:
+        raise DepositRuntimeConfigurationError("verified reference liquidity is not configured")
+    if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps < 10000:
+        raise DepositRuntimeConfigurationError("operator-approved feeBps is not configured")
+    try:
+        snapshot = DemandSnapshot(
+            buy_usdt_base_units=snapshot_data["buyUsdtBaseUnits"],
+            sell_usdt_base_units=snapshot_data["sellUsdtBaseUnits"],
+            window_seconds=snapshot_data["windowSeconds"],
+            observed_at_epoch=snapshot_data["observedAtEpoch"],
+            finalized=snapshot_data["finalized"],
+        )
+    except (KeyError, TypeError) as exc:
+        raise DepositRuntimeConfigurationError("finalized demand snapshot schema is invalid") from exc
+
+    def provide(direction: str, source_network: str, source_amount: int) -> dict[str, Any]:
+        price = calculate_demand_price(
+            base_price_usdt_per_soby=pricing.get("baseReferencePriceUsdtPerSoby"),
+            reference_liquidity_usdt_base_units=liquidity,
+            snapshot=snapshot, now_epoch=int(time.time()),
+            expected_window_seconds=pricing.get("demandWindowSeconds", 3600),
+            max_snapshot_age_seconds=pricing.get("demandMaxAgeSeconds", 300),
+            upward_sensitivity_bps=pricing.get("upwardDemandSensitivityBps", 10000),
+            downward_sensitivity_bps=pricing.get("downwardDemandSensitivityBps", 2500),
+        )
+        if direction == "usdt_to_soby":
+            gross = (Decimal(source_amount) / Decimal(10**6) / price.quoted_price_usdt_per_soby) * Decimal(10**18)
+        elif direction == "soby_to_usdt":
+            gross = (Decimal(source_amount) / Decimal(10**18) * price.quoted_price_usdt_per_soby) * Decimal(10**6)
+        else:
+            raise ValueError("unsupported swap direction")
+        net = int((gross * Decimal(10000 - fee_bps) / Decimal(10000)).to_integral_value(rounding=ROUND_DOWN))
+        if net <= 0:
+            raise ValueError("quoted destination amount rounds to zero")
+        lifetime = limits.get("quoteLifetimeSeconds", 120)
+        if not isinstance(lifetime, int) or isinstance(lifetime, bool) or not 15 <= lifetime <= 900:
+            raise ValueError("quote lifetime must be between 15 and 900 seconds")
+        return {
+            "destination_amount": net, "rate": str(price.quoted_price_usdt_per_soby),
+            "fee_bps": fee_bps, "expires_at": int(time.time()) + lifetime,
+            "executable": True,
+        }
+    return provide
 
 
 class CustodialDepositPayoutRuntime:
@@ -115,6 +176,21 @@ def main() -> int:
     payout_worker = InventoryPayoutWorker(ledger, payout_executor)
     runtime = CustodialDepositPayoutRuntime(ledger, deposit_worker, payout_worker)
 
+    order_api = None
+    order_api_thread = None
+    if config.get("orderApiEnabled") is True:
+        secret_env = config.get("orderApiAccessSecretEnv", "SOBYA_ORDER_API_ACCESS_SECRET")
+        secret = os.environ.get(secret_env, "") if isinstance(secret_env, str) else ""
+        quote_provider = build_order_quote_provider(config)
+        order_api = create_order_api_server(
+            config.get("orderApiHost", "127.0.0.1"),
+            int(config.get("orderApiPort", 8765)), ledger, deposit_worker,
+            config=config, quote_provider=quote_provider, access_secret=secret,
+        )
+        order_api_thread = threading.Thread(target=order_api.serve_forever, daemon=True)
+        order_api_thread.start()
+        LOG.info("SOBYA order API started on loopback port %s", order_api.server_address[1])
+
     if not verifiers:
         LOG.info("deposit verification is disabled; no deposit RPC clients were created")
     if not payout_executor.enabled:
@@ -131,6 +207,11 @@ def main() -> int:
     try:
         runtime.run_forever(stop, interval_seconds=interval)
     finally:
+        if order_api is not None:
+            order_api.shutdown()
+            order_api.server_close()
+            if order_api_thread is not None:
+                order_api_thread.join(timeout=5)
         LOG.info("SOBYA unified custodial runtime stopped")
     return 0
 

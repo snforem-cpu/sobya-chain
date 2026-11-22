@@ -49,5 +49,7 @@ jobs:
           python -m unittest -v test_observer_routers.py
           cd ../custodial
           python -m unittest -v test_custodial_ledger.py
+          python -m unittest -v test_custodial_order_api.py
+          python -m unittest -v test_custodial_runtime.py
           python -m unittest -v test_demand_pricing.py
           python -m unittest -v test_evm_deposit_watcher.py
