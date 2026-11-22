@@ -62,7 +62,7 @@
     "downwardDemandSensitivityBps": 2500,
     "demandWindowSeconds": 3600,
     "demandMaxAgeSeconds": 300,
-    "demandSignalSource": "finalized-executed-swaps-only",
+    "demandSignalSource": "finalized-completed-ledger-orders",
     "priceCeiling": null,
     "priceFloor": null,
     "inventorySnapshotMaxAgeSeconds": 300
