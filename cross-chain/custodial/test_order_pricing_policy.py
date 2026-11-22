@@ -41,8 +41,8 @@ class OrderPricingPolicyTests(unittest.TestCase):
                 "inventorySnapshotMaxAgeSeconds": 300,
             },
             "limits": {
-                "maxOrderUsdtBaseUnits": 100_000_000,
-                "maxDailyUsdtBaseUnitsPerNetwork": 500_000_000,
+                "maxOrderUsdtBaseUnits": 500_000_000,
+                "maxDailyUsdtBaseUnitsPerNetwork": 10_000_000_000,
                 "minimumInventoryBaseUnits": 100 * 10**18,
                 "feeBps": 100, "quoteLifetimeSeconds": 120,
             },
@@ -71,14 +71,14 @@ class OrderPricingPolicyTests(unittest.TestCase):
 
     def test_rejects_order_above_per_order_limit(self):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "maximum"):
-            self.provider()("usdt_to_soby", "ethereum", 100_000_001)
+            self.provider()("usdt_to_soby", "ethereum", 500_000_001)
 
     def test_rejects_daily_network_limit(self):
         self.ledger.create_order(
             direction="usdt_to_soby", source_network="ethereum", destination_network="sobya",
             deposit_address="0x" + "11" * 20, source_wallet="0x" + "22" * 20,
             destination_wallet="0x" + "33" * 20, source_asset="0x" + "44" * 20,
-            destination_asset="native", source_amount=499_500_000,
+            destination_asset="native", source_amount=9_999_500_000,
             destination_amount=1 * 10**18,
         )
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "daily USDT intake"):
