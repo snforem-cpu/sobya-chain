@@ -72,6 +72,8 @@ class CustodialOrderApi:
         item = self.networks.get(name)
         if not isinstance(item, dict):
             raise OrderApiError("network configuration is missing")
+        if require_watch and self.config.get("depositWatchEnabled") is not True:
+            raise OrderApiError("global deposit verification is disabled")
         if require_watch and item.get("depositWatchEnabled") is not True:
             raise OrderApiError("deposit verification is not enabled for " + name)
         return item
@@ -199,8 +201,15 @@ class CustodialOrderApi:
                 (order_id,)).fetchone()
         if quote is None:
             raise OrderApiError("quote metadata is unavailable")
+        with sqlite3.connect(self.database) as db:
+            proof = db.execute("""SELECT status,attempts,last_error,tx_id,event_index
+                FROM pending_inventory_deposits WHERE order_id=?""", (order_id,)).fetchone()
         return {
             "order_id": order_id, "status": order["state"],
+            "deposit_proof": ({"status": proof[0], "attempts": proof[1],
+                               "last_error": proof[2], "transaction_id": proof[3],
+                               "event_index": proof[4]} if proof else None),
+            "quote_expired": self.clock() >= quote[4] and order["state"] == "created",
             "direction": order["direction"], "source_network": order["source_network"],
             "destination_network": order["destination_network"],
             "source_amount_base_units": order["source_amount"],
