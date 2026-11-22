@@ -71,13 +71,13 @@
   },
   "safety": {
     "requireFinalizedDeposit": true,
-    "requireUniqueDepositDestination": true,
+    "requireUniqueDepositDestination": false,
     "requireInventoryBeforeAcceptingOrder": true,
     "requirePayoutFinalityBeforeComplete": true,
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order. Customer order UI and loopback API are available when orderApiEnabled is explicitly true; they require SOBYA_ORDER_API_ACCESS_SECRET (32+ bytes), a live quote provider with a fresh finalized demandSnapshot, verified non-zero reference liquidity, and operator-approved feeBps. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy. ",
+  "notice": "Template only. All networks are disabled. Set referenceLiquidityUsdtBaseUnits from verified executable inventory before quote creation. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order; per-order unique deposit addresses are not required. Customer order UI and loopback API are available when orderApiEnabled is explicitly true; they require SOBYA_ORDER_API_ACCESS_SECRET (32+ bytes), a live quote provider with a fresh finalized demandSnapshot, verified non-zero reference liquidity, and operator-approved feeBps. The API remains disabled by default and must be exposed only through a trusted TLS reverse proxy. ",
   "depositWatchEnabled": false,
   "orderApiEnabled": false,
   "orderApiHost": "127.0.0.1",
