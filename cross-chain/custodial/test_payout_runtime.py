@@ -24,7 +24,26 @@ class PayoutRuntimeGateTests(unittest.TestCase):
             self.assertFalse(executor.enabled)
             self.assertEqual(executor.adapters, {})
 
-    def test_enabled_custody_requires_four_distinct_inventory_wallets(self):
+    def test_enabled_custody_allows_same_evm_address_on_ethereum_and_sobya(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = {
+                "mode": "custodial-inventory",
+                "featureEnabled": True,
+                "networks": {
+                    "ethereum": {"enabled": False, "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD"},
+                    "tron": {"enabled": False, "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"},
+                    "solana": {"enabled": False, "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh"},
+                    "sobya": {"enabled": False, "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD"},
+                },
+            }
+            ledger = CustodialOrderLedger(Path(directory) / "orders.sqlite")
+            executor = build_inventory_payout_executor(
+                config, ledger, str(Path(directory) / "payout.sqlite")
+            )
+            self.assertTrue(executor.enabled)
+            self.assertEqual(executor.adapters, {})
+
+    def test_enabled_custody_rejects_duplicate_non_evm_inventory_wallets(self):
         with tempfile.TemporaryDirectory() as directory:
             config = {
                 "mode": "custodial-inventory",
@@ -32,8 +51,8 @@ class PayoutRuntimeGateTests(unittest.TestCase):
                 "networks": {
                     "ethereum": {"enabled": False, "inventoryWallet": "0x1111111111111111111111111111111111111111"},
                     "tron": {"enabled": False, "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"},
-                    "solana": {"enabled": False, "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh"},
-                    "sobya": {"enabled": False, "inventoryWallet": "0x1111111111111111111111111111111111111111"},
+                    "solana": {"enabled": False, "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx"},
+                    "sobya": {"enabled": False, "inventoryWallet": "0x2222222222222222222222222222222222222222"},
                 },
             }
             ledger = CustodialOrderLedger(Path(directory) / "orders.sqlite")
