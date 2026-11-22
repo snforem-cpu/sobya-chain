@@ -23,15 +23,18 @@ class RpcPreflightTests(unittest.TestCase):
         def fake_open(request, timeout):
             payload = json.loads(request.data)
             method = payload["method"]
-            values = {
-                "eth_chainId": hex(EXPECTED["ethereum"]),
-                "eth_getBlockByNumber": (
+            if method == "eth_chainId":
+                value = hex(EXPECTED["ethereum"])
+            elif method == "eth_getBlockByNumber":
+                value = (
                     {"number": "0x100"} if payload["params"][0] == "latest"
                     else {"number": "0xf0"}
-                ),
-                "eth_getCode": "0x60016000",
-            }
-            return FakeResponse(values[method])
+                )
+            elif method == "eth_getCode":
+                value = "0x60016000"
+            else:
+                raise AssertionError(method)
+            return FakeResponse(value)
         with patch("urllib.request.urlopen", side_effect=fake_open):
             result = check_network("ethereum", "https://rpc.example")
         self.assertEqual(result["chain_id"], 1)
