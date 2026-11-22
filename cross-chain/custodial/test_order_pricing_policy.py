@@ -85,6 +85,21 @@ class OrderPricingPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "daily USDT intake"):
             self.provider()("usdt_to_soby", "ethereum", 1_000_000)
 
+    def test_expired_unfunded_order_releases_daily_and_inventory_reservations(self):
+        order_id = self.ledger.create_order(
+            direction="usdt_to_soby", source_network="ethereum", destination_network="sobya",
+            deposit_address="0x" + "11" * 20, source_wallet="0x" + "22" * 20,
+            destination_wallet="0x" + "33" * 20, source_asset="0x" + "44" * 20,
+            destination_asset="native", source_amount=499_500_000,
+            destination_amount=900_000 * 10**18,
+        )
+        with self.ledger._connect() as db:
+            db.execute("CREATE TABLE custodial_order_quote_expiry (order_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
+            db.execute("INSERT INTO custodial_order_quote_expiry(order_id, expires_at) VALUES (?, ?)",
+                       (order_id, int(time.time()) - 1))
+        quote = self.provider()("usdt_to_soby", "ethereum", 1_000_000)
+        self.assertEqual(quote["destination_amount"], 198 * 10**18)
+
     def test_rejects_live_inventory_reserve_breach(self):
         FakeSobyaRpc.balance = 101 * 10**18
         with self.assertRaisesRegex(DepositRuntimeConfigurationError, "protected minimum"):
