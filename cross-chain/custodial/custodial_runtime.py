@@ -106,21 +106,18 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
     max_order = limits.get("maxOrderUsdtBaseUnits")
     daily_cap = limits.get("maxDailyUsdtBaseUnitsPerNetwork")
     minimum_inventory = limits.get("minimumInventoryBaseUnits")
-    liquidity = pricing.get("referenceLiquidityUsdtBaseUnits")
-    for value, label in ((liquidity, "reference liquidity"), (max_order, "maximum order"),
+    for value, label in ((max_order, "maximum order"),
                          (daily_cap, "daily network cap"), (minimum_inventory, "minimum SOBY inventory")):
         if not isinstance(value, int) or isinstance(value, bool) or not 0 < value <= 2**256 - 1:
             raise DepositRuntimeConfigurationError(f"positive uint256 operator-approved {label} is required")
     if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps <= 1000:
         raise DepositRuntimeConfigurationError("feeBps must be operator-approved and between 0 and 1000 (10%)")
     try:
-        floor_d, ceiling_d = Decimal(str(pricing.get("priceFloor"))), Decimal(str(pricing.get("priceCeiling")))
         base_price = Decimal(str(pricing.get("baseReferencePriceUsdtPerSoby")))
     except Exception as exc:
-        raise DepositRuntimeConfigurationError("base price and positive price floor/ceiling are required") from exc
-    if (not all(x.is_finite() for x in (floor_d, ceiling_d, base_price))
-            or base_price <= 0 or floor_d <= 0 or floor_d >= ceiling_d):
-        raise DepositRuntimeConfigurationError("base price and bounds must be finite and positive; floor < ceiling")
+        raise DepositRuntimeConfigurationError("the agreed positive base reference price is required") from exc
+    if not base_price.is_finite() or base_price <= 0:
+        raise DepositRuntimeConfigurationError("base reference price must be finite and positive")
     lifetime = limits.get("quoteLifetimeSeconds", 120)
     if not isinstance(lifetime, int) or isinstance(lifetime, bool) or not 15 <= lifetime <= 900:
         raise DepositRuntimeConfigurationError("quote lifetime must be between 15 and 900 seconds")
@@ -162,6 +159,13 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
             raise DepositRuntimeConfigurationError("finalized SOBYA inventory observation is stale or future-dated")
         if inventory_balance <= minimum_inventory:
             raise DepositRuntimeConfigurationError("live SOBY inventory must exceed the protected minimum reserve")
+        # Derive reference depth from live spendable SOBY at the agreed base price.
+        # This does not require an external USDT liquidity deposit.
+        spendable_inventory = inventory_balance - minimum_inventory
+        liquidity = int((Decimal(spendable_inventory) / Decimal(10**18)
+                         * base_price * Decimal(10**6)).to_integral_value(rounding=ROUND_DOWN))
+        if liquidity <= 0:
+            raise DepositRuntimeConfigurationError("verified spendable SOBY inventory is too small for pricing")
 
         # Demand is derived only from completed orders: the ledger reaches complete
         # only after the destination payout has independently passed chain finality.
@@ -196,12 +200,14 @@ def build_order_quote_provider(config: dict[str, Any], ledger: Any = None):
             expected_window_seconds=window, max_snapshot_age_seconds=max_demand_age,
             upward_sensitivity_bps=up_sensitivity, downward_sensitivity_bps=down_sensitivity,
         )
-        if not floor_d <= price.quoted_price_usdt_per_soby <= ceiling_d:
-            raise DepositRuntimeConfigurationError("demand-adjusted price is outside operator-approved price bounds")
+        # No upper price ceiling: demand may raise SOBY without an arbitrary cap.
+        # The upward sensitivity is configured higher than the downward sensitivity.
+        if not price.quoted_price_usdt_per_soby.is_finite() or price.quoted_price_usdt_per_soby <= 0:
+            raise DepositRuntimeConfigurationError("demand-adjusted SOBY price is not executable")
         gross = (Decimal(source_amount) / Decimal(10**6) / price.quoted_price_usdt_per_soby) * Decimal(10**18)
         net = int((gross * Decimal(10000 - fee_bps) / Decimal(10000)).to_integral_value(rounding=ROUND_DOWN))
-        if net <= 0:
-            raise DepositRuntimeConfigurationError("quoted destination amount rounds to zero")
+        if net <= 0 or net > 2**256 - 1:
+            raise DepositRuntimeConfigurationError("quoted destination amount is outside the supported uint256 range")
         daily = sum(int(row[0]) for row in daily_rows)
         reserved = sum(int(row[0]) for row in reserved_rows)
         if daily + source_amount > daily_cap:
