@@ -37,18 +37,23 @@
 <p class="muted warn">Initial liquidity phase: create and fund the first pool only after verifying both token addresses, token decimals, and amounts. Swaps remain disabled until the funded pool and a controlled swap test are verified.</p>
 </section>
 <section class="panel hidden" id="crosschain">
-<div class="tag">CROSS-CHAIN · QUOTE PREVIEW</div>
-<h2 style="margin:8px 0">USDT → SOBY</h2>
-<p class="muted">One interface for Ethereum, TRON and Solana. The source networks remain on their own infrastructure; SOBYA handles destination settlement.</p>
-<label class="field"><span>Source network</span><select id="ccNetwork" style="width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#07182b;color:white;font:inherit"><option value="ethereum">Ethereum · USDT</option><option value="tron">TRON · USDT</option><option value="solana">Solana · USDT</option></select></label>
-<label class="field"><span>USDT contract / mint address</span><input id="ccAsset" placeholder="Verified USDT contract or mint address"></label>
-<div class="row"><label class="field"><span>USDT amount</span><input id="ccAmount" type="number" min="0.000001" step="0.000001" placeholder="0.0"></label><label class="field"><span>Your source wallet</span><input id="ccSourceWallet" placeholder="Source-chain wallet address"></label></div>
-<label class="field"><span>Solver public address / identity</span><input id="ccSolver" placeholder="Configured SOBYA solver identity"></label>
-<label class="field"><span>Receive SOBY at (SOBYA EVM address)</span><input id="ccRecipient" placeholder="0x…"></label>
-<button class="btn primary" id="ccQuoteBtn">Request indicative quote</button>
-<div class="status" id="ccStatus" aria-live="polite">Quote preview only. No funds are requested or moved.</div>
-<pre id="ccQuote" class="status hidden" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
-<p class="muted warn">A quote is not an accepted order. Source escrow, finalized deposit verification, signed solver quote, funded SOBYA inventory and payout settlement must all be live before a swap can execute. This panel never asks for a seed phrase or private key.</p>
+<div class="tag">CROSS-CHAIN · ORDER & SETTLEMENT</div>
+<h2 style="margin:8px 0">Swap with SOBYA inventory</h2>
+<p class="muted">Real order workflow: request a firm quote, send the exact amount from your own wallet, submit the transaction proof, then track deposit verification and payout. Never share a seed phrase or private key.</p>
+<label class="field"><span>Swap direction</span><select id="ccDirection" style="width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#07182b;color:white;font:inherit"><option value="usdt_to_soby">Ethereum USDT → SOBY</option><option value="soby_to_usdt">SOBY → Ethereum USDT</option></select></label>
+<div class="row"><label class="field"><span>Amount</span><input id="ccAmount" type="text" inputmode="decimal" placeholder="0.00"></label><label class="field"><span>Asset</span><input id="ccAssetLabel" value="USDT (Ethereum)" readonly></label></div>
+<label class="field"><span>Your sending wallet address</span><input id="ccSourceWallet" placeholder="Wallet address you will send from"></label>
+<label class="field"><span>Receive address</span><input id="ccRecipient" placeholder="Address on the destination network"></label>
+<button class="btn primary" id="ccQuoteBtn">Create swap order & quote</button>
+<div class="status" id="ccStatus" aria-live="polite">Connect your wallet or enter your public wallet addresses. Quotes are subject to live inventory and verified pricing checks.</div>
+<div id="ccOrder" class="hidden">
+<div class="status" id="ccQuote"></div>
+<label class="field"><span>Deposit transaction hash</span><input id="ccTxHash" placeholder="Paste the transaction hash after sending"></label>
+<label class="field"><span>Transfer event / log index</span><input id="ccEventIndex" type="number" min="0" step="1" value="0"></label>
+<div class="row"><button class="btn primary" id="ccSubmitDeposit">Submit deposit proof</button><button class="btn" id="ccRefreshOrder">Refresh order status</button></div>
+<div class="status" id="ccOrderStatus" aria-live="polite">Order created. Send only the exact quoted amount to the deposit address above.</div>
+</div>
+<p class="muted warn">Supported launch networks: Ethereum USDT and SOBYA EVM only. A submitted transaction is not considered paid until the chain watcher verifies the exact transfer and finality; payout is not guaranteed by quote creation.</p>
 </section>
 <section class="panel hidden" id="wrap">
 <div class="tag">NATIVE SOBY ↔ WSOBY</div>
@@ -141,30 +146,16 @@ $('removeBtn').onclick=async()=>{try{const a=$('tokenA').value.trim(),b=$('token
 $('wrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive SOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.deposit({value:amount});say('Wrapping SOBY: '+tx.hash);await tx.wait();say('WSOBY minted 1:1. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
 $('unwrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive WSOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.withdraw(amount);say('Unwrapping WSOBY: '+tx.hash);await tx.wait();say('Native SOBY returned. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
 
-$('ccQuoteBtn').onclick=async()=>{
- const button=$('ccQuoteBtn'),status=$('ccStatus'),output=$('ccQuote');
- output.classList.add('hidden');output.textContent='';
- try{
-  const network=$('ccNetwork').value,asset=$('ccAsset').value.trim(),amountText=$('ccAmount').value.trim();
-  const sourceWallet=$('ccSourceWallet').value.trim(),solver=$('ccSolver').value.trim(),recipient=$('ccRecipient').value.trim();
-  if(!asset||!amountText||!sourceWallet||!solver||!recipient)throw Error('Complete all fields. Use verified public addresses only.');
-  if(!/^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,64})$/.test(asset))throw Error('Enter a valid EVM contract or Solana mint address.');
-  if(!/^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,64})$/.test(sourceWallet))throw Error('Enter a valid source wallet address.');
-  if(!/^0x[0-9a-fA-F]{40}$/.test(recipient)||!/^0x[0-9a-fA-F]{40}$/.test(solver))throw Error('Solver and SOBYA recipient must be EVM addresses.');
-  const amount=Number(amountText);
-  if(!Number.isFinite(amount)||amount<=0||!/^\\d+(\\.\\d{1,6})?$/.test(amountText))throw Error('Enter a positive USDT amount with up to 6 decimal places.');
-  const sourceAmount=BigInt(amountText.replace('.','').padEnd(amountText.includes('.')?amountText.indexOf('.')+7:amountText.length+6,'0')).toString();
-  if(BigInt(sourceAmount)>BigInt(Number.MAX_SAFE_INTEGER))throw Error('Amount is above the safe quote-preview limit. Split it into smaller orders.');
-  button.disabled=true;status.textContent='Requesting an unsigned, non-reserving quote preview…';
-  const response=await fetch('/api/cross-chain/v1/quote-previews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request:{order_id:crypto.randomUUID(),source_chain:network,source_asset:asset,source_amount:Number(sourceAmount),user:sourceWallet,solver,destination_recipient:recipient}})});
-  const payload=await response.json().catch(()=>({error:'Invalid response from quote gateway'}));
-  if(!response.ok)throw Error(payload.error||('Quote gateway returned HTTP '+response.status));
-  if(payload.signed!==false||payload.reserved!==false||!payload.quote)throw Error('Gateway response did not match the unsigned preview contract. Request rejected.');
-  output.textContent=JSON.stringify(payload.quote,null,2);output.classList.remove('hidden');
-  status.textContent='Indicative quote received. It is unsigned and no inventory has been reserved; no swap has been placed.';
- }catch(error){status.textContent='Quote unavailable: '+(error.message||String(error))+'. Cross-chain execution remains disabled.'}
- finally{button.disabled=false}
-};
+const apiBasePromise=fetch(CONFIG_URL,{cache:'no-store'}).then(r=>r.json()).then(x=>x.custodialApiUrl||'');
+let activeOrderId=null,activeQuote=null;
+function ccDirectionChanged(){const reverse=$('ccDirection').value==='soby_to_usdt';$('ccAssetLabel').value=reverse?'SOBY (SOBYA)':'USDT (Ethereum)';$('ccAmount').placeholder=reverse?'0.0':'0.00';$('ccOrder').classList.add('hidden');activeOrderId=null;activeQuote=null;}
+$('ccDirection').addEventListener('change',ccDirectionChanged);
+function decimalBaseUnits(value,decimals){if(!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value))throw Error('Enter a valid positive decimal amount.');const [whole,fraction='']=value.split('.');if(fraction.length>decimals)throw Error('Too many decimal places.');return (whole+fraction.padEnd(decimals,'0')).replace(/^0+(?=\d)/,'');}
+function displayUnits(value,decimals){const s=String(value).padStart(decimals+1,'0');const whole=s.slice(0,-decimals),frac=s.slice(-decimals).replace(/0+$/,'');return frac?whole+'.'+frac:whole;}
+async function loadOrder(){if(!activeOrderId)return;const base=await apiBasePromise;if(!base)throw Error('DEX config has no custodialApiUrl.');const r=await fetch(base.replace(/\/$/,'')+'/v1/orders/'+encodeURIComponent(activeOrderId),{cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'Order status request failed');$('ccOrderStatus').textContent='Order '+data.order_id+' · Status: '+data.status+(data.deposit_proof?' · Deposit proof: '+data.deposit_proof.status:'')+(data.deposit_transaction_id?' · TX: '+data.deposit_transaction_id:'')+(data.quote_expired?' · Quote expired':'');}
+$('ccQuoteBtn').onclick=async()=>{const button=$('ccQuoteBtn');try{const direction=$('ccDirection').value,reverse=direction==='soby_to_usdt';const amountText=$('ccAmount').value.trim(),sourceWallet=$('ccSourceWallet').value.trim(),recipient=$('ccRecipient').value.trim();if(!amountText||!sourceWallet||!recipient)throw Error('Complete amount and both public wallet addresses.');if(!/^0x[0-9a-fA-F]{40}$/.test(sourceWallet)||!/^0x[0-9a-fA-F]{40}$/.test(recipient))throw Error('For this launch, both sending and receiving addresses must be EVM addresses.');const base=await apiBasePromise;if(!base)throw Error('DEX config has no custodialApiUrl. Public API URL has not been configured.');const amount=decimalBaseUnits(amountText,reverse?18:6);if(BigInt(amount)<=0n)throw Error('Amount must be positive.');const payload={direction,source_network:reverse?'sobya':'ethereum',destination_network:reverse?'ethereum':'sobya',source_wallet:sourceWallet,destination_wallet:recipient,source_amount_base_units:amount};button.disabled=true;$('ccStatus').textContent='Requesting live quote and reserving an order record…';const response=await fetch(base.replace(/\/$/,'')+'/v1/quotes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw Error(data.error||'Quote request failed');activeOrderId=data.order_id;activeQuote=data;$('ccQuote').textContent='Order ID: '+data.order_id+'\nDirection: '+direction+'\nSend exactly: '+displayUnits(data.source_amount_base_units,reverse?18:6)+' '+(reverse?'SOBY':'USDT')+'\nDeposit address: '+data.deposit_address+'\nReceive: '+displayUnits(data.destination_amount_base_units,reverse?6:18)+' '+(reverse?'USDT':'SOBY')+'\nReference price: '+data.price_usdt_per_soby+' USDT / SOBY\nFee: '+data.fee_bps+' bps\nQuote expires: '+new Date(data.quote_expires_at*1000).toLocaleString();$('ccOrder').classList.remove('hidden');$('ccStatus').textContent='Order created. Verify the deposit address and exact amount before sending.';await loadOrder();}catch(e){$('ccStatus').textContent='Order not created: '+(e.message||String(e));}finally{button.disabled=false;}};
+$('ccSubmitDeposit').onclick=async()=>{try{if(!activeOrderId)throw Error('Create an order first.');const tx=$('ccTxHash').value.trim(),index=Number($('ccEventIndex').value);if(!tx||!Number.isSafeInteger(index)||index<0)throw Error('Enter transaction hash and non-negative event index.');const base=await apiBasePromise;const r=await fetch(base.replace(/\/$/,'')+'/v1/orders/'+encodeURIComponent(activeOrderId)+'/deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_id:tx,event_index:index})});const data=await r.json();if(!r.ok)throw Error(data.error||'Deposit proof rejected');$('ccOrderStatus').textContent=data.message||'Deposit proof submitted; awaiting finalized verification.';await loadOrder();}catch(e){$('ccOrderStatus').textContent='Could not submit proof: '+(e.message||String(e));}};
+$('ccRefreshOrder').onclick=async()=>{try{await loadOrder();}catch(e){$('ccOrderStatus').textContent=e.message||String(e);}};
 
 function watchWalletEvents(raw){
  if(!raw||typeof raw.on!=='function')return;
