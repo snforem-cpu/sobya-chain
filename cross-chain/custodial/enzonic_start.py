@@ -31,8 +31,13 @@ def _validate_operator_config(config: dict) -> None:
     if any(isinstance(networks.get(name), dict) and (networks[name].get("enabled") is True or networks[name].get("depositWatchEnabled") is True) for name in ("tron", "solana")):
         raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
     api = config.get("api", {})
-    if not isinstance(api, dict) or api.get("enabled") is not True or api.get("host", "127.0.0.1") not in ("127.0.0.1", "localhost"):
-        raise SystemExit("live order API must be enabled on loopback behind HTTPS ingress")
+    if not isinstance(api, dict) or api.get("enabled") is not True:
+        raise SystemExit("live order API must be enabled")
+    if api.get("host") != "0.0.0.0" or api.get("port") != 25701:
+        raise SystemExit("live API must bind to the Enzonic Connect primary port 25701")
+    token_env = api.get("gatewayTokenEnv")
+    if not isinstance(token_env, str) or not os.environ.get(token_env):
+        raise SystemExit("live API requires a shared gateway token in the Enzonic Connect environment")
     if not isinstance(api.get("allowedOrigin"), str) or not api["allowedOrigin"].startswith("https://"):
         raise SystemExit("live API requires an explicit HTTPS browser origin allowlist")
     pricing = config.get("pricing", {})
