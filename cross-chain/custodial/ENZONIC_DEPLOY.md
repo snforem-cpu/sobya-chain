@@ -1,59 +1,45 @@
-# Enzonic deployment
+# SOBYA Enzonic Connect deployment
 
-Deploy from the branch `enzonic-order-api` for review and validation. The implementation is based on `enzonic-swap-worker` and includes the finalized-deposit runtime plus the order/quote API.
+Deploy the custodial runtime from branch `feat/sobya-live-order-clean` only after reviewing its pull request. The Python entry point is `cross-chain/custodial/enzonic_start.py`.
 
-## Required Enzonic settings
+## Default startup
 
-- Runtime: **Python 3.12**.
-- Main file: `cross-chain/custodial/enzonic_start.py`.
-- Install dependencies from the repository-root `requirements.txt`, which includes `cross-chain/custodial/requirements.txt`.
-- Keep private keys, seed phrases, keystore contents, RPC credentials, and passphrases out of GitHub and source files.
+- Python 3.12.
+- Install `cross-chain/custodial/requirements.txt`.
+- Run `python cross-chain/custodial/enzonic_start.py`.
+- The example creates a local config with deposit and payout gates disabled. The order API is enabled only on loopback for local validation. This does not accept customer deposits.
 
-## Order and quote API
+## Enzonic Connect primary port
 
-The API is implemented in `order_api.py` and runs in the same process as the unified custodial runtime when `api.enabled=true`.
+The assigned public Connect address supplied by the operator is `fr-one.enzonic.com:25701`, primary port `25701`.
 
-- `GET /health` — process health only; it does not imply deposits or payouts are enabled.
-- `POST /v1/quotes` — creates a persistent order and a time-limited quote.
-- `GET /v1/orders/{order_id}` — returns the order, quote, and deposit-proof queue status.
-- `POST /v1/orders/{order_id}/deposit` — accepts `transaction_id` and the exact `event_index` (EVM log index, TRON log index, or Solana instruction index).
+For live mode, the local operator config must set:
 
-Quote request fields:
+- `api.enabled=true`
+- `api.host=0.0.0.0`
+- `api.port=25701`
+- `api.gatewayTokenEnv=SOBYA_GATEWAY_TOKEN`
+- `api.allowedOrigin=https://snforem-cpu.github.io`
 
-```json
-{
-  "direction": "usdt_to_soby",
-  "source_network": "ethereum",
-  "destination_network": "sobya",
-  "source_wallet": "USER_SOURCE_ADDRESS",
-  "destination_wallet": "USER_SOBYA_ADDRESS",
-  "source_amount_base_units": 1000000
-}
-```
+Set `SOBYA_GATEWAY_TOKEN` as an Enzonic Connect secret/environment variable, not in Git or in the JSON config. The same secret is configured in the separate HTTPS gateway. The API rejects public requests without the matching gateway token.
 
-For the reverse direction use `direction=soby_to_usdt`, `source_network=sobya`, and select `ethereum`, `tron`, or `solana` as `destination_network`. Amounts are integer base units: USDT uses 6 decimals and native SOBY uses 18 decimals. The quote response supplies the shared inventory deposit address, destination amount, fee field, price, expiry, and order ID. The API refuses to quote unless the destination network has `inventoryVerified=true`, which the operator may set only after independently checking the executable payout balance. The current fee defaults to zero until the fee policy is completed in step 3.
+The launcher refuses live mode unless both Ethereum and SOBYA have HTTPS RPC environment variables, existing encrypted keystore files, passphrase environment variables, enabled finalized-deposit watchers, independently verified inventories, and a non-zero verified reference-liquidity value. TRON and Solana are rejected for this launch.
 
-The deposit endpoint accepts:
+## Public HTTPS access
 
-```json
-{
-  "transaction_id": "CHAIN_TRANSACTION_HASH_OR_SIGNATURE",
-  "event_index": 0
-}
-```
+The Connect host:port is the upstream service address, not a verified HTTPS URL. Use the separate Enzonic Deploy reverse proxy described in [ENZONIC_HTTPS_GATEWAY.md](ENZONIC_HTTPS_GATEWAY.md). The DEX must call only the HTTPS hostname assigned by Enzonic Deploy after its `/health` endpoint has been verified. Do not set `dex/config.json:custodialApiUrl` to the raw Connect address.
 
-The API binds that proof to the stored order and queues it in the same durable SQLite table used by the worker. The verifier independently checks the transaction, sender, exact asset, amount, recipient, event/instruction index, and finality. A queued or pending proof is not a completed deposit; payout remains blocked until the worker advances that order to `deposit_final`. The status endpoint exposes queue state and retry information.
+## API contract
 
-## Runtime safety and network model
+- `GET /health`
+- `POST /v1/quotes`
+- `GET /v1/orders/{order_id}`
+- `POST /v1/orders/{order_id}/deposit`
 
-The API is **disabled by default** (`api.enabled=false`). To start it, the operator must explicitly enable the top-level and relevant per-network deposit-watch gates, configure HTTPS RPC endpoints, and set `api.enabled=true`. The API binds to `127.0.0.1:8080` by default. For public client access, place it behind an operator-managed HTTPS reverse proxy with request controls; do not expose the plain HTTP listener directly to the internet.
+Quotes are derived from completed ledger orders only. A quote is refused until verified reference liquidity is configured and the destination chain's current balance is read from its HTTPS RPC. The SOBYA destination check preserves the 100,000 SOBY reserve. The runtime uses 1% fees, a 500 USDT maximum order, and a 10,000 USDT daily cap.
 
-The order model uses the same shared inventory wallet on each chain. No unique deposit addresses, balance-delta inference, automatic bridges, or wallet signing are used by the API. The API never signs or broadcasts transactions. The payout worker still runs only after deposit verification and only processes orders in `deposit_final`.
+A deposit proof is not accepted as paid until the watcher independently verifies the exact sender, token/native asset, amount, destination, event index, canonical block and finality. Payout begins only after finalized deposit verification and completes only after finalized payout verification.
 
-For a first process check, leave all wallet, RPC, and passphrase environment variables unset. The launcher creates a local config from the disabled example. API, deposit watching, and payouts remain disabled.
+## Release gate
 
-## Before accepting real customer orders or enabling payouts
-
-Do not publish the API or accept real deposits until the operator has configured and verified each source-chain RPC, exact inventory addresses, chain/token identities, destination balances (then set the matching `inventoryVerified=true` flag), quote price, limits and fee policy, HTTPS ingress, and durable backups. Do not enable `featureEnabled` or any network payout flag until encrypted keystores and passphrases are installed as runtime secrets, fee balances and inventory are verified, and controlled end-to-end tests pass.
-
-This code implementation is not a live exchange launch. The Enzonic process must still be deployed and verified in step 5; live deposits and payouts remain disabled until the later release gates are completed.
+The code and gateway project are not a substitute for operator deployment. Do not accept customer funds until the HTTPS gateway is deployed, its public health check succeeds, both live inventory balances and gas funding are verified, and controlled end-to-end tests pass in both directions. Keep the DEX API URL empty until the exact public HTTPS origin is known.
