@@ -243,8 +243,27 @@ def make_handler(api: CustodialOrderApi):
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            allowed_origin = api.config.get("api", {}).get("allowedOrigin")
+            request_origin = self.headers.get("Origin")
+            if isinstance(allowed_origin, str) and request_origin == allowed_origin:
+                self.send_header("Access-Control-Allow-Origin", allowed_origin)
+                self.send_header("Vary", "Origin")
             self.end_headers()
             self.wfile.write(raw)
+
+        def do_OPTIONS(self):
+            allowed_origin = api.config.get("api", {}).get("allowedOrigin")
+            request_origin = self.headers.get("Origin")
+            if not isinstance(allowed_origin, str) or request_origin != allowed_origin:
+                return self._send(403, {"error": "origin is not allowed"})
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", allowed_origin)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def _body(self) -> dict[str, Any]:
             try:
