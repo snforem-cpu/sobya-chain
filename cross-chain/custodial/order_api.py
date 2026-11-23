@@ -112,7 +112,7 @@ class CustodialOrderApi:
             raise OrderApiError("feeBps must be an integer from 0 to 9999")
         return result.quoted_price_usdt_per_soby, fee_bps
 
-    def _check_live_inventory(self, network: str, amount: int) -> None:
+    def _check_live_inventory(self, network: str, amount: int, recipient: str) -> None:
         item = self._network(network, require_watch=False)
         if self.config.get("featureEnabled") is not True or item.get("enabled") is not True:
             raise OrderApiError("destination payout network is not enabled by verified operator configuration")
@@ -130,20 +130,40 @@ class CustodialOrderApi:
             if actual_chain != expected_chain:
                 raise OrderApiError("destination inventory RPC chain ID mismatch")
             wallet = self._required(item.get("inventoryWallet"), "destination inventory wallet")
+            recipient = self._required(recipient, "destination recipient")
+            if not recipient.startswith("0x") or len(recipient) != 42:
+                raise OrderApiError("destination recipient must be a 20-byte EVM address")
+            bytes.fromhex(recipient[2:])
+            latest = rpc.call("eth_getBlockByNumber", ["latest", False])
+            if not isinstance(latest, dict):
+                raise OrderApiError("destination RPC did not return the latest block")
+            if latest.get("baseFeePerGas") is not None:
+                priority = int(rpc.call("eth_maxPriorityFeePerGas", []), 16)
+                max_fee = 2 * int(latest["baseFeePerGas"], 16) + priority
+            else:
+                max_fee = int(rpc.call("eth_gasPrice", []), 16)
             if network == "ethereum":
                 token = self._required(item.get("usdtContract"), "Ethereum USDT contract")
                 owner = wallet.lower().removeprefix("0x").rjust(64, "0")
                 data = "0x70a08231" + owner
                 raw = rpc.call("eth_call", [{"to": token, "data": data}, "latest"])
                 available = int(raw, 16)
+                transfer_data = "0xa9059cbb" + recipient[2:].lower().rjust(64, "0") + hex(amount)[2:].rjust(64, "0")
+                gas = int(rpc.call("eth_estimateGas", [{"from": wallet, "to": token, "data": transfer_data, "value": "0x0"}]), 16)
+                native_balance = int(rpc.call("eth_getBalance", [wallet, "latest"]), 16)
+                gas_reserve = (gas * max_fee * 120 + 99) // 100
+                if native_balance < gas_reserve:
+                    raise OrderApiError("Ethereum inventory wallet has insufficient native gas balance for the USDT payout")
                 required = amount
             else:
                 raw = rpc.call("eth_getBalance", [wallet, "latest"])
                 available = int(raw, 16)
                 reserve = int(self.limits.get("minimumInventoryBaseUnits", "100000000000000000000000"))
-                required = amount + reserve
+                gas = int(rpc.call("eth_estimateGas", [{"from": wallet, "to": recipient, "value": hex(amount)}]), 16)
+                gas_reserve = (gas * max_fee * 120 + 99) // 100
+                required = amount + reserve + gas_reserve
             if available < required:
-                raise OrderApiError("live destination inventory is insufficient after protected reserve")
+                raise OrderApiError("live destination inventory is insufficient after protected reserve and gas")
         except OrderApiError:
             raise
         except Exception as exc:
@@ -182,7 +202,7 @@ class CustodialOrderApi:
         else:
             raise OrderApiError("unsupported swap direction")
 
-        self._check_live_inventory(destination_network, gross)
+        self._check_live_inventory(destination_network, gross, destination_wallet)
         usdt_value = source_amount if direction == "usdt_to_soby" else gross
         max_order = self.limits.get("maxOrderUsdtBaseUnits", 500000000)
         daily_cap = self.limits.get("maxDailyUsdtBaseUnitsPerNetwork", 10000000000)
