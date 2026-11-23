@@ -71,7 +71,7 @@ class EvmInventoryPayoutAdapter:
         nonce = self.w3.eth.get_transaction_count(self.inventory, "pending")
         base = {"from": self.inventory, "nonce": nonce, "chainId": self.chain_id}
         if self.network == "sobya":
-            if intent.asset.upper() != "SOBY":
+            if intent.asset.upper() not in {"SOBY", "ASOBYA"}:
                 raise PayoutError("SOBYA payout asset must be native SOBY")
             tx = {**base, "to": recipient, "value": intent.amount_base_units, "data": b""}
         else:
