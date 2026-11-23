@@ -32,7 +32,16 @@ def _rpc(url: str, method: str, params: list[Any]) -> Any:
         "jsonrpc": "2.0", "id": 1, "method": method, "params": params
     }).encode("utf-8")
     request = urllib.request.Request(
-        url, data=payload, headers={"Content-Type": "application/json"},
+        url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            # Some public RPC gateways reject Python's default urllib user agent.
+            # Use a conventional browser-like UA; this does not bypass auth or
+            # alter the JSON-RPC payload.
+            "User-Agent": "Mozilla/5.0 (compatible; SOBYA-Enzonic-RPC/1.0)",
+        },
         method="POST",
     )
     try:
