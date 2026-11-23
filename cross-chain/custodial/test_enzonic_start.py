@@ -42,6 +42,6 @@ class EnzonicLauncherTests(unittest.TestCase):
                 "api":{"enabled":True,"host":"0.0.0.0","port":25701,"gatewayTokenEnv":"SOBYA_GATEWAY_TOKEN","allowedOrigin":"https://snforem-cpu.github.io"},
                 "pricing":{"baseReferencePriceUsdtPerSoby":"0.005","upwardDemandSensitivityBps":10000,"downwardDemandSensitivityBps":2500,"priceCeiling":None,"priceFloor":None,"referenceLiquidityUsdtBaseUnits":1000000000000},"limits":{"feeBps":100,"maxOrderUsdtBaseUnits":500000000,"maxDailyUsdtBaseUnitsPerNetwork":10000000000,"minimumInventoryBaseUnits":"100000000000000000000000"}}
             env={"ETH_RPC":"https://eth.example/rpc","ETH_KEY":str(eth),"ETH_PASS":"secret","SOB_RPC":"https://sob.example/rpc","SOB_KEY":str(sob),"SOB_PASS":"secret"}
-            with patch.dict(os.environ,{**env,"SOBYA_GATEWAY_TOKEN":"a".repeat(64),"SOBYA_API_TLS_CERT":str(cert),"SOBYA_API_TLS_KEY":str(key)},clear=True): enzonic_start._validate_operator_config(cfg)
+            with patch.dict(os.environ,{**env,"SOBYA_GATEWAY_TOKEN":"a"*64,"SOBYA_API_TLS_CERT":str(cert),"SOBYA_API_TLS_KEY":str(key)},clear=True): enzonic_start._validate_operator_config(cfg)
 
 if __name__ == "__main__": unittest.main()
