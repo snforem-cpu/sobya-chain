@@ -17,6 +17,7 @@ from typing import Any, Callable
 from custodial_ledger import CustodialOrderError
 from inventory_deposit_watchers import InventoryDepositError
 from demand_pricing import DemandSnapshot, PricingError, calculate_demand_price
+from inventory_deposit_watchers import JsonRpc
 
 
 class OrderApiError(ValueError):
@@ -109,6 +110,43 @@ class CustodialOrderApi:
             raise OrderApiError("feeBps must be an integer from 0 to 9999")
         return result.quoted_price_usdt_per_soby, fee_bps
 
+    def _check_live_inventory(self, network: str, amount: int) -> None:
+        item = self._network(network, require_watch=False)
+        if self.config.get("featureEnabled") is not True or item.get("enabled") is not True:
+            raise OrderApiError("destination payout network is not enabled by verified operator configuration")
+        if item.get("inventoryVerified") is not True:
+            raise OrderApiError("destination inventory has not passed operator balance verification")
+        env_name = item.get("rpcUrlEnv")
+        import os
+        rpc_url = os.environ.get(env_name, "") if isinstance(env_name, str) else ""
+        if not rpc_url.startswith("https://"):
+            raise OrderApiError("live destination inventory RPC is not configured over HTTPS")
+        try:
+            rpc = JsonRpc(rpc_url)
+            expected_chain = item.get("chainId")
+            actual_chain = int(rpc.call("eth_chainId", []), 16)
+            if actual_chain != expected_chain:
+                raise OrderApiError("destination inventory RPC chain ID mismatch")
+            wallet = self._required(item.get("inventoryWallet"), "destination inventory wallet")
+            if network == "ethereum":
+                token = self._required(item.get("usdtContract"), "Ethereum USDT contract")
+                owner = wallet.lower().removeprefix("0x").rjust(64, "0")
+                data = "0x70a08231" + owner
+                raw = rpc.call("eth_call", [{"to": token, "data": data}, "latest"])
+                available = int(raw, 16)
+                required = amount
+            else:
+                raw = rpc.call("eth_getBalance", [wallet, "latest"])
+                available = int(raw, 16)
+                reserve = int(self.limits.get("minimumInventoryBaseUnits", "100000000000000000000000"))
+                required = amount + reserve
+            if available < required:
+                raise OrderApiError("live destination inventory is insufficient after protected reserve")
+        except OrderApiError:
+            raise
+        except Exception as exc:
+            raise OrderApiError("could not verify live destination inventory; quote refused") from exc
+
     def create_quote(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise OrderApiError("JSON object required")
@@ -142,8 +180,7 @@ class CustodialOrderApi:
         else:
             raise OrderApiError("unsupported swap direction")
 
-        if destination_cfg.get("inventoryVerified") is not True:
-            raise OrderApiError("destination inventory has not passed operator balance verification")
+        self._check_live_inventory(destination_network, gross)
         usdt_value = source_amount if direction == "usdt_to_soby" else gross
         max_order = self.limits.get("maxOrderUsdtBaseUnits", 500000000)
         daily_cap = self.limits.get("maxDailyUsdtBaseUnitsPerNetwork", 10000000000)
