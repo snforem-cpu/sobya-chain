@@ -38,7 +38,8 @@
     "demandMaxAgeSeconds": 300,
     "demandSignalSource": "finalized-executed-swaps-only",
     "priceCeiling": null,
-    "priceFloor": null
+    "priceFloor": null,
+    "referenceLiquidityVerified": false
   },
   "limits": {
     "maxOrderUsdtBaseUnits": 500000000,
