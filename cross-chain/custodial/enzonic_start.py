@@ -54,7 +54,7 @@ def main() -> int:
         if template.get("featureEnabled") is not False:
             raise SystemExit("refusing to bootstrap from a template with payouts enabled")
         config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        config_path.write_text(json.dumps(template, indent=2) + "\\n", encoding="utf-8")
+        config_path.write_text(json.dumps(template, indent=2) + "\n", encoding="utf-8")
         os.chmod(config_path, stat.S_IRUSR | stat.S_IWUSR)
         print("Created local disabled config.json; deposits and payouts remain fail-closed.")
     active = json.loads(config_path.read_text(encoding="utf-8"))
