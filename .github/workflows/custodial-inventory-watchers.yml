@@ -14,6 +14,17 @@ permissions:
   contents: read
 
 jobs:
+  https-gateway-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check Enzonic HTTPS gateway syntax
+        working-directory: cross-chain/custodial/https-gateway
+        run: node --check server.mjs
+
   inventory-watcher-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
