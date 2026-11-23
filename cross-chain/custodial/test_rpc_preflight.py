@@ -71,17 +71,18 @@ class RpcPreflightTests(unittest.TestCase):
             endpoints = _candidate_endpoints("sobya")
         self.assertEqual(endpoints, [
             "https://old-host.invalid/rpc",
-            "https://sobya-evm-rpc.nodesafe-app.xyz",
+            "https://sobya-evm-rpc.nodesafe-dapp.xyz",
             "https://operator-fallback.example/rpc",
         ])
+        self.assertNotIn("https://sobya-rpc.bonynode.online", endpoints)
 
     def test_sobya_deduplicates_nodesafe_when_it_is_primary(self):
         with patch.dict("os.environ", {
-            "SOBYA_SOBYA_RPC_URL": "https://sobya-evm-rpc.nodesafe-app.xyz",
+            "SOBYA_SOBYA_RPC_URL": "https://sobya-evm-rpc.nodesafe-dapp.xyz",
         }, clear=False):
             endpoints = _candidate_endpoints("sobya")
         self.assertEqual(
-            endpoints.count("https://sobya-evm-rpc.nodesafe-app.xyz"), 1
+            endpoints.count("https://sobya-evm-rpc.nodesafe-dapp.xyz"), 1
         )
 
     def test_rejects_wrong_chain(self):
