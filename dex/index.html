@@ -47,7 +47,7 @@
 <button class="btn primary" id="ccQuoteBtn">Create swap order & quote</button>
 <div class="status" id="ccStatus" aria-live="polite">Enter your public wallet addresses. Quotes require verified live pricing and available inventory.</div>
 <div id="ccOrder" class="hidden">
-<div class="status" id="ccQuote"></div>
+<div class="status" id="ccQuote" style="white-space:pre-wrap;overflow-wrap:anywhere"></div>
 <label class="field"><span>Deposit transaction hash</span><input id="ccTxHash" placeholder="Paste transaction hash after sending"></label>
 <label class="field"><span>Transfer event / log index (native SOBY uses 0)</span><input id="ccEventIndex" type="number" min="0" step="1" value="0"></label>
 <div class="row"><button class="btn primary" id="ccSubmitDeposit">Submit deposit proof</button><button class="btn" id="ccRefreshOrder">Refresh order status</button></div>
