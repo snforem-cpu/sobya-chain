@@ -101,5 +101,6 @@ class OrderApiTests(unittest.TestCase):
         quote = self.quote(); status = self.api.get_order(quote["order_id"])
         self.assertEqual(status["status"], "created")
         self.assertEqual(status["quote"]["fee_bps"], 100)
+        self.assertEqual(status["deposit_address"], "0x" + "22" * 20)
 
 if __name__ == "__main__": unittest.main()
