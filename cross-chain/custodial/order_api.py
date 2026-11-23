@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import hmac
 import os
+import ssl
 import sqlite3
 import time
 import uuid
@@ -416,10 +417,18 @@ def make_handler(api: CustodialOrderApi):
     return Handler
 
 
-def start_order_api(api: CustodialOrderApi, host: str, port: int) -> ThreadingHTTPServer:
+def start_order_api(api: CustodialOrderApi, host: str, port: int, *,
+                    tls_certfile: str | None = None, tls_keyfile: str | None = None) -> ThreadingHTTPServer:
     if not isinstance(host, str) or not host:
         raise OrderApiError("API bind host is invalid")
     if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
         raise OrderApiError("API port is invalid")
+    if bool(tls_certfile) != bool(tls_keyfile):
+        raise OrderApiError("both API TLS certificate and private key paths are required")
     server = ThreadingHTTPServer((host, port), make_handler(api))
+    if tls_certfile and tls_keyfile:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(certfile=tls_certfile, keyfile=tls_keyfile)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
     return server
