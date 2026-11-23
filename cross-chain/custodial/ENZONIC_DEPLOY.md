@@ -21,7 +21,7 @@ For live mode, the local operator config must set:
 - `api.gatewayTokenEnv=SOBYA_GATEWAY_TOKEN`
 - `api.allowedOrigin=https://snforem-cpu.github.io`
 
-Set `SOBYA_GATEWAY_TOKEN` as an Enzonic Connect secret/environment variable, not in Git or in the JSON config. The same secret is configured in the separate HTTPS gateway. The API rejects public requests without the matching gateway token.
+Set `SOBYA_GATEWAY_TOKEN` as an Enzonic Connect secret/environment variable, not in Git or in the JSON config. The same secret is configured in the separate HTTPS gateway. Also set `SOBYA_API_TLS_CERT` and `SOBYA_API_TLS_KEY` to the paths of a trusted TLS certificate and matching private key for `fr-one.enzonic.com`. The API listener uses TLS on port 25701, and the gateway rejects plain-HTTP upstreams. The API rejects public requests without the matching gateway token.
 
 The launcher refuses live mode unless both Ethereum and SOBYA have HTTPS RPC environment variables, existing encrypted keystore files, passphrase environment variables, enabled finalized-deposit watchers, independently verified inventories, and a non-zero verified reference-liquidity value. TRON and Solana are rejected for this launch.
 
