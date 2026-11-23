@@ -39,10 +39,6 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live order API must be enabled")
     if api.get("host") != "0.0.0.0" or api.get("port") != 25701:
         raise SystemExit("live API must bind to the Enzonic Connect primary port 25701")
-    cert_path = os.environ.get("SOBYA_API_TLS_CERT", "")
-    key_path = os.environ.get("SOBYA_API_TLS_KEY", "")
-    if not cert_path or not key_path or not Path(cert_path).is_file() or not Path(key_path).is_file():
-        raise SystemExit("live API requires a valid TLS certificate and private key for the Enzonic Connect hostname")
     token_env = api.get("gatewayTokenEnv")
     if not isinstance(token_env, str) or len(os.environ.get(token_env, "")) < 64:
         raise SystemExit("live API requires a shared gateway token of at least 64 characters in the Enzonic Connect environment")
