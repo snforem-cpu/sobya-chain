@@ -54,7 +54,7 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live fee or USDT order/daily limits do not match the approved policy")
     if str(limits.get("minimumInventoryBaseUnits")) != "100000000000000000000000":
         raise SystemExit("live SOBY protected inventory reserve must remain 100,000 SOBY")
-    if not isinstance(pricing.get("referenceLiquidityUsdtBaseUnits"), int) or pricing["referenceLiquidityUsdtBaseUnits"] <= 0:
+    if pricing.get("referenceLiquidityVerified") is not True or not isinstance(pricing.get("referenceLiquidityUsdtBaseUnits"), int) or pricing["referenceLiquidityUsdtBaseUnits"] <= 0:
         raise SystemExit("live mode requires independently verified referenceLiquidityUsdtBaseUnits")
 
 def main() -> int:
