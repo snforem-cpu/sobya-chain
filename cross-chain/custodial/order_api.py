@@ -16,6 +16,7 @@ from typing import Any, Callable
 
 from custodial_ledger import CustodialOrderError
 from inventory_deposit_watchers import InventoryDepositError
+from demand_pricing import DemandSnapshot, PricingError, calculate_demand_price
 
 
 class OrderApiError(ValueError):
@@ -63,9 +64,12 @@ class CustodialOrderApi:
 
     @staticmethod
     def _amount(value: Any) -> int:
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-            raise OrderApiError("source_amount_base_units must be a positive integer")
-        return value
+        if isinstance(value, bool) or not (isinstance(value, int) or (isinstance(value, str) and value.isdigit())):
+            raise OrderApiError("source_amount_base_units must be a positive integer or digit string")
+        amount = int(value)
+        if amount <= 0:
+            raise OrderApiError("source_amount_base_units must be positive")
+        return amount
 
     @staticmethod
     def _required(value: Any, field: str) -> str:
@@ -74,7 +78,7 @@ class CustodialOrderApi:
         return value.strip()
 
     def _network(self, name: str, *, require_watch: bool = True) -> dict[str, Any]:
-        if name not in {"ethereum", "tron", "solana", "sobya"}:
+        if name not in {"ethereum", "sobya"}:
             raise OrderApiError("unsupported network")
         item = self.networks.get(name)
         if not isinstance(item, dict):
@@ -86,18 +90,24 @@ class CustodialOrderApi:
         return item
 
     def _price_and_fee(self) -> tuple[Decimal, int]:
+        reference = self.pricing.get("referenceLiquidityUsdtBaseUnits")
+        if not isinstance(reference, int) or isinstance(reference, bool) or reference <= 0:
+            raise OrderApiError("verified reference liquidity is required; live quotes are paused")
+        window = self.pricing.get("demandWindowSeconds", 3600)
+        max_age = self.pricing.get("demandMaxAgeSeconds", 300)
+        now = self.clock()
         try:
-            price = Decimal(str(self.pricing.get("baseReferencePriceUsdtPerSoby")))
-        except (InvalidOperation, TypeError, ValueError) as exc:
-            raise OrderApiError("operator-approved SOBY reference price is not configured") from exc
-        if not price.is_finite() or price <= 0:
-            raise OrderApiError("operator-approved SOBY reference price must be positive")
-        fee_bps = self.limits.get("feeBps")
-        if fee_bps is None:
-            fee_bps = 0  # Fee policy is deliberately configured in step 3.
+            with sqlite3.connect(self.database) as db:
+                buy = db.execute("SELECT COALESCE(SUM(CAST(source_amount AS INTEGER)),0) FROM custodial_orders WHERE state='complete' AND direction='usdt_to_soby' AND source_network='ethereum' AND updated_at >= datetime('now', ?)", ("-" + str(int(window)) + " seconds",)).fetchone()[0]
+                sell = db.execute("SELECT COALESCE(SUM(CAST(destination_amount AS INTEGER)),0) FROM custodial_orders WHERE state='complete' AND direction='soby_to_usdt' AND destination_network='ethereum' AND updated_at >= datetime('now', ?)", ("-" + str(int(window)) + " seconds",)).fetchone()[0]
+            snapshot = DemandSnapshot(int(buy), int(sell), int(window), now, True)
+            result = calculate_demand_price(base_price_usdt_per_soby=self.pricing.get("baseReferencePriceUsdtPerSoby"), reference_liquidity_usdt_base_units=reference, snapshot=snapshot, now_epoch=now, expected_window_seconds=window, max_snapshot_age_seconds=max_age, upward_sensitivity_bps=self.pricing.get("upwardDemandSensitivityBps", 10000), downward_sensitivity_bps=self.pricing.get("downwardDemandSensitivityBps", 2500))
+        except (PricingError, TypeError, ValueError, sqlite3.Error) as exc:
+            raise OrderApiError("demand price unavailable: " + str(exc)) from exc
+        fee_bps = self.limits.get("feeBps", 100)
         if not isinstance(fee_bps, int) or isinstance(fee_bps, bool) or not 0 <= fee_bps < 10000:
             raise OrderApiError("feeBps must be an integer from 0 to 9999")
-        return price, fee_bps
+        return result.quoted_price_usdt_per_soby, fee_bps
 
     def create_quote(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
@@ -110,8 +120,8 @@ class CustodialOrderApi:
         source_amount = self._amount(payload.get("source_amount_base_units"))
 
         if direction == "usdt_to_soby":
-            if source_network not in {"ethereum", "tron", "solana"} or destination_network != "sobya":
-                raise OrderApiError("USDT-to-SOBY requires Ethereum/TRON/Solana source and SOBYA destination")
+            if source_network != "ethereum" or destination_network != "sobya":
+                raise OrderApiError("USDT-to-SOBY requires Ethereum source and SOBYA destination")
             source_cfg = self._network(source_network)
             destination_cfg = self._network("sobya", require_watch=False)
             source_asset = self._required(source_cfg.get("usdtContract") if source_network != "sobya" else None, "USDT asset")
@@ -120,8 +130,8 @@ class CustodialOrderApi:
             price, fee_bps = self._price_and_fee()
             gross = int((Decimal(source_amount) / Decimal(10**6) / price * Decimal(10**18)).to_integral_value(rounding=ROUND_DOWN))
         elif direction == "soby_to_usdt":
-            if source_network != "sobya" or destination_network not in {"ethereum", "tron", "solana"}:
-                raise OrderApiError("SOBY-to-USDT requires SOBYA source and Ethereum/TRON/Solana destination")
+            if source_network != "sobya" or destination_network != "ethereum":
+                raise OrderApiError("SOBY-to-USDT requires SOBYA source and Ethereum destination")
             source_cfg = self._network("sobya")
             destination_cfg = self._network(destination_network, require_watch=False)
             source_asset = "asobya"
@@ -134,6 +144,23 @@ class CustodialOrderApi:
 
         if destination_cfg.get("inventoryVerified") is not True:
             raise OrderApiError("destination inventory has not passed operator balance verification")
+        usdt_value = source_amount if direction == "usdt_to_soby" else gross
+        max_order = self.limits.get("maxOrderUsdtBaseUnits", 500000000)
+        daily_cap = self.limits.get("maxDailyUsdtBaseUnitsPerNetwork", 10000000000)
+        if not isinstance(max_order, int) or isinstance(max_order, bool) or max_order <= 0:
+            raise OrderApiError("maxOrderUsdtBaseUnits is invalid")
+        if not isinstance(daily_cap, int) or isinstance(daily_cap, bool) or daily_cap <= 0:
+            raise OrderApiError("maxDailyUsdtBaseUnitsPerNetwork is invalid")
+        if usdt_value > max_order:
+            raise OrderApiError("order exceeds the configured 500 USDT maximum")
+        with sqlite3.connect(self.database) as db:
+            if direction == "usdt_to_soby":
+                used = db.execute("SELECT COALESCE(SUM(CAST(source_amount AS INTEGER)),0) FROM custodial_orders WHERE direction='usdt_to_soby' AND source_network='ethereum' AND state!='rejected' AND created_at >= datetime('now','start of day')").fetchone()[0]
+            else:
+                used = db.execute("SELECT COALESCE(SUM(CAST(destination_amount AS INTEGER)),0) FROM custodial_orders WHERE direction='soby_to_usdt' AND destination_network='ethereum' AND state!='rejected' AND created_at >= datetime('now','start of day')").fetchone()[0]
+        if int(used) + usdt_value > daily_cap:
+            raise OrderApiError("daily Ethereum USDT order limit reached")
+
         if gross <= 0:
             raise OrderApiError("quoted destination amount rounds to zero base units")
         fee = (gross * fee_bps) // 10000
