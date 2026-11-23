@@ -15,7 +15,7 @@ The operator supplied Connect address is `fr-one.enzonic.com:25701`, primary por
 
 For the live local config set `api.enabled=true`, `api.host=0.0.0.0`, `api.port=25701`, `api.gatewayTokenEnv=SOBYA_GATEWAY_TOKEN`, and `api.allowedOrigin=https://snforem-cpu.github.io`. Set `SOBYA_GATEWAY_TOKEN` as a 64+ character random Enzonic environment secret. The gateway uses HMAC-SHA256 signed requests and responses; the shared secret is not transmitted.
 
-The launcher rejects live mode unless both Ethereum and SOBYA have HTTPS RPCs, existing encrypted keystores, passphrase environment variables, enabled finalized-deposit watchers, independently verified inventories, correct chain IDs, verified reference liquidity, and the approved pricing/fee/limit settings. TRON and Solana are rejected for this launch.
+The launcher rejects live mode unless both Ethereum and SOBYA have HTTPS RPCs, existing encrypted keystores, passphrase environment variables, enabled finalized-deposit watchers, independently verified inventories, correct chain IDs, a positive `referenceLiquidityUsdtBaseUnits` value plus `referenceLiquidityVerified=true`, and the approved pricing/fee/limit settings. TRON and Solana are rejected for this launch.
 
 ## Public HTTPS access
 
