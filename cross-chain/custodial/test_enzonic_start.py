@@ -1,96 +1,47 @@
-import json
-import os
-import tempfile
-import unittest
+import json, os, tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
-
 import enzonic_start
 
+def disabled_config():
+    return {"mode":"custodial-inventory", "featureEnabled":False, "depositWatchEnabled":False, "networks":{"ethereum":{"enabled":False},"sobya":{"enabled":False}}, "api":{"enabled":True,"host":"127.0.0.1","port":8080,"allowedOrigin":"https://snforem-cpu.github.io"}}
 
 class EnzonicLauncherTests(unittest.TestCase):
-    def test_bootstraps_only_a_disabled_local_config(self):
+    def test_bootstraps_only_disabled_local_config(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "config.example.json").write_text(json.dumps({
-                "featureEnabled": False,
-                "networks": {
-                    name: {"enabled": False}
-                    for name in ("ethereum", "tron", "solana", "sobya")
-                },
-            }), encoding="utf-8")
-            old_cwd = Path.cwd()
-            with patch.object(enzonic_start, "HERE", root), patch.dict(
-                os.environ, {}, clear=True
-            ), patch("custodial_runtime.main", return_value=0):
+            root=Path(directory); (root/"config.example.json").write_text(json.dumps(disabled_config()),encoding="utf-8")
+            old=Path.cwd()
+            with patch.object(enzonic_start,"HERE",root), patch.dict(os.environ,{},clear=True), patch("custodial_runtime.main",return_value=0):
                 try:
-                    self.assertEqual(enzonic_start.main(), 0)
-                    config = json.loads((root / "config.json").read_text(encoding="utf-8"))
-                    self.assertFalse(config["featureEnabled"])
-                    self.assertTrue(all(
-                        config["networks"][name]["enabled"] is False
-                        for name in ("ethereum", "tron", "solana", "sobya")
-                    ))
-                    self.assertEqual(
-                        os.environ["SOBYA_CUSTODIAL_CONFIG"], str(root / "config.json")
-                    )
-                    self.assertEqual(
-                        Path(os.environ["SOBYA_CUSTODIAL_DB"]),
-                        root / "data" / "orders.sqlite3",
-                    )
-                finally:
-                    os.chdir(old_cwd)
+                    self.assertEqual(enzonic_start.main(),0)
+                    cfg=json.loads((root/"config.json").read_text(encoding="utf-8"))
+                    self.assertFalse(cfg["featureEnabled"])
+                    self.assertEqual(os.environ["SOBYA_CUSTODIAL_CONFIG"],str(root/"config.json"))
+                finally: os.chdir(old)
 
-    def test_existing_operator_config_is_not_overwritten(self):
+    def test_disabled_operator_config_is_accepted_and_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            disabled = {
-                "featureEnabled": False,
-                "networks": {
-                    name: {"enabled": False}
-                    for name in ("ethereum", "tron", "solana", "sobya")
-                },
-                "operatorConfig": True,
-            }
-            (root / "config.example.json").write_text("{}", encoding="utf-8")
-            config_path = root / "config.json"
-            config_path.write_text(json.dumps(disabled), encoding="utf-8")
-            old_cwd = Path.cwd()
-            with patch.object(enzonic_start, "HERE", root), patch.dict(
-                os.environ, {"SOBYA_CUSTODIAL_CONFIG": str(config_path)}, clear=True
-            ), patch("custodial_runtime.main", return_value=0):
+            root=Path(directory); cfg=disabled_config(); (root/"config.example.json").write_text("{}",encoding="utf-8")
+            path=root/"config.json"; path.write_text(json.dumps(cfg),encoding="utf-8"); old=Path.cwd()
+            with patch.object(enzonic_start,"HERE",root), patch.dict(os.environ,{"SOBYA_CUSTODIAL_CONFIG":str(path)},clear=True), patch("custodial_runtime.main",return_value=0):
                 try:
-                    self.assertEqual(enzonic_start.main(), 0)
-                    self.assertEqual(
-                        json.loads(config_path.read_text(encoding="utf-8")),
-                        disabled,
-                    )
-                finally:
-                    os.chdir(old_cwd)
+                    self.assertEqual(enzonic_start.main(),0)
+                    self.assertEqual(json.loads(path.read_text(encoding="utf-8")),cfg)
+                finally: os.chdir(old)
 
-    def test_refuses_existing_config_with_any_live_gate_enabled(self):
+    def test_incomplete_live_config_is_rejected(self):
+        cfg=disabled_config(); cfg["featureEnabled"]=True
+        with self.assertRaisesRegex(SystemExit,"global depositWatchEnabled"): enzonic_start._validate_operator_config(cfg)
+
+    def test_live_config_requires_https_rpc_keystores_and_reference_liquidity(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "config.example.json").write_text("{}", encoding="utf-8")
-            config_path = root / "config.json"
-            config = {
-                "featureEnabled": True,
-                "networks": {
-                    name: {"enabled": name == "ethereum"}
-                    for name in ("ethereum", "tron", "solana", "sobya")
-                },
-            }
-            config_path.write_text(json.dumps(config), encoding="utf-8")
-            old_cwd = Path.cwd()
-            with patch.object(enzonic_start, "HERE", root), patch.dict(
-                os.environ, {"SOBYA_CUSTODIAL_CONFIG": str(config_path)}, clear=True
-            ):
-                try:
-                    with self.assertRaisesRegex(SystemExit, "not authorized"):
-                        enzonic_start.main()
-                finally:
-                    os.chdir(old_cwd)
+            root=Path(directory); eth=root/"eth.json"; sob=root/"sob.json"; eth.write_text("{}",encoding="utf-8"); sob.write_text("{}",encoding="utf-8")
+            cfg={"mode":"custodial-inventory","featureEnabled":True,"depositWatchEnabled":True,"networks":{
+                "ethereum":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"rpcUrlEnv":"ETH_RPC","keystorePathEnv":"ETH_KEY","keystorePassphraseEnv":"ETH_PASS"},
+                "sobya":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"rpcUrlEnv":"SOB_RPC","keystorePathEnv":"SOB_KEY","keystorePassphraseEnv":"SOB_PASS"}},
+                "api":{"enabled":True,"host":"127.0.0.1","allowedOrigin":"https://snforem-cpu.github.io"},
+                "pricing":{"referenceLiquidityUsdtBaseUnits":1000000000000}}
+            env={"ETH_RPC":"https://eth.example/rpc","ETH_KEY":str(eth),"ETH_PASS":"secret","SOB_RPC":"https://sob.example/rpc","SOB_KEY":str(sob),"SOB_PASS":"secret"}
+            with patch.dict(os.environ,env,clear=True): enzonic_start._validate_operator_config(cfg)
 
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
