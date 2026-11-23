@@ -25,7 +25,7 @@ class OrderApiTests(unittest.TestCase):
         self.ledger = CustodialOrderLedger(Path(self.tmp.name) / "orders.sqlite")
         self.worker = FakeDepositWorker(); self.now = [1000]
         self.api = CustodialOrderApi(self.ledger, self.worker, api_config(), clock=lambda: self.now[0])
-        self.api._check_live_inventory = lambda network, amount: None
+        self.api._check_live_inventory = lambda network, amount, recipient: None
 
     def quote(self, direction="usdt_to_soby", amount=1000000):
         reverse = direction == "soby_to_usdt"
@@ -73,7 +73,7 @@ class OrderApiTests(unittest.TestCase):
             self.api.submit_deposit(quote["order_id"], {"transaction_id": "0x" + "aa" * 32, "event_index": 0})
 
     def test_unverified_inventory_rejects_quote(self):
-        self.api._check_live_inventory = lambda network, amount: (_ for _ in ()).throw(OrderApiError("inventory has not passed verification"))
+        self.api._check_live_inventory = lambda network, amount, recipient: (_ for _ in ()).throw(OrderApiError("inventory has not passed verification"))
         with self.assertRaisesRegex(OrderApiError, "inventory has not passed"): self.quote()
 
     def test_reference_liquidity_missing_pauses_quotes(self):
