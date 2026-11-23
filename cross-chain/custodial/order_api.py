@@ -7,6 +7,9 @@ signs or broadcasts transactions.
 from __future__ import annotations
 
 import json
+import hashlib
+import re
+import threading
 import hmac
 import os
 import ssl
@@ -324,17 +327,41 @@ class CustodialOrderApi:
 
 
 def make_handler(api: CustodialOrderApi):
+    used_nonces: dict[str, int] = {}
+    nonce_lock = threading.Lock()
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "SOBYA-Order-API/1.0"
 
-        def _authorized(self) -> bool:
+        def _authorized(self, body: bytes = b"") -> bool:
             api_cfg = api.config.get("api", {})
             env_name = api_cfg.get("gatewayTokenEnv") if isinstance(api_cfg, dict) else None
-            expected = os.environ.get(env_name, "") if isinstance(env_name, str) else ""
-            supplied = self.headers.get("X-SOBYA-Gateway-Token", "")
-            if not expected:
+            secret = os.environ.get(env_name, "") if isinstance(env_name, str) else ""
+            if not secret:
                 return api_cfg.get("host", "127.0.0.1") in ("127.0.0.1", "localhost")
-            return bool(supplied) and hmac.compare_digest(supplied, expected)
+            timestamp = self.headers.get("X-SOBYA-Request-Timestamp", "")
+            nonce = self.headers.get("X-SOBYA-Request-Nonce", "")
+            signature = self.headers.get("X-SOBYA-Request-Signature", "")
+            if not timestamp.isdigit() or not re.fullmatch(r"[0-9a-f]{32}", nonce) or not re.fullmatch(r"[0-9a-f]{64}", signature):
+                return False
+            now = int(time.time())
+            if abs(now - int(timestamp)) > 60:
+                return False
+            body_hash = hashlib.sha256(body).hexdigest()
+            canonical = "\n".join((timestamp, nonce, self.command, self.path, body_hash))
+            expected = hmac.new(secret.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(signature, expected):
+                return False
+            with nonce_lock:
+                expired = [key for key, seen in used_nonces.items() if now - seen > 120]
+                for key in expired:
+                    used_nonces.pop(key, None)
+                if nonce in used_nonces:
+                    return False
+                used_nonces[nonce] = now
+            self._gateway_secret = secret
+            self._request_nonce = nonce
+            return True
 
         def _send(self, status: int, body: dict[str, Any]) -> None:
             raw = json.dumps(body, separators=(",", ":")).encode("utf-8")
@@ -343,6 +370,15 @@ def make_handler(api: CustodialOrderApi):
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            secret = getattr(self, "_gateway_secret", "")
+            nonce = getattr(self, "_request_nonce", "")
+            if secret and nonce:
+                timestamp = str(int(time.time()))
+                canonical = "\n".join((timestamp, nonce, str(status), hashlib.sha256(raw).hexdigest()))
+                signature = hmac.new(secret.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+                self.send_header("X-SOBYA-Response-Timestamp", timestamp)
+                self.send_header("X-SOBYA-Response-Nonce", nonce)
+                self.send_header("X-SOBYA-Response-Signature", signature)
             allowed_origin = api.config.get("api", {}).get("allowedOrigin")
             request_origin = self.headers.get("Origin")
             if isinstance(allowed_origin, str) and request_origin == allowed_origin:
@@ -352,7 +388,7 @@ def make_handler(api: CustodialOrderApi):
             self.wfile.write(raw)
 
         def do_OPTIONS(self):
-            if not self._authorized():
+            if not self._authorized(b""):
                 return self._send(403, {"error": "gateway authentication required"})
             allowed_origin = api.config.get("api", {}).get("allowedOrigin")
             request_origin = self.headers.get("Origin")
@@ -365,22 +401,32 @@ def make_handler(api: CustodialOrderApi):
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.send_header("Access-Control-Max-Age", "600")
             self.send_header("Content-Length", "0")
+            secret = getattr(self, "_gateway_secret", "")
+            nonce = getattr(self, "_request_nonce", "")
+            if secret and nonce:
+                timestamp = str(int(time.time()))
+                canonical = "\n".join((timestamp, nonce, "204", hashlib.sha256(b"").hexdigest()))
+                signature = hmac.new(secret.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+                self.send_header("X-SOBYA-Response-Timestamp", timestamp)
+                self.send_header("X-SOBYA-Response-Nonce", nonce)
+                self.send_header("X-SOBYA-Response-Signature", signature)
             self.end_headers()
 
-        def _body(self) -> dict[str, Any]:
+        def _body(self) -> tuple[dict[str, Any], bytes]:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
             except ValueError as exc:
                 raise OrderApiError("invalid Content-Length") from exc
             if length <= 0 or length > 16384:
                 raise OrderApiError("request body must be between 1 and 16384 bytes")
+            raw = self.rfile.read(length)
             try:
-                value = json.loads(self.rfile.read(length))
+                value = json.loads(raw)
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 raise OrderApiError("malformed JSON body") from exc
             if not isinstance(value, dict):
                 raise OrderApiError("JSON object required")
-            return value
+            return value, raw
 
         def do_GET(self):
             if not self._authorized():
@@ -397,10 +443,10 @@ def make_handler(api: CustodialOrderApi):
             return self._send(404, {"error": "not found"})
 
         def do_POST(self):
-            if not self._authorized():
-                return self._send(403, {"error": "gateway authentication required"})
             try:
-                body = self._body()
+                body, raw = self._body()
+                if not self._authorized(raw):
+                    return self._send(403, {"error": "gateway authentication required"})
                 if self.path == "/v1/quotes":
                     return self._send(201, api.create_quote(body))
                 prefix = "/v1/orders/"
