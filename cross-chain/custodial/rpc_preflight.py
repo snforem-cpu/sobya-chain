@@ -12,9 +12,9 @@ from typing import Any
 
 DEFAULTS = {
     "ethereum": "https://ethereum-rpc.publicnode.com",
-    "sobya": "https://sobya-evm-rpc.nodesafe-app.xyz",
+    "sobya": "https://sobya-evm-rpc.nodesafe-dapp.xyz",
 }
-SOBYA_FALLBACKS = ("https://sobya-rpc.bonynode.online",)
+SOBYA_FALLBACKS: tuple[str, ...] = ()  # Never use a CometBFT endpoint for Ethereum JSON-RPC.
 EXPECTED = {
     "ethereum": 1,
     "sobya": 357812033857,
