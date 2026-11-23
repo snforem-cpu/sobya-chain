@@ -4,6 +4,7 @@ import https from "node:https";
 const PORT = Number(process.env.PORT || 8080);
 const UPSTREAM = process.env.SOBYA_UPSTREAM_URL || "";
 const ALLOWED_ORIGIN = process.env.SOBYA_ALLOWED_ORIGIN || "https://snforem-cpu.github.io";
+const GATEWAY_TOKEN = process.env.SOBYA_GATEWAY_TOKEN || "";
 const MAX_BODY = 16384;
 const WINDOW_MS = 60000;
 const MAX_REQUESTS = 60;
@@ -46,6 +47,11 @@ function rateLimit(req, res) {
 
 const server = http.createServer(async (req, res) => {
   let target;
+  if (!GATEWAY_TOKEN) {
+    res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({ error: "gateway authentication secret is not configured" }));
+    return;
+  }
   try { target = configuredUpstream(); }
   catch (error) {
     res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
@@ -92,6 +98,7 @@ const server = http.createServer(async (req, res) => {
   };
   if (req.headers["content-type"]) headers["Content-Type"] = req.headers["content-type"];
   if (origin) headers["Origin"] = origin;
+  headers["X-SOBYA-Gateway-Token"] = GATEWAY_TOKEN;
 
   const upstreamReq = transport.request({
     protocol: target.protocol, hostname: target.hostname, port: target.port,
