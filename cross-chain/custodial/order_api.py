@@ -98,6 +98,8 @@ class CustodialOrderApi:
 
     def _price_and_fee(self) -> tuple[Decimal, int]:
         reference = self.pricing.get("referenceLiquidityUsdtBaseUnits")
+        if self.pricing.get("referenceLiquidityVerified") is not True:
+            raise OrderApiError("reference liquidity has not been independently verified")
         if not isinstance(reference, int) or isinstance(reference, bool) or reference <= 0:
             raise OrderApiError("verified reference liquidity is required; live quotes are paused")
         window = self.pricing.get("demandWindowSeconds", 3600)
