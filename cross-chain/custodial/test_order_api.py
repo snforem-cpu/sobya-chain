@@ -72,6 +72,14 @@ class OrderApiTests(unittest.TestCase):
         with self.assertRaisesRegex(OrderApiError, "quote expired"):
             self.api.submit_deposit(quote["order_id"], {"transaction_id": "0x" + "aa" * 32, "event_index": 0})
 
+    def test_daily_cap_combines_buys_and_sells_on_ethereum(self):
+        import sqlite3, time
+        self.ledger.create_order(order_id="earlier-buy-orders", direction="usdt_to_soby", source_network="ethereum", destination_network="sobya", deposit_address="0x"+"22"*20, source_wallet="0x"+"44"*20, destination_wallet="0x"+"55"*20, source_asset="0x"+"11"*20, destination_asset="asobya", source_amount=9800000000, destination_amount=1)
+        with sqlite3.connect(self.ledger.database) as db:
+            db.execute("INSERT INTO custodial_api_quotes(order_id,price_usdt_per_soby,gross_destination_amount,fee_base_units,fee_bps,expires_at,created_at) VALUES(?,?,?,?,?,?,?)", ("earlier-buy-orders","0.005","1","0",100,9999999999,int(time.time())))
+        with self.assertRaisesRegex(OrderApiError, "daily Ethereum USDT order limit"):
+            self.quote("soby_to_usdt", "100000000000000000000000")
+
     def test_unverified_inventory_rejects_quote(self):
         self.api._check_live_inventory = lambda network, amount, recipient: (_ for _ in ()).throw(OrderApiError("inventory has not passed verification"))
         with self.assertRaisesRegex(OrderApiError, "inventory has not passed"): self.quote()
