@@ -17,32 +17,6 @@
       "depositWatchEnabled": false,
       "inventoryVerified": false
     },
-    "tron": {
-      "enabled": false,
-      "network": "mainnet",
-      "rpcUrlEnv": "SOBYA_TRON_RPC_URL",
-      "usdtContract": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
-      "inventoryWallet": "TQ8tU9BJJc67mLvick7Mp24HSMhpcd6kZx",
-      "keystorePathEnv": "SOBYA_TRON_KEYSTORE",
-      "usdtDecimals": 6,
-      "keystorePassphraseEnv": "SOBYA_TRON_KEYSTORE_PASSPHRASE",
-      "feeLimitSun": 100000000,
-      "depositWatchEnabled": false,
-      "inventoryVerified": false
-    },
-    "solana": {
-      "enabled": false,
-      "cluster": "mainnet-beta",
-      "rpcUrlEnv": "SOBYA_SOLANA_RPC_URL",
-      "usdtMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-      "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-      "inventoryWallet": "BMH7LJjaKkQRZd9EL4UqUfsTYEC44ZZoWSEdL1XWaSnh",
-      "keystorePathEnv": "SOBYA_SOLANA_KEYSTORE",
-      "usdtDecimals": 6,
-      "keystorePassphraseEnv": "SOBYA_SOLANA_KEYSTORE_PASSPHRASE",
-      "depositWatchEnabled": false,
-      "inventoryVerified": false
-    },
     "sobya": {
       "enabled": false,
       "chainId": 357812033857,
@@ -81,7 +55,7 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Operator template. The order API starts by default on loopback, but deposits and payouts remain fail-closed until Ethereum and SOBYA RPCs, deposit watchers, independently verified executable balances, encrypted keystores, HTTPS ingress, and controlled end-to-end tests are configured. Only Ethereum USDT and SOBYA are supported for this launch. Do not commit secrets. Demand-adjusted pricing requires referenceLiquidityUsdtBaseUnits to be set from independently verified executable liquidity; quotes must fail closed until that value is supplied. Fees are 100 bps; maximum order 500 USDT; daily cap 10,000 USDT; protected SOBY inventory reserve 100,000 SOBY.",
+  "notice": "Operator template. API starts on loopback by default. Real orders remain fail-closed until Ethereum and SOBYA HTTPS RPCs, finalized deposit watchers, verified live payout balances, encrypted keystores, reference liquidity, and HTTPS ingress are configured. Only Ethereum USDT and SOBYA EVM are supported. Do not commit secrets. Price uses only completed finalized ledger orders. Fees 100 bps; maximum order 500 USDT; daily cap 10,000 USDT; protected SOBY reserve 100,000.",
   "depositWatchEnabled": false,
   "api": {
     "enabled": true,
