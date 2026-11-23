@@ -29,7 +29,7 @@ The local operator config used by `enzonic_start.py` must keep the order API ena
 }
 ```
 
-Keep the API token in Enzonic Connect environment variables, not in Git or `config.json`. Set `SOBYA_GATEWAY_TOKEN` to a long random secret (at least 32 random bytes). The launcher rejects live mode if the token, HTTPS RPCs, encrypted keystores, verified inventories, both chain watchers, or verified reference liquidity are missing. The default example remains disabled.
+Keep the API token in Enzonic Connect environment variables, not in Git or `config.json`. Set `SOBYA_GATEWAY_TOKEN` to a long random secret (at least 32 random bytes). Set `SOBYA_API_TLS_CERT` and `SOBYA_API_TLS_KEY` to file paths for a trusted certificate and matching private key valid for `fr-one.enzonic.com`. The Python API listener enables TLS on port 25701 using those files; the gateway refuses plain-HTTP upstreams. The launcher rejects live mode if the token, TLS certificate/key, HTTPS RPCs, encrypted keystores, verified inventories, both chain watchers, or verified reference liquidity are missing. The default example remains disabled.
 
 The live operator config must enable only Ethereum and SOBYA:
 - Ethereum chain ID 1, USDT contract pinned in the example, HTTPS RPC, verified USDT inventory, deposit watcher, encrypted keystore and passphrase env.
