@@ -13,7 +13,7 @@ const buckets = new Map();
 function configuredUpstream() {
   let url;
   try { url = new URL(UPSTREAM); } catch { throw new Error("SOBYA_UPSTREAM_URL must be set to the Enzonic Connect origin"); }
-  if (!["http:", "https:"].includes(url.protocol) ||
+  if (url.protocol !== "https:" ||
       url.hostname !== "fr-one.enzonic.com" || url.port !== "25701" ||
       url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
     throw new Error("Upstream must be exactly the configured Enzonic Connect host and primary port");
