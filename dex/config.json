@@ -10,5 +10,7 @@
   "deploymentStatus": "pending",
   "notice": "Mainnet deployment receipts, bytecode, deployer and constructor-link checks have not been verified by the current release gate. Liquidity and swaps remain disabled until the recorded deployments are independently verified, required pools are funded, and mainnet smoke tests pass. Existing address fields are unverified references and must not be treated as proof of deployment.",
   "liquidityEnabled": false,
-  "tradingEnabled": false
+  "tradingEnabled": false,
+  "custodialApiUrl": "",
+  "custodialApiNotice": "Set only to the verified public HTTPS Enzonic API origin after TLS ingress is confirmed; do not use the raw host:port as an HTTPS URL."
 }
