@@ -34,8 +34,8 @@ class OrderApiTests(unittest.TestCase):
     def test_usdt_to_soby_quote_uses_inventory_and_fee(self):
         quote = self.quote()
         self.assertEqual(quote["deposit_address"], "0x" + "22" * 20)
-        self.assertEqual(quote["gross_destination_amount_base_units"], "200000000000000000")
-        self.assertEqual(quote["destination_amount_base_units"], "198000000000000000")
+        self.assertEqual(quote["gross_destination_amount_base_units"], "200000000000000000000")
+        self.assertEqual(quote["destination_amount_base_units"], "198000000000000000000")
         self.assertEqual(quote["fee_bps"], 100)
         self.assertEqual(quote["quote_expires_at"], 1120)
 
