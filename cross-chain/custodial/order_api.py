@@ -214,10 +214,14 @@ class CustodialOrderApi:
         if usdt_value > max_order:
             raise OrderApiError("order exceeds the configured 500 USDT maximum")
         with sqlite3.connect(self.database) as db:
-            if direction == "usdt_to_soby":
-                used = db.execute("SELECT COALESCE(SUM(CAST(source_amount AS INTEGER)),0) FROM custodial_orders WHERE direction='usdt_to_soby' AND source_network='ethereum' AND state!='rejected' AND created_at >= datetime('now','start of day')").fetchone()[0]
-            else:
-                used = db.execute("SELECT COALESCE(SUM(CAST(destination_amount AS INTEGER)),0) FROM custodial_orders WHERE direction='soby_to_usdt' AND destination_network='ethereum' AND state!='rejected' AND created_at >= datetime('now','start of day')").fetchone()[0]
+            used = db.execute("""SELECT COALESCE(SUM(CASE
+                WHEN o.direction='usdt_to_soby' THEN CAST(o.source_amount AS INTEGER)
+                ELSE CAST(q.gross_destination_amount AS INTEGER) END),0)
+                FROM custodial_orders o JOIN custodial_api_quotes q ON q.order_id=o.order_id
+                WHERE ((o.direction='usdt_to_soby' AND o.source_network='ethereum')
+                    OR (o.direction='soby_to_usdt' AND o.destination_network='ethereum'))
+                    AND o.state!='rejected'
+                    AND datetime(q.created_at,'unixepoch') >= datetime('now','start of day')""").fetchone()[0]
         if int(used) + usdt_value > daily_cap:
             raise OrderApiError("daily Ethereum USDT order limit reached")
 
