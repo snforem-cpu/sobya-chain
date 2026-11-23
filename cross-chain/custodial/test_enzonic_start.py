@@ -35,13 +35,13 @@ class EnzonicLauncherTests(unittest.TestCase):
 
     def test_live_config_requires_https_rpc_keystores_and_reference_liquidity(self):
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory); eth=root/"eth.json"; sob=root/"sob.json"; eth.write_text("{}",encoding="utf-8"); sob.write_text("{}",encoding="utf-8")
+            root=Path(directory); eth=root/"eth.json"; sob=root/"sob.json"; cert=root/"server.crt"; key=root/"server.key"; eth.write_text("{}",encoding="utf-8"); sob.write_text("{}",encoding="utf-8"); cert.write_text("test-cert",encoding="utf-8"); key.write_text("test-key",encoding="utf-8")
             cfg={"mode":"custodial-inventory","featureEnabled":True,"depositWatchEnabled":True,"networks":{
                 "ethereum":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"rpcUrlEnv":"ETH_RPC","keystorePathEnv":"ETH_KEY","keystorePassphraseEnv":"ETH_PASS"},
                 "sobya":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"rpcUrlEnv":"SOB_RPC","keystorePathEnv":"SOB_KEY","keystorePassphraseEnv":"SOB_PASS"}},
                 "api":{"enabled":True,"host":"0.0.0.0","port":25701,"gatewayTokenEnv":"SOBYA_GATEWAY_TOKEN","allowedOrigin":"https://snforem-cpu.github.io"},
                 "pricing":{"referenceLiquidityUsdtBaseUnits":1000000000000}}
             env={"ETH_RPC":"https://eth.example/rpc","ETH_KEY":str(eth),"ETH_PASS":"secret","SOB_RPC":"https://sob.example/rpc","SOB_KEY":str(sob),"SOB_PASS":"secret"}
-            with patch.dict(os.environ,{**env,"SOBYA_GATEWAY_TOKEN":"a-long-test-token"},clear=True): enzonic_start._validate_operator_config(cfg)
+            with patch.dict(os.environ,{**env,"SOBYA_GATEWAY_TOKEN":"a-long-test-token","SOBYA_API_TLS_CERT":str(cert),"SOBYA_API_TLS_KEY":str(key)},clear=True): enzonic_start._validate_operator_config(cfg)
 
 if __name__ == "__main__": unittest.main()
