@@ -112,20 +112,33 @@ const server = http.createServer(async (req, res) => {
     protocol: target.protocol, hostname: target.hostname, port: target.port,
     method: req.method, path: req.url, headers, timeout: 25000
   }, upstreamRes => {
-    res.writeHead(upstreamRes.statusCode || 502, {
-      "Content-Type": upstreamRes.headers["content-type"] || "application/json",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      ...(upstreamRes.headers["access-control-allow-origin"] ? {
-        "Access-Control-Allow-Origin": upstreamRes.headers["access-control-allow-origin"],
-        "Vary": "Origin"
-      } : {}),
-      ...(upstreamRes.headers["access-control-allow-methods"] ? {
-        "Access-Control-Allow-Methods": upstreamRes.headers["access-control-allow-methods"],
-        "Access-Control-Allow-Headers": upstreamRes.headers["access-control-allow-headers"] || "Content-Type"
-      } : {})
+    const chunks = [];
+    upstreamRes.on("data", chunk => chunks.push(chunk));
+    upstreamRes.on("end", () => {
+      const responseBody = Buffer.concat(chunks);
+      const responseTimestamp = String(upstreamRes.headers["x-sobya-response-timestamp"] || "");
+      const responseNonce = String(upstreamRes.headers["x-sobya-response-nonce"] || "");
+      const responseSignature = String(upstreamRes.headers["x-sobya-response-signature"] || "");
+      const responseStatus = String(upstreamRes.statusCode || 502);
+      const validTimestamp = /^\d+$/.test(responseTimestamp) && Math.abs(Math.floor(Date.now() / 1000) - Number(responseTimestamp)) <= 60;
+      const responseCanonical = [responseTimestamp, nonce, responseStatus, createHash("sha256").update(responseBody).digest("hex")].join("\n");
+      const expectedSignature = createHmac("sha256", GATEWAY_TOKEN).update(responseCanonical).digest();
+      const suppliedSignature = /^[0-9a-f]{64}$/.test(responseSignature) ? Buffer.from(responseSignature, "hex") : Buffer.alloc(0);
+      const authenticated = validTimestamp && responseNonce === nonce && suppliedSignature.length === expectedSignature.length && timingSafeEqual(suppliedSignature, expectedSignature);
+      if (!authenticated) {
+        res.writeHead(502, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ error: "upstream response authentication failed" }));
+        return;
+      }
+      res.writeHead(Number(responseStatus), {
+        "Content-Type": upstreamRes.headers["content-type"] || "application/json",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        ...(upstreamRes.headers["access-control-allow-origin"] ? { "Access-Control-Allow-Origin": upstreamRes.headers["access-control-allow-origin"], "Vary": "Origin" } : {}),
+        ...(upstreamRes.headers["access-control-allow-methods"] ? { "Access-Control-Allow-Methods": upstreamRes.headers["access-control-allow-methods"], "Access-Control-Allow-Headers": upstreamRes.headers["access-control-allow-headers"] || "Content-Type" } : {})
+      });
+      res.end(responseBody);
     });
-    upstreamRes.pipe(res);
   });
   upstreamReq.on("timeout", () => upstreamReq.destroy(new Error("upstream timeout")));
   upstreamReq.on("error", () => {
