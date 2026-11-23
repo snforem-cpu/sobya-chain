@@ -81,7 +81,7 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Operator template. The order API starts by default on loopback, but deposits and payouts remain fail-closed until Ethereum and SOBYA RPCs, deposit watchers, independently verified executable balances, encrypted keystores, HTTPS ingress, and controlled end-to-end tests are configured. Only Ethereum USDT and SOBYA are supported for this launch. Do not commit secrets. The demand-adjusted price requires referenceLiquidityUsdtBaseUnits to be set from independently verified executable liquidity; quotes must fail closed until that value is supplied. Fees are 100 bps; minimum order 500 USDT; daily cap 10,000 USDT; protected SOBY inventory reserve 100,000 SOBY.",
+  "notice": "Operator template. The order API starts by default on loopback, but deposits and payouts remain fail-closed until Ethereum and SOBYA RPCs, deposit watchers, independently verified executable balances, encrypted keystores, HTTPS ingress, and controlled end-to-end tests are configured. Only Ethereum USDT and SOBYA are supported for this launch. Do not commit secrets. Demand-adjusted pricing requires referenceLiquidityUsdtBaseUnits to be set from independently verified executable liquidity; quotes must fail closed until that value is supplied. Fees are 100 bps; maximum order 500 USDT; daily cap 10,000 USDT; protected SOBY inventory reserve 100,000 SOBY.",
   "depositWatchEnabled": false,
   "api": {
     "enabled": true,
