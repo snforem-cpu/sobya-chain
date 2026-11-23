@@ -1,0 +1,79 @@
+name: Custodial inventory deposit watcher tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - "cross-chain/custodial/**"
+      - ".github/workflows/custodial-inventory-watchers.yml"
+concurrency:
+  group: custodial-inventory-watchers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  https-gateway-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check Enzonic HTTPS gateway syntax
+        working-directory: cross-chain/custodial/https-gateway
+        run: node --check server.mjs
+
+  inventory-watcher-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install custodial chain SDK dependencies
+        working-directory: cross-chain/custodial
+        run: python -m pip install -r requirements.txt
+      - name: Compile custodial modules
+        working-directory: cross-chain/custodial
+        run: python -m compileall -q .
+      - name: Test shared-inventory deposit verifiers
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_inventory_deposit_watchers.py -v
+      - name: Test order and quote API with durable deposit proof submission
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_order_api.py -v
+      - name: Test unified deposit-to-payout runtime wiring
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_custodial_runtime.py -v
+      - name: Test Enzonic unified runtime launcher
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_enzonic_start.py -v
+      - name: Test payout runtime release gates
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_payout_runtime.py -v
+      - name: Test EVM inventory payout adapters
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_evm_inventory_payout.py -v
+      - name: Test TRON inventory payout adapter
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_tron_inventory_payout.py -v
+      - name: Test Solana inventory payout adapter guards
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_solana_inventory_payout.py -v
+      - name: Test encrypted inventory keystores
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_inventory_keystore.py -v
+      - name: Test durable custodial payout orchestration
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_payout_executor.py -v
+      - name: Test continuous payout worker and restart recovery
+        working-directory: cross-chain/custodial
+        run: python -m unittest test_payout_worker.py -v
+      - name: Test custodial ledger and pricing regressions
+        working-directory: cross-chain/custodial
+        run: |
+          python -m unittest test_custodial_ledger.py -v
+          python -m unittest test_demand_pricing.py -v
