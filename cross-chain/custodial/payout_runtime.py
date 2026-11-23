@@ -16,6 +16,8 @@ def build_inventory_payout_executor(config: dict[str, Any], ledger: Any,
     network_cfg = config.get("networks", {})
     if not isinstance(network_cfg, dict):
         raise PayoutConfigurationError("network configuration is malformed")
+    if any(isinstance(network_cfg.get(name), dict) and network_cfg[name].get("enabled") is True for name in ("tron", "solana")):
+        raise PayoutConfigurationError("this SOBYA launch supports only Ethereum and SOBYA payout networks")
     adapters = {}
     feature_enabled = config.get("featureEnabled") is True
     if feature_enabled:
