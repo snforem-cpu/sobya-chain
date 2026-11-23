@@ -14,6 +14,12 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live config requires network settings")
     if config.get("depositWatchEnabled") is not True:
         raise SystemExit("live config requires global depositWatchEnabled=true")
+    if networks["ethereum"].get("chainId") != 1 or networks["sobya"].get("chainId") != 357812033857:
+        raise SystemExit("live config must pin Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857")
+    if str(networks["ethereum"].get("usdtContract", "")).lower() != "0xdac17f958d2ee523a2206206994597c13d831ec7":
+        raise SystemExit("Ethereum USDT contract does not match the canonical mainnet token")
+    if any(isinstance(networks.get(name), dict) and (networks[name].get("enabled") is True or networks[name].get("depositWatchEnabled") is True) for name in ("tron", "solana")):
+        raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
     for name in ("ethereum", "sobya"):
         item = networks.get(name)
         if not isinstance(item, dict) or item.get("enabled") is not True or item.get("depositWatchEnabled") is not True:
@@ -40,11 +46,20 @@ def _validate_operator_config(config: dict) -> None:
     if not cert_path or not key_path or not Path(cert_path).is_file() or not Path(key_path).is_file():
         raise SystemExit("live API requires a valid TLS certificate and private key for the Enzonic Connect hostname")
     token_env = api.get("gatewayTokenEnv")
-    if not isinstance(token_env, str) or not os.environ.get(token_env):
-        raise SystemExit("live API requires a shared gateway token in the Enzonic Connect environment")
-    if not isinstance(api.get("allowedOrigin"), str) or not api["allowedOrigin"].startswith("https://"):
-        raise SystemExit("live API requires an explicit HTTPS browser origin allowlist")
+    if not isinstance(token_env, str) or len(os.environ.get(token_env, "")) < 64:
+        raise SystemExit("live API requires a shared gateway token of at least 64 characters in the Enzonic Connect environment")
+    if api.get("allowedOrigin") != "https://snforem-cpu.github.io":
+        raise SystemExit("live API origin must match the published SOBYA DEX origin")
     pricing = config.get("pricing", {})
+    limits = config.get("limits", {})
+    if pricing.get("baseReferencePriceUsdtPerSoby") != "0.005" or pricing.get("upwardDemandSensitivityBps") != 10000 or pricing.get("downwardDemandSensitivityBps") != 2500:
+        raise SystemExit("live pricing settings do not match the approved SOBYA policy")
+    if pricing.get("priceCeiling") is not None or pricing.get("priceFloor") is not None:
+        raise SystemExit("SOBYA live pricing must remain uncapped and without a floor")
+    if limits.get("feeBps") != 100 or limits.get("maxOrderUsdtBaseUnits") != 500000000 or limits.get("maxDailyUsdtBaseUnitsPerNetwork") != 10000000000:
+        raise SystemExit("live fee or USDT order/daily limits do not match the approved policy")
+    if str(limits.get("minimumInventoryBaseUnits")) != "100000000000000000000000":
+        raise SystemExit("live SOBY protected inventory reserve must remain 100,000 SOBY")
     if not isinstance(pricing.get("referenceLiquidityUsdtBaseUnits"), int) or pricing["referenceLiquidityUsdtBaseUnits"] <= 0:
         raise SystemExit("live mode requires independently verified referenceLiquidityUsdtBaseUnits")
 
