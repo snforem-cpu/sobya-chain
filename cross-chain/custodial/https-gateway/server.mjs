@@ -1,5 +1,6 @@
 import http from "node:http";
 import https from "node:https";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const PORT = Number(process.env.PORT || 8080);
 const UPSTREAM = process.env.SOBYA_UPSTREAM_URL || "";
@@ -13,10 +14,10 @@ const buckets = new Map();
 function configuredUpstream() {
   let url;
   try { url = new URL(UPSTREAM); } catch { throw new Error("SOBYA_UPSTREAM_URL must be set to the Enzonic Connect origin"); }
-  if (url.protocol !== "https:" ||
+  if (!["http:", "https:"].includes(url.protocol) ||
       url.hostname !== "fr-one.enzonic.com" || url.port !== "25701" ||
       url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
-    throw new Error("Upstream must be exactly the configured Enzonic Connect host and primary port");
+    throw new Error("Upstream must be the configured Enzonic Connect host and primary port");
   }
   return url;
 }
@@ -98,7 +99,14 @@ const server = http.createServer(async (req, res) => {
   };
   if (req.headers["content-type"]) headers["Content-Type"] = req.headers["content-type"];
   if (origin) headers["Origin"] = origin;
-  headers["X-SOBYA-Gateway-Token"] = GATEWAY_TOKEN;
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const nonce = randomBytes(16).toString("hex");
+  const bodyHash = createHash("sha256").update(body).digest("hex");
+  const requestCanonical = [timestamp, nonce, req.method, req.url, bodyHash].join("\n");
+  const requestSignature = createHmac("sha256", GATEWAY_TOKEN).update(requestCanonical).digest("hex");
+  headers["X-SOBYA-Request-Timestamp"] = timestamp;
+  headers["X-SOBYA-Request-Nonce"] = nonce;
+  headers["X-SOBYA-Request-Signature"] = requestSignature;
 
   const upstreamReq = transport.request({
     protocol: target.protocol, hostname: target.hostname, port: target.port,
