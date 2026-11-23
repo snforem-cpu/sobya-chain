@@ -34,8 +34,6 @@ def _validate_operator_config(config: dict) -> None:
             raise SystemExit(name + " requires HTTPS RPC and external keystore/passphrase environment variables")
         if not Path(key).is_file():
             raise SystemExit(name + " keystore file is missing")
-    if any(isinstance(networks.get(name), dict) and (networks[name].get("enabled") is True or networks[name].get("depositWatchEnabled") is True) for name in ("tron", "solana")):
-        raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
     api = config.get("api", {})
     if not isinstance(api, dict) or api.get("enabled") is not True:
         raise SystemExit("live order API must be enabled")
