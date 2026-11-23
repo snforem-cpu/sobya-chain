@@ -40,7 +40,7 @@ class EnzonicLauncherTests(unittest.TestCase):
                 "ethereum":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"chainId":1,"usdtContract":"0xdAC17F958D2ee523a2206206994597C13D831ec7","rpcUrlEnv":"ETH_RPC","keystorePathEnv":"ETH_KEY","keystorePassphraseEnv":"ETH_PASS"},
                 "sobya":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"chainId":357812033857,"rpcUrlEnv":"SOB_RPC","keystorePathEnv":"SOB_KEY","keystorePassphraseEnv":"SOB_PASS"}},
                 "api":{"enabled":True,"host":"0.0.0.0","port":25701,"gatewayTokenEnv":"SOBYA_GATEWAY_TOKEN","allowedOrigin":"https://snforem-cpu.github.io"},
-                "pricing":{"baseReferencePriceUsdtPerSoby":"0.005","upwardDemandSensitivityBps":10000,"downwardDemandSensitivityBps":2500,"priceCeiling":None,"priceFloor":None,"referenceLiquidityUsdtBaseUnits":1000000000000},"limits":{"feeBps":100,"maxOrderUsdtBaseUnits":500000000,"maxDailyUsdtBaseUnitsPerNetwork":10000000000,"minimumInventoryBaseUnits":"100000000000000000000000"}}
+                "pricing":{"baseReferencePriceUsdtPerSoby":"0.005","upwardDemandSensitivityBps":10000,"downwardDemandSensitivityBps":2500,"priceCeiling":None,"priceFloor":None,"referenceLiquidityUsdtBaseUnits":1000000000000,"referenceLiquidityVerified":True},"limits":{"feeBps":100,"maxOrderUsdtBaseUnits":500000000,"maxDailyUsdtBaseUnitsPerNetwork":10000000000,"minimumInventoryBaseUnits":"100000000000000000000000"}}
             env={"ETH_RPC":"https://eth.example/rpc","ETH_KEY":str(eth),"ETH_PASS":"secret","SOB_RPC":"https://sob.example/rpc","SOB_KEY":str(sob),"SOB_PASS":"secret"}
             with patch.dict(os.environ,{**env,"SOBYA_GATEWAY_TOKEN":"a"*64},clear=True): enzonic_start._validate_operator_config(cfg)
 
