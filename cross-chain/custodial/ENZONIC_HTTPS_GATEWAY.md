@@ -49,7 +49,7 @@ Use Node.js 20 or later and start command:
 `node server.mjs`
 
 Set these server-side environment variables in the Deploy project:
-- `SOBYA_UPSTREAM_URL`: the verified upstream URL for the Connect host, using the exact protocol that actually answers on port 25701. First test `/health`; do not guess that the port speaks HTTPS. If Connect confirms plain HTTP, use `http://fr-one.enzonic.com:25701`; if it confirms TLS, use `https://fr-one.enzonic.com:25701`.
+- `SOBYA_UPSTREAM_URL`: the verified upstream URL for the Connect host, using `https://fr-one.enzonic.com:25701` only if that primary port presents a valid trusted TLS certificate. The gateway intentionally rejects plain HTTP upstreams because the shared authentication token must not travel unencrypted. If Connect does not provide TLS on port 25701, do not use this proxy configuration yet; a TLS-enabled upstream endpoint or secure private tunnel must be enabled first.
 - `SOBYA_GATEWAY_TOKEN`: the exact same secret configured in Enzonic Connect.
 - `SOBYA_ALLOWED_ORIGIN`: `https://snforem-cpu.github.io`.
 
