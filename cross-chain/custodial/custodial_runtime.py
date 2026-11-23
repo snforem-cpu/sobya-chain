@@ -29,7 +29,7 @@ from payout_worker import InventoryPayoutWorker
 from order_api import CustodialOrderApi, start_order_api
 
 LOG = logging.getLogger("sobya.custodial.runtime")
-NETWORK_NAMES = ("ethereum", "tron", "solana", "sobya")
+NETWORK_NAMES = ("ethereum", "sobya")
 
 
 class DepositRuntimeConfigurationError(ValueError):
