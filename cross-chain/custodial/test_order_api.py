@@ -15,7 +15,7 @@ def api_config():
             "ethereum": {"enabled": True, "depositWatchEnabled": True, "chainId": 1, "usdtContract": "0x" + "11" * 20, "inventoryWallet": "0x" + "22" * 20, "inventoryVerified": True},
             "sobya": {"enabled": True, "depositWatchEnabled": True, "chainId": 357812033857, "inventoryWallet": "0x" + "33" * 20, "inventoryVerified": True},
         },
-        "pricing": {"baseReferencePriceUsdtPerSoby": "0.005", "referenceLiquidityUsdtBaseUnits": 1000000000000, "demandWindowSeconds": 3600, "demandMaxAgeSeconds": 300, "upwardDemandSensitivityBps": 10000, "downwardDemandSensitivityBps": 2500},
+        "pricing": {"baseReferencePriceUsdtPerSoby": "0.005", "referenceLiquidityUsdtBaseUnits": 1000000000000, "referenceLiquidityVerified": True, "demandWindowSeconds": 3600, "demandMaxAgeSeconds": 300, "upwardDemandSensitivityBps": 10000, "downwardDemandSensitivityBps": 2500},
         "limits": {"quoteLifetimeSeconds": 120, "feeBps": 100, "maxOrderUsdtBaseUnits": 500000000, "maxDailyUsdtBaseUnitsPerNetwork": 10000000000, "minimumInventoryBaseUnits": "100000000000000000000000"},
     }
 
