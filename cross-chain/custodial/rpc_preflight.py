@@ -106,14 +106,37 @@ def check_network(name: str, url: str | None = None) -> dict[str, Any]:
     return result
 
 
+def _candidate_endpoints(name: str) -> list[str]:
+    """Return deduplicated endpoints, always retaining the known public default.
+
+    A stale Enzonic environment variable must not hide the canonical NodeSafe
+    endpoint. For SOBYA, try the configured URL first, then NodeSafe, then
+    operator-configured/legacy fallbacks.
+    """
+    if name not in DEFAULTS:
+        raise ValueError("only Ethereum and SOBYA are supported")
+    primary_env = (
+        "SOBYA_ETHEREUM_RPC_URL"
+        if name == "ethereum"
+        else "SOBYA_SOBYA_RPC_URL"
+    )
+    candidates = [os.environ.get(primary_env) or DEFAULTS[name]]
+    if name == "sobya":
+        candidates.append(DEFAULTS["sobya"])
+        fallback = os.environ.get("SOBYA_SOBYA_RPC_FALLBACK_URL")
+        candidates.extend([fallback] if fallback else list(SOBYA_FALLBACKS))
+
+    # Preserve order while avoiding duplicate requests to the same endpoint.
+    return list(dict.fromkeys(
+        endpoint.strip() for endpoint in candidates
+        if isinstance(endpoint, str) and endpoint.strip()
+    ))
+
+
 def run_preflight() -> list[dict[str, Any]]:
     results = []
     for name in ("ethereum", "sobya"):
-        primary_env = "SOBYA_ETHEREUM_RPC_URL" if name == "ethereum" else "SOBYA_SOBYA_RPC_URL"
-        candidates = [os.environ.get(primary_env, DEFAULTS[name])]
-        if name == "sobya":
-            fallback = os.environ.get("SOBYA_SOBYA_RPC_FALLBACK_URL")
-            candidates.extend([fallback] if fallback else list(SOBYA_FALLBACKS))
+        candidates = _candidate_endpoints(name)
         last_error = None
         for index, endpoint in enumerate(candidates):
             try:
