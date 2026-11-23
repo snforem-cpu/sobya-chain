@@ -84,7 +84,7 @@ class EvmInventoryPayoutTests(unittest.TestCase):
             network="sobya", web3=web3, account=FakeAccount(), chain_id=chain_id,
             inventory_wallet=INVENTORY, confirmations=2,
         )
-        intent = PayoutIntent("order-2", "sobya", "SOBY", AMOUNT, RECIPIENT)
+        intent = PayoutIntent("order-2", "sobya", "asobya", AMOUNT, RECIPIENT)
         prepared = adapter.prepare(intent)
         self.assertEqual(web3.eth.last_tx["to"], RECIPIENT)
         self.assertEqual(web3.eth.last_tx["value"], AMOUNT)
