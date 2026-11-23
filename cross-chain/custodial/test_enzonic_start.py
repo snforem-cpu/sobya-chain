@@ -4,7 +4,7 @@ from unittest.mock import patch
 import enzonic_start
 
 def disabled_config():
-    return {"mode":"custodial-inventory", "featureEnabled":False, "depositWatchEnabled":False, "networks":{"ethereum":{"enabled":False},"sobya":{"enabled":False}}, "api":{"enabled":True,"host":"127.0.0.1","port":8080,"allowedOrigin":"https://snforem-cpu.github.io"}}
+    return {"mode":"custodial-inventory", "featureEnabled":False, "depositWatchEnabled":False, "networks":{"ethereum":{"enabled":False},"sobya":{"enabled":False}}, "api":{"enabled":True,"host":"127.0.0.1","port":8080,"allowedOrigin":"https://snforem-cpu.github.io","gatewayTokenEnv":"SOBYA_GATEWAY_TOKEN"}}
 
 class EnzonicLauncherTests(unittest.TestCase):
     def test_bootstraps_only_disabled_local_config(self):
@@ -39,9 +39,9 @@ class EnzonicLauncherTests(unittest.TestCase):
             cfg={"mode":"custodial-inventory","featureEnabled":True,"depositWatchEnabled":True,"networks":{
                 "ethereum":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"rpcUrlEnv":"ETH_RPC","keystorePathEnv":"ETH_KEY","keystorePassphraseEnv":"ETH_PASS"},
                 "sobya":{"enabled":True,"depositWatchEnabled":True,"inventoryVerified":True,"rpcUrlEnv":"SOB_RPC","keystorePathEnv":"SOB_KEY","keystorePassphraseEnv":"SOB_PASS"}},
-                "api":{"enabled":True,"host":"127.0.0.1","allowedOrigin":"https://snforem-cpu.github.io"},
+                "api":{"enabled":True,"host":"0.0.0.0","port":25701,"gatewayTokenEnv":"SOBYA_GATEWAY_TOKEN","allowedOrigin":"https://snforem-cpu.github.io"},
                 "pricing":{"referenceLiquidityUsdtBaseUnits":1000000000000}}
             env={"ETH_RPC":"https://eth.example/rpc","ETH_KEY":str(eth),"ETH_PASS":"secret","SOB_RPC":"https://sob.example/rpc","SOB_KEY":str(sob),"SOB_PASS":"secret"}
-            with patch.dict(os.environ,env,clear=True): enzonic_start._validate_operator_config(cfg)
+            with patch.dict(os.environ,{**env,"SOBYA_GATEWAY_TOKEN":"a-long-test-token"},clear=True): enzonic_start._validate_operator_config(cfg)
 
 if __name__ == "__main__": unittest.main()
