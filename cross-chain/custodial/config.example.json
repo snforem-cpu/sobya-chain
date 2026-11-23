@@ -67,10 +67,10 @@
     "priceFloor": null
   },
   "limits": {
-    "maxOrderUsdtBaseUnits": null,
-    "maxDailyUsdtBaseUnitsPerNetwork": null,
-    "minimumInventoryBaseUnits": null,
-    "feeBps": null,
+    "maxOrderUsdtBaseUnits": 500000000,
+    "maxDailyUsdtBaseUnitsPerNetwork": 10000000000,
+    "minimumInventoryBaseUnits": "100000000000000000000000",
+    "feeBps": 100,
     "quoteLifetimeSeconds": 120
   },
   "safety": {
@@ -81,12 +81,13 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Template only. All networks are disabled. Set destination network inventoryVerified=true only after its executable payout balance is independently checked; set referenceLiquidityUsdtBaseUnits from verified executable liquidity before enabling demand-adjusted pricing in step 3. Never put private keys or seed phrases in this file or repository. Payout runtime is implemented behind featureEnabled and per-network enabled flags; all remain false. Store network-bound encrypted key files outside the repository and supply their passphrases through local environment variables only. Deposit verification runs in the unified custodial runtime when depositWatchEnabled and the relevant per-network depositWatchEnabled flag are explicitly true. The order/API layer must submit (order_id, transaction hash/signature, exact log/instruction index) to the durable queue; shared-wallet balance deltas are never used to infer an order. The order API is implemented in order_api.py and remains disabled by default. It creates durable quotes/orders, accepts exact transaction_id plus event_index proofs, and exposes order status. Set api.enabled=true only after configuring the required source-network deposit watchers and a protected public HTTPS endpoint. Fees default to zero until step 3 explicitly configures feeBps. Shared inventory wallets are reused across orders; unique per-order deposit addresses are not required.",
+  "notice": "Operator template. The order API starts by default on loopback, but deposits and payouts remain fail-closed until Ethereum and SOBYA RPCs, deposit watchers, independently verified executable balances, encrypted keystores, HTTPS ingress, and controlled end-to-end tests are configured. Only Ethereum USDT and SOBYA are supported for this launch. Do not commit secrets. The demand-adjusted price requires referenceLiquidityUsdtBaseUnits to be set from independently verified executable liquidity; quotes must fail closed until that value is supplied. Fees are 100 bps; minimum order 500 USDT; daily cap 10,000 USDT; protected SOBY inventory reserve 100,000 SOBY.",
   "depositWatchEnabled": false,
   "api": {
-    "enabled": false,
+    "enabled": true,
     "host": "127.0.0.1",
     "port": 8080,
-    "notice": "Keep disabled until operator configures HTTPS reverse proxy/public exposure and source-network deposit verification. The API never signs or broadcasts transactions."
+    "notice": "API enabled by default but bound to loopback only. Expose it only through an operator-managed HTTPS reverse proxy with origin allowlisting, rate limits, request-size limits, and durable storage. API enablement does not enable deposits or payouts.",
+    "allowedOrigin": "https://snforem-cpu.github.io"
   }
 }
