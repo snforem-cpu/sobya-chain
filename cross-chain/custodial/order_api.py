@@ -7,6 +7,8 @@ signs or broadcasts transactions.
 from __future__ import annotations
 
 import json
+import hmac
+import os
 import sqlite3
 import time
 import uuid
@@ -300,6 +302,15 @@ def make_handler(api: CustodialOrderApi):
     class Handler(BaseHTTPRequestHandler):
         server_version = "SOBYA-Order-API/1.0"
 
+        def _authorized(self) -> bool:
+            api_cfg = api.config.get("api", {})
+            env_name = api_cfg.get("gatewayTokenEnv") if isinstance(api_cfg, dict) else None
+            expected = os.environ.get(env_name, "") if isinstance(env_name, str) else ""
+            supplied = self.headers.get("X-SOBYA-Gateway-Token", "")
+            if not expected:
+                return api_cfg.get("host", "127.0.0.1") in ("127.0.0.1", "localhost")
+            return bool(supplied) and hmac.compare_digest(supplied, expected)
+
         def _send(self, status: int, body: dict[str, Any]) -> None:
             raw = json.dumps(body, separators=(",", ":")).encode("utf-8")
             self.send_response(status)
@@ -316,6 +327,8 @@ def make_handler(api: CustodialOrderApi):
             self.wfile.write(raw)
 
         def do_OPTIONS(self):
+            if not self._authorized():
+                return self._send(403, {"error": "gateway authentication required"})
             allowed_origin = api.config.get("api", {}).get("allowedOrigin")
             request_origin = self.headers.get("Origin")
             if not isinstance(allowed_origin, str) or request_origin != allowed_origin:
@@ -345,6 +358,8 @@ def make_handler(api: CustodialOrderApi):
             return value
 
         def do_GET(self):
+            if not self._authorized():
+                return self._send(403, {"error": "gateway authentication required"})
             if self.path == "/health":
                 return self._send(200, {"status": "ok", "service": "sobya-order-api"})
             prefix = "/v1/orders/"
@@ -357,6 +372,8 @@ def make_handler(api: CustodialOrderApi):
             return self._send(404, {"error": "not found"})
 
         def do_POST(self):
+            if not self._authorized():
+                return self._send(403, {"error": "gateway authentication required"})
             try:
                 body = self._body()
                 if self.path == "/v1/quotes":
