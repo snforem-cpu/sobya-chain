@@ -44,8 +44,13 @@ def _rpc(url: str, method: str, params: list[Any]) -> Any:
         },
         method="POST",
     )
+    response_status = None
+    response_content_type = "unknown"
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
+            response_status = getattr(response, "status", None)
+            headers = getattr(response, "headers", {})
+            response_content_type = headers.get("Content-Type", "unknown")
             body = json.loads(response.read())
     except Exception as exc:
         # Keep diagnostics useful without printing the endpoint (which may
@@ -59,8 +64,31 @@ def _rpc(url: str, method: str, params: list[Any]) -> Any:
             detail = f"{type(exc).__name__}: {exc}"
         detail = " ".join(str(detail).split())[:180]
         raise RpcPreflightError(f"{method}: network request failed ({detail})") from exc
-    if not isinstance(body, dict) or body.get("id") != 1 or body.get("error") or "result" not in body:
-        raise RpcPreflightError(f"{method}: invalid JSON-RPC response")
+    if not isinstance(body, dict):
+        detail = f"received JSON {type(body).__name__}"
+        raise RpcPreflightError(
+            f"{method}: invalid JSON-RPC response ({detail}; "
+            f"HTTP {response_status}; content-type={response_content_type})"
+        )
+    if body.get("error"):
+        rpc_error = body.get("error")
+        if isinstance(rpc_error, dict):
+            error_code = rpc_error.get("code", "unknown")
+            error_message = " ".join(str(rpc_error.get("message", "RPC error")).split())[:160]
+            detail = f"JSON-RPC error code={error_code}, message={error_message}"
+        else:
+            detail = f"JSON-RPC error={type(rpc_error).__name__}"
+        raise RpcPreflightError(
+            f"{method}: {detail} (HTTP {response_status}; "
+            f"content-type={response_content_type})"
+        )
+    if body.get("id") != 1 or "result" not in body:
+        keys = ",".join(sorted(str(key) for key in body.keys())[:12])
+        detail = f"unexpected response id={body.get('id')!r}; keys={keys}"
+        raise RpcPreflightError(
+            f"{method}: invalid JSON-RPC response ({detail}; "
+            f"HTTP {response_status}; content-type={response_content_type})"
+        )
     return body["result"]
 
 
