@@ -124,7 +124,9 @@ def main() -> int:
     if api_config.get("enabled") is True:
         api = CustodialOrderApi(ledger, deposit_worker, config)
         api_server = start_order_api(
-            api, api_config.get("host", "127.0.0.1"), api_config.get("port", 8080)
+            api, api_config.get("host", "127.0.0.1"), api_config.get("port", 8080),
+            tls_certfile=os.environ.get("SOBYA_API_TLS_CERT"),
+            tls_keyfile=os.environ.get("SOBYA_API_TLS_KEY"),
         )
         api_thread = threading.Thread(
             target=api_server.serve_forever, name="sobya-order-api", daemon=True
