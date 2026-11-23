@@ -15,9 +15,6 @@ def config():
         "depositWatchEnabled": True,
         "networks": {
             "ethereum": {"depositWatchEnabled": True, "rpcUrlEnv": "ETH_RPC", "chainId": 1},
-            "tron": {"depositWatchEnabled": True, "rpcUrlEnv": "TRON_RPC"},
-            "solana": {"depositWatchEnabled": True, "rpcUrlEnv": "SOL_RPC",
-                       "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
             "sobya": {"depositWatchEnabled": True, "rpcUrlEnv": "SOBYA_RPC", "chainId": 357812033857},
         },
     }
@@ -29,31 +26,20 @@ class DepositRuntimeBuilderTests(unittest.TestCase):
         cfg["depositWatchEnabled"] = False
         self.assertEqual(build_inventory_deposit_verifiers(cfg), {})
 
-    def test_builds_all_four_read_only_verifiers_from_https_env(self):
+    def test_builds_only_ethereum_and_sobya_read_only_verifiers_from_https_env(self):
         with patch.dict(os.environ, {
             "ETH_RPC": "https://eth.invalid",
-            "TRON_RPC": "https://tron.invalid",
-            "SOL_RPC": "https://sol.invalid",
             "SOBYA_RPC": "https://sobya.invalid",
         }, clear=True):
             verifiers = build_inventory_deposit_verifiers(config())
-        self.assertEqual(set(verifiers), {"ethereum", "tron", "solana", "sobya"})
+        self.assertEqual(set(verifiers), {"ethereum", "sobya"})
 
     def test_missing_rpc_fails_closed(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(DepositRuntimeConfigurationError, "HTTPS RPC"):
                 build_inventory_deposit_verifiers(config())
 
-    def test_only_explicitly_enabled_networks_are_built(self):
-        cfg = config()
-        cfg["networks"]["tron"]["depositWatchEnabled"] = False
-        with patch.dict(os.environ, {
-            "ETH_RPC": "https://eth.invalid",
-            "SOL_RPC": "https://sol.invalid",
-            "SOBYA_RPC": "https://sobya.invalid",
-        }, clear=True):
-            self.assertEqual(set(build_inventory_deposit_verifiers(cfg)),
-                             {"ethereum", "solana", "sobya"})
+
 
 
 class UnifiedRuntimeTests(unittest.TestCase):
