@@ -46,6 +46,17 @@ class OrderApiTests(unittest.TestCase):
         self.assertEqual(quote["gross_destination_amount_base_units"], "5000")
         self.assertEqual(quote["destination_amount_base_units"], "4950")
 
+    def test_price_moves_only_after_completed_executed_buy_order(self):
+        self.ledger.create_order(order_id="completed-buy", direction="usdt_to_soby", source_network="ethereum", destination_network="sobya", deposit_address="0x"+"22"*20, source_wallet="0x"+"44"*20, destination_wallet="0x"+"55"*20, source_asset="0x"+"11"*20, destination_asset="asobya", source_amount=100000000, destination_amount=19800000000000000000)
+        with __import__("sqlite3").connect(self.ledger.database) as db:
+            db.execute("UPDATE custodial_orders SET state='deposit_final' WHERE order_id='completed-buy'")
+        before = self.api._price_and_fee()[0]
+        self.assertEqual(str(before), "0.005")
+        with __import__("sqlite3").connect(self.ledger.database) as db:
+            db.execute("UPDATE custodial_orders SET state='complete' WHERE order_id='completed-buy'")
+        after = self.api._price_and_fee()[0]
+        self.assertGreater(after, before)
+
     def test_decimal_string_base_units_are_accepted_without_float_conversion(self):
         quote = self.quote("soby_to_usdt", "1000000000000000000")
         self.assertEqual(quote["source_amount_base_units"], "1000000000000000000")
