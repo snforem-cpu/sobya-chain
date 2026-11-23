@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from rpc_preflight import (
     RpcPreflightError, check_network, EXPECTED, USDT_ETH, SOBYA_INVENTORY,
+    _candidate_endpoints,
 )
 
 
@@ -60,6 +61,28 @@ class RpcPreflightTests(unittest.TestCase):
             result = check_network("sobya", "https://rpc.example")
         self.assertEqual(result["inventory_balance_wei"], 0x1234)
         self.assertIn(("eth_getBalance", [SOBYA_INVENTORY, "finalized"]), calls)
+
+
+    def test_sobya_keeps_nodesafe_default_after_stale_env_url(self):
+        with patch.dict("os.environ", {
+            "SOBYA_SOBYA_RPC_URL": "https://old-host.invalid/rpc",
+            "SOBYA_SOBYA_RPC_FALLBACK_URL": "https://operator-fallback.example/rpc",
+        }, clear=False):
+            endpoints = _candidate_endpoints("sobya")
+        self.assertEqual(endpoints, [
+            "https://old-host.invalid/rpc",
+            "https://sobya-evm-rpc.nodesafe-app.xyz",
+            "https://operator-fallback.example/rpc",
+        ])
+
+    def test_sobya_deduplicates_nodesafe_when_it_is_primary(self):
+        with patch.dict("os.environ", {
+            "SOBYA_SOBYA_RPC_URL": "https://sobya-evm-rpc.nodesafe-app.xyz",
+        }, clear=False):
+            endpoints = _candidate_endpoints("sobya")
+        self.assertEqual(
+            endpoints.count("https://sobya-evm-rpc.nodesafe-app.xyz"), 1
+        )
 
     def test_rejects_wrong_chain(self):
         def fake_open(request, timeout):
