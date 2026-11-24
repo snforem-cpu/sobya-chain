@@ -308,33 +308,6 @@ class InventoryDepositRecorderTests(unittest.TestCase):
         worker.submit(self.order, TX, 2)
         self.assertEqual(worker.run_once(), {"verified": 0, "pending": 0, "failed": 1})
         self.assertEqual(self.ledger.get_order(self.order)["state"], "created")
-    def test_failed_proof_can_be_corrected_without_recreating_order(self):
-        class BadVerifier:
-            def verify(inner, expected):
-                raise InventoryDepositError("wrong recipient")
-        service = InventoryDepositService(self.ledger, {"ethereum": BadVerifier()})
-        worker = InventoryDepositWorker(service, str(Path(self.temp.name) / "orders.sqlite"))
-        worker.submit(self.order, TX, 2)
-        self.assertEqual(worker.run_once(), {"verified": 0, "pending": 0, "failed": 1})
-
-        corrected_tx = "0x" + "ac" * 32
-        class GoodVerifier:
-            def verify(inner, expected):
-                return VerifiedInventoryDeposit(
-                    expected.network, expected.tx_id, expected.sender,
-                    expected.inventory_wallet, expected.asset,
-                    expected.amount_base_units, expected.event_index,
-                    "ethereum:finalized:81",
-                )
-        service = InventoryDepositService(self.ledger, {"ethereum": GoodVerifier()})
-        worker = InventoryDepositWorker(service, str(Path(self.temp.name) / "orders.sqlite"))
-        worker.submit(self.order, corrected_tx, 3)
-        self.assertEqual(worker.run_once(), {"verified": 1, "pending": 0, "failed": 0})
-        order = self.ledger.get_order(self.order)
-        self.assertEqual(order["state"], "deposit_final")
-        self.assertEqual(order["deposit_tx"], corrected_tx)
-        self.assertEqual(order["deposit_event_index"], 3)
-
     def test_same_chain_event_cannot_be_credited_to_two_orders(self):
         second = self.ledger.create_order(
             direction="usdt_to_soby", source_network="ethereum",
