@@ -32,6 +32,7 @@ def live_one_way_config(eth_keystore=None):
                 "depositWatchEnabled": True,
                 "chainId": 1,
                 "usdtContract": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "usdtDecimals": 6,
                 "inventoryWallet": "0x" + "22" * 20,
                 "rpcUrlEnv": "ETH_RPC",
             },
