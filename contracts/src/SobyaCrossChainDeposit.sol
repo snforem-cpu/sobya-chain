@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+interface IERC20DepositToken {
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
 /// @title SOBYA cross-chain deposit escrow
 /// @notice Holds an exact ERC-20 payment until the operator confirms the SOBYA
 ///         payout. A depositor can reclaim an unfulfilled order after its deadline.
@@ -8,11 +14,6 @@ pragma solidity ^0.8.24;
 ///      not bridge assets or verify SOBYA finality; the authorized operator must
 ///      call markFulfilled only after independently verifying the destination payout.
 contract SobyaCrossChainDeposit {
-    interface IERC20 {
-        function balanceOf(address account) external view returns (uint256);
-        function transfer(address to, uint256 amount) external returns (bool);
-        function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    }
 
     struct Order {
         address depositor;
@@ -25,7 +26,7 @@ contract SobyaCrossChainDeposit {
         bool paymentReleased;
     }
 
-    IERC20 public immutable paymentToken;
+    IERC20DepositToken public immutable paymentToken;
     address public immutable operator;
     mapping(bytes32 => Order) public orders;
 
@@ -49,7 +50,7 @@ contract SobyaCrossChainDeposit {
 
     constructor(address token, address operator_) {
         if (token == address(0) || operator_ == address(0)) revert InvalidOrder();
-        paymentToken = IERC20(token);
+        paymentToken = IERC20DepositToken(token);
         operator = operator_;
     }
 
