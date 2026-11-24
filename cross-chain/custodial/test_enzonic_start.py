@@ -147,5 +147,16 @@ class EnzonicLauncherTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "requires Ethereum and SOBYA network objects"):
             enzonic_start._validate_operator_config(cfg)
 
+
+    def test_live_config_rejects_malformed_pricing_and_limits_objects(self):
+        cfg = live_one_way_config()
+        cfg["pricing"] = []
+        with self.assertRaisesRegex(SystemExit, "pricing and limits must be JSON objects"):
+            enzonic_start._validate_operator_config(cfg)
+        cfg = live_one_way_config()
+        cfg["limits"] = None
+        with self.assertRaisesRegex(SystemExit, "pricing and limits must be JSON objects"):
+            enzonic_start._validate_operator_config(cfg)
+
 if __name__ == "__main__":
     unittest.main()
