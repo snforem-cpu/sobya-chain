@@ -135,5 +135,17 @@ class EnzonicLauncherTests(unittest.TestCase):
             enzonic_start._validate_operator_config(cfg)
 
 
+    def test_live_config_rejects_missing_ethereum_object_cleanly(self):
+        cfg = live_one_way_config()
+        del cfg["networks"]["ethereum"]
+        with self.assertRaisesRegex(SystemExit, "requires Ethereum and SOBYA network objects"):
+            enzonic_start._validate_operator_config(cfg)
+
+    def test_live_config_rejects_non_object_sobya_config_cleanly(self):
+        cfg = live_one_way_config()
+        cfg["networks"]["sobya"] = None
+        with self.assertRaisesRegex(SystemExit, "requires Ethereum and SOBYA network objects"):
+            enzonic_start._validate_operator_config(cfg)
+
 if __name__ == "__main__":
     unittest.main()
