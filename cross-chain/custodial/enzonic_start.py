@@ -56,6 +56,8 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live API origin must match the published SOBYA DEX origin")
     pricing = config.get("pricing", {})
     limits = config.get("limits", {})
+    if not isinstance(pricing, dict) or not isinstance(limits, dict):
+        raise SystemExit("live pricing and limits must be JSON objects")
     if pricing.get("baseReferencePriceUsdtPerSoby") != "0.005" or pricing.get("upwardDemandSensitivityBps") != 10000 or pricing.get("downwardDemandSensitivityBps") != 2500:
         raise SystemExit("live pricing settings do not match the approved SOBYA policy")
     if pricing.get("priceCeiling") is not None or pricing.get("priceFloor") is not None:
