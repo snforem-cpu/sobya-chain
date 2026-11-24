@@ -158,5 +158,20 @@ class EnzonicLauncherTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "pricing and limits must be JSON objects"):
             enzonic_start._validate_operator_config(cfg)
 
+
+    def test_live_config_rejects_invalid_inventory_addresses_and_usdt_decimals(self):
+        cfg = live_one_way_config()
+        cfg["networks"]["ethereum"]["inventoryWallet"] = "not-an-address"
+        with self.assertRaisesRegex(SystemExit, "Ethereum USDT source wallet"):
+            enzonic_start._validate_operator_config(cfg)
+        cfg = live_one_way_config()
+        cfg["networks"]["ethereum"]["usdtDecimals"] = 18
+        with self.assertRaisesRegex(SystemExit, "Ethereum USDT source wallet"):
+            enzonic_start._validate_operator_config(cfg)
+        cfg = live_one_way_config()
+        cfg["networks"]["sobya"]["inventoryWallet"] = "0x1234"
+        with self.assertRaisesRegex(SystemExit, "SOBYA payout inventory wallet"):
+            enzonic_start._validate_operator_config(cfg)
+
 if __name__ == "__main__":
     unittest.main()
