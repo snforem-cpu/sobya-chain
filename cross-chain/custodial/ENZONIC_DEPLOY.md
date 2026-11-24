@@ -19,7 +19,7 @@ For the live local config set `api.enabled=true`, `api.host=0.0.0.0`, `api.port=
 
 This initial live route is deliberately one-way:
 
-- Ethereum mainnet USDT is the read-only deposit source: `enabled=false`, `depositWatchEnabled=true`, chain ID `1`, canonical USDT contract, HTTPS RPC, and 64 confirmations.
+- Ethereum mainnet USDT is the read-only deposit source: `enabled=false`, `depositWatchEnabled=true`, chain ID `1`, canonical USDT contract (6 decimals), HTTPS RPC, and Ethereum's finalized-block RPC tag.
 - SOBYA EVM is the payout destination: `enabled=true`, `depositWatchEnabled=false`, chain ID `357812033857`, HTTPS RPC, verified SOBY inventory, and the encrypted SOBYA payout keystore/passphrase.
 - An Ethereum signing keystore is not required for this direction. Do not configure an Ethereum payout wallet.
 - TRON and Solana remain unsupported for this launch.
