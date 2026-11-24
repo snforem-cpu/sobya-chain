@@ -1,6 +1,11 @@
 name: Custodial inventory deposit watcher tests
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "cross-chain/custodial/**"
+      - ".github/workflows/custodial-inventory-watchers.yml"
   pull_request:
     types: [opened, synchronize, reopened, edited]
     paths:
