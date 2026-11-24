@@ -1,0 +1,37 @@
+name: SOBYA NodeSafe CometBFT RPC probe
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sobya-cometbft-rpc-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify NodeSafe dapp RPC status and chain identity (read-only)
+        env:
+          SOBYA_COMETBFT_RPC: https://sobya-rpc.nodesafe-dapp.xyz
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 "$SOBYA_COMETBFT_RPC/status" -o /tmp/status.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync('/tmp/status.json', 'utf8'));
+          const result = data.result;
+          if (!result?.node_info?.network) throw new Error('RPC /status response is missing node_info.network');
+          const chain = result.node_info.network;
+          const height = result.sync_info?.latest_block_height;
+          const catchingUp = result.sync_info?.catching_up;
+          console.log(JSON.stringify({ chain_id: chain, latest_block_height: height, catching_up: catchingUp }, null, 2));
+          if (chain !== 'sobya-1') throw new Error('Wrong CometBFT chain ID: ' + chain);
+          if (!height || Number(height) < 1) throw new Error('RPC returned invalid block height');
+          if (catchingUp !== false) throw new Error('RPC node is catching up');
+          NODE
+          curl --fail --silent --show-error --max-time 20 "$SOBYA_COMETBFT_RPC/health"
+          echo
