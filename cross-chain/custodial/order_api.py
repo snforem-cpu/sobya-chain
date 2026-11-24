@@ -275,6 +275,8 @@ class CustodialOrderApi:
         }
 
     def submit_deposit(self, order_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.config.get("customerDepositsEnabled") is not True:
+            raise OrderApiError("customer deposits are currently disabled")
         if not isinstance(payload, dict):
             raise OrderApiError("JSON object required")
         tx_id = self._required(payload.get("transaction_id"), "transaction_id")
