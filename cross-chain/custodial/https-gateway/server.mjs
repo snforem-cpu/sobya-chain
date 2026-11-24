@@ -55,8 +55,7 @@ function rateLimit(req, res) {
     for (const [key, value] of buckets) if (now - value.start >= WINDOW_MS) buckets.delete(key);
   }
   if (current.count > MAX_REQUESTS) {
-    res.writeHead(429, { "Content-Type": "application/json", "Cache-Control": "no-store", "Retry-After": "60" });
-    res.end(JSON.stringify({ error: "rate limit exceeded" }));
+    sendGatewayError(req, res, 429, "rate limit exceeded");
     return false;
   }
   return true;
