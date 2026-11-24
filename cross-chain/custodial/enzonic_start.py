@@ -4,6 +4,15 @@ import json, os, stat, sys
 from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
+def _valid_evm_address(value: object) -> bool:
+    if not isinstance(value, str) or len(value) != 42 or not value.startswith("0x"):
+        return False
+    try:
+        bytes.fromhex(value[2:])
+    except ValueError:
+        return False
+    return True
+
 def _validate_operator_config(config: dict) -> None:
     if not isinstance(config, dict) or config.get("mode") != "custodial-inventory":
         raise SystemExit("invalid custodial-inventory config")
@@ -20,8 +29,12 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live config requires Ethereum and SOBYA network objects")
     if eth.get("chainId") != 1 or sobya.get("chainId") != 357812033857:
         raise SystemExit("live config must pin Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857")
-    if str(networks["ethereum"].get("usdtContract", "")).lower() != "0xdac17f958d2ee523a2206206994597c13d831ec7":
+    if str(eth.get("usdtContract", "")).lower() != "0xdac17f958d2ee523a2206206994597c13d831ec7":
         raise SystemExit("Ethereum USDT contract does not match the canonical mainnet token")
+    if eth.get("usdtDecimals") != 6 or not _valid_evm_address(eth.get("inventoryWallet")):
+        raise SystemExit("Ethereum USDT source wallet or six-decimal token configuration is invalid")
+    if not _valid_evm_address(sobya.get("inventoryWallet")):
+        raise SystemExit("SOBYA payout inventory wallet must be a valid EVM address")
     if any(isinstance(networks.get(name), dict) and (networks[name].get("enabled") is True or networks[name].get("depositWatchEnabled") is True) for name in ("tron", "solana")):
         raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
     # This launch is deliberately one-way: Ethereum is a read-only USDT
