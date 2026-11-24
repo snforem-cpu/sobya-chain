@@ -65,5 +65,6 @@
     "notice": "API enabled by default but bound to loopback only. Expose it only through an operator-managed HTTPS reverse proxy with origin allowlisting, rate limits, request-size limits, and durable storage. API enablement does not enable deposits or payouts.",
     "allowedOrigin": "https://snforem-cpu.github.io",
     "gatewayTokenEnv": "SOBYA_GATEWAY_TOKEN"
-  }
+  },
+  "customerDepositsEnabled": false
 }
