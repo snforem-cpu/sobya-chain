@@ -21,6 +21,10 @@ def _validate_operator_config(config: dict) -> None:
     networks = config.get("networks")
     if not isinstance(networks, dict):
         raise SystemExit("live config requires network settings")
+    pricing = config.get("pricing", {})
+    limits = config.get("limits", {})
+    if not isinstance(pricing, dict) or not isinstance(limits, dict):
+        raise SystemExit("live pricing and limits must be JSON objects")
     if config.get("depositWatchEnabled") is not True:
         raise SystemExit("live config requires global depositWatchEnabled=true")
     eth = networks.get("ethereum")
@@ -67,10 +71,6 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live API requires a shared gateway token of at least 64 characters in the Enzonic Connect environment")
     if api.get("allowedOrigin") != "https://snforem-cpu.github.io":
         raise SystemExit("live API origin must match the published SOBYA DEX origin")
-    pricing = config.get("pricing", {})
-    limits = config.get("limits", {})
-    if not isinstance(pricing, dict) or not isinstance(limits, dict):
-        raise SystemExit("live pricing and limits must be JSON objects")
     if pricing.get("baseReferencePriceUsdtPerSoby") != "0.005" or pricing.get("upwardDemandSensitivityBps") != 10000 or pricing.get("downwardDemandSensitivityBps") != 2500:
         raise SystemExit("live pricing settings do not match the approved SOBYA policy")
     if pricing.get("priceCeiling") is not None or pricing.get("priceFloor") is not None:
