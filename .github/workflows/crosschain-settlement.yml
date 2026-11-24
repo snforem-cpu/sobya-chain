@@ -47,7 +47,7 @@ jobs:
         working-directory: cross-chain/github-actions-worker
         run: node --check worker.mjs
       - name: Run settlement scanner
-        if: ${{ vars.CROSSCHAIN_AUTOMATION_ENABLED == 'true' }}
+        if: ${{ github.ref == 'refs/heads/main' && vars.CROSSCHAIN_AUTOMATION_ENABLED == 'true' }}
         working-directory: cross-chain/github-actions-worker
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -69,5 +69,5 @@ jobs:
           CROSSCHAIN_STATE_BRANCH: sobya-crosschain-state
         run: node worker.mjs
       - name: Keep automation safely disabled until audited contracts are deployed
-        if: ${{ vars.CROSSCHAIN_AUTOMATION_ENABLED != 'true' }}
+        if: ${{ github.ref != 'refs/heads/main' || vars.CROSSCHAIN_AUTOMATION_ENABLED != 'true' }}
         run: echo "Settlement worker is installed but disabled. No deposits or payouts are processed."
