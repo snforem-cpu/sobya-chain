@@ -1,4 +1,5 @@
 name: Deploy SOBYA website to GitHub Pages
+# Keep each deployment on a fresh push run; do not retry artifact-upload runs in place.
 
 on:
   push:
