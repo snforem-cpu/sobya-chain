@@ -10,9 +10,7 @@
       "rpcUrlEnv": "SOBYA_ETHEREUM_RPC_URL",
       "usdtContract": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
       "inventoryWallet": "0xebdb899fFE84a89e1d576964b640491c135651AD",
-      "keystorePathEnv": "SOBYA_ETHEREUM_KEYSTORE",
       "usdtDecimals": 6,
-      "keystorePassphraseEnv": "SOBYA_ETHEREUM_KEYSTORE_PASSPHRASE",
       "confirmations": 64,
       "depositWatchEnabled": false,
       "inventoryVerified": false
@@ -56,7 +54,7 @@
     "pauseOnWatcherFailure": true,
     "allowAdminWithdrawal": false
   },
-  "notice": "Operator template. API starts on loopback by default. Real orders remain fail-closed until Ethereum and SOBYA HTTPS RPCs, finalized deposit watchers, verified live payout balances, encrypted keystores, reference liquidity, and HTTPS ingress are configured. Only Ethereum USDT and SOBYA EVM are supported. Do not commit secrets. Price uses only completed finalized ledger orders. Fees 100 bps; maximum order 500 USDT; daily cap 10,000 USDT; protected SOBY reserve 100,000.",
+  "notice": "Operator template for the one-way Ethereum USDT deposit to SOBYA payout route. Real orders remain fail-closed until Ethereum HTTPS read-only RPC, finalized USDT watcher, verified SOBYA payout balance and gas, encrypted SOBYA payout keystore, independently verified reference liquidity, and the public HTTPS gateway are configured. Ethereum signing keys are not required. Only Ethereum USDT deposits and SOBYA EVM payouts are supported. Do not commit secrets. Price uses completed finalized ledger orders. Fees 100 bps; maximum order 500 USDT; daily cap 10,000 USDT; protected SOBY reserve 100,000.",
   "depositWatchEnabled": false,
   "api": {
     "enabled": true,
