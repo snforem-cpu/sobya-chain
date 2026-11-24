@@ -10,7 +10,7 @@ class FakeDepositWorker:
 
 def api_config():
     return {
-        "mode": "custodial-inventory", "featureEnabled": True, "depositWatchEnabled": True,
+        "mode": "custodial-inventory", "featureEnabled": True, "depositWatchEnabled": True, "customerDepositsEnabled": True,
         "networks": {
             "ethereum": {"enabled": True, "depositWatchEnabled": True, "chainId": 1, "usdtContract": "0x" + "11" * 20, "inventoryWallet": "0x" + "22" * 20, "inventoryVerified": True},
             "sobya": {"enabled": True, "depositWatchEnabled": True, "chainId": 357812033857, "inventoryWallet": "0x" + "33" * 20, "inventoryVerified": True},
@@ -66,6 +66,13 @@ class OrderApiTests(unittest.TestCase):
         result = self.api.submit_deposit(quote["order_id"], {"transaction_id": "0x" + "aa" * 32, "event_index": 3})
         self.assertEqual(result["status"], "deposit_submitted")
         self.assertEqual(self.worker.submissions, [(quote["order_id"], "0x" + "aa" * 32, 3)])
+
+    def test_customer_deposits_closed_when_flag_false(self):
+        quote = self.quote()
+        self.api.config["customerDepositsEnabled"] = False
+        with self.assertRaisesRegex(OrderApiError, "customer deposits are currently disabled"):
+            self.api.submit_deposit(quote["order_id"], {"transaction_id": "0x" + "bb" * 32, "event_index": 0})
+        self.assertEqual(self.worker.submissions, [])
 
     def test_expired_quote_cannot_submit_deposit(self):
         quote = self.quote(); self.now[0] = quote["quote_expires_at"]
