@@ -52,7 +52,7 @@ contract SobyaCrossChainAutomationTest {
     function setUp() public {
         token = new MockDepositToken();
         escrow = new SobyaCrossChainDeposit(address(token), OPERATOR);
-        vault = new SobyaInventoryPayoutVault(RELAYER, 5 ether, 20 ether);
+        vault = new SobyaInventoryPayoutVault(RELAYER, 15 ether, 20 ether);
         vm.deal(address(this), 20 ether);
         vm.deal(address(vault), 20 ether);
         token.mint(BUYER, 10_000_000);
@@ -100,16 +100,16 @@ contract SobyaCrossChainAutomationTest {
     function testPayoutVaultEnforcesPerOrderAndDailyLimits() public {
         vm.prank(RELAYER);
         (bool tooLarge,) = address(vault).call(
-            abi.encodeWithSelector(vault.release.selector, ORDER, payable(RECIPIENT), 6 ether)
+            abi.encodeWithSelector(vault.release.selector, ORDER, payable(RECIPIENT), 16 ether)
         );
         require(!tooLarge, "per-order limit was bypassed");
 
         vm.prank(RELAYER);
-        vault.release(ORDER, payable(RECIPIENT), 5 ether);
+        vault.release(ORDER, payable(RECIPIENT), 10 ether);
         bytes32 secondOrder = keccak256("second-order");
         vm.prank(RELAYER);
         (bool dailyExceeded,) = address(vault).call(
-            abi.encodeWithSelector(vault.release.selector, secondOrder, payable(RECIPIENT), 16 ether)
+            abi.encodeWithSelector(vault.release.selector, secondOrder, payable(RECIPIENT), 11 ether)
         );
         require(!dailyExceeded, "daily limit was bypassed");
     }
