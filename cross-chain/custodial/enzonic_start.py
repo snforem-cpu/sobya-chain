@@ -20,20 +20,28 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("Ethereum USDT contract does not match the canonical mainnet token")
     if any(isinstance(networks.get(name), dict) and (networks[name].get("enabled") is True or networks[name].get("depositWatchEnabled") is True) for name in ("tron", "solana")):
         raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
-    for name in ("ethereum", "sobya"):
-        item = networks.get(name)
-        if not isinstance(item, dict) or item.get("enabled") is not True or item.get("depositWatchEnabled") is not True:
-            raise SystemExit(name + " must have enabled and depositWatchEnabled set true")
-        if item.get("inventoryVerified") is not True:
-            raise SystemExit(name + " inventory must be independently verified before live mode")
-        rpc_env, key_env, pass_env = item.get("rpcUrlEnv"), item.get("keystorePathEnv"), item.get("keystorePassphraseEnv")
-        rpc = os.environ.get(rpc_env, "") if isinstance(rpc_env, str) else ""
-        key = os.environ.get(key_env, "") if isinstance(key_env, str) else ""
-        secret = os.environ.get(pass_env, "") if isinstance(pass_env, str) else ""
-        if not rpc.startswith("https://") or not key or not secret:
-            raise SystemExit(name + " requires HTTPS RPC and external keystore/passphrase environment variables")
-        if not Path(key).is_file():
-            raise SystemExit(name + " keystore file is missing")
+    # This launch is deliberately one-way: Ethereum is a read-only USDT
+    # deposit source; SOBYA is the only signing/payout destination.
+    eth = networks.get("ethereum")
+    if not isinstance(eth, dict) or eth.get("enabled") is True or eth.get("depositWatchEnabled") is not True:
+        raise SystemExit("Ethereum must be deposit-watch-only (enabled=false, depositWatchEnabled=true)")
+    eth_rpc_env = eth.get("rpcUrlEnv")
+    eth_rpc = os.environ.get(eth_rpc_env, "") if isinstance(eth_rpc_env, str) else ""
+    if not eth_rpc.startswith("https://"):
+        raise SystemExit("Ethereum deposit watcher requires an HTTPS RPC endpoint")
+    sobya = networks.get("sobya")
+    if not isinstance(sobya, dict) or sobya.get("enabled") is not True or sobya.get("depositWatchEnabled") is not False:
+        raise SystemExit("SOBYA must be payout-only (enabled=true, depositWatchEnabled=false)")
+    if sobya.get("inventoryVerified") is not True:
+        raise SystemExit("SOBYA payout inventory must be independently verified before live mode")
+    rpc_env, key_env, pass_env = sobya.get("rpcUrlEnv"), sobya.get("keystorePathEnv"), sobya.get("keystorePassphraseEnv")
+    rpc = os.environ.get(rpc_env, "") if isinstance(rpc_env, str) else ""
+    key = os.environ.get(key_env, "") if isinstance(key_env, str) else ""
+    secret = os.environ.get(pass_env, "") if isinstance(pass_env, str) else ""
+    if not rpc.startswith("https://") or not key or not secret:
+        raise SystemExit("SOBYA payout requires HTTPS RPC and external keystore/passphrase environment variables")
+    if not Path(key).is_file():
+        raise SystemExit("SOBYA payout keystore file is missing")
     api = config.get("api", {})
     if not isinstance(api, dict) or api.get("enabled") is not True:
         raise SystemExit("live order API must be enabled")
