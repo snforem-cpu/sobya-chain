@@ -45,12 +45,12 @@ def _validate_operator_config(config: dict) -> None:
     # deposit source; SOBYA is the only signing/payout destination.
     if eth.get("enabled") is True or eth.get("depositWatchEnabled") is not True:
         raise SystemExit("Ethereum must be deposit-watch-only (enabled=false, depositWatchEnabled=true)")
+    if sobya.get("enabled") is not True or sobya.get("depositWatchEnabled") is not False:
+        raise SystemExit("SOBYA must be payout-only (enabled=true, depositWatchEnabled=false)")
     eth_rpc_env = eth.get("rpcUrlEnv")
     eth_rpc = os.environ.get(eth_rpc_env, "") if isinstance(eth_rpc_env, str) else ""
     if not eth_rpc.startswith("https://"):
         raise SystemExit("Ethereum deposit watcher requires an HTTPS RPC endpoint")
-    if sobya.get("enabled") is not True or sobya.get("depositWatchEnabled") is not False:
-        raise SystemExit("SOBYA must be payout-only (enabled=true, depositWatchEnabled=false)")
     if sobya.get("inventoryVerified") is not True:
         raise SystemExit("SOBYA payout inventory must be independently verified before live mode")
     rpc_env, key_env, pass_env = sobya.get("rpcUrlEnv"), sobya.get("keystorePathEnv"), sobya.get("keystorePassphraseEnv")
