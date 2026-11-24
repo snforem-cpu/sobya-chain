@@ -27,7 +27,7 @@ Set `SOBYA_GATEWAY_TOKEN` in the Enzonic Connect environment as a random secret 
 
 The launcher refuses live mode unless:
 - Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857 are pinned;
-- only Ethereum and SOBYA deposit/payout gates are enabled;
+- Ethereum is enabled only as a read-only deposit watcher; SOBYA is enabled only as the native-SOBY payout destination;
 - Ethereum has an HTTPS read-only deposit-watcher RPC; SOBYA has an HTTPS payout RPC, independently verified native SOBY inventory, and the only signing keystore/passphrase required for this one-way route;
 - the Connect API is bound to port 25701 and the shared gateway secret is configured;
 - reference liquidity is a positive, independently verified USDT base-unit value;
