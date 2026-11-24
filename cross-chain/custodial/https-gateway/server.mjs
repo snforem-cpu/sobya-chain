@@ -64,11 +64,13 @@ function rateLimit(req, res) {
 const server = http.createServer(async (req, res) => {
   let target;
   if (!GATEWAY_TOKEN) {
+    console.error("[sobya-gateway] configuration error: gateway token is missing");
     sendGatewayError(req, res, 503, "gateway authentication secret is not configured");
     return;
   }
   try { target = configuredUpstream(); }
   catch (error) {
+    console.error("[sobya-gateway] upstream configuration error:", error.message);
     sendGatewayError(req, res, 503, error.message);
     return;
   }
@@ -135,9 +137,11 @@ const server = http.createServer(async (req, res) => {
       const suppliedSignature = /^[0-9a-f]{64}$/.test(responseSignature) ? Buffer.from(responseSignature, "hex") : Buffer.alloc(0);
       const authenticated = validTimestamp && responseNonce === nonce && suppliedSignature.length === expectedSignature.length && timingSafeEqual(suppliedSignature, expectedSignature);
       if (!authenticated) {
+        console.error("[sobya-gateway] upstream authentication failed:", JSON.stringify({ status: responseStatus, timestampPresent: Boolean(responseTimestamp), noncePresent: Boolean(responseNonce), signaturePresent: Boolean(responseSignature) }));
         sendGatewayError(req, res, 502, "upstream response authentication failed");
         return;
       }
+      console.log("[sobya-gateway] upstream response:", req.method, path, responseStatus);
       res.writeHead(Number(responseStatus), {
         "Content-Type": upstreamRes.headers["content-type"] || "application/json",
         "Cache-Control": "no-store",
@@ -148,8 +152,12 @@ const server = http.createServer(async (req, res) => {
       res.end(responseBody);
     });
   });
-  upstreamReq.on("timeout", () => upstreamReq.destroy(new Error("upstream timeout")));
-  upstreamReq.on("error", () => {
+  upstreamReq.on("timeout", () => {
+    console.error("[sobya-gateway] upstream timeout:", req.method, path);
+    upstreamReq.destroy(new Error("upstream timeout"));
+  });
+  upstreamReq.on("error", error => {
+    console.error("[sobya-gateway] upstream connection error:", JSON.stringify({ method: req.method, path, code: error.code || "UNKNOWN", message: error.message }));
     if (!res.headersSent) {
       sendGatewayError(req, res, 502, "Enzonic Connect API upstream is unavailable");
     } else res.destroy();
