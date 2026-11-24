@@ -62,6 +62,33 @@ function rateLimit(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const path = new URL(req.url, "http://gateway.local").pathname;
+  if (!allowedPath(path) || !["GET", "POST", "OPTIONS"].includes(req.method)) {
+    sendGatewayError(req, res, 404, "not found");
+    return;
+  }
+  const origin = req.headers.origin;
+  if (origin && origin !== ALLOWED_ORIGIN) {
+    sendGatewayError(req, res, 403, "origin is not allowed");
+    return;
+  }
+
+  // Browser CORS preflight is a gateway concern. Answer it locally instead
+  // of forwarding OPTIONS to the private Enzonic worker (which is not a
+  // browser-facing service and must not be required for preflight).
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      ...corsHeaders(req),
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "600",
+      "Cache-Control": "no-store",
+      "Content-Length": "0"
+    });
+    res.end();
+    return;
+  }
+
   let target;
   if (!GATEWAY_TOKEN) {
     console.error("[sobya-gateway] configuration error: gateway token is missing");
@@ -72,16 +99,6 @@ const server = http.createServer(async (req, res) => {
   catch (error) {
     console.error("[sobya-gateway] upstream configuration error:", error.message);
     sendGatewayError(req, res, 503, error.message);
-    return;
-  }
-  const path = new URL(req.url, "http://gateway.local").pathname;
-  if (!allowedPath(path) || !["GET", "POST", "OPTIONS"].includes(req.method)) {
-    sendGatewayError(req, res, 404, "not found");
-    return;
-  }
-  const origin = req.headers.origin;
-  if (origin && origin !== ALLOWED_ORIGIN) {
-    sendGatewayError(req, res, 403, "origin is not allowed");
     return;
   }
   if (!rateLimit(req, res)) return;
