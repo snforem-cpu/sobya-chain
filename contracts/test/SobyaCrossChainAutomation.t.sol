@@ -40,6 +40,7 @@ contract SobyaCrossChainAutomationTest {
         VmCrossChain(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     address private constant OPERATOR = address(0xA11CE);
+    address private constant TREASURY = address(0x7EA5);
     address private constant RELAYER = address(0xB0B);
     address private constant BUYER = address(0xCAFE);
     address private constant RECIPIENT = address(0xD00D);
@@ -51,7 +52,7 @@ contract SobyaCrossChainAutomationTest {
 
     function setUp() public {
         token = new MockDepositToken();
-        escrow = new SobyaCrossChainDeposit(address(token), OPERATOR);
+        escrow = new SobyaCrossChainDeposit(address(token), OPERATOR, TREASURY);
         vault = new SobyaInventoryPayoutVault(RELAYER, 15 ether, 20 ether);
         vm.deal(address(this), 20 ether);
         vm.deal(address(vault), 20 ether);
@@ -68,8 +69,8 @@ contract SobyaCrossChainAutomationTest {
         vm.prank(OPERATOR);
         escrow.markFulfilled(ORDER);
         vm.prank(OPERATOR);
-        escrow.releasePayment(ORDER, address(this));
-        require(token.balanceOf(address(this)) == 1_000_000, "payment not released");
+        escrow.releasePayment(ORDER);
+        require(token.balanceOf(TREASURY) == 1_000_000, "payment not released to fixed treasury");
     }
 
     function testUnfulfilledOrderCanBeRefundedAfterDeadline() public {
