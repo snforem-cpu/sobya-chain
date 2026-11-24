@@ -28,6 +28,7 @@ contract SobyaCrossChainDeposit {
 
     IERC20DepositToken public immutable paymentToken;
     address public immutable operator;
+    address public immutable treasury;
     mapping(bytes32 => Order) public orders;
 
     event OrderDeposited(
@@ -48,10 +49,11 @@ contract SobyaCrossChainDeposit {
     error TransferFailed();
     error InexactTokenTransfer();
 
-    constructor(address token, address operator_) {
-        if (token == address(0) || operator_ == address(0)) revert InvalidOrder();
+    constructor(address token, address operator_, address treasury_) {
+        if (token == address(0) || operator_ == address(0) || treasury_ == address(0)) revert InvalidOrder();
         paymentToken = IERC20DepositToken(token);
         operator = operator_;
+        treasury = treasury_;
     }
 
     function deposit(
@@ -94,16 +96,15 @@ contract SobyaCrossChainDeposit {
         emit OrderFulfilled(orderId);
     }
 
-    function releasePayment(bytes32 orderId, address recipient) external {
+    function releasePayment(bytes32 orderId) external {
         if (msg.sender != operator) revert Unauthorized();
         Order storage order = orders[orderId];
         if (
-            !order.fulfilled || order.refunded || order.paymentReleased ||
-            recipient == address(0)
+            !order.fulfilled || order.refunded || order.paymentReleased
         ) revert AlreadyProcessed();
         order.paymentReleased = true;
-        if (!paymentToken.transfer(recipient, order.paymentAmount)) revert TransferFailed();
-        emit PaymentReleased(orderId, recipient, order.paymentAmount);
+        if (!paymentToken.transfer(treasury, order.paymentAmount)) revert TransferFailed();
+        emit PaymentReleased(orderId, treasury, order.paymentAmount);
     }
 
     function refund(bytes32 orderId) external {
