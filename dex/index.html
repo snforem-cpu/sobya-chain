@@ -171,7 +171,11 @@ async function checkCrossChainApi(){
  try{
   const origin=base.endsWith('/')?base.slice(0,-1):base;
   const response=await fetch(origin+'/health',{cache:'no-store',mode:'cors'});
-  if(!response.ok)throw Error('Health endpoint returned HTTP '+response.status);
+  if(!response.ok){
+   let detail='';
+   try{const failure=await response.clone().json();detail=typeof failure.error==='string'?failure.error:'';}catch{}
+   throw Error(detail||('Health endpoint returned HTTP '+response.status));
+  }
   const health=await response.json();
   if(health.status!=='ok'||health.service!=='sobya-order-api')throw Error('Health endpoint returned an unexpected service response.');
   apiHealthy=true;const depositsOpen=config.customerDepositsEnabled===true;$('ccDepositControls').classList.toggle('hidden',!depositsOpen);$('ccDepositClosed').classList.toggle('hidden',depositsOpen);$('ccStatus').textContent=depositsOpen?'Order service online. Customer deposit controls are enabled by operator configuration.':'Order service online. Quotes may be requested. Customer deposits remain closed.';
