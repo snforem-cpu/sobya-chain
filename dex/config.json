@@ -11,6 +11,6 @@
   "notice": "The four mainnet contract deployments passed read-only receipt, bytecode, deployer and constructor-link verification. Liquidity operations are enabled for owner-controlled initial pool creation and funding. Swaps remain disabled until a funded pool is verified and mainnet swap smoke tests pass. The TWAP oracle is pool-specific, not a global USD price feed.",
   "liquidityEnabled": true,
   "tradingEnabled": false,
-  "custodialApiUrl": "",
-  "custodialApiNotice": "Populate only with the verified Enzonic Deploy public HTTPS gateway origin after /health succeeds. Never use the raw Connect host:port here."
+  "custodialApiUrl": "https://sobya-chain.enzonic.dev",
+  "custodialApiNotice": "Cross-chain order API is routed through the Enzonic HTTPS gateway. Quotes and order tracking are available only while the gateway and custodial runtime are healthy. Customer deposits remain subject to backend verification and finality checks."
 }
