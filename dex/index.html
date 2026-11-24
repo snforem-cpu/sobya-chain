@@ -165,7 +165,7 @@ function apiBase(){
  const base=config.custodialApiUrl.trim();return base.endsWith('/')?base.slice(0,-1):base;
 }
 async function checkCrossChainApi(){
- apiHealthy=false;$('ccQuoteBtn').disabled=true;$('ccDepositControls').classList.add('hidden');$('ccDepositClosed').classList.remove('hidden');
+ apiHealthy=false;$('ccQuoteBtn').disabled=false;$('ccDepositControls').classList.add('hidden');$('ccDepositClosed').classList.remove('hidden');
  const base=config&&typeof config.custodialApiUrl==='string'?config.custodialApiUrl.trim():'';
  if(!base){$('ccStatus').textContent='Cross-chain service is not configured. No customer deposits are accepted.';return false;}
  try{
