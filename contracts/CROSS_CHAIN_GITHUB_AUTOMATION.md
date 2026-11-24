@@ -49,9 +49,15 @@ has passed.
    test inventory and configure a dedicated relayer.
 5. Implement and test a stateless event scanner with durable checkpointing and
    replay-safe transaction recovery. The checkpoint must not be stored only on
-   an ephemeral runner filesystem.
+   an ephemeral runner filesystem. A first implementation now exists under
+   `cross-chain/github-actions-worker/` and stores its cursor on the
+   `sobya-crosschain-state` branch.
 6. Add a GitHub Actions scheduled workflow with concurrency protection, bounded
-   block ranges, retry/recovery, finality checks, and secret-only signing.
+   block ranges, retry/recovery, finality checks, and secret-only signing. A
+   disabled-by-default workflow now exists at
+   `.github/workflows/crosschain-settlement.yml`; it can run the settlement job
+   only from `main` after the repository variable `CROSSCHAIN_AUTOMATION_ENABLED`
+   is explicitly enabled.
 7. Complete a low-value end-to-end test: USDT deposit -> finalized SOBY payout
    -> escrow fulfillment -> USDT release. Also test expiry/refund and duplicate
    event replay.
