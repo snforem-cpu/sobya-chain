@@ -2,7 +2,7 @@ import http from "node:http";
 import https from "node:https";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-const PORT = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT || 25701);
 const UPSTREAM = process.env.SOBYA_UPSTREAM_URL || "";
 const ALLOWED_ORIGIN = process.env.SOBYA_ALLOWED_ORIGIN || "https://snforem-cpu.github.io";
 const GATEWAY_TOKEN = process.env.SOBYA_GATEWAY_TOKEN || "";
