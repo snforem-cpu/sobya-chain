@@ -143,7 +143,7 @@ async function connect(){
   const liquidity=liquidityEnabled(),trading=tradingEnabled();
   $('swapBtn').disabled=!trading;
   for(const id of ['poolBtn','removeBtn','wrapBtn','unwrapBtn'])$(id).disabled=!liquidity;
-  $('ccQuoteBtn').disabled=!apiHealthy;
+  $('ccQuoteBtn').disabled=false;
   say(trading?'Wallet connected. Swaps are enabled.':liquidity?'Wallet connected. Pool creation and liquidity are enabled; swaps remain locked until the initial pool passes live tests.':'Wallet connected, but DEX transactions are disabled pending verification.');
  }catch(e){console.error('Wallet connection failed:',e);say(e.shortMessage||e.message||String(e))}
  finally{button.disabled=false}
@@ -161,7 +161,7 @@ $('wrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount'
 $('unwrapBtn').onclick=async()=>{try{const amount=ethers.parseEther($('wrapAmount').value);if(amount<=0n)throw Error('Enter a positive WSOBY amount.');const w=new ethers.Contract(config.wrappedSoby,wrappedAbi,signer);const tx=await w.withdraw(amount);say('Unwrapping WSOBY: '+tx.hash);await tx.wait();say('Native SOBY returned. Transaction: '+tx.hash)}catch(e){say(e.shortMessage||e.message||String(e))}};
 function apiBase(){
  if(!config||typeof config.custodialApiUrl!=='string'||!config.custodialApiUrl.trim())throw Error('The HTTPS order gateway URL is not configured.');
- if(!apiHealthy)throw Error('The SOBYA order gateway health check has not passed. No order or deposit can be submitted.');
+ 
  const base=config.custodialApiUrl.trim();return base.endsWith('/')?base.slice(0,-1):base;
 }
 async function checkCrossChainApi(){
@@ -175,8 +175,8 @@ async function checkCrossChainApi(){
   const health=await response.json();
   if(health.status!=='ok'||health.service!=='sobya-order-api')throw Error('Health endpoint returned an unexpected service response.');
   apiHealthy=true;$('ccStatus').textContent='Order service online. Quotes may be requested. Customer deposits remain closed.';
-  $('ccQuoteBtn').disabled=!signer;return true;
- }catch(e){$('ccStatus').textContent='Order service unavailable: '+(e.message||String(e))+'. No orders or customer deposits are accepted.';return false;}
+  $('ccQuoteBtn').disabled=false;return true;
+ }catch(e){$('ccStatus').textContent='Gateway health check failed: '+(e.message||String(e))+'. You can still request a quote; the gateway response will show whether order creation is available.';$('ccQuoteBtn').disabled=false;return false;}
 }
 let activeOrderId=null,activeQuote=null,orderPollTimer=null;
 function ccDirectionChanged(){const reverse=$('ccDirection').value==='soby_to_usdt';$('ccAssetLabel').value=reverse?'SOBY (SOBYA)':'USDT (Ethereum)';$('ccAmount').placeholder=reverse?'0.0':'0.00';$('ccOrder').classList.add('hidden');activeOrderId=null;activeQuote=null;if(orderPollTimer)clearInterval(orderPollTimer);}
