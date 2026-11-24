@@ -28,7 +28,7 @@ Set `SOBYA_GATEWAY_TOKEN` in the Enzonic Connect environment as a random secret 
 The launcher refuses live mode unless:
 - Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857 are pinned;
 - only Ethereum and SOBYA deposit/payout gates are enabled;
-- both networks have HTTPS RPCs, verified balances, encrypted keystore files and passphrase environment variables;
+- Ethereum has an HTTPS read-only deposit-watcher RPC; SOBYA has an HTTPS payout RPC, independently verified native SOBY inventory, and the only signing keystore/passphrase required for this one-way route;
 - the Connect API is bound to port 25701 and the shared gateway secret is configured;
 - reference liquidity is a positive, independently verified USDT base-unit value;
 - pricing, fees, limits and protected SOBY reserve match the approved SOBYA policy.
@@ -62,4 +62,4 @@ It must return `{"status":"ok","service":"sobya-order-api"}`. Only then set `cus
 
 ## Release boundary
 
-This repository prepares the gateway code and launcher, but it cannot create a server inside the user's Enzonic account or know the assigned subdomain. The DEX URL intentionally remains empty until the HTTPS health check succeeds. Do not accept customer deposits until the gateway is live and controlled end-to-end tests pass in both directions.
+This repository prepares the gateway code and launcher, but it cannot create a server inside the user's Enzonic account or know the assigned subdomain. The DEX URL intentionally remains empty until the HTTPS health check succeeds. Do not accept customer deposits until the gateway is live and a controlled end-to-end Ethereum-USDT-to-SOBY settlement test passes. This launch does not enable the reverse SOBY-to-USDT direction.
