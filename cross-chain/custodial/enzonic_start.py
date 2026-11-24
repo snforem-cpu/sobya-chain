@@ -14,7 +14,11 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live config requires network settings")
     if config.get("depositWatchEnabled") is not True:
         raise SystemExit("live config requires global depositWatchEnabled=true")
-    if networks["ethereum"].get("chainId") != 1 or networks["sobya"].get("chainId") != 357812033857:
+    eth = networks.get("ethereum")
+    sobya = networks.get("sobya")
+    if not isinstance(eth, dict) or not isinstance(sobya, dict):
+        raise SystemExit("live config requires Ethereum and SOBYA network objects")
+    if eth.get("chainId") != 1 or sobya.get("chainId") != 357812033857:
         raise SystemExit("live config must pin Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857")
     if str(networks["ethereum"].get("usdtContract", "")).lower() != "0xdac17f958d2ee523a2206206994597c13d831ec7":
         raise SystemExit("Ethereum USDT contract does not match the canonical mainnet token")
@@ -22,15 +26,13 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
     # This launch is deliberately one-way: Ethereum is a read-only USDT
     # deposit source; SOBYA is the only signing/payout destination.
-    eth = networks.get("ethereum")
-    if not isinstance(eth, dict) or eth.get("enabled") is True or eth.get("depositWatchEnabled") is not True:
+    if eth.get("enabled") is True or eth.get("depositWatchEnabled") is not True:
         raise SystemExit("Ethereum must be deposit-watch-only (enabled=false, depositWatchEnabled=true)")
     eth_rpc_env = eth.get("rpcUrlEnv")
     eth_rpc = os.environ.get(eth_rpc_env, "") if isinstance(eth_rpc_env, str) else ""
     if not eth_rpc.startswith("https://"):
         raise SystemExit("Ethereum deposit watcher requires an HTTPS RPC endpoint")
-    sobya = networks.get("sobya")
-    if not isinstance(sobya, dict) or sobya.get("enabled") is not True or sobya.get("depositWatchEnabled") is not False:
+    if sobya.get("enabled") is not True or sobya.get("depositWatchEnabled") is not False:
         raise SystemExit("SOBYA must be payout-only (enabled=true, depositWatchEnabled=false)")
     if sobya.get("inventoryVerified") is not True:
         raise SystemExit("SOBYA payout inventory must be independently verified before live mode")
