@@ -1,0 +1,201 @@
+name: SOBYA Keplr-compatible Cosmos MsgSend regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/keplr-cosmos-msgsend.yml'
+  push:
+    branches:
+      - 'fix/**'
+      - 'feature/**'
+      - 'release/**'
+    paths:
+      - 'sobya/**'
+      - '.github/workflows/keplr-cosmos-msgsend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-keplr-cosmos-msgsend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cosmos-direct-signing:
+    strategy:
+      fail-fast: false
+      matrix:
+        source_ref:
+          - ${{ github.sha }}
+          - ecd6fe1e819770749d6b0cc9bfa886d0b08521dc
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.source_ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sobya/go.mod
+          cache: true
+          cache-dependency-path: sobya/go.sum
+
+      - name: Test and build SOBYA node
+        working-directory: sobya
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+          go test -mod=readonly ./...
+          go build -mod=readonly -o ../sobyad ./cmd/sobyad
+
+      - name: Create disposable chain and Keplr-compatible Cosmos account
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-keplr-msgsend
+          CHAIN_ID: sobya-keplr-msgsend-ci-1
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad init "SOBYA Keplr Cosmos Signing CI" --chain-id "$CHAIN_ID" --home "$SOBYA_HOME"
+
+          # Keplr's native Cosmos account path is m/44'/118'/0'/0/0.
+          # SOBYA sets coin type 118 and the standard secp256k1 algorithm;
+          # this CLI-created key exercises the same Cosmos Direct-signing
+          # transaction format without exposing any real wallet mnemonic.
+          ./sobyad keys add validator --algo secp256k1 --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/validator-key.json"
+          ./sobyad keys add keplr-cosmos-test --algo secp256k1 --keyring-backend test --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/keplr-key.json"
+          WALLET_ADDR="$(jq -r '.address' "$RUNNER_TEMP/keplr-key.json")"
+          VALIDATOR_ADDR="$(./sobyad keys show validator -a --keyring-backend test --home "$SOBYA_HOME")"
+          test -n "$WALLET_ADDR"
+          test -n "$VALIDATOR_ADDR"
+          case "$WALLET_ADDR" in sobya1*) ;; *) echo "Unexpected SOBYA account prefix: $WALLET_ADDR"; exit 1 ;; esac
+
+          ./sobyad genesis add-genesis-account "$WALLET_ADDR" 100000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis add-genesis-account "$VALIDATOR_ADDR" 100000000000000000000asobya --home "$SOBYA_HOME"
+          ./sobyad genesis gentx validator 1000000000000000000asobya --chain-id "$CHAIN_ID" --keyring-backend test --home "$SOBYA_HOME"
+          ./sobyad genesis collect-gentxs --home "$SOBYA_HOME"
+
+          # Match the owner-approved production minimum gas price.
+          python3 - "$SOBYA_HOME/config/app.toml" <<'PY'
+          import pathlib, re, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+          s2, n = re.subn(r'(?m)^minimum-gas-prices\s*=\s*".*"$',
+                          'minimum-gas-prices = "1000000000asobya"', s, count=1)
+          if n != 1:
+              raise SystemExit("could not locate minimum-gas-prices in app.toml")
+          p.write_text(s2)
+          PY
+          grep -n 'minimum-gas-prices = "1000000000asobya"' "$SOBYA_HOME/config/app.toml"
+          printf '%s\n' "$WALLET_ADDR" > "$RUNNER_TEMP/keplr-wallet-address"
+          printf '%s\n' "$VALIDATOR_ADDR" > "$RUNNER_TEMP/validator-address"
+
+      - name: Start disposable chain and commit a signed Cosmos MsgSend
+        env:
+          SOBYA_HOME: ${{ runner.temp }}/sobya-keplr-msgsend
+          CHAIN_ID: sobya-keplr-msgsend-ci-1
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./sobyad start --chain-id "$CHAIN_ID" --home "$SOBYA_HOME" > "$RUNNER_TEMP/sobya-keplr-node.log" 2>&1 &
+          NODE_PID=$!
+          cleanup() {
+            kill "$NODE_PID" 2>/dev/null || true
+            wait "$NODE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          # An HTTP-ready RPC at height 0 is not ready for bank queries or
+          # transaction broadcast. Wait until the disposable validator commits
+          # its first block before proceeding.
+          READY=0
+          for attempt in $(seq 1 90); do
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:26657/status > "$RUNNER_TEMP/status.json"; then
+              HEIGHT="$(jq -r '.result.sync_info.latest_block_height // "0"' "$RUNNER_TEMP/status.json")"
+              if [ "$HEIGHT" -ge 1 ]; then
+                READY=1
+                echo "Disposable SOBYA chain reached block height $HEIGHT."
+                break
+              fi
+            fi
+            if ! kill -0 "$NODE_PID" 2>/dev/null; then cat "$RUNNER_TEMP/sobya-keplr-node.log"; exit 1; fi
+            sleep 2
+          done
+          if [ "$READY" -ne 1 ]; then
+            echo "Disposable SOBYA chain did not commit its first block in time."
+            cat "$RUNNER_TEMP/sobya-keplr-node.log"
+            exit 1
+          fi
+
+          WALLET_ADDR="$(cat "$RUNNER_TEMP/keplr-wallet-address")"
+          VALIDATOR_ADDR="$(cat "$RUNNER_TEMP/validator-address")"
+          ./sobyad query bank balances "$WALLET_ADDR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/before-wallet.json"
+          ./sobyad query bank balances "$VALIDATOR_ADDR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/before-validator.json"
+
+          AMOUNT=1000000000000000000
+          FEE=200000000000000
+          ./sobyad tx bank send keplr-cosmos-test "$VALIDATOR_ADDR" "${AMOUNT}asobya" \
+            --chain-id "$CHAIN_ID" \
+            --node tcp://127.0.0.1:26657 \
+            --home "$SOBYA_HOME" \
+            --keyring-backend test \
+            --fees "${FEE}asobya" \
+            --gas 200000 \
+            --sign-mode direct \
+            --broadcast-mode sync \
+            --yes \
+            --output json > "$RUNNER_TEMP/keplr-msgsend.json"
+
+          CODE="$(jq -r '.code // .tx_response.code // 0' "$RUNNER_TEMP/keplr-msgsend.json")"
+          test "$CODE" = "0"
+          TXHASH="$(jq -r '.txhash // .tx_response.txhash' "$RUNNER_TEMP/keplr-msgsend.json")"
+          test -n "$TXHASH"
+          test "$TXHASH" != "null"
+
+          # Sync broadcast only confirms CheckTx. Require inclusion in a
+          # committed block and a successful DeliverTx before declaring pass.
+          COMMITTED=0
+          for attempt in $(seq 1 60); do
+            if ./sobyad query tx "$TXHASH" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/committed-tx.json" 2>/dev/null; then
+              TX_CODE="$(jq -r '.tx_response.code // .code // 0' "$RUNNER_TEMP/committed-tx.json")"
+              if [ "$TX_CODE" = "0" ]; then COMMITTED=1; break; fi
+            fi
+            sleep 2
+          done
+          test "$COMMITTED" -eq 1
+          jq -e '.tx.body.messages[0]["@type"] == "/cosmos.bank.v1beta1.MsgSend"' "$RUNNER_TEMP/committed-tx.json" >/dev/null
+          jq -e '.tx.auth_info.signer_infos[0].mode_info.single.mode == "SIGN_MODE_DIRECT" or .tx.auth_info.signer_infos[0].mode_info.single.mode == 1' "$RUNNER_TEMP/committed-tx.json" >/dev/null
+
+          ./sobyad query bank balances "$WALLET_ADDR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/after-wallet.json"
+          ./sobyad query bank balances "$VALIDATOR_ADDR" --node tcp://127.0.0.1:26657 --home "$SOBYA_HOME" --output json > "$RUNNER_TEMP/after-validator.json"
+          python3 - "$RUNNER_TEMP/before-wallet.json" "$RUNNER_TEMP/before-validator.json" "$RUNNER_TEMP/after-wallet.json" "$RUNNER_TEMP/after-validator.json" "$AMOUNT" "$FEE" <<'PY'
+          import json, sys
+          def balance(path):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              return sum(int(c["amount"]) for c in data.get("balances", []) if c["denom"] == "asobya")
+          bw, bv, aw, av = map(balance, sys.argv[1:5])
+          amount, fee = map(int, sys.argv[5:7])
+          assert bw - aw == amount + fee, f"sender debit={bw-aw}, expected={amount+fee}"
+          assert av - bv == amount, f"recipient credit={av-bv}, expected={amount}"
+          print("PASS: Keplr-compatible secp256k1 SIGN_MODE_DIRECT MsgSend committed.")
+          print(f"PASS: exact asobya deltas; sent={amount}, fee={fee}.")
+          PY
+          echo "PASS: SOBYA native Cosmos wallet signing and live local CheckTx/DeliverTx path."
+          echo "Transaction: $TXHASH"
+
+      - name: Upload node log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sobya-keplr-msgsend-failure
+          path: ${{ runner.temp }}/sobya-keplr-node.log
+          if-no-files-found: ignore
+          retention-days: 7
