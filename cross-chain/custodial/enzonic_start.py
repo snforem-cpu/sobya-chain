@@ -4,6 +4,15 @@ import json, os, stat, sys
 from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
+def _valid_evm_address(value: object) -> bool:
+    if not isinstance(value, str) or len(value) != 42 or not value.startswith("0x"):
+        return False
+    try:
+        bytes.fromhex(value[2:])
+    except ValueError:
+        return False
+    return True
+
 def _validate_operator_config(config: dict) -> None:
     if not isinstance(config, dict) or config.get("mode") != "custodial-inventory":
         raise SystemExit("invalid custodial-inventory config")
@@ -12,28 +21,46 @@ def _validate_operator_config(config: dict) -> None:
     networks = config.get("networks")
     if not isinstance(networks, dict):
         raise SystemExit("live config requires network settings")
+    pricing = config.get("pricing", {})
+    limits = config.get("limits", {})
+    if not isinstance(pricing, dict) or not isinstance(limits, dict):
+        raise SystemExit("live pricing and limits must be JSON objects")
     if config.get("depositWatchEnabled") is not True:
         raise SystemExit("live config requires global depositWatchEnabled=true")
-    if networks["ethereum"].get("chainId") != 1 or networks["sobya"].get("chainId") != 357812033857:
+    eth = networks.get("ethereum")
+    sobya = networks.get("sobya")
+    if not isinstance(eth, dict) or not isinstance(sobya, dict):
+        raise SystemExit("live config requires Ethereum and SOBYA network objects")
+    if eth.get("chainId") != 1 or sobya.get("chainId") != 357812033857:
         raise SystemExit("live config must pin Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857")
-    if str(networks["ethereum"].get("usdtContract", "")).lower() != "0xdac17f958d2ee523a2206206994597c13d831ec7":
+    if str(eth.get("usdtContract", "")).lower() != "0xdac17f958d2ee523a2206206994597c13d831ec7":
         raise SystemExit("Ethereum USDT contract does not match the canonical mainnet token")
+    if eth.get("usdtDecimals") != 6 or not _valid_evm_address(eth.get("inventoryWallet")):
+        raise SystemExit("Ethereum USDT source wallet or six-decimal token configuration is invalid")
+    if not _valid_evm_address(sobya.get("inventoryWallet")):
+        raise SystemExit("SOBYA payout inventory wallet must be a valid EVM address")
     if any(isinstance(networks.get(name), dict) and (networks[name].get("enabled") is True or networks[name].get("depositWatchEnabled") is True) for name in ("tron", "solana")):
         raise SystemExit("TRON and Solana are not supported in this SOBYA launch")
-    for name in ("ethereum", "sobya"):
-        item = networks.get(name)
-        if not isinstance(item, dict) or item.get("enabled") is not True or item.get("depositWatchEnabled") is not True:
-            raise SystemExit(name + " must have enabled and depositWatchEnabled set true")
-        if item.get("inventoryVerified") is not True:
-            raise SystemExit(name + " inventory must be independently verified before live mode")
-        rpc_env, key_env, pass_env = item.get("rpcUrlEnv"), item.get("keystorePathEnv"), item.get("keystorePassphraseEnv")
-        rpc = os.environ.get(rpc_env, "") if isinstance(rpc_env, str) else ""
-        key = os.environ.get(key_env, "") if isinstance(key_env, str) else ""
-        secret = os.environ.get(pass_env, "") if isinstance(pass_env, str) else ""
-        if not rpc.startswith("https://") or not key or not secret:
-            raise SystemExit(name + " requires HTTPS RPC and external keystore/passphrase environment variables")
-        if not Path(key).is_file():
-            raise SystemExit(name + " keystore file is missing")
+    # This launch is deliberately one-way: Ethereum is a read-only USDT
+    # deposit source; SOBYA is the only signing/payout destination.
+    if eth.get("enabled") is True or eth.get("depositWatchEnabled") is not True:
+        raise SystemExit("Ethereum must be deposit-watch-only (enabled=false, depositWatchEnabled=true)")
+    if sobya.get("enabled") is not True or sobya.get("depositWatchEnabled") is not False:
+        raise SystemExit("SOBYA must be payout-only (enabled=true, depositWatchEnabled=false)")
+    eth_rpc_env = eth.get("rpcUrlEnv")
+    eth_rpc = os.environ.get(eth_rpc_env, "") if isinstance(eth_rpc_env, str) else ""
+    if not eth_rpc.startswith("https://"):
+        raise SystemExit("Ethereum deposit watcher requires an HTTPS RPC endpoint")
+    if sobya.get("inventoryVerified") is not True:
+        raise SystemExit("SOBYA payout inventory must be independently verified before live mode")
+    rpc_env, key_env, pass_env = sobya.get("rpcUrlEnv"), sobya.get("keystorePathEnv"), sobya.get("keystorePassphraseEnv")
+    rpc = os.environ.get(rpc_env, "") if isinstance(rpc_env, str) else ""
+    key = os.environ.get(key_env, "") if isinstance(key_env, str) else ""
+    secret = os.environ.get(pass_env, "") if isinstance(pass_env, str) else ""
+    if not rpc.startswith("https://") or not key or not secret:
+        raise SystemExit("SOBYA payout requires HTTPS RPC and external keystore/passphrase environment variables")
+    if not Path(key).is_file():
+        raise SystemExit("SOBYA payout keystore file is missing")
     api = config.get("api", {})
     if not isinstance(api, dict) or api.get("enabled") is not True:
         raise SystemExit("live order API must be enabled")
@@ -44,8 +71,6 @@ def _validate_operator_config(config: dict) -> None:
         raise SystemExit("live API requires a shared gateway token of at least 64 characters in the Enzonic Connect environment")
     if api.get("allowedOrigin") != "https://snforem-cpu.github.io":
         raise SystemExit("live API origin must match the published SOBYA DEX origin")
-    pricing = config.get("pricing", {})
-    limits = config.get("limits", {})
     if pricing.get("baseReferencePriceUsdtPerSoby") != "0.005" or pricing.get("upwardDemandSensitivityBps") != 10000 or pricing.get("downwardDemandSensitivityBps") != 2500:
         raise SystemExit("live pricing settings do not match the approved SOBYA policy")
     if pricing.get("priceCeiling") is not None or pricing.get("priceFloor") is not None:

@@ -110,4 +110,24 @@ class OrderApiTests(unittest.TestCase):
         self.assertEqual(status["quote"]["fee_bps"], 100)
         self.assertEqual(status["deposit_address"], "0x" + "22" * 20)
 
+
+    def test_one_way_live_config_rejects_reverse_soby_to_usdt_quotes(self):
+        cfg = api_config()
+        cfg["networks"]["ethereum"]["enabled"] = False
+        cfg["networks"]["ethereum"]["depositWatchEnabled"] = True
+        cfg["networks"]["sobya"]["enabled"] = True
+        cfg["networks"]["sobya"]["depositWatchEnabled"] = False
+        api = CustodialOrderApi(self.ledger, self.worker, cfg, clock=lambda: self.now[0])
+        api._check_live_inventory = lambda network, amount, recipient: None
+        payload = {
+            "direction": "soby_to_usdt",
+            "source_network": "sobya",
+            "destination_network": "ethereum",
+            "source_wallet": "0x" + "44" * 20,
+            "destination_wallet": "0x" + "55" * 20,
+            "source_amount_base_units": "1000000000000000000",
+        }
+        with self.assertRaisesRegex(OrderApiError, "deposit verification is not enabled for sobya"):
+            api.create_quote(payload)
+
 if __name__ == "__main__": unittest.main()
