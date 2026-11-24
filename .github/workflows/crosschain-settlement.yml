@@ -1,6 +1,10 @@
 name: SOBYA cross-chain settlement worker
 
 on:
+  pull_request:
+    paths:
+      - "cross-chain/github-actions-worker/**"
+      - ".github/workflows/crosschain-settlement.yml"
   workflow_dispatch:
   schedule:
     - cron: "*/15 * * * *"
@@ -13,6 +17,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  worker-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install worker dependencies
+        working-directory: cross-chain/github-actions-worker
+        run: npm install --no-audit --no-fund
+      - name: Run worker unit tests and syntax checks
+        working-directory: cross-chain/github-actions-worker
+        run: npm run check
+
   settle:
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -31,7 +50,7 @@ jobs:
         if: ${{ vars.CROSSCHAIN_AUTOMATION_ENABLED == 'true' }}
         working-directory: cross-chain/github-actions-worker
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
           ETHEREUM_ESCROW_ADDRESS: ${{ vars.ETHEREUM_ESCROW_ADDRESS }}
           ETHEREUM_DEPLOYMENT_BLOCK: ${{ vars.ETHEREUM_DEPLOYMENT_BLOCK }}
