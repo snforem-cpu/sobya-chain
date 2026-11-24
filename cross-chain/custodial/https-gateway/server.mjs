@@ -11,6 +11,22 @@ const WINDOW_MS = 60000;
 const MAX_REQUESTS = 60;
 const buckets = new Map();
 
+function corsHeaders(req) {
+  return req.headers.origin === ALLOWED_ORIGIN
+    ? { "Access-Control-Allow-Origin": ALLOWED_ORIGIN, "Vary": "Origin" }
+    : {};
+}
+
+function sendGatewayError(req, res, status, message) {
+  res.writeHead(status, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    ...corsHeaders(req)
+  });
+  res.end(JSON.stringify({ error: message }));
+}
+
 function configuredUpstream() {
   let url;
   try { url = new URL(UPSTREAM); } catch { throw new Error("SOBYA_UPSTREAM_URL must be set to the Enzonic Connect origin"); }
@@ -39,8 +55,7 @@ function rateLimit(req, res) {
     for (const [key, value] of buckets) if (now - value.start >= WINDOW_MS) buckets.delete(key);
   }
   if (current.count > MAX_REQUESTS) {
-    res.writeHead(429, { "Content-Type": "application/json", "Cache-Control": "no-store", "Retry-After": "60" });
-    res.end(JSON.stringify({ error: "rate limit exceeded" }));
+    sendGatewayError(req, res, 429, "rate limit exceeded");
     return false;
   }
   return true;
@@ -49,26 +64,22 @@ function rateLimit(req, res) {
 const server = http.createServer(async (req, res) => {
   let target;
   if (!GATEWAY_TOKEN) {
-    res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    res.end(JSON.stringify({ error: "gateway authentication secret is not configured" }));
+    sendGatewayError(req, res, 503, "gateway authentication secret is not configured");
     return;
   }
   try { target = configuredUpstream(); }
   catch (error) {
-    res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    res.end(JSON.stringify({ error: error.message }));
+    sendGatewayError(req, res, 503, error.message);
     return;
   }
   const path = new URL(req.url, "http://gateway.local").pathname;
   if (!allowedPath(path) || !["GET", "POST", "OPTIONS"].includes(req.method)) {
-    res.writeHead(404, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    res.end(JSON.stringify({ error: "not found" }));
+    sendGatewayError(req, res, 404, "not found");
     return;
   }
   const origin = req.headers.origin;
   if (origin && origin !== ALLOWED_ORIGIN) {
-    res.writeHead(403, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    res.end(JSON.stringify({ error: "origin is not allowed" }));
+    sendGatewayError(req, res, 403, "origin is not allowed");
     return;
   }
   if (!rateLimit(req, res)) return;
@@ -78,14 +89,12 @@ const server = http.createServer(async (req, res) => {
     for await (const chunk of req) {
       body = Buffer.concat([body, chunk]);
       if (body.length > MAX_BODY) {
-        res.writeHead(413, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        res.end(JSON.stringify({ error: "request body too large" }));
+        sendGatewayError(req, res, 413, "request body too large");
         return;
       }
     }
   } catch {
-    res.writeHead(400, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "could not read request body" }));
+    sendGatewayError(req, res, 400, "could not read request body");
     return;
   }
 
@@ -126,8 +135,7 @@ const server = http.createServer(async (req, res) => {
       const suppliedSignature = /^[0-9a-f]{64}$/.test(responseSignature) ? Buffer.from(responseSignature, "hex") : Buffer.alloc(0);
       const authenticated = validTimestamp && responseNonce === nonce && suppliedSignature.length === expectedSignature.length && timingSafeEqual(suppliedSignature, expectedSignature);
       if (!authenticated) {
-        res.writeHead(502, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        res.end(JSON.stringify({ error: "upstream response authentication failed" }));
+        sendGatewayError(req, res, 502, "upstream response authentication failed");
         return;
       }
       res.writeHead(Number(responseStatus), {
@@ -143,8 +151,7 @@ const server = http.createServer(async (req, res) => {
   upstreamReq.on("timeout", () => upstreamReq.destroy(new Error("upstream timeout")));
   upstreamReq.on("error", () => {
     if (!res.headersSent) {
-      res.writeHead(502, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-      res.end(JSON.stringify({ error: "Enzonic Connect API upstream is unavailable" }));
+      sendGatewayError(req, res, 502, "Enzonic Connect API upstream is unavailable");
     } else res.destroy();
   });
   if (body.length) upstreamReq.write(body);

@@ -30,7 +30,7 @@ jobs:
           if (config.chainName !== 'SOBYA Mainnet') throw new Error('Unexpected network name');
           if (config.deploymentStatus !== 'verified') throw new Error('Mainnet deployment must be marked verified only after receipt and bytecode verification');
           if (config.liquidityEnabled !== true) throw new Error('Initial liquidity operations must remain explicitly enabled');
-          if (config.tradingEnabled !== true) throw new Error('Owner-authorized mainnet swap testing must remain explicitly enabled in the published DEX config');
+          if (typeof config.tradingEnabled !== 'boolean') throw new Error('Trading must remain behind an explicit boolean operator gate');
           for (const key of ['factory', 'router', 'wrappedSoby', 'oracle']) {
             if (!/^0x[0-9a-fA-F]{40}$/.test(config[key] || '')) {
               throw new Error(`Missing or malformed recorded deployment address: ${key}`);
@@ -48,5 +48,5 @@ jobs:
           if (!deploy.includes('MAINNET_DEPLOYMENTS')) throw new Error('Recorded mainnet deployment set is missing');
           if (!deploy.includes('Read-only checks passed')) throw new Error('Verifier success report is missing');
           if (!deploy.includes('Deploy SOBYA DEX contracts')) throw new Error('Mobile deploy button label is missing');
-          console.log('Verified mainnet deployments are recorded; owner-authorized swap testing and initial liquidity are enabled.');
+          console.log('Verified mainnet deployments are recorded; liquidity and trading remain controlled by explicit operator gates.');
           NODE
