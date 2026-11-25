@@ -12,6 +12,12 @@ export const AUTO_EXCHANGE_POLICY = Object.freeze({
   maxPrice: null,
   timeOnlyPriceChanges: false,
   priceChangesRequireConfirmedTrades: true,
+  // Public EVM address supplied by the project owner. The same 20-byte
+  // address is used on Ethereum (USDT inventory destination) and SOBYA EVM
+  // (SOBY payout source); balances and transactions remain chain-specific.
+  inventoryWalletEvmAddress: "0xebdb899fFE84a89e1d576964b640491c135651AD",
+  ethereumChainId: 1,
+  sobyaEvmChainId: 357812033857,
   tradingEnabled: false,
   payoutEnabled: false,
 });
