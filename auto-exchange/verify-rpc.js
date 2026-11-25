@@ -4,8 +4,8 @@ import { ETHEREUM_USDT } from "./quote-ledger.js";
 
 const ethereumUrl = process.env.ETHEREUM_RPC_URL || "https://ethereum-rpc.publicnode.com";
 const sobyaCandidates = [
-  process.env.SOBYA_EVM_RPC_URL || "https://sobya-evm-rpc.nodesafe-app.xyz",
-  process.env.SOBYA_EVM_RPC_FALLBACK_URL || "https://sobya-rpc.nodesafe-dapp.xyz"
+  process.env.SOBYA_EVM_RPC_URL || "https://sobya-evm-rpc.nodesafe-dapp.xyz",
+  process.env.SOBYA_EVM_RPC_FALLBACK_URL || "https://sobya-evm-rpc.nodesafe-app.xyz"
 ].filter((url, index, list) => url && list.indexOf(url) === index);
 const inventory = getAddress(AUTO_EXCHANGE_POLICY.inventoryWalletEvmAddress);
 let failed = false;
