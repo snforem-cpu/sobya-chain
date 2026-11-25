@@ -46,11 +46,15 @@ const ethUsdFeed = new Contract("0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
   ["function decimals() view returns (uint8)", "function latestRoundData() view returns (uint80,int256,uint256,uint256,uint80)"], ethereum);
 async function getFreshEthUsdPrice() {
   const [decimals, round] = await Promise.all([ethUsdFeed.decimals(), ethUsdFeed.latestRoundData()]);
+  const roundId = BigInt(round[0]);
   const answer = BigInt(round[1]);
   const updatedAt = Number(round[3]);
-  if (answer <= 0n || Number(decimals) !== 8 || !Number.isSafeInteger(updatedAt) ||
-      Date.now() / 1000 - updatedAt > 3600 || updatedAt > Date.now() / 1000) {
-    throw new Error("Chainlink ETH/USD price is invalid or older than one hour");
+  const answeredInRound = BigInt(round[4]);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (roundId <= 0n || answeredInRound < roundId || answer <= 0n ||
+      Number(decimals) !== 8 || !Number.isSafeInteger(updatedAt) || updatedAt <= 0 ||
+      nowSeconds - updatedAt > 3600 || updatedAt > nowSeconds) {
+    throw new Error("Chainlink ETH/USD price round is incomplete, invalid, or older than one hour");
   }
   return answer.toString();
 }
