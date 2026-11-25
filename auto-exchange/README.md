@@ -1,45 +1,58 @@
 # SOBYA Auto Exchange (isolated)
 
-This directory is a separate project. It must not modify `buy/`, `dex/`, existing contracts, chain configuration, or live balances.
+This is an independent project under `auto-exchange/`. It does not modify `buy/`, `dex/`, existing contracts, chain configuration, or live balances.
 
 ## Wallet and networks
 
-- Inventory wallet EVM address: `0xebdb899fFE84a89e1d576964b640491c135651AD`.
-- Ethereum mainnet (chain ID 1): this address is the destination for customer USDT deposits.
-- SOBYA EVM (chain ID 357812033857): the same address is the SOBY inventory/payout wallet.
-- The address is identical on both EVM networks, but tokens, balances, transaction hashes, and confirmations are network-specific. USDT deposited on Ethereum is not a SOBY balance on SOBYA.
+- Inventory EVM address: `0xebdb899fFE84a89e1d576964b640491c135651AD`.
+- Ethereum mainnet (chain ID 1): customer USDT deposits.
+- SOBYA EVM (chain ID 357812033857): SOBY inventory/payout source.
+- The same address is used on both networks; balances and transactions remain separate.
 
-The address is public and is not a private key. Never store a wallet private key in this file, the frontend, or Git history.
-
-## Agreed commercial policy
+## Commercial policy recorded
 
 - Opening price: 0.005 USDT per SOBY.
-- Reference inventory: 1,000,000 SOBY (not a claim about current live balance).
+- Reference inventory: 1,000,000 SOBY (not a claim about live balance).
 - Exchange fee: 1% (100 bps).
-- Upward price coefficient: 1000.
-- Downward price coefficient: 250.
-- Upward response is four times the downward response.
+- Directional coefficients: 1000 upward / 250 downward (4:1).
 - Quote validity: 10 minutes.
-- No fixed upper price ceiling.
-- Time passing alone never changes price; only confirmed trades/inventory changes may do so.
+- No fixed maximum price; time alone does not move the price.
 
-## Settlement design constraints — no paid contract or hosted backend
+The absolute price-impact formula/normalizer for the 1000/250 coefficients has not been specified. The code deliberately does not invent one or calculate a live floating price.
 
-The owner has explicitly rejected deploying a paid smart contract and adding paid hosting/services. The intended execution environment remains GitHub Pages + GitHub Actions + GitHub Secrets, using public RPC endpoints.
+## Implemented settlement core
 
-A customer's Ethereum sender address can be read from the USDT transfer and reused as the SOBYA EVM payout recipient. The same address format works across both EVM networks. This solves recipient identification, but it does not by itself bind a deposit to the exact quote shown to the customer.
+`settlement.js` is a pure, side-effect-free matching module. It accepts a quote ledger and a decoded Ethereum USDT Transfer event, then checks:
 
-A plain ERC-20 transfer to this inventory EOA contains only token transfer data (sender, recipient, amount). It does not contain a quote ID, quoted SOBY quantity, or quote expiry. GitHub Actions also cannot read the customer's browser session or local storage. Therefore, do not infer a quote from the sender or deposit amount alone and do not enable automatic payouts until an independently verifiable quote-to-deposit binding and durable replay-protected order ledger exist.
+1. Ethereum chain ID, sender, deposit address, USDT contract address and exact integer atomic-unit amount.
+2. A single matching open quote (zero matches = unmatched; multiple = ambiguous/manual review).
+3. The block timestamp falls within that quote's creation/expiry window.
+4. Required confirmations have been reached.
+5. The transaction hash + log index has not already been processed.
 
-A no-contract/no-paid-hosting design must be proven before accepting funds. In particular, a static GitHub Pages page cannot securely create a private, durable quote record by itself. Any proposed amount-encoding or pre-issued-quote scheme must be specified and tested for collisions, expiry, precision, duplicate transfers, concurrent orders, and price changes. If these requirements cannot be met, the system must remain in quote-only mode rather than risk mispaying customers.
+A successful match changes the quote to `paid` and returns `matched_paid_not_settled`. **It does not sign or send SOBY.** The transfer replay key is recorded in the returned ledger state. The caller must persist that state durably and serialize writers.
 
-## Safety status
+Tests cover exact matching, wrong chain/token/sender/recipient/amount, expiry, insufficient confirmations, duplicate logs and ambiguous quotes.
 
-- Trading is disabled.
-- Payouts are disabled.
-- No private key or signing secret is present in this repository.
-- No customer deposits should be sent to this wallet for this Auto Exchange until the full settlement path is implemented, reviewed, and explicitly enabled.
+## Critical limitation — quote issuance and durable ledger
+
+The matching core is now implemented, but the end-to-end exchange is NOT operational.
+
+An ordinary ERC-20 transfer has no quote ID. Matching therefore depends on a pre-existing quote ledger that assigns a unique exact USDT atomic amount to one sender and one quote. The included `ledger.example.json` is only a schema example, not a live database. A static GitHub Pages page cannot safely write private durable orders to the repository, and a public workflow cannot accept arbitrary user quote requests while safely using a privileged repository token.
+
+Before enabling real deposits, a trusted quote-issuance path must reserve unique amounts, persist quotes, prevent collisions/concurrent reuse, and expire/release reservations. The settlement runner must then persist its ledger atomically with single-writer protection. GitHub Actions can run scheduled jobs, but it is not a continuously available backend and scheduled runs may be delayed.
+
+If that durable quote/ledger path cannot be provided within the no-paid-hosting constraint, the interface must remain quote-only/manual-review. Do not send customer funds to the inventory address for this Auto Exchange yet.
+
+## Security state
+
+- `tradingEnabled: false`.
+- `payoutEnabled: false`.
+- No private key, signing secret, live RPC signer, or automatic payout code is present.
+- Never place a private key in frontend files, Git history, artifacts, or logs.
+- Never run financial signing from untrusted pull-request workflows.
+- No paid contract, paid hosting, or new paid service is part of the intended design.
 
 ## Tests
 
-Run `npm test` from this directory. Current tests validate the agreed policy and keep settlement disabled.
+Run `npm test` from this directory. GitHub Actions workflow `.github/workflows/test-auto-exchange.yml` runs these isolated tests on changes to this directory.
