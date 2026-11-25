@@ -27,15 +27,12 @@ The public UI uses the current NodeSafe `nodesafe-dapp.xyz` EVM endpoint. Contra
 - Native SOBY / WSOBY wrapping is available when the connected wallet has sufficient SOBY for the amount and network fees.
 - Pool creation and liquidity operations are enabled for owner-directed initialization.
 - Public swaps are **disabled** until a funded pool, live reserves, quote accuracy, and controlled mainnet swap tests are verified.
-- Cross-chain order creation and customer deposits are **disabled**. No working HTTPS order gateway is currently configured; the previous Enzonic URL is intentionally removed.
-- Do not send USDT or other assets to a displayed address unless a live order service has been deployed and independently verified.
 
-## Safety requirements before opening swaps or cross-chain orders
+## Safety requirements before opening public swaps
 
 1. Verify the deployed bytecode and constructor relationships on the explorer.
 2. Confirm the intended pool exists and has the expected token pair and decimals.
 3. Add and verify initial liquidity using owner-controlled transactions.
 4. Confirm quotes against live reserves and execute a controlled, low-value mainnet swap.
-5. For cross-chain orders, deploy a reachable HTTPS gateway, enable finalized deposit watchers, prove inventory and payout controls, and pass end-to-end settlement tests.
 
 No network genesis change is required for these application-layer steps.
