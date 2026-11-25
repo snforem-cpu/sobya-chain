@@ -17,16 +17,14 @@ function fixture() {
   }, getFeeData: async () => ({ gasPrice: 10n }),
   getBalance: async () => 10n ** 18n,
   getTransactionCount: async () => 4 };
-  const usdt = {
-    balanceOf: async () => 100000000n,
-    estimateGas: { transfer: async () => 50000n },
-    transfer: async (_to, _amount, opts) => {
-      assert.equal(opts.nonce, 4);
-      return { hash: "0x" + "c".repeat(64), wait: async () => ({
-        status: 1, blockNumber: 200, gasUsed: 45000n, gasPrice: 10n
-      }) };
-    }
+  const transfer = async (_to, _amount, opts) => {
+    assert.equal(opts.nonce, 4);
+    return { hash: "0x" + "c".repeat(64), wait: async () => ({
+      status: 1, blockNumber: 200, gasUsed: 45000n, gasPrice: 10n
+    }) };
   };
+  transfer.estimateGas = async () => 50000n;
+  const usdt = { balanceOf: async () => 100000000n, transfer };
   const signer = { address: "0xebdb899fFE84a89e1d576964b640491c135651AD" };
   const applyConfirmedPriceChange = ({ ledger: l, direction, settlementConfirmed }) => {
     assert.equal(direction, "down");
