@@ -61,6 +61,16 @@ test("successful receipt without exact USDT Transfer event is held for review", 
   assert.equal(result.ledger.currentPriceUsdtPerSoby, "0.005");
 });
 
+test("return too large to preserve a positive price is rejected before refund", async () => {
+  const f = fixture();
+  f.quote.paymentAmountAtomic = (500_000_000n * 10n ** 18n).toString();
+  await assert.rejects(
+    executeReturnRefund({ ...f, ledgerSha: "start", refundRecipient: wallet,
+      amount: 9900000n, ethereumConfirmations: 12 }),
+    /reduce price to zero or below/
+  );
+});
+
 test("prepared refund cannot be blindly retried", async () => {
   const f = fixture();
   f.quote.refundNonce = 4;
