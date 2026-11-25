@@ -59,11 +59,12 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - `tradingEnabled: false`.
 - `payoutEnabled: false`.
 - Both flags remain false by default. The payout and refund workers exit before accessing RPC credentials or the signing key while either flag is false.
-- The verified SOBYA RPC endpoint is a read-only connectivity result; it does not establish that signing, broadcasting, gas estimation, or transaction inclusion works.
+- The read-only RPC verifier now checks SOBYA native-transfer `eth_estimateGas`, EVM fee data, and whether the current inventory balance covers the simulated gas reserve. The verified endpoint returned a 21,000-gas estimate and zero gas price at the latest check; this is a simulation only and does not establish signing, broadcasting, or transaction inclusion.
+- The latest Ethereum inventory check returned 0 USDT and 0 ETH. Therefore the reverse SOBY-return/USDT-refund direction is not funded and cannot refund customers until the inventory wallet receives USDT and enough ETH for Ethereum gas.
 - The payout worker is implemented but is not authorized for live use until the PR is reviewed and merged, GitHub Actions secrets are configured, and controlled end-to-end tests have passed. Do not send USDT or SOBY while disabled.
 - Required repository Actions secrets after review: `ETHEREUM_RPC_URL`, `SOBYA_EVM_RPC_URL`, and `SOBYA_PAYOUT_PRIVATE_KEY`. Set `SOBYA_EVM_RPC_URL` to the verified primary endpoint above. Never put the private key in an issue, chat, source file, or workflow output. The key must derive the configured inventory address.
 - Ethereum USDT deposits are matched by exact sender, destination, token, amount, chain, quote validity, 12 confirmations, and transaction-log replay key.
-- SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas and requires the payout amount plus a 20% buffered gas reserve.
+- SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas and requires the payout amount plus a 20% buffered gas reserve. A zero gas price is accepted for the SOBYA network because its current RPC reports zero; negative fee values remain rejected.
 - A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger.
 - The reverse return worker and issue workflow are implemented in this branch, but both are also gated by the same disabled policy flags. No USDT refund can execute while either flag is false.
 - If execution stops after a payout nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent.
