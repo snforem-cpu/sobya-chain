@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { createReturnQuote, parseReturnIssueBody, formatSobyAtomic, formatUsdtAtomic } from "./return-ledger.js";
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
 
-if (!AUTO_EXCHANGE_POLICY.returnTradingEnabled) {
-  console.log("SOBY-to-USDT return quotes are currently disabled; no return requests will be accepted.");
+if (!AUTO_EXCHANGE_POLICY.tradingEnabled) {
+  console.log("Auto Exchange quote issuance is disabled by shared project policy.");
   process.exit(0);
 }
 
@@ -52,7 +52,7 @@ function quoteComment(q) {
     "- **Return network:** SOBYA EVM",
     "- **Return address:** \`" + q.depositAddress + "\`",
     "- **Valid until:** " + q.expiresAt, "",
-    "**Do not send SOBY:** the SOBY-to-USDT return direction is currently closed until USDT inventory and Ethereum gas reserves are funded."
+    "**Funding note:** USDT refunds are processed after the SOBY return is confirmed. If the inventory wallet does not yet have enough USDT and ETH for the refund and Ethereum gas, the order remains safely queued in a funding-wait state and is retried automatically after funds arrive. Do not send more than the exact quoted SOBY amount."
   ].join("\n");
 }
 const ledger = JSON.parse(await readFile("auto-exchange/ledger.json", "utf8"));
