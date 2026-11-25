@@ -35,14 +35,13 @@ jobs:
           if (config.rpcUrl !== 'https://sobya-evm-rpc.nodesafe-dapp.xyz') throw new Error('DEX must use the verified NodeSafe dapp EVM RPC');
           if (config.deploymentStatus !== 'verified') throw new Error('Published contract deployment status missing');
           if (config.tradingEnabled !== false) throw new Error('Public swaps must remain locked until funded-pool tests pass');
-          if (config.crossChainOrdersEnabled !== false || config.customerDepositsEnabled !== false) throw new Error('Cross-chain orders and deposits must remain closed without a verified gateway');
-          if (config.custodialApiUrl !== '') throw new Error('Unverified custodial gateway URL must not be configured');
           for (const key of ['factory', 'router', 'wrappedSoby']) {
             if (!/^0x[0-9a-fA-F]{40}$/.test(config[key] || '')) throw new Error('Invalid deployed contract address: ' + key);
           }
           const dex = fs.readFileSync('dex/index.html', 'utf8');
           if (!dex.includes('https://sobya-evm-rpc.nodesafe-dapp.xyz')) throw new Error('Wallet connector is not using the current EVM RPC');
-          if (!dex.includes("config.crossChainOrdersEnabled!==true") || !dex.includes('!apiHealthy')) throw new Error('Cross-chain quote UI must fail closed');
+          if (dex.includes('crosschain') || dex.includes('Ethereum USDT') || dex.includes('USDT → SOBY')) throw new Error('Retired cross-chain exchange UI remains in the DEX');
+          if ((dex.match(/class="btn tab/g) || []).length !== 3) throw new Error('DEX must expose exactly the three original tabs');
           const home = fs.readFileSync('index.html', 'utf8');
           for (const oldHost of ['sobya-evm-rpc.nodesafe-app.xyz', 'sobya-rpc.nodesafe-app.xyz', 'sobya-api.nodesafe-app.xyz']) {
             if (home.includes(oldHost)) throw new Error('Stale NodeSafe endpoint remains on the public homepage: ' + oldHost);
