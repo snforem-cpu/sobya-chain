@@ -3,11 +3,12 @@
 export const AUTO_EXCHANGE_POLICY = Object.freeze({
   quoteCurrency: "USDT",
   payoutAsset: "SOBY",
-  openingPriceUsdtPerSoby: 0.005,
+  openingPriceUsdtPerSoby: "0.005",
   referenceInventorySoby: 1_000_000,
   exchangeFeeBps: 100,
-  upwardPriceCoefficient: 1000,
-  downwardPriceCoefficient: 250,
+  upwardPriceCoefficient: 100,
+  downwardPriceCoefficient: 25,
+  priceImpactDenominator: 10_000,
   quoteValiditySeconds: 600,
   maxPrice: null,
   timeOnlyPriceChanges: false,
@@ -22,8 +23,8 @@ export const AUTO_EXCHANGE_POLICY = Object.freeze({
   payoutEnabled: false,
 });
 
-// Directional asymmetry is fixed at 4:1. The absolute impact unit/normalizer
-// has deliberately not been guessed; it must be specified before live quotes.
+// Directional asymmetry is fixed at 4:1; coefficients are basis points
+// applied proportionally to trade size relative to reference inventory.
 export function getDirectionalPriceCoefficient(direction) {
   if (direction === "up") return AUTO_EXCHANGE_POLICY.upwardPriceCoefficient;
   if (direction === "down") return AUTO_EXCHANGE_POLICY.downwardPriceCoefficient;
