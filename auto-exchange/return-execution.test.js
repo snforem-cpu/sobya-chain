@@ -20,7 +20,8 @@ function fixture() {
   const transfer = async (_to, _amount, opts) => {
     assert.equal(opts.nonce, 4);
     return { hash: "0x" + "c".repeat(64), wait: async () => ({
-      status: 1, blockNumber: 200, gasUsed: 45000n, gasPrice: 10n
+      status: 1, blockNumber: 200, gasUsed: 45000n, gasPrice: 10n,
+      logs: [{ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7" }]
     }) };
   };
   transfer.estimateGas = async () => 50000n;
@@ -38,7 +39,7 @@ function fixture() {
   return { quote, ledger, saveLedger, ethereum, usdt, signer, applyConfirmedPriceChange };
 }
 
-test("refund reserves nonce, broadcasts once, confirms, then applies downward price change", async () => {
+test("refund reserves nonce, verifies exact Transfer event, confirms, then applies downward price change", async () => {
   const f = fixture();
   const result = await executeReturnRefund({ ...f, ledgerSha: "start",
     refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
@@ -47,6 +48,17 @@ test("refund reserves nonce, broadcasts once, confirms, then applies downward pr
   assert.equal(result.ledger.returnQuotes[0].refundNonce, 4);
   assert.equal(result.ledger.returnQuotes[0].refundTxHash, "0x" + "c".repeat(64));
   assert.equal(result.ledger.currentPriceUsdtPerSoby, "0.00499");
+});
+
+test("successful receipt without exact USDT Transfer event is held for review", async () => {
+  const f = fixture();
+  f.usdt.interface.parseLog = () => { throw new Error("unrelated log"); };
+  const result = await executeReturnRefund({ ...f, ledgerSha: "start",
+    refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
+  assert.equal(result.review, true);
+  assert.equal(result.completed, false);
+  assert.equal(result.ledger.returnQuotes[0].status, "review");
+  assert.equal(result.ledger.currentPriceUsdtPerSoby, "0.005");
 });
 
 test("prepared refund cannot be blindly retried", async () => {
