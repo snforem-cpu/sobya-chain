@@ -28,6 +28,6 @@ jobs:
           node-version: 22
       - name: Process all pending SOBY return requests
         env:
-          GH_TOKEN: \${{ github.token }}
-          GH_REPOSITORY: \${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: node auto-exchange/process-return-requests.js
