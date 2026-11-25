@@ -76,6 +76,23 @@ export async function executeReturnRefund({
     ledgerSha = await saveLedger(ledger, ledgerSha, "Flag USDT refund for review " + quote.orderId);
     return { ledger, ledgerSha, completed: false, review: true };
   }
+  const usdtAddress = "0xdAC17F958D2ee523a2206206994597C13D831ec7".toLowerCase();
+  const transferConfirmed = (receipt.logs || []).some(log => {
+    if (String(log.address).toLowerCase() !== usdtAddress) return false;
+    try {
+      const parsed = usdt.interface.parseLog(log);
+      return parsed?.name === "Transfer" &&
+        String(parsed.args.from).toLowerCase() === String(signer.address).toLowerCase() &&
+        String(parsed.args.to).toLowerCase() === refundRecipient.toLowerCase() &&
+        BigInt(parsed.args.value) === amount;
+    } catch { return false; }
+  });
+  if (!transferConfirmed) {
+    quote.status = "review";
+    quote.refundReviewReason = "Successful Ethereum receipt did not contain the exact USDT Transfer event";
+    ledgerSha = await saveLedger(ledger, ledgerSha, "Flag USDT refund without matching Transfer event " + quote.orderId);
+    return { ledger, ledgerSha, completed: false, review: true };
+  }
   ledger = applyConfirmedPriceChange({
     ledger, quantitySobyAtomic: quote.paymentAmountAtomic,
     direction: "down", settlementConfirmed: true
