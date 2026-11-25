@@ -3,16 +3,17 @@ import assert from "node:assert/strict";
 import { AUTO_EXCHANGE_POLICY, getDirectionalPriceCoefficient } from "./config.js";
 
 test("opening sale policy is fixed", () => {
-  assert.equal(AUTO_EXCHANGE_POLICY.openingPriceUsdtPerSoby, 0.005);
+  assert.equal(AUTO_EXCHANGE_POLICY.openingPriceUsdtPerSoby, "0.005");
   assert.equal(AUTO_EXCHANGE_POLICY.referenceInventorySoby, 1_000_000);
   assert.equal(AUTO_EXCHANGE_POLICY.exchangeFeeBps, 100);
   assert.equal(AUTO_EXCHANGE_POLICY.quoteValiditySeconds, 600);
 });
 
-test("upward price response is four times downward response", () => {
-  assert.equal(getDirectionalPriceCoefficient("up"), 1000);
-  assert.equal(getDirectionalPriceCoefficient("down"), 250);
+test("upward and downward coefficients are 100 and 25 with 4:1 asymmetry", () => {
+  assert.equal(getDirectionalPriceCoefficient("up"), 100);
+  assert.equal(getDirectionalPriceCoefficient("down"), 25);
   assert.equal(getDirectionalPriceCoefficient("up") / getDirectionalPriceCoefficient("down"), 4);
+  assert.equal(AUTO_EXCHANGE_POLICY.priceImpactDenominator, 10_000);
 });
 
 test("price has no configured ceiling and does not move with time alone", () => {
