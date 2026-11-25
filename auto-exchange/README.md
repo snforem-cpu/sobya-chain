@@ -6,6 +6,8 @@ Independent project under `auto-exchange/`. It does not modify `buy/`, `dex/`, e
 - Inventory EVM address: `0xebdb899fFE84a89e1d576964b640491c135651AD`.
 - Ethereum mainnet (chain ID 1): customer USDT deposit network.
 - SOBYA EVM (chain ID 357812033857): SOBY payout network.
+- Verified primary SOBYA EVM JSON-RPC: `https://sobya-evm-rpc.nodesafe-dapp.xyz`.
+- Previous NodeSafe hostname `https://sobya-evm-rpc.nodesafe-app.xyz` is retained only as a read-only verifier fallback; it is not the selected primary.
 - The same EVM address is used on both chains; balances and transactions are separate.
 
 ## Recorded commercial policy
@@ -51,23 +53,22 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - The return worker scans confirmed native SOBY transfers to the inventory wallet on SOBYA EVM, matching exact sender, recipient, amount, chain, quote window, and transaction replay key.
 - After two SOBYA confirmations, the worker checks USDT inventory and the separate Ethereum ETH gas reserve, reserves the Ethereum nonce in the GitHub ledger, and sends the quoted USDT refund.
 - It marks the return settled and applies the 25-bps downward price movement only after 12 Ethereum confirmations and an exact USDT `Transfer` event from the inventory wallet to the customer's quoted address.
-- A prepared or broadcast refund is never blindly retried. Missing receipt events, insufficient USDT, insufficient ETH gas, or uncertain outcomes go to manual review.
 - The return quote and refund workflows use GitHub Issues, GitHub Actions, and the same committed JSON ledger; they do not require a separate server.
 
 ## Security state — no live funds
 - `tradingEnabled: false`.
 - `payoutEnabled: false`.
-- Both `tradingEnabled` and `payoutEnabled` remain false by default. The payout worker exits before reading RPC credentials or the signing key while either flag is false.
-- The payout worker is implemented but is not authorized for live use until the PR is merged, GitHub Secrets are configured, and an end-to-end controlled test has passed. Do not send USDT while disabled.
-- Required repository Actions secrets after review: `ETHEREUM_RPC_URL`, `SOBYA_EVM_RPC_URL`, and `SOBYA_PAYOUT_PRIVATE_KEY`. Never put the private key in an issue, chat, source file, or workflow output. The key must derive the configured inventory address.
+- Both flags remain false by default. The payout and refund workers exit before accessing RPC credentials or the signing key while either flag is false.
+- The verified SOBYA RPC endpoint is a read-only connectivity result; it does not establish that signing, broadcasting, gas estimation, or transaction inclusion works.
+- The payout worker is implemented but is not authorized for live use until the PR is reviewed and merged, GitHub Actions secrets are configured, and controlled end-to-end tests have passed. Do not send USDT or SOBY while disabled.
+- Required repository Actions secrets after review: `ETHEREUM_RPC_URL`, `SOBYA_EVM_RPC_URL`, and `SOBYA_PAYOUT_PRIVATE_KEY`. Set `SOBYA_EVM_RPC_URL` to the verified primary endpoint above. Never put the private key in an issue, chat, source file, or workflow output. The key must derive the configured inventory address.
 - Ethereum USDT deposits are matched by exact sender, destination, token, amount, chain, quote validity, 12 confirmations, and transaction-log replay key.
 - SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas and requires the payout amount plus a 20% buffered gas reserve.
 - A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger.
 - The reverse return worker and issue workflow are implemented in this branch, but both are also gated by the same disabled policy flags. No USDT refund can execute while either flag is false.
-- If execution stops after a payout nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent. This favors avoiding duplicate payments over automatic recovery.
+- If execution stops after a payout nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent.
 - No private key is placed in frontend files, Git history, or workflow logs. The quote workflow handles untrusted issue text without wallet secrets.
 - No paid contract, paid hosting, or new paid service is part of this design.
 
 ## Tests
-Run `npm test` inside `auto-exchange/`. The GitHub Actions test workflow runs policy, quote allocation, settlement, pricing, payout gas-reserve, mocked payout-lifecycle, SOBY-return matching, and mocked USDT-refund lifecycle tests. `payout-execution.js` is the same injected lifecycle used by the production worker; its tests cover durable nonce reservation, broadcast, receipt confirmation, failed receipts, insufficient inventory, and interruption/restart no-blind-retry behavior. All RPC, signer, and ledger adapters in these tests are deterministic mocks. These tests do not verify live RPC endpoints or authorize real-money operation.
-
+Run `npm test` inside `auto-exchange/`. GitHub Actions tests cover quote allocation, settlement matching, pricing, payout gas-reserve and mocked payout lifecycle, SOBY-return matching, and mocked USDT-refund lifecycle. These deterministic tests do not verify live transaction execution or authorize real-money operation.
