@@ -20,6 +20,7 @@ jobs:
       - name: Verify public BUY API and manual pricing
         run: |
           node <<'NODE'
+          async function main() {
           const base = 'https://sobya-chain.snforem.workers.dev';
           const origin = 'https://snforem-cpu.github.io';
           const healthResponse = await fetch(base + '/health', { headers: { Origin: origin } });
@@ -41,4 +42,6 @@ jobs:
           }
           console.log('PASS: BUY API online; database configured; manual price available; GitHub Pages CORS allowed; automatic checkout remains disabled.');
           console.log('Manual price USD/SOBY: ' + price.priceUsd);
+          }
+          main().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
