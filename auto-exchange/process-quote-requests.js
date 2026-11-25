@@ -120,7 +120,7 @@ for (const item of errors) {
   const comments = await listComments(item.issueNumber);
   const marker = "<!-- sobya-auto-exchange-invalid:" + item.issueNumber + " -->";
   if (!comments.some(c => (c.body || "").includes(marker))) {
-    await addComment(item.issueNumber, marker + "\\nQuote request could not be issued: " + item.message + ". Please edit the issue to correct the fields.");
+    await addComment(item.issueNumber, marker + "\nQuote request could not be issued: " + item.message + ". Please edit the issue to correct the fields.");
   }
 }
 console.log("Scanned " + pending.length + " open request issues; ledger now contains " + ledger.quotes.length + " reserved quote records.");
