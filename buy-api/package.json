@@ -6,7 +6,5 @@
     "test": "node --test"
   },
   "devDependencies": {},
-  "dependencies": {
-    "viem": "^2.38.5"
-  }
+  "dependencies": {}
 }
