@@ -41,8 +41,9 @@ function priceAtomic(value) {
   if (n <= 0n) throw new Error("Invalid exchange price");
   return n;
 }
-function formatAtomic(n, decimals) {
-  const fraction = (n % 10n**BigInt(decimals)).toString().padStart(decimals,"0").replace(/0+$/,"");
+function formatAtomic(n, decimals, trim = true) {
+  let fraction = (n % 10n**BigInt(decimals)).toString().padStart(decimals,"0");
+  if (trim) fraction = fraction.replace(/0+$/,"");
   return (n / 10n**BigInt(decimals)).toString() + (fraction ? "." + fraction : "");
 }
 function validAddress(value) { return /^0x[0-9a-fA-F]{40}$/.test(String(value || "")); }
@@ -153,7 +154,7 @@ async function createQuote(request, env) {
         orderId, direction, sender,
         paymentAmount: formatAtomic(payment,decimals),
         paymentAmountAtomic: payment.toString(),
-        payoutAmount: formatAtomic(payout,direction === "buy" ? 18 : 6),
+        payoutAmount: formatAtomic(payout,direction === "buy" ? 18 : 6,direction === "buy"),
         payoutAmountAtomic: payout.toString(),
         quotedPrice: row.quoted_price, exchangeFeeBps:FEE_BPS,
         chainId:row.chain_id, depositAddress:INVENTORY, tokenAddress:row.token_address,
