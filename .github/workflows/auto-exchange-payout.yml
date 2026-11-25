@@ -1,0 +1,41 @@
+name: SOBYA Auto Exchange payout worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+# This workflow is deliberately separate from public issue/quote processing.
+# It must never run for pull requests or untrusted branch code.
+concurrency:
+  group: sobya-auto-exchange-payout
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  payout:
+    if: github.repository == 'snforem-cpu/sobya-chain' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: auto-exchange/package-lock.json
+      - name: Install isolated exchange dependencies
+        working-directory: auto-exchange
+        run: npm ci
+      - name: Verify deposits and execute eligible SOBY payouts
+        working-directory: auto-exchange
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+          SOBYA_EVM_RPC_URL: ${{ secrets.SOBYA_EVM_RPC_URL }}
+          SOBYA_PAYOUT_PRIVATE_KEY: ${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
+        run: node payout-worker.js
