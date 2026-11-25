@@ -24,7 +24,11 @@ function fixture() {
     }) };
   };
   transfer.estimateGas = async () => 50000n;
-  const usdt = { balanceOf: async () => 100000000n, transfer };
+  const usdt = { balanceOf: async () => 100000000n, transfer,
+    interface: { parseLog: () => ({ name: "Transfer", args: {
+      from: "0xebdb899fFE84a89e1d576964b640491c135651AD",
+      to: wallet, value: 9900000n
+    } }) } };
   const signer = { address: "0xebdb899fFE84a89e1d576964b640491c135651AD" };
   const applyConfirmedPriceChange = ({ ledger: l, direction, settlementConfirmed }) => {
     assert.equal(direction, "down");
