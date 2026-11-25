@@ -93,7 +93,7 @@ async function initWalletConnector(){
   const mod=await import('https://esm.sh/@metamask/connect-evm@2.1.1?bundle');
   evmClient=await mod.createEVMClient({
    dapp:{name:'SOBYA DEX',url:window.location.href,iconUrl:new URL('../assets/logo/sobya-coin-128.png',window.location.href).href},
-   api:{supportedNetworks:{[CHAIN_ID_HEX]: 'https://sobya-evm-rpc.nodesafe-app.xyz'}},
+   api:{supportedNetworks:{[CHAIN_ID_HEX]: 'https://sobya-evm-rpc.nodesafe-dapp.xyz'}},
    analytics:{enabled:false}
   });
   return evmClient;
