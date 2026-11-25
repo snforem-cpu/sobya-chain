@@ -42,10 +42,59 @@ function priceAtomic(value) {
   return n;
 }
 function formatAtomic(n, decimals) {
-  return (n / 10n**BigInt(decimals)).toString() + "." +
-    (n % 10n**BigInt(decimals)).toString().padStart(decimals,"0").replace(/0+$/,"");
+  const fraction = (n % 10n**BigInt(decimals)).toString().padStart(decimals,"0").replace(/0+$/,"");
+  return (n / 10n**BigInt(decimals)).toString() + (fraction ? "." + fraction : "");
 }
 function validAddress(value) { return /^0x[0-9a-fA-F]{40}$/.test(String(value || "")); }
+function decodeBase64Url(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+async function verifyGitHubOidc(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) return false;
+  let header, claims;
+  try {
+    header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
+  } catch { return false; }
+  const now = Math.floor(Date.now() / 1000);
+  if (header.alg !== "RS256" || !header.kid ||
+      claims.iss !== "https://token.actions.githubusercontent.com" ||
+      claims.aud !== "sobya-auto-exchange" ||
+      claims.repository !== "snforem-cpu/sobya-chain" ||
+      claims.ref !== "refs/heads/main" ||
+      !Number.isFinite(claims.exp) || claims.exp <= now ||
+      (Number.isFinite(claims.nbf) && claims.nbf > now + 30) ||
+      (Number.isFinite(claims.iat) && claims.iat > now + 30)) return false;
+  const allowed = new Set([
+    "snforem-cpu/sobya-chain/.github/workflows/auto-exchange-payout.yml@refs/heads/main",
+    "snforem-cpu/sobya-chain/.github/workflows/auto-exchange-return-refund.yml@refs/heads/main"
+  ]);
+  if (!allowed.has(claims.workflow_ref)) return false;
+  const jwksResponse = await fetch("https://token.actions.githubusercontent.com/.well-known/jwks");
+  if (!jwksResponse.ok) return false;
+  const jwks = await jwksResponse.json();
+  const jwk = (jwks.keys || []).find(key => key.kid === header.kid && key.kty === "RSA");
+  if (!jwk) return false;
+  try {
+    const publicKey = await crypto.subtle.importKey("jwk", jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const signed = new TextEncoder().encode(parts[0] + "." + parts[1]);
+    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, decodeBase64Url(parts[2]), signed);
+  } catch { return false; }
+}
+function quoteForLedger(row) {
+  const base = {
+    orderId: row.order_id, sender: row.sender, depositAddress: row.deposit_address,
+    chainId: Number(row.chain_id), requestedAmountAtomic: row.requested_amount_atomic,
+    paymentAmountAtomic: row.payment_amount_atomic, payoutAmountAtomic: row.payout_amount_atomic,
+    quotedPrice: row.quoted_price, exchangeFeeBps: Number(row.exchange_fee_bps),
+    createdAt: row.created_at, expiresAt: row.expires_at, status: row.status
+  };
+  if (row.direction === "buy") return { ...base, tokenAddress: row.token_address };
+  return base;
+}
 async function createQuote(request, env) {
   const body = await request.json();
   const direction = body.direction;
@@ -124,10 +173,29 @@ export default {
     }
     if (url.pathname === "/internal/open-quotes" && request.method === "GET") {
       const auth = request.headers.get("Authorization") || "";
-      if (!env.D1_SYNC_TOKEN || auth !== "Bearer " + env.D1_SYNC_TOKEN)
+      if (!(await verifyGitHubOidc(auth.startsWith("Bearer ") ? auth.slice(7) : "")))
         return response({error:"Unauthorized"},401,ORIGIN);
-      const result = await env.DB.prepare("SELECT * FROM exchange_quotes WHERE status IN ('open','paid','returned','refund_waiting_funds') ORDER BY created_at").all();
-      return response({quotes:result.results || []},200,ORIGIN);
+      const result = await env.DB.prepare("SELECT * FROM exchange_quotes WHERE status IN ('open','paid','returned','refund_waiting_funds','payout_waiting_funds','settled','refunded','review') ORDER BY created_at").all();
+      return response({quotes:(result.results || []).map(quoteForLedger)},200,ORIGIN);
+    }
+    if (url.pathname === "/internal/sync-ledger" && request.method === "POST") {
+      const auth = request.headers.get("Authorization") || "";
+      if (!(await verifyGitHubOidc(auth.startsWith("Bearer ") ? auth.slice(7) : "")))
+        return response({error:"Unauthorized"},401,ORIGIN);
+      const body = await request.json();
+      const updates = Array.isArray(body.quotes) ? body.quotes : [];
+      const returns = Array.isArray(body.returnQuotes) ? body.returnQuotes : [];
+      const statements = [];
+      for (const q of [...updates.map(q => ({...q,direction:"buy"})), ...returns.map(q => ({...q,direction:"return"}))]) {
+        if (typeof q.orderId !== "string" || !["buy","return"].includes(q.direction) ||
+            typeof q.status !== "string") continue;
+        statements.push(env.DB.prepare("UPDATE exchange_quotes SET status=?1,payment_tx_hash=?2,settlement_tx_hash=?3,last_error=?4,updated_at=?5 WHERE order_id=?6 AND direction=?7")
+          .bind(q.status, q.depositTxHash || q.returnTxHash || null, q.payoutTxHash || q.refundTxHash || null,
+            q.payoutReviewReason || q.refundWaitReason || q.payoutWaitReason || null,
+            new Date().toISOString(), q.orderId, q.direction));
+      }
+      if (statements.length) await env.DB.batch(statements);
+      return response({updated:statements.length},200,ORIGIN);
     }
     if (!origin) return response({error:"Origin not allowed"},403,ORIGIN);
     if (url.pathname === "/v1/quote" && request.method === "POST") {
