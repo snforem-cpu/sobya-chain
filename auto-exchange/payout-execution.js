@@ -41,13 +41,13 @@ export async function executePayout({
   const feeData = await sobya.getFeeData();
   let maxFeePerGas;
   let feeOverrides;
-  if (feeData.maxFeePerGas !== null && feeData.maxPriorityFeePerGas !== null) {
+  if (feeData.maxFeePerGas != null && feeData.maxPriorityFeePerGas != null) {
     maxFeePerGas = feeData.maxFeePerGas;
     feeOverrides = {
       maxFeePerGas: feeData.maxFeePerGas,
       maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
     };
-  } else if (feeData.gasPrice !== null) {
+  } else if (feeData.gasPrice != null) {
     maxFeePerGas = feeData.gasPrice;
     feeOverrides = { gasPrice: feeData.gasPrice };
   } else {
