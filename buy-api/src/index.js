@@ -440,11 +440,16 @@ export default {
       const paid=String(b?.paymentAmount ?? "").trim();
       const tx=String(b?.paymentTx ?? "").trim();
       const buyer=String(b?.buyerAddress ?? "").trim();
+      // This manual exchange route is intentionally restricted to Ethereum mainnet USDT.
+      // Payment remains pending until the owner independently verifies the ERC-20 transfer.
       if (!/^\d+(?:\.\d{1,18})?$/.test(amount) || Number(amount)<=0 || Number(amount)>1000000000 ||
-          !network || network.length>80 || !asset || asset.length>40 || !paid || paid.length>80 ||
-          !tx || tx.length>180 || !/^0x[0-9a-fA-F]{40}$/.test(buyer)) {
+          network !== "Ethereum" || asset !== "USDT" ||
+          !/^\d+(?:\.\d{1,6})?$/.test(paid) || Number(paid)<=0 ||
+          !/^0x[0-9a-fA-F]{64}$/.test(tx) || !/^0x[0-9a-fA-F]{40}$/.test(buyer)) {
         return json({error:"invalid_order_details"},400,allowed);
       }
+      const duplicate = await env.DB.prepare("SELECT id FROM manual_orders WHERE lower(payment_tx)=lower(?) LIMIT 1").bind(tx).first();
+      if (duplicate) return json({error:"duplicate_payment_transaction"},409,allowed);
       const settings=await env.DB.prepare("SELECT price_usd FROM manual_sale_settings WHERE id=1").first();
       const price=Number(settings?.price_usd || 0.005);
       const total=Number((Number(amount)*price).toFixed(8));
