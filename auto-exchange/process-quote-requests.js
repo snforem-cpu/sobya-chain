@@ -24,8 +24,8 @@ async function request(path, options = {}) {
 async function listPendingIssues() {
   const all = [];
   for (let page = 1; page <= 10; page++) {
-    const items = await request("/issues?state=open&per_page=100&page=" + page + "&labels=auto-exchange-quote-request");
-    all.push(...items.filter(item => !item.pull_request));
+    const items = await request("/issues?state=open&per_page=100&page=" + page);
+    all.push(...items.filter(item => !item.pull_request && item.title.startsWith("[AUTO-EXCHANGE QUOTE]")));
     if (items.length < 100) break;
   }
   return all.sort((a, b) => a.number - b.number);
@@ -117,6 +117,10 @@ if (notificationsChanged) {
   await saveLedger(ledger, ledgerSha);
 }
 for (const item of errors) {
-  await addComment(item.issueNumber, "Quote request could not be issued: " + item.message + ". Please edit the issue to correct the fields.");
+  const comments = await listComments(item.issueNumber);
+  const marker = "<!-- sobya-auto-exchange-invalid:" + item.issueNumber + " -->";
+  if (!comments.some(c => (c.body || "").includes(marker))) {
+    await addComment(item.issueNumber, marker + "\\nQuote request could not be issued: " + item.message + ". Please edit the issue to correct the fields.");
+  }
 }
 console.log("Scanned " + pending.length + " open request issues; ledger now contains " + ledger.quotes.length + " reserved quote records.");
