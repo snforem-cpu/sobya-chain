@@ -29,9 +29,9 @@ jobs:
       - name: Verify SOBY returns and execute eligible USDT refunds
         working-directory: auto-exchange
         env:
-          GH_TOKEN: \${{ github.token }}
-          GH_REPOSITORY: \${{ github.repository }}
-          ETHEREUM_RPC_URL: \${{ secrets.ETHEREUM_RPC_URL }}
-          SOBYA_EVM_RPC_URL: \${{ secrets.SOBYA_EVM_RPC_URL }}
-          SOBYA_PAYOUT_PRIVATE_KEY: \${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+          SOBYA_EVM_RPC_URL: ${{ secrets.SOBYA_EVM_RPC_URL }}
+          SOBYA_PAYOUT_PRIVATE_KEY: ${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
         run: node return-worker.js
