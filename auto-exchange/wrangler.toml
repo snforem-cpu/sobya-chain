@@ -1,0 +1,10 @@
+name = "sobya-buy-api"
+main = "d1/worker.js"
+compatibility_date = "2026-11-25"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sobya-buy-db"
+database_id = "2c25fe97-d6f9-4614-b5e9-fa72133070f9"
+migrations_dir = "d1/migrations"

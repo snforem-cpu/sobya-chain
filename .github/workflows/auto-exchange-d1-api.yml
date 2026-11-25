@@ -1,0 +1,56 @@
+name: SOBYA Auto Exchange D1 API
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "auto-exchange/d1/**"
+      - "auto-exchange/wrangler.toml"
+      - ".github/workflows/auto-exchange-d1-api.yml"
+  push:
+    branches: [main]
+    paths:
+      - "auto-exchange/d1/**"
+      - "auto-exchange/wrangler.toml"
+      - ".github/workflows/auto-exchange-d1-api.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.repository == 'snforem-cpu/sobya-chain'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate Worker syntax
+        run: node --check auto-exchange/d1/worker.js
+      - name: Check Cloudflare deployment credentials
+        id: credentials
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare deployment secrets are not configured; source validation completed without deployment."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Apply D1 migrations
+        if: steps.credentials.outputs.available == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        working-directory: auto-exchange
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 d1 migrations apply sobya-buy-db --remote
+      - name: Deploy API Worker
+        if: steps.credentials.outputs.available == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        working-directory: auto-exchange
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy
