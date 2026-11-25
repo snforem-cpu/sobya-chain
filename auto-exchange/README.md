@@ -12,11 +12,22 @@ Independent project under `auto-exchange/`. It does not modify `buy/`, `dex/`, e
 - Opening price: 0.005 USDT per SOBY.
 - Reference inventory: 1,000,000 SOBY (not a claim about current wallet balance).
 - Exchange fee: 1% (100 bps).
-- Directional coefficients: 1000 upward / 250 downward (4:1).
+- Directional coefficients: 100 upward / 25 downward (4:1).
+- Coefficients are basis points (BPS), scaled by trade quantity relative to the 1,000,000 SOBY reference inventory.
 - Quote validity: 10 minutes.
 - No fixed maximum price; time alone does not move price.
+- A price change is permitted only after the corresponding trade/stock return is confirmed and settled.
 
-The absolute price-impact formula/normalizer for coefficients 1000/250 is still unspecified. The quote issuer therefore uses the agreed opening price only; it does not invent a dynamic price formula.
+## Dynamic price formula
+
+Let P be the current price in USDT/SOBY and Q the confirmed quantity in SOBY:
+
+- After a confirmed SOBY sale: `Pnew = Pold × (1 + 100/10000 × Q/1,000,000)`.
+- After a confirmed SOBY stock return: `Pnew = Pold × (1 - 25/10000 × Q/1,000,000)`.
+
+All calculations use integer fixed-point arithmetic (18 decimal places), not JavaScript floating-point math. The upward coefficient is four times the downward coefficient. Example for 10,000 SOBY: sale increases price by 0.01%; stock return decreases it by 0.0025%. Price never changes merely because time passes.
+
+The pure price engine is in `pricing.js`. New quotes read `ledger.currentPriceUsdtPerSoby`, falling back to the opening price until a confirmed price update is recorded. Existing quotes retain their original `quotedPrice` and payout amount for their full ten-minute validity.
 
 ## Durable quote requests and unique payment amounts
 - Customers submit a GitHub Issue using `.github/ISSUE_TEMPLATE/auto-exchange-quote.yml`.
@@ -31,9 +42,6 @@ The absolute price-impact formula/normalizer for coefficients 1000/250 is still 
 
 The issue queue and committed JSON ledger are durable GitHub records. This is not a continuously available API: issuance waits for GitHub Actions and scheduled runs can be delayed. Customers must not assume instant quotes.
 
-## Opening-price calculation
-For a reserved payment amount, the opening quote computes SOBY at 0.005 USDT/SOBY and applies the 1% fee to the SOBY output. The quote contains the exact integer atomic payment and payout amounts. The 1000/250 coefficients are stored but not used to invent a live repricing formula.
-
 ## Deposit matching core
 `settlement.js` checks Ethereum chain ID, sender, deposit address, USDT contract, exact atomic amount, one unique open quote, quote validity, confirmation threshold, and transaction-hash/log-index replay protection. It returns `matched_paid_not_settled`; it does not sign or send SOBY.
 
@@ -47,4 +55,4 @@ For a reserved payment amount, the opening quote computes SOBY at 0.005 USDT/SOB
 - No paid contract, paid hosting, or new paid service is part of this design.
 
 ## Tests
-Run `npm test` inside `auto-exchange/`. The test workflow runs the isolated policy, quote allocation, and settlement tests.
+Run `npm test` inside `auto-exchange/`. The test workflow runs the isolated policy, quote allocation, settlement, and price-movement tests.
