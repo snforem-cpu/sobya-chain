@@ -3,8 +3,8 @@ export function calculateRequiredPayoutBalance({ payoutAmountAtomic, gasLimit, m
   const payout = BigInt(payoutAmountAtomic);
   const gas = BigInt(gasLimit);
   const fee = BigInt(maxFeePerGas);
-  if (payout <= 0n || gas <= 0n || fee <= 0n) {
-    throw new TypeError("payout amount, gas limit, and fee must be positive");
+  if (payout <= 0n || gas <= 0n || fee < 0n) {
+    throw new TypeError("payout amount and gas limit must be positive; fee cannot be negative");
   }
   if (!Number.isSafeInteger(gasBufferBps) || gasBufferBps < 0 || gasBufferBps > 10_000) {
     throw new TypeError("gasBufferBps must be an integer from 0 to 10000");

@@ -17,6 +17,13 @@ test("rounds a fractional buffered gas reserve up", () => {
 test("rejects zero or negative funding inputs", () => {
   assert.throws(() => calculateRequiredPayoutBalance({ payoutAmountAtomic: "0", gasLimit: "1", maxFeePerGas: "1" }));
 });
+test("supports zero-gas-fee SOBYA networks without adding a false gas reserve", () => {
+  assert.equal(
+    calculateRequiredPayoutBalance({ payoutAmountAtomic: "1000", gasLimit: "21000", maxFeePerGas: "0" }),
+    1000n
+  );
+  assert.throws(() => calculateRequiredPayoutBalance({ payoutAmountAtomic: "1000", gasLimit: "21000", maxFeePerGas: "-1" }));
+});
 
 
 test("only a confirmed paid order without a reserved nonce is payout eligible", () => {
