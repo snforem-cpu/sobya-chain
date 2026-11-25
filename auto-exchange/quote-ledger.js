@@ -29,7 +29,7 @@ export function allocateUniquePaymentAmount(requestedAmountAtomic, quotes) {
   const used = new Set(quotes.map(q => String(q.paymentAmountAtomic)));
   const requested = BigInt(requestedAmountAtomic);
   // The unique micro-USDT tail is part of the quoted total, not a separate fee.
-  for (let suffix = 1n; suffix <= 999_999n; suffix++) {
+  for (let suffix = 1n; suffix <= 1_000n; suffix++) {
     const candidate = requested + suffix;
     if (!used.has(candidate.toString())) return { paymentAmountAtomic: candidate.toString(), markerAtomic: suffix.toString() };
   }
