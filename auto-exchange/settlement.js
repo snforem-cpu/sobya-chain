@@ -54,7 +54,7 @@ export function matchDeposit({ quotes, processedTransfers, transfer, now = Date.
       !/^0x[0-9a-fA-F]{40}$/.test(transfer.from || "") ||
       !/^0x[0-9a-fA-F]{40}$/.test(transfer.to || "") ||
       !/^0x[0-9a-fA-F]{40}$/.test(transfer.tokenAddress || "") ||
-      !/^\\d+$/.test(String(transfer.amountAtomic)) || BigInt(transfer.amountAtomic) <= 0n ||
+      !/^\d+$/.test(String(transfer.amountAtomic)) || BigInt(transfer.amountAtomic) <= 0n ||
       !Number.isFinite(Date.parse(transfer.blockTimestamp))) {
     throw new TypeError("transfer fields are invalid");
   }
