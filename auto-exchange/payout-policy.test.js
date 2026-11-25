@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateRequiredPayoutBalance } from "./payout-policy.js";
+import { calculateRequiredPayoutBalance, isPayoutEligible } from "./payout-policy.js";
 
 test("requires payout plus a 20% buffered gas reserve", () => {
   assert.equal(
