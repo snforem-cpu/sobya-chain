@@ -123,7 +123,7 @@ test("crash after broadcast cannot create a replacement transaction", async () =
   assert.equal(sendAttempts, 0);
 });
 
-test("insufficient payout inventory is persisted for manual review without signing", async () => {
+test("insufficient payout inventory is held safely and resumes automatically after funding", async () => {
   const { quote, deps, saves } = fixture({
     sobya: {
       estimateGas: async () => 21_000n,
@@ -133,9 +133,14 @@ test("insufficient payout inventory is persisted for manual review without signi
     }
   });
   const result = await executePayout(deps);
-  assert.equal(result.review, true);
-  assert.equal(quote.status, "review");
+  assert.equal(result.waitingForFunds, true);
+  assert.equal(quote.status, "payout_waiting_funds");
+  assert.equal(quote.payoutNonce, undefined);
   assert.equal(saves.length, 1);
+  deps.sobya.getBalance = async () => 1_000_000n;
+  const resumed = await executePayout(deps);
+  assert.equal(resumed.completed, true);
+  assert.equal(quote.status, "settled");
 });
 
 test("failed payout receipt is recorded for review and does not move price", async () => {

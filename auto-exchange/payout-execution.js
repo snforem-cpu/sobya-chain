@@ -22,7 +22,9 @@ export async function executePayout({
     throw new Error("Payout quote must belong to the supplied ledger");
   }
   validateQuote(quote);
-  if (quote.status !== "paid") throw new Error("Only a paid deposit quote may be paid out");
+  if (quote.status !== "paid" && quote.status !== "payout_waiting_funds") {
+    throw new Error("Only a paid deposit quote may be paid out");
+  }
   if (!/^0x[0-9a-fA-F]{40}$/.test(payoutRecipient) ||
       payoutRecipient.toLowerCase() !== quote.sender.toLowerCase()) {
     throw new Error("Payout recipient must exactly match the quote sender");
@@ -61,11 +63,11 @@ export async function executePayout({
   });
   const balance = await sobya.getBalance(signer.address);
   if (balance < requiredBalance) {
-    quote.status = "review";
-    quote.payoutReviewReason = "Insufficient SOBY balance for payout plus estimated gas reserve";
+    quote.status = "payout_waiting_funds";
+    quote.payoutWaitReason = "Insufficient SOBY balance for payout plus estimated gas reserve";
     quote.requiredNativeBalanceAtomic = requiredBalance.toString();
-    ledgerSha = await saveLedger(ledger, ledgerSha, "Flag SOBYA payout for insufficient balance " + quote.orderId);
-    return { ledger, ledgerSha, completed: false, review: true };
+    ledgerSha = await saveLedger(ledger, ledgerSha, "Hold SOBYA payout until inventory is funded " + quote.orderId);
+    return { ledger, ledgerSha, completed: false, waitingForFunds: true };
   }
 
   // Persist the nonce reservation before any broadcast. A crash from here onward

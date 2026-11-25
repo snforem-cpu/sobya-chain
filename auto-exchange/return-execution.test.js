@@ -50,6 +50,35 @@ test("refund reserves nonce, verifies exact Transfer event, confirms, then appli
   assert.equal(result.ledger.currentPriceUsdtPerSoby, "0.00499");
 });
 
+test("USDT refund waits for inventory funding and resumes without a new SOBY transfer", async () => {
+  const f = fixture();
+  f.usdt.balanceOf = async () => 0n;
+  const waiting = await executeReturnRefund({ ...f, ledgerSha: "start",
+    refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
+  assert.equal(waiting.waitingForFunds, true);
+  assert.equal(f.quote.status, "refund_waiting_funds");
+  assert.equal(f.quote.refundNonce, undefined);
+  f.usdt.balanceOf = async () => 100000000n;
+  const resumed = await executeReturnRefund({ ...f, ledgerSha: waiting.ledgerSha,
+    refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
+  assert.equal(resumed.completed, true);
+  assert.equal(f.quote.status, "settled");
+});
+
+test("USDT refund waits for ETH gas funding and resumes without a new SOBY transfer", async () => {
+  const f = fixture();
+  f.ethereum.getBalance = async () => 0n;
+  const waiting = await executeReturnRefund({ ...f, ledgerSha: "start",
+    refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
+  assert.equal(waiting.waitingForFunds, true);
+  assert.equal(f.quote.status, "refund_waiting_funds");
+  f.ethereum.getBalance = async () => 10n ** 18n;
+  const resumed = await executeReturnRefund({ ...f, ledgerSha: waiting.ledgerSha,
+    refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
+  assert.equal(resumed.completed, true);
+  assert.equal(f.quote.status, "settled");
+});
+
 test("successful receipt without exact USDT Transfer event is held for review", async () => {
   const f = fixture();
   f.usdt.interface.parseLog = () => { throw new Error("unrelated log"); };

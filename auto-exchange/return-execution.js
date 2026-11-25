@@ -3,7 +3,8 @@ import { calculateNextPrice } from "./pricing.js";
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
 
 export function isReturnRefundEligible(quote) {
-  return quote?.status === "returned" && quote.refundTxHash === undefined && quote.refundNonce === undefined;
+  return (quote?.status === "returned" || quote?.status === "refund_waiting_funds") &&
+    quote.refundTxHash === undefined && quote.refundNonce === undefined;
 }
 
 export async function executeReturnRefund({
@@ -15,7 +16,8 @@ export async function executeReturnRefund({
   if (!ledger.returnQuotes?.some(item => item.orderId === quote.orderId && item === quote)) {
     throw new Error("Return quote must belong to the supplied ledger");
   }
-  if (quote.status !== "returned" || !/^0x[0-9a-fA-F]{40}$/.test(refundRecipient) ||
+  if ((quote.status !== "returned" && quote.status !== "refund_waiting_funds") ||
+      !/^0x[0-9a-fA-F]{40}$/.test(refundRecipient) ||
       refundRecipient.toLowerCase() !== quote.sender.toLowerCase() ||
       amount <= 0n || amount.toString() !== String(quote.payoutAmountAtomic)) {
     throw new Error("USDT refund recipient or amount does not match the confirmed return quote");
@@ -38,10 +40,10 @@ export async function executeReturnRefund({
   });
   const balance = await usdt.balanceOf(signer.address);
   if (balance < amount) {
-    quote.status = "review";
-    quote.refundReviewReason = "Insufficient USDT inventory for quoted refund";
-    ledgerSha = await saveLedger(ledger, ledgerSha, "Flag USDT refund for insufficient inventory " + quote.orderId);
-    return { ledger, ledgerSha, completed: false, review: true };
+    quote.status = "refund_waiting_funds";
+    quote.refundWaitReason = "Insufficient USDT inventory for quoted refund";
+    ledgerSha = await saveLedger(ledger, ledgerSha, "Hold USDT refund until inventory is funded " + quote.orderId);
+    return { ledger, ledgerSha, completed: false, waitingForFunds: true };
   }
   const estimatedGas = await usdt.transfer.estimateGas(refundRecipient, amount);
   const gasLimit = (estimatedGas * 12_000n + 9_999n) / 10_000n;
@@ -59,11 +61,11 @@ export async function executeReturnRefund({
   }) - 1n;
   const ethBalance = await ethereum.getBalance(signer.address);
   if (ethBalance < requiredEth) {
-    quote.status = "review";
-    quote.refundReviewReason = "Insufficient ETH gas reserve for USDT refund";
+    quote.status = "refund_waiting_funds";
+    quote.refundWaitReason = "Insufficient ETH gas reserve for USDT refund";
     quote.requiredEthGasAtomic = requiredEth.toString();
-    ledgerSha = await saveLedger(ledger, ledgerSha, "Flag USDT refund for insufficient ETH gas " + quote.orderId);
-    return { ledger, ledgerSha, completed: false, review: true };
+    ledgerSha = await saveLedger(ledger, ledgerSha, "Hold USDT refund until ETH gas reserve is funded " + quote.orderId);
+    return { ledger, ledgerSha, completed: false, waitingForFunds: true };
   }
 
   const nonce = await ethereum.getTransactionCount(signer.address, "pending");
