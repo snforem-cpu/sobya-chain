@@ -1,5 +1,4 @@
 import { calculateRequiredPayoutBalance } from "./payout-policy.js";
-import { AUTO_EXCHANGE_POLICY } from "./config.js";
 
 export function isReturnRefundEligible(quote) {
   return quote?.status === "returned" && quote.refundTxHash === undefined && quote.refundNonce === undefined;
@@ -35,7 +34,7 @@ export async function executeReturnRefund({
     ledgerSha = await saveLedger(ledger, ledgerSha, "Flag USDT refund for insufficient inventory " + quote.orderId);
     return { ledger, ledgerSha, completed: false, review: true };
   }
-  const estimatedGas = await usdt.estimateGas.transfer(refundRecipient, amount);
+  const estimatedGas = await usdt.transfer.estimateGas(refundRecipient, amount);
   const gasLimit = (estimatedGas * 12_000n + 9_999n) / 10_000n;
   const feeData = await ethereum.getFeeData();
   let maxFeePerGas, feeOverrides;
