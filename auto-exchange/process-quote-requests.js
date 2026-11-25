@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { createQuote, parseQuoteIssueBody, formatUsdtAtomic } from "./quote-ledger.js";
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
 
-if (!AUTO_EXCHANGE_POLICY.buyTradingEnabled) {
-  console.log("USDT-to-SOBY quote issuance is disabled by project policy.");
+if (!AUTO_EXCHANGE_POLICY.tradingEnabled) {
+  console.log("Auto Exchange quote issuance is disabled by shared project policy.");
   process.exit(0);
 }
 
