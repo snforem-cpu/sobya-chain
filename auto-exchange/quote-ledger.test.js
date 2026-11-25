@@ -15,7 +15,7 @@ test("opening quote applies the configured 1 percent fee", () => {
   assert.equal(calculateOpeningQuote(10_000_000n), 1980n * 10n ** 18n);
 });
 test("quote calculation uses the current persisted price", () => {
-  assert.equal(calculateOpeningQuote(10_000_000n, "0.0050005"), 1979802217778222177782n);
+  assert.equal(calculateOpeningQuote(10_000_000n, "0.0050005"), 1979802019798020197980n);
 });
 test("allocates unique exact payment amount across the complete ledger", () => {
   assert.equal(allocateUniquePaymentAmount(10_000_000n, []).paymentAmountAtomic, "10000001");
