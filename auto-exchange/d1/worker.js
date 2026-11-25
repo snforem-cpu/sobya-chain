@@ -59,6 +59,7 @@ async function createQuote(request, env) {
   const now = new Date();
   const createdAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + QUOTE_TTL_SECONDS*1000).toISOString();
+  await env.DB.prepare("UPDATE exchange_quotes SET status = 'expired', updated_at = ?1 WHERE status = 'open' AND expires_at <= ?1").bind(createdAt).run();
   const sender = body.sender.toLowerCase();
   const orderId = "SOBYA-" + crypto.randomUUID().replaceAll("-","").toUpperCase();
   for (let marker=1n; marker<=1000n; marker++) {
