@@ -28,6 +28,7 @@ test("supports zero-gas-fee SOBYA networks without adding a false gas reserve", 
 
 test("only a confirmed paid order without a reserved nonce is payout eligible", () => {
   assert.equal(isPayoutEligible({ status: "paid" }), true);
+  assert.equal(isPayoutEligible({ status: "payout_waiting_funds" }), true);
   assert.equal(isPayoutEligible({ status: "payout_prepared", payoutNonce: 4 }), false);
   assert.equal(isPayoutEligible({ status: "payout_broadcast", payoutNonce: 4, payoutTxHash: "0xabc" }), false);
   assert.equal(isPayoutEligible({ status: "paid", payoutNonce: 4 }), false);

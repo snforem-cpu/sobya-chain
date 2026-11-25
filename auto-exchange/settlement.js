@@ -26,7 +26,7 @@ export function validateQuote(quote) {
       Date.parse(quote.expiresAt) <= Date.parse(quote.createdAt)) {
     throw new TypeError("quote timestamps are invalid");
   }
-  if (!["open", "paid", "review", "payout_prepared", "payout_broadcast", "settled", "expired"].includes(quote.status)) {
+  if (!["open", "paid", "review", "payout_waiting_funds", "payout_prepared", "payout_broadcast", "settled", "expired"].includes(quote.status)) {
     throw new TypeError("quote.status is invalid");
   }
   return true;
