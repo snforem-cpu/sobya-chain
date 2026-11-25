@@ -1,0 +1,73 @@
+name: SOBYA cross-chain settlement worker
+
+on:
+  pull_request:
+    paths:
+      - "cross-chain/github-actions-worker/**"
+      - ".github/workflows/crosschain-settlement.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sobya-crosschain-settlement
+  cancel-in-progress: false
+
+jobs:
+  worker-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install worker dependencies
+        working-directory: cross-chain/github-actions-worker
+        run: npm install --no-audit --no-fund
+      - name: Run worker unit tests and syntax checks
+        working-directory: cross-chain/github-actions-worker
+        run: npm run check
+
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install worker dependencies
+        working-directory: cross-chain/github-actions-worker
+        run: npm install --omit=dev --no-audit --no-fund
+      - name: Validate worker
+        working-directory: cross-chain/github-actions-worker
+        run: node --check worker.mjs
+      - name: Run settlement scanner
+        if: ${{ github.ref == 'refs/heads/main' && vars.CROSSCHAIN_AUTOMATION_ENABLED == 'true' }}
+        working-directory: cross-chain/github-actions-worker
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+          ETHEREUM_ESCROW_ADDRESS: ${{ vars.ETHEREUM_ESCROW_ADDRESS }}
+          ETHEREUM_DEPLOYMENT_BLOCK: ${{ vars.ETHEREUM_DEPLOYMENT_BLOCK }}
+          ETHEREUM_OPERATOR_PRIVATE_KEY: ${{ secrets.ETHEREUM_OPERATOR_PRIVATE_KEY }}
+          ETHEREUM_CONFIRMATIONS: ${{ vars.ETHEREUM_CONFIRMATIONS }}
+          SOBYA_EVM_RPC_URL: ${{ secrets.SOBYA_EVM_RPC_URL || 'https://sobya-evm-rpc.nodesafe-dapp.xyz' }}
+          SOBYA_PAYOUT_VAULT_ADDRESS: ${{ vars.SOBYA_PAYOUT_VAULT_ADDRESS }}
+          SOBYA_RELAYER_PRIVATE_KEY: ${{ secrets.SOBYA_RELAYER_PRIVATE_KEY }}
+          SOBYA_TREASURY_ADDRESS: ${{ vars.SOBYA_TREASURY_ADDRESS }}
+          SOBYA_CONFIRMATIONS: ${{ vars.SOBYA_CONFIRMATIONS }}
+          SOBY_PER_USDT: ${{ vars.SOBY_PER_USDT }}
+          MAX_USDT_MICRO: ${{ vars.MAX_USDT_MICRO }}
+          MAX_SOBY_WEI: ${{ vars.MAX_SOBY_WEI }}
+          SCAN_BLOCK_SPAN: ${{ vars.SCAN_BLOCK_SPAN }}
+          MIN_DEADLINE_REMAINING_SECONDS: ${{ vars.MIN_DEADLINE_REMAINING_SECONDS }}
+          CROSSCHAIN_STATE_BRANCH: sobya-crosschain-state
+        run: node worker.mjs
+      - name: Keep automation safely disabled until audited contracts are deployed
+        if: ${{ github.ref != 'refs/heads/main' || vars.CROSSCHAIN_AUTOMATION_ENABLED != 'true' }}
+        run: echo "Settlement worker is installed but disabled. No deposits or payouts are processed."

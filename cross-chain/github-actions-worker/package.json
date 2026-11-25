@@ -1,0 +1,13 @@
+{
+  "name": "sobya-crosschain-actions-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check worker.mjs && node --test worker.test.mjs",
+    "start": "node worker.mjs"
+  },
+  "dependencies": {
+    "ethers": "6.13.5"
+  }
+}

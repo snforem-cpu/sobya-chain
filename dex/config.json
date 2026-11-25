@@ -8,11 +8,11 @@
   "wrappedSoby": "0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c",
   "oracle": "0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4",
   "deploymentStatus": "verified",
-  "notice": "Cross-chain USDT-to-SOBY customer deposits are enabled for operator-directed live testing. Use only amounts you are prepared to risk; settlement depends on the live Enzonic deposit watcher and SOBYA payout inventory.",
+  "notice": "Cross-chain customer deposits are temporarily disabled while the Enzonic-dependent service is replaced by the GitHub Actions settlement worker. Do not send USDT or SOBY through the cross-chain panel.",
   "liquidityEnabled": true,
   "tradingEnabled": true,
-  "custodialApiUrl": "https://sobya-chain.enzonic.dev",
-  "custodialApiNotice": "USDT-to-SOBY deposit submission is enabled in the DEX for live testing. The HTTPS gateway and Enzonic worker must be online and correctly configured to accept and settle orders.",
-  "crossChainOrdersEnabled": true,
-  "customerDepositsEnabled": true
+  "custodialApiUrl": "",
+  "custodialApiNotice": "The legacy Enzonic gateway is not used by the replacement settlement pilot.",
+  "crossChainOrdersEnabled": false,
+  "customerDepositsEnabled": false
 }
