@@ -26,7 +26,7 @@ export function validateQuote(quote) {
       Date.parse(quote.expiresAt) <= Date.parse(quote.createdAt)) {
     throw new TypeError("quote timestamps are invalid");
   }
-  if (!["open", "paid", "review", "settled", "expired"].includes(quote.status)) {
+  if (!["open", "paid", "review", "payout_prepared", "payout_broadcast", "settled", "expired"].includes(quote.status)) {
     throw new TypeError("quote.status is invalid");
   }
   return true;
@@ -46,6 +46,17 @@ export function matchDeposit({ quotes, processedTransfers, transfer, now = Date.
   confirmations, requiredConfirmations }) {
   if (!Array.isArray(quotes) || !Array.isArray(processedTransfers)) {
     throw new TypeError("quotes and processedTransfers must be arrays");
+  }
+  // Validate every persisted quote before matching. Corrupt or unknown ledger states
+  // fail closed rather than being silently skipped or reaching the payout worker.
+  for (const quote of quotes) validateQuote(quote);
+  if (!Number.isSafeInteger(transfer.chainId) || transfer.chainId <= 0 ||
+      !/^0x[0-9a-fA-F]{40}$/.test(transfer.from || "") ||
+      !/^0x[0-9a-fA-F]{40}$/.test(transfer.to || "") ||
+      !/^0x[0-9a-fA-F]{40}$/.test(transfer.tokenAddress || "") ||
+      !/^\\d+$/.test(String(transfer.amountAtomic)) || BigInt(transfer.amountAtomic) <= 0n ||
+      !Number.isFinite(Date.parse(transfer.blockTimestamp))) {
+    throw new TypeError("transfer fields are invalid");
   }
   const replayKey = transferReplayKey(transfer);
   if (processedTransfers.includes(replayKey)) {
