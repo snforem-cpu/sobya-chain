@@ -16,12 +16,9 @@ export const AUTO_EXCHANGE_POLICY = Object.freeze({
   inventoryWalletEvmAddress: "0xebdb899fFE84a89e1d576964b640491c135651AD",
   ethereumChainId: 1,
   sobyaEvmChainId: 357812033857,
-  // Activate the funded USDT -> SOBY purchase direction only.
-  buyTradingEnabled: true,
-  buyPayoutEnabled: true,
-  // Keep SOBY -> USDT returns closed until USDT and Ethereum gas reserves exist.
-  returnTradingEnabled: false,
-  returnRefundEnabled: false,
+  // Shared activation policy for both directions, using one inventory wallet and one signing key.
+  tradingEnabled: true,
+  payoutEnabled: true,
 });
 
 export function getDirectionalPriceCoefficient(direction) {
