@@ -62,3 +62,14 @@ test("unmatched or pending transfers do not mutate ledger", () => {
   assert.equal(result.quotes[0].status, "open");
   assert.deepEqual(result.processedTransfers, []);
 });
+
+test("validates persisted payout lifecycle states", () => {
+  assert.equal(validateQuote({ ...quote, status: "payout_prepared" }), true);
+  assert.equal(validateQuote({ ...quote, status: "payout_broadcast" }), true);
+});
+test("matcher fails closed when any persisted quote is malformed", () => {
+  assert.throws(() => matchDeposit({ ...base, quotes: [{ ...quote, paymentAmountAtomic: "1.2" }] }));
+});
+test("matcher rejects malformed transfer fields", () => {
+  assert.throws(() => matchDeposit({ ...base, transfer: { ...transfer, amountAtomic: "1.2" } }));
+});
