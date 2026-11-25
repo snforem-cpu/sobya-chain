@@ -51,6 +51,25 @@ jobs:
           if (!verifier.includes('https://sobya-evm-rpc.nodesafe-dapp.xyz')) throw new Error('SOBY payout verifier is not using the current EVM RPC');
           console.log('PASS: SOBYA DEX configuration, current EVM RPC, and all safety gates.');
           NODE
+      - name: Read live SOBYA factory market count (no transactions)
+        run: |
+          node <<'NODE'
+          async function main() {
+            const response = await fetch('https://sobya-evm-rpc.nodesafe-dapp.xyz', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: '0x35f59c1Bb30e1FA29020294cB02Bd770D6e3fa8e', data: '0x574f2ba3' }, 'latest'] })
+            });
+            if (!response.ok) throw new Error('Mainnet factory read returned HTTP ' + response.status);
+            const payload = await response.json();
+            if (payload.error || !/^0x[0-9a-fA-F]+$/.test(payload.result || '')) throw new Error('Could not read live factory pair count');
+            const count = Number(BigInt(payload.result));
+            console.log('SOBYA Mainnet factory pair count: ' + count);
+            if (count === 0) console.log('No pool exists yet; swaps correctly remain disabled.');
+            else console.log('Pool records exist; reserve and controlled swap verification is still required before opening swaps.');
+          }
+          main().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
       - name: Validate JavaScript syntax in DEX page
         run: |
           node <<'NODE'
