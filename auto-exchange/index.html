@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>SOBYA Auto Exchange</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #081226; color: #eef4ff; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    main { width: min(680px, 100%); padding: 28px; border: 1px solid #304568; border-radius: 18px; background: #101f39; box-sizing: border-box; }
+    h1 { margin-top: 0; } .muted { color: #b9c8df; line-height: 1.6; }
+    dl { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+    dt { color: #b9c8df; } dd { margin: 0; font-weight: 650; text-align: right; }
+    .notice { margin-top: 22px; padding: 14px; border-radius: 10px; background: #352b16; color: #ffe5a3; line-height: 1.55; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SOBYA Auto Exchange</h1>
+    <p class="muted">An independent automated exchange interface. This page is separate from SOBYA Buy and the SOBYA DEX.</p>
+    <dl>
+      <dt>Opening price</dt><dd>0.005 USDT / SOBY</dd>
+      <dt>Exchange fee</dt><dd>1%</dd>
+      <dt>Reference inventory</dt><dd>1,000,000 SOBY</dd>
+      <dt>Upward coefficient</dt><dd>1000</dd>
+      <dt>Downward coefficient</dt><dd>250</dd>
+      <dt>Quote validity target</dt><dd>10 minutes</dd>
+      <dt>Maximum price</dt><dd>No fixed ceiling</dd>
+    </dl>
+    <div class="notice"><strong>Not live yet.</strong> Deposits and payouts are disabled. The quote-impact unit and a verifiable order-to-deposit identifier must be finalized and tested before this interface can accept funds.</div>
+  </main>
+</body>
+</html>
