@@ -46,6 +46,12 @@ test("reprocessing the same issue is idempotent", () => {
 test("expired historical payment amounts are never reused", () => {
   assert.equal(allocateUniquePaymentAmount(10_000_000n,[{paymentAmountAtomic:"10000001",status:"expired"}]).paymentAmountAtomic,"10000002");
 });
+test("unique USDT routing tail is capped at 0.001 USDT", () => {
+  const used = Array.from({ length: 1000 }, (_, i) => ({
+    paymentAmountAtomic: String(10_000_001 + i)
+  }));
+  assert.throws(() => allocateUniquePaymentAmount(10_000_000n, used), /No unique USDT micro-amount/);
+});
 test("parses GitHub issue form fields", () => {
   assert.deepEqual(parseQuoteIssueBody("### EVM wallet address\n\n"+sender+"\n\n### Requested USDT amount\n\n10.25"),{sender,requestedAmount:"10.25"});
 });
