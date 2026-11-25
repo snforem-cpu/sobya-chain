@@ -1,0 +1,36 @@
+name: SOBYA Auto Exchange policy tests
+
+on:
+  push:
+    branches: [feat/github-only-soby-auto-exchange, main]
+    paths:
+      - 'auto-exchange/**'
+      - '.github/workflows/test-auto-exchange.yml'
+  pull_request:
+    paths:
+      - 'auto-exchange/**'
+      - '.github/workflows/test-auto-exchange.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax-check all executable workers
+        working-directory: auto-exchange
+        run: |
+          node --check payout-worker.js
+          node --check process-quote-requests.js
+          node --check return-worker.js
+          node --check process-return-requests.js
+          node --check verify-rpc.js
+      - name: Run isolated policy tests
+        working-directory: auto-exchange
+        run: npm test

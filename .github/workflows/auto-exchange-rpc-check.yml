@@ -1,0 +1,39 @@
+name: SOBYA Auto Exchange read-only RPC verification
+
+on:
+  push:
+    branches: [feat/github-only-soby-auto-exchange]
+    paths:
+      - "auto-exchange/verify-rpc.js"
+      - "auto-exchange/config.js"
+      - "auto-exchange/quote-ledger.js"
+      - ".github/workflows/auto-exchange-rpc-check.yml"
+  pull_request:
+    paths:
+      - "auto-exchange/verify-rpc.js"
+      - "auto-exchange/config.js"
+      - "auto-exchange/quote-ledger.js"
+      - ".github/workflows/auto-exchange-rpc-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-rpcs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated exchange dependencies
+        working-directory: auto-exchange
+        run: npm install --no-audit --no-fund
+      - name: Check Ethereum and SOBYA RPCs without signing or sending
+        working-directory: auto-exchange
+        env:
+          ETHEREUM_RPC_URL: https://ethereum-rpc.publicnode.com
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+          SOBYA_EVM_RPC_FALLBACK_URL: https://sobya-evm-rpc.nodesafe-app.xyz
+        run: node verify-rpc.js

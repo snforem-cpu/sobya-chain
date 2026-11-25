@@ -1,0 +1,35 @@
+name: SOBYA Auto Exchange quote ledger
+
+on:
+  issues:
+    types: [opened, reopened, edited, labeled]
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+# One writer only. The periodic full queue scan recovers events that were
+# coalesced while another run was active/pending.
+concurrency:
+  group: sobya-auto-exchange-return-refund
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  process-quote-requests:
+    if: github.repository == 'snforem-cpu/sobya-chain'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Process all pending quote requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: node auto-exchange/process-quote-requests.js

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "quotes": [],
+  "processedTransfers": [],
+  "notes": [
+    "Illustrative schema only; this file is not a live order database.",
+    "A production ledger must be durable, single-writer/serialized, append-audited, and protected against concurrent workflow runs.",
+    "Return quotes and processed SOBY-return transaction hashes are stored in the same single-writer ledger."
+  ],
+  "returnQuotes": [],
+  "processedReturns": []
+}

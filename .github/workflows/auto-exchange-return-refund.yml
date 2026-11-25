@@ -1,0 +1,37 @@
+name: SOBYA Auto Exchange USDT refund worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+concurrency:
+  group: sobya-auto-exchange-return-refund
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refund:
+    if: github.repository == 'snforem-cpu/sobya-chain' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated exchange dependencies
+        working-directory: auto-exchange
+        run: npm install --no-audit --no-fund
+      - name: Verify SOBY returns and execute eligible USDT refunds
+        working-directory: auto-exchange
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          ETHEREUM_RPC_URL: https://ethereum-rpc.publicnode.com
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+          SOBYA_PAYOUT_PRIVATE_KEY: ${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
+        run: node return-worker.js

@@ -1,0 +1,33 @@
+name: SOBYA Auto Exchange — Request a quote
+description: Request a 10-minute Ethereum USDT to SOBY quote. This does not accept deposits.
+title: "[AUTO-EXCHANGE QUOTE]"
+labels:
+  - auto-exchange-quote-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Important:** This creates a quote request only. Do not send USDT. Trading and payouts are currently disabled.
+  - type: input
+    id: wallet
+    attributes:
+      label: EVM wallet address
+      description: Your Ethereum address. The same address is the intended SOBYA payout recipient.
+      placeholder: "0x..."
+    validations:
+      required: true
+  - type: input
+    id: amount
+    attributes:
+      label: Requested USDT amount
+      description: Base amount in USDT, up to 6 decimal places. The issued quote will state the exact unique payment amount.
+      placeholder: "10"
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand this is a quote request only and I must not send funds.
+          required: true
