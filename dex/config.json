@@ -8,11 +8,6 @@
   "wrappedSoby": "0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c",
   "oracle": "0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4",
   "deploymentStatus": "verified",
-  "notice": "Cross-chain orders and customer deposits are disabled until a reachable HTTPS order service, finalized deposit verification, funded payout inventory, and end-to-end settlement tests are independently confirmed.",
   "liquidityEnabled": true,
-  "tradingEnabled": false,
-  "custodialApiUrl": "",
-  "custodialApiNotice": "Order gateway is not configured. Do not send deposits; order creation remains unavailable until the service is deployed and verified.",
-  "crossChainOrdersEnabled": false,
-  "customerDepositsEnabled": false
+  "tradingEnabled": false
 }
