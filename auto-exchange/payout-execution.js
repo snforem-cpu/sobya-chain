@@ -1,4 +1,5 @@
 import { calculateRequiredPayoutBalance, isPayoutEligible } from "./payout-policy.js";
+import { validateQuote } from "./settlement.js";
 
 // Executes one already-verified, confirmed deposit payout. All external effects are
 // injected so the exact production lifecycle can be exercised with deterministic mocks.
@@ -19,6 +20,15 @@ export async function executePayout({
   }
   if (!ledger.quotes.some(item => item.orderId === quote.orderId && item === quote)) {
     throw new Error("Payout quote must belong to the supplied ledger");
+  }
+  validateQuote(quote);
+  if (quote.status !== "paid") throw new Error("Only a paid deposit quote may be paid out");
+  if (!/^0x[0-9a-fA-F]{40}$/.test(payoutRecipient) ||
+      payoutRecipient.toLowerCase() !== quote.sender.toLowerCase()) {
+    throw new Error("Payout recipient must exactly match the quote sender");
+  }
+  if (amount <= 0n || amount.toString() !== String(quote.payoutAmountAtomic)) {
+    throw new Error("Payout amount must exactly match the quoted atomic SOBY amount");
   }
   if (typeof saveLedger !== "function" || typeof applyConfirmedPriceChange !== "function") {
     throw new TypeError("persistence and confirmed-price adapters are required");
