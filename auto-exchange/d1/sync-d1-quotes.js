@@ -49,6 +49,6 @@ if (changed) {
   ledgerSha = saved.content.sha;
 }
 const sync = await d1("/internal/sync-ledger", { method: "POST",
-  body: JSON.stringify({ quotes: ledger.quotes, returnQuotes: ledger.returnQuotes }) });
+  body: JSON.stringify({ quotes: ledger.quotes, returnQuotes: ledger.returnQuotes, currentPriceUsdtPerSoby: ledger.currentPriceUsdtPerSoby || "0.005" }) });
 console.log("D1 quote bridge complete. Imported " + (changed ? "new" : "no new") +
   " reservations; synchronized " + sync.updated + " order states.");
