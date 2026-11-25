@@ -25,7 +25,6 @@
     .direction p { color: #b9c9df; line-height: 1.6; min-height: 72px; }
     a { color: #a8ceff; font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 4px; }
     .notice { margin-top: 22px; padding: 16px; border: 1px solid #8b6b2b; border-radius: 13px; background: #302713; color: #ffe7ae; line-height: 1.65; }
-    .disabled-link { color: #8fa4c2; font-weight: 600; }
     .detail { color: #aebfd8; line-height: 1.7; font-size: .92rem; margin-top: 18px; }
     footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #2b4265; color: #8fa4c2; font-size: .82rem; }
     @media (max-width: 560px) { .stats,.directions { grid-template-columns: 1fr; } .direction p { min-height: 0; } }
@@ -55,13 +54,13 @@
       </div>
       <div class="direction">
         <h2>Return SOBY for USDT</h2>
-        <p>This direction is temporarily closed. It will open after the inventory wallet has USDT for refunds and ETH for Ethereum gas.</p>
-        <span class="disabled-link" aria-disabled="true">SOBY → USDT returns are not accepting orders</span>
+        <p>Request a SOBYA EVM return quote and send the exact SOBY amount shown. The USDT refund is processed after confirmation; if USDT or Ethereum gas is not yet funded, the order waits safely and resumes when funds arrive.</p>
+        <a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-return.yml">Request SOBY → USDT return quote</a>
       </div>
     </section>
 
-    <div class="notice"><strong>USDT → SOBY purchases are enabled.</strong> Request a quote first, then send only the exact USDT amount to the deposit address and Ethereum USDT contract shown in the issued quote, before its 10-minute expiry. The SOBY payout is sent to the receiving wallet in that quote; the SOBYA network fee is deducted from the SOBY payout. Never send funds without a valid issued quote. <strong>SOBY → USDT returns remain closed</strong> until the wallet has USDT inventory and ETH for Ethereum gas. Do not send SOBY for a refund yet.</div>
-    <p class="detail">The project uses GitHub Issues, GitHub Actions, and a versioned JSON ledger; it does not require a separate hosting provider. Price changes are tied to confirmed settled quantities: +100 BPS for SOBY sold and −25 BPS for SOBY returned, proportionally to the 1,000,000 SOBY reference inventory. No time-only price changes are applied. The two exchange directions have independent activation gates so an unfunded refund route cannot block initial SOBY purchases.</p>
+    <div class="notice"><strong>Both exchange directions are enabled.</strong> For USDT → SOBY, request a quote and send only the exact USDT amount to the quoted Ethereum address before its 10-minute expiry. For SOBY → USDT, request a return quote and send only the exact SOBY amount to the quoted SOBYA address. Refunds are made after confirmation. If USDT inventory or Ethereum gas is not yet sufficient, the return order remains in a funding-wait state and is retried automatically after the initial purchases fund the wallet. Never send funds without a valid quote.</div>
+    <p class="detail">The project uses GitHub Issues, GitHub Actions, and a versioned JSON ledger; it does not require a separate hosting provider. Price changes are tied to confirmed settled quantities: +100 BPS for SOBY sold and −25 BPS for SOBY returned, proportionally to the 1,000,000 SOBY reference inventory. No time-only price changes are applied. Both directions use the same inventory wallet, signing key, and shared activation policy.</p>
     <footer>Network routes: Ethereum Mainnet for USDT deposits/refunds · SOBYA EVM for native SOBY payouts/returns.</footer>
   </main>
 </body>
