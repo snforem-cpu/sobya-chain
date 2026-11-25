@@ -28,9 +28,7 @@ test("the same inventory EVM address is configured for Ethereum and SOBYA", () =
   assert.equal(AUTO_EXCHANGE_POLICY.sobyaEvmChainId, 357812033857);
 });
 
-test("USDT-to-SOBY buying is enabled while the unfunded reverse direction stays disabled", () => {
-  assert.equal(AUTO_EXCHANGE_POLICY.buyTradingEnabled, true);
-  assert.equal(AUTO_EXCHANGE_POLICY.buyPayoutEnabled, true);
-  assert.equal(AUTO_EXCHANGE_POLICY.returnTradingEnabled, false);
-  assert.equal(AUTO_EXCHANGE_POLICY.returnRefundEnabled, false);
+test("both exchange directions share the same enabled trading and payout gates", () => {
+  assert.equal(AUTO_EXCHANGE_POLICY.tradingEnabled, true);
+  assert.equal(AUTO_EXCHANGE_POLICY.payoutEnabled, true);
 });
