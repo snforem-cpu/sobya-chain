@@ -115,11 +115,9 @@ async function connect(){
   signer=await provider.getSigner(accounts[0]);
   const address=await signer.getAddress();
   button.textContent=address.slice(0,6)+'…'+address.slice(-4);
-  $('ccWalletAddress').value=address;
   const liquidity=liquidityEnabled(),trading=tradingEnabled();
   $('swapBtn').disabled=!trading;
   for(const id of ['poolBtn','removeBtn','wrapBtn','unwrapBtn'])$(id).disabled=!liquidity;
-  $('ccQuoteBtn').disabled=!(config&&config.crossChainOrdersEnabled===true&&apiHealthy);
   say(trading?'Wallet connected. Swaps are enabled.':liquidity?'Wallet connected. Pool creation and liquidity are enabled; swaps remain locked until the initial pool passes live tests.':'Wallet connected, but DEX transactions are disabled pending verification.');
  }catch(e){console.error('Wallet connection failed:',e);say(e.shortMessage||e.message||String(e))}
  finally{button.disabled=false}
