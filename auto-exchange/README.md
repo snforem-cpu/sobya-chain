@@ -57,13 +57,3 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 ## Tests
 Run `npm test` inside `auto-exchange/`. The test workflow runs the isolated policy, quote allocation, settlement, and price-movement tests.
 
-## Constant-product AMM math foundation (not live)
-`amm.js` adds exact-input constant-product quote math for both directions:
-- USDT (6 decimals) -> SOBY (18 decimals)
-- SOBY (18 decimals) -> USDT (6 decimals)
-
-The quote uses the standard fee-adjusted formula:
-`amountOut = (amountIn × (10000 − feeBps) × reserveOut) / (reserveIn × 10000 + amountIn × (10000 − feeBps))`.
-It returns post-trade reserve values and an integer-BPS execution-impact estimate, and enforces a caller-supplied minimum output.
-
-**Important:** this is a pure calculator, not an AMM pool or a live market. The existing quote-issuance worker still uses the legacy fixed-inventory quote path. No verified USDT/SOBY pool reserves, pool contract, liquidity provider, on-chain swap, or atomic cross-chain settlement are configured. Therefore this module is deliberately not wired into customer quotes and trading/payout flags remain disabled. Do not treat the example reference inventory as actual liquidity, and do not send funds. A production AMM requires real funded reserves and an audited pool contract; an Ethereum USDT deposit followed by a SOBYA payout additionally needs a secure cross-chain settlement design.
