@@ -63,7 +63,7 @@ function quoteComment(q) {
     "- **Your receiving wallet:** \`" + q.sender + "\`",
     "- **Exact USDT payment:** **" + formatUsdtAtomic(q.paymentAmountAtomic) + " USDT**",
     "- **Quoted SOBY amount (after 1% fee):** **" + formatSobyAtomic(q.payoutAmountAtomic) + " SOBY**",
-    "- **Opening price used:** 0.005 USDT/SOBY",
+    "- **Quoted price:** " + q.quotedPrice + " USDT/SOBY",
     "- **Deposit network:** Ethereum Mainnet",
     "- **USDT contract:** \`" + q.tokenAddress + "\`",
     "- **Deposit address:** \`" + q.depositAddress + "\`",
