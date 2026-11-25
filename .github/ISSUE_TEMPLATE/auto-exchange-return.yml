@@ -1,0 +1,33 @@
+name: SOBYA Auto Exchange — Return SOBY for USDT
+description: Request a 10-minute SOBY return / USDT refund quote. This does not accept deposits.
+title: "[AUTO-EXCHANGE RETURN]"
+labels:
+  - auto-exchange-return-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Important:** This creates a quote request only. Do not send SOBY. Return settlement and USDT refunds are currently disabled.
+  - type: input
+    id: wallet
+    attributes:
+      label: EVM wallet address
+      description: Your SOBYA address. The same address is the intended Ethereum USDT refund recipient.
+      placeholder: "0x..."
+    validations:
+      required: true
+  - type: input
+    id: amount
+    attributes:
+      label: SOBY amount to return
+      description: Amount in SOBY, up to 18 decimal places. The issued quote will state the exact unique return amount.
+      placeholder: "100"
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand this is a quote request only and I must not send funds.
+          required: true
