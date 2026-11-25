@@ -4,8 +4,8 @@ import { applyConfirmedPriceChange } from "./pricing.js";
 import { matchSobyReturn } from "./return-ledger.js";
 import { executeReturnRefund, isReturnRefundEligible } from "./return-execution.js";
 
-if (!(AUTO_EXCHANGE_POLICY.returnTradingEnabled && AUTO_EXCHANGE_POLICY.returnRefundEnabled)) {
-  console.log("SOBY-to-USDT return/refund direction is disabled; no RPC or signing key was accessed.");
+if (!(AUTO_EXCHANGE_POLICY.tradingEnabled && AUTO_EXCHANGE_POLICY.payoutEnabled)) {
+  console.log("Auto Exchange is disabled by shared project policy; no RPC or signing key was accessed.");
   process.exit(0);
 }
 const required = ["GH_TOKEN", "GH_REPOSITORY", "ETHEREUM_RPC_URL", "SOBYA_EVM_RPC_URL", "SOBYA_PAYOUT_PRIVATE_KEY"];
