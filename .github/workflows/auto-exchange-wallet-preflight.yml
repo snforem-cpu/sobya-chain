@@ -7,6 +7,7 @@ on:
       - ".github/workflows/auto-exchange-wallet-preflight.yml"
   workflow_dispatch:
 
+# A later push to this workflow path also triggers the same read-only check.
 permissions:
   contents: read
 
