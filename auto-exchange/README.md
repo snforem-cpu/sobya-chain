@@ -57,14 +57,14 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - The return quote and refund workflows use GitHub Issues, GitHub Actions, and the same committed JSON ledger; they do not require a separate server.
 
 ## Operational activation state
-- USDT → SOBY buying and automated SOBY payouts are enabled independently of the reverse direction.
-- SOBY → USDT return quotes and refunds remain disabled until the inventory wallet has USDT for refunds and ETH for Ethereum gas. This allows initial USDT purchases to build the USDT inventory without accepting unfunded return obligations.
+- Both USDT → SOBY buying and SOBY → USDT returns use the same inventory wallet, the same `SOBYA_PAYOUT_PRIVATE_KEY`, and the same shared `tradingEnabled` / `payoutEnabled` activation gates.
+- Both directions are enabled. Initial USDT purchases add USDT to the inventory wallet. A confirmed SOBY return is accepted and recorded; if USDT inventory or Ethereum gas is insufficient at refund time, the order remains in a retryable funding-wait state and is automatically retried after funds arrive. This avoids disabling the reverse route while ensuring no unfunded refund is falsely marked as paid.
 - A read-only GitHub Actions preflight verified that the configured signing key is present and derives the configured inventory address. It also verified Ethereum chain ID 1 and SOBYA EVM chain ID 357812033857.
 - At the preflight, the inventory wallet held 1,000,000 native SOBY, 0 USDT, and 0 ETH. The zero Ethereum balances do not block receiving USDT for initial purchases or sending native SOBY on SOBYA; they do block the reverse USDT refund route.
 - Customers must request a fresh quote and send only the exact USDT amount to the quoted Ethereum address before the 10-minute expiry. Never send USDT without a valid quote. The payout worker requires 12 Ethereum confirmations, exact token/sender/recipient/amount matching, and replay protection.
 - SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas, deducts the buffered SOBYA network-fee budget from the gross quoted SOBY payout, and requires the gross amount in the inventory wallet. The customer receives the net SOBY amount. A zero gas price is accepted for SOBYA because its RPC reports zero; negative fee values remain rejected.
 - A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger.
-- The reverse return worker and return-quote processor exit before accessing RPC credentials or the signing key while their independent return gates are false.
+- The return worker uses the same shared activation gates and signing key as the SOBY payout worker. Insufficient USDT or Ethereum gas is handled by the retryable funding-wait state before nonce reservation; no refund is falsely marked complete.
 - If execution stops after a payout/refund nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent. Insufficient balances before nonce reservation are recorded as retryable funding-wait states.
 - The private key is not placed in frontend files, Git history, or workflow output. The read-only preflight reports only whether its derived address matches; it never prints the key.
 - No real-money end-to-end transfer has been performed yet; the first accepted purchase will be a live transaction. No paid contract, paid hosting, or new paid service is part of this design.
