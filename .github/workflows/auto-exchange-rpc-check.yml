@@ -8,6 +8,12 @@ on:
       - "auto-exchange/config.js"
       - "auto-exchange/quote-ledger.js"
       - ".github/workflows/auto-exchange-rpc-check.yml"
+  pull_request:
+    paths:
+      - "auto-exchange/verify-rpc.js"
+      - "auto-exchange/config.js"
+      - "auto-exchange/quote-ledger.js"
+      - ".github/workflows/auto-exchange-rpc-check.yml"
   workflow_dispatch:
 
 permissions:
