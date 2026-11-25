@@ -2,5 +2,8 @@
   "schemaVersion": 1,
   "quotes": [],
   "processedTransfers": [],
-  "lastUpdatedAt": null
+  "lastUpdatedAt": null,
+  "returnQuotes": [],
+  "processedReturns": [],
+  "lastScannedSobyBlock": null
 }
