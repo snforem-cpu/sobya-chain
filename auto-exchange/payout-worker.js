@@ -5,9 +5,9 @@ import { applyConfirmedPriceChange } from "./pricing.js";
 import { isPayoutEligible } from "./payout-policy.js";
 import { executePayout } from "./payout-execution.js";
 
-const enabled = AUTO_EXCHANGE_POLICY.buyTradingEnabled && AUTO_EXCHANGE_POLICY.buyPayoutEnabled;
+const enabled = AUTO_EXCHANGE_POLICY.tradingEnabled && AUTO_EXCHANGE_POLICY.payoutEnabled;
 if (!enabled) {
-  console.log("USDT-to-SOBY payout worker is disabled by project policy; no RPC or signing key was accessed.");
+  console.log("Auto Exchange is disabled by shared project policy; no RPC or signing key was accessed.");
   process.exit(0);
 }
 
