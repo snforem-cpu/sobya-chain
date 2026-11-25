@@ -1,4 +1,4 @@
-import { calculateRequiredPayoutBalance, isPayoutEligible } from "./payout-policy.js";
+import { isPayoutEligible } from "./payout-policy.js";
 import { validateQuote } from "./settlement.js";
 
 // Executes one already-verified, confirmed deposit payout. All external effects are
