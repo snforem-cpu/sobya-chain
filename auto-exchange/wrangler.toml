@@ -7,4 +7,4 @@ workers_dev = true
 binding = "DB"
 database_name = "sobya-buy-db"
 database_id = "2c25fe97-d6f9-4614-b5e9-fa72133070f9"
-migrations_dir = "d1"
+migrations_dir = "d1/migrations"
