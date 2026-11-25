@@ -12,3 +12,10 @@ export function calculateRequiredPayoutBalance({ payoutAmountAtomic, gasLimit, m
   const bufferedGas = (gas * fee * BigInt(10_000 + gasBufferBps) + 9_999n) / 10_000n;
   return payout + bufferedGas;
 }
+
+
+// A payout is eligible only before a nonce reservation or transaction hash exists.
+// Prepared/broadcast orders are intentionally held for reconciliation, never retried blindly.
+export function isPayoutEligible(quote) {
+  return quote?.status === "paid" && !quote.payoutTxHash && quote.payoutNonce === undefined;
+}
