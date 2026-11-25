@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { executePayout } from "./payout-execution.js";
 
 function fixture(overrides = {}) {
-  const quote = { orderId: "sobya-e2e-1", status: "paid" };
+  const quote = {
+    orderId: "sobya-e2e-1", status: "paid",
+    sender: "0x2222222222222222222222222222222222222222",
+    depositAddress: "0x3333333333333333333333333333333333333333",
+    tokenAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    chainId: 1, paymentAmountAtomic: "1000000", payoutAmountAtomic: "100000",
+    createdAt: "2026-11-25T10:00:00.000Z", expiresAt: "2026-11-25T10:10:00.000Z"
+  };
   const ledger = { quotes: [quote], priceState: { marker: "unchanged" } };
   const saves = [];
   const sobya = {
@@ -28,7 +35,7 @@ function fixture(overrides = {}) {
   };
   const deps = {
     ledger, quote, ledgerSha: "initial-sha", sobya, signer,
-    payoutRecipient: "0x2222222222222222222222222222222222222222",
+    payoutRecipient: quote.sender,
     amount: 100_000n,
     saveLedger: async (nextLedger, sha, message) => {
       saves.push({ snapshot: structuredClone(nextLedger), message });
@@ -125,4 +132,14 @@ test("refuses a quote not owned by the durable ledger", async () => {
   const { deps } = fixture();
   deps.quote = { orderId: "foreign", status: "paid" };
   await assert.rejects(() => executePayout(deps), /must belong to the supplied ledger/);
+});
+
+test("refuses a payout recipient that differs from the quote wallet", async () => {
+  const { deps } = fixture({ payoutRecipient: "0x4444444444444444444444444444444444444444" });
+  await assert.rejects(() => executePayout(deps), /must exactly match the quote sender/);
+});
+
+test("refuses a payout amount that differs from the quoted SOBY amount", async () => {
+  const { deps } = fixture({ amount: 100_001n });
+  await assert.rejects(() => executePayout(deps), /must exactly match the quoted atomic SOBY amount/);
 });
