@@ -2,6 +2,7 @@ import { JsonRpcProvider, Wallet, Interface, getAddress, id, zeroPadValue } from
 import { matchDeposit } from "./settlement.js";
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
 import { applyConfirmedPriceChange } from "./pricing.js";
+import { calculateRequiredPayoutBalance } from "./payout-policy.js";
 
 const enabled = AUTO_EXCHANGE_POLICY.tradingEnabled && AUTO_EXCHANGE_POLICY.payoutEnabled;
 if (!enabled) {
@@ -156,12 +157,16 @@ for (const quote of ledger.quotes) {
   } else {
     throw new Error("SOBYA RPC did not provide usable gas fee data");
   }
-  const gasReserve = gasLimit * maxFeePerGas;
+  const requiredBalance = calculateRequiredPayoutBalance({
+    payoutAmountAtomic: amount.toString(),
+    gasLimit: gasLimit.toString(),
+    maxFeePerGas: maxFeePerGas.toString()
+  });
   const balance = await sobya.getBalance(signer.address);
-  if (balance < amount + gasReserve) {
+  if (balance < requiredBalance) {
     quote.status = "review";
     quote.payoutReviewReason = "Insufficient SOBY balance for payout plus estimated gas reserve";
-    quote.requiredNativeBalanceAtomic = (amount + gasReserve).toString();
+    quote.requiredNativeBalanceAtomic = requiredBalance.toString();
     continue;
   }
 
