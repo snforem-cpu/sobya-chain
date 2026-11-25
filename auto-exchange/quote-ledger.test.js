@@ -14,6 +14,9 @@ test("parses exact six-decimal USDT amounts", () => {
 test("opening quote applies the configured 1 percent fee", () => {
   assert.equal(calculateOpeningQuote(10_000_000n), 1980n * 10n ** 18n);
 });
+test("quote calculation uses the current persisted price", () => {
+  assert.equal(calculateOpeningQuote(10_000_000n, "0.0050005"), 1979802019798020197980n);
+});
 test("allocates unique exact payment amount across the complete ledger", () => {
   assert.equal(allocateUniquePaymentAmount(10_000_000n, []).paymentAmountAtomic, "10000001");
   assert.equal(allocateUniquePaymentAmount(10_000_000n, [{paymentAmountAtomic:"10000001"}]).paymentAmountAtomic, "10000002");
@@ -22,8 +25,17 @@ test("creates quote with unique payment amount and ten-minute expiry", () => {
   const result = createQuote({ ledger: empty, issueNumber: 42, sender, requestedAmount: "10", now: new Date("2026-11-25T10:00:00Z") });
   assert.equal(result.quote.paymentAmountAtomic, "10000001");
   assert.equal(result.quote.payoutAmountAtomic, "1980000198000000000000");
+  assert.equal(result.quote.quotedPrice, "0.005");
   assert.equal(Date.parse(result.quote.expiresAt)-Date.parse(result.quote.createdAt), 600000);
   assert.equal(result.ledger.quotes.length, 1);
+});
+test("creates quote using ledger current price when set", () => {
+  const result = createQuote({
+    ledger: { ...empty, currentPriceUsdtPerSoby: "0.0050005" },
+    issueNumber: 43, sender, requestedAmount: "10", now: new Date("2026-11-25T10:00:00Z")
+  });
+  assert.equal(result.quote.quotedPrice, "0.0050005");
+  assert.equal(result.quote.payoutAmountAtomic, "1979802019798020197980");
 });
 test("reprocessing the same issue is idempotent", () => {
   const first = createQuote({ledger:empty,issueNumber:7,sender,requestedAmount:"5",now:new Date("2026-11-25T10:00:00Z")});
