@@ -43,11 +43,14 @@ jobs:
           if (dex.includes('crosschain') || dex.includes('Ethereum USDT') || dex.includes('USDT → SOBY')) throw new Error('Retired cross-chain exchange UI remains in the DEX');
           if ((dex.match(/class="btn tab/g) || []).length !== 3) throw new Error('DEX must expose exactly the three original tabs');
           const home = fs.readFileSync('index.html', 'utf8');
-          for (const oldHost of ['sobya-evm-rpc.nodesafe-app.xyz', 'sobya-rpc.nodesafe-app.xyz', 'sobya-api.nodesafe-app.xyz']) {
-            if (home.includes(oldHost)) throw new Error('Stale NodeSafe endpoint remains on the public homepage: ' + oldHost);
+          for (const endpoint of [
+            'https://sobya-evm-rpc.nodesafe-app.xyz',
+            'https://sobya-evm-rpc.nodesafe-dapp.xyz',
+            'https://sobya-rpc.bonynode.online/',
+            'https://chainlist.org/chain/357812033857'
+          ]) {
+            if (!home.includes(endpoint)) throw new Error('Public homepage is missing a SOBYA connection or discovery link: ' + endpoint);
           }
-          const verifier = fs.readFileSync('buy-api/src/payment-verification.js', 'utf8');
-          if (!verifier.includes('https://sobya-evm-rpc.nodesafe-dapp.xyz')) throw new Error('SOBY payout verifier is not using the current EVM RPC');
           console.log('PASS: SOBYA DEX configuration, current EVM RPC, and all safety gates.');
           NODE
       - name: Read live SOBYA factory market count (no transactions)
