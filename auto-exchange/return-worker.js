@@ -75,7 +75,12 @@ for (const quote of ledger.returnQuotes) {
       getAddress(tx.from) !== getAddress(quote.sender) ||
       getAddress(tx.to) !== inventory || tx.value.toString() !== String(quote.paymentAmountAtomic)) continue;
   const result = await executeReturnRefund({ ledger, quote, ledgerSha,
-    saveLedger, ethereum: { ...ethereum, sobyaProvider: sobya },
+    saveLedger, ethereum: {
+      sobyaProvider: sobya,
+      getFeeData: () => ethereum.getFeeData(),
+      getBalance: address => ethereum.getBalance(address),
+      getTransactionCount: (address, tag) => ethereum.getTransactionCount(address, tag)
+    },
     usdt, signer, refundRecipient: getAddress(quote.sender),
     amount: BigInt(quote.payoutAmountAtomic), sobyaConfirmations: requiredConfirmations,
     ethereumConfirmations: 12, applyConfirmedPriceChange });
