@@ -51,6 +51,31 @@ function fixture(overrides = {}) {
   return { quote, ledger, saves, sobya, signer, deps };
 }
 
+test("executes a SOBYA payout when the verified network gas price is zero", async () => {
+  const { quote, deps } = fixture({
+    sobya: {
+      estimateGas: async () => 21_000n,
+      getFeeData: async () => ({ maxFeePerGas: null, maxPriorityFeePerGas: null, gasPrice: 0n }),
+      getBalance: async () => 1_000_000n,
+      getTransactionCount: async () => 8
+    },
+    signer: {
+      address: "0x1111111111111111111111111111111111111111",
+      sendTransaction: async request => {
+        assert.equal(request.gasPrice, 0n);
+        return {
+          hash: "0x" + "d".repeat(64),
+          wait: async () => ({ status: 1, blockNumber: 125, gasUsed: 21_000n, gasPrice: 0n })
+        };
+      }
+    }
+  });
+  const result = await executePayout(deps);
+  assert.equal(result.completed, true);
+  assert.equal(quote.status, "settled");
+  assert.equal(quote.payoutFeePaidAtomic, "0");
+});
+
 test("executes and persists prepared, broadcast, and confirmed settlement lifecycle", async () => {
   const { quote, saves, deps } = fixture();
   const result = await executePayout(deps);
