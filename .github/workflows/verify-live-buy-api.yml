@@ -41,25 +41,24 @@ jobs:
             throw new Error('BUY form CORS preflight failed');
           }
           console.log('PASS: BUY API online; database configured; manual price available; GitHub Pages CORS allowed; automatic checkout remains disabled.');
-          const badOrder = await fetch(base + '/api/manual/orders', {
+          const invalidOrder = await fetch(base + '/api/manual/orders', {
             method: 'POST',
             headers: { Origin: origin, 'content-type': 'application/json' },
-            body: JSON.stringify({
-              sobyAmount: '1000', paymentNetwork: 'TRON', paymentAsset: 'USDT',
-              paymentAmount: '5', paymentTx: '0x' + 'a'.repeat(64),
-              buyerAddress: '0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f'
-            })
+            body: JSON.stringify({ sobyAmount: '1000', paymentNetwork: '', paymentAsset: '', paymentAmount: '', paymentTx: '', buyerAddress: 'invalid' })
           });
-          const badOrderBody = await badOrder.json();
-          if (badOrder.status !== 400 || badOrderBody.error !== 'invalid_order_details') {
-            throw new Error('Manual exchange API must reject non-Ethereum payment networks');
+          const invalidOrderBody = await invalidOrder.json();
+          if (invalidOrder.status !== 400 || invalidOrderBody.error !== 'invalid_order_details') {
+            throw new Error('Manual purchase API must reject incomplete order details');
           }
           const buyPage = await fetch('https://snforem-cpu.github.io/sobya-chain/buy/');
           const buyHtml = await buyPage.text();
-          for (const required of ['Ethereum Mainnet', 'USDT (ERC-20)', 'هاش المعاملة على Ethereum', 'USDT']) {
+          for (const required of ['Manual purchase requests', 'e.g. Ethereum, BNB Chain', 'e.g. ETH, USDT, BNB', 'Transaction ID / hash']) {
             if (!buyHtml.includes(required)) throw new Error('Published BUY page is missing: ' + required);
           }
-          console.log('PASS: BUY API online; database configured; manual price available; CORS allowed; non-Ethereum payment rejected; public BUY page is Ethereum USDT only.');
+          if (buyHtml.includes('Ethereum Mainnet') || buyHtml.includes('USDT (ERC-20)')) {
+            throw new Error('Published BUY page still contains Ethereum-USDT-only checkout');
+          }
+          console.log('PASS: BUY API online; database configured; manual price available; CORS allowed; incomplete order rejected; multi-network and multi-asset manual purchase form is published.');
 
           }
           main().catch(error => { console.error(error); process.exitCode = 1; });
