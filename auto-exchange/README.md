@@ -59,5 +59,5 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - No paid contract, paid hosting, or new paid service is part of this design.
 
 ## Tests
-Run `npm test` inside `auto-exchange/`. The GitHub Actions test workflow runs policy, quote allocation, settlement, pricing, and payout gas-reserve unit tests. These are unit tests, not an end-to-end live-money test.
+Run `npm test` inside `auto-exchange/`. The GitHub Actions test workflow runs policy, quote allocation, settlement, pricing, payout gas-reserve, and mocked payout-lifecycle tests. `payout-execution.js` is the same injected lifecycle used by the production worker; its tests cover durable nonce reservation, broadcast, receipt confirmation, failed receipts, insufficient inventory, and interruption/restart no-blind-retry behavior. All RPC, signer, and ledger adapters in these tests are deterministic mocks. These tests do not verify live RPC endpoints or authorize real-money operation.
 
