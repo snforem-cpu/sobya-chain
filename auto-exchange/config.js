@@ -12,16 +12,13 @@ export const AUTO_EXCHANGE_POLICY = Object.freeze({
   maxPrice: null,
   timeOnlyPriceChanges: false,
   priceChangesRequireConfirmedTrades: true,
+  // Same EVM address on Ethereum and SOBYA; balances are chain-specific.
   inventoryWalletEvmAddress: "0xebdb899fFE84a89e1d576964b640491c135651AD",
   ethereumChainId: 1,
   sobyaEvmChainId: 357812033857,
-  // Buy-side USDT deposits and SOBY payouts have independent gates.
+  // Both exchange directions are controlled by these shared activation gates.
   tradingEnabled: false,
   payoutEnabled: false,
-  // Return-side SOBY deposits and USDT refunds remain independently disabled
-  // until the Ethereum wallet has adequate USDT inventory and ETH gas.
-  returnEnabled: false,
-  refundEnabled: false,
 });
 
 export function getDirectionalPriceCoefficient(direction) {
