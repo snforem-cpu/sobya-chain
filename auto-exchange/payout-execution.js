@@ -56,11 +56,11 @@ export async function executePayout({
     throw new Error("SOBYA RPC did not provide usable gas fee data");
   }
 
-  const requiredBalance = calculateRequiredPayoutBalance({
-    payoutAmountAtomic: amount.toString(),
-    gasLimit: gasLimit.toString(),
-    maxFeePerGas: maxFeePerGas.toString()
-  });
+  const networkFeeBudget = gasLimit * maxFeePerGas;
+  const netPayoutAmount = amount - networkFeeBudget;
+  if (netPayoutAmount <= 0n) throw new Error("SOBYA network fee exceeds the quoted payout; manual review required");
+  // The gross quote is split between the customer's net SOBY and the SOBYA network fee.
+  const requiredBalance = amount;
   const balance = await sobya.getBalance(signer.address);
   if (balance < requiredBalance) {
     quote.status = "payout_waiting_funds";
@@ -79,7 +79,7 @@ export async function executePayout({
   ledgerSha = await saveLedger(ledger, ledgerSha, "Reserve SOBYA payout nonce for " + quote.orderId);
 
   const tx = await signer.sendTransaction({
-    to: payoutRecipient, value: amount, nonce, gasLimit, ...feeOverrides
+    to: payoutRecipient, value: netPayoutAmount, nonce, gasLimit, ...feeOverrides
   });
   quote.payoutTxHash = tx.hash;
   quote.status = "payout_broadcast";
@@ -96,7 +96,7 @@ export async function executePayout({
 
   ledger = applyConfirmedPriceChange({
     ledger,
-    quantitySobyAtomic: amount.toString(),
+    quantitySobyAtomic: netPayoutAmount.toString(),
     direction: "up",
     settlementConfirmed: true
   });
@@ -106,6 +106,9 @@ export async function executePayout({
   settledQuote.settledAt = new Date().toISOString();
   settledQuote.payoutBlockNumber = payoutReceipt.blockNumber;
   settledQuote.payoutGasUsed = payoutReceipt.gasUsed.toString();
+  settledQuote.payoutGrossAmountAtomic = amount.toString();
+  settledQuote.payoutNetworkFeeBudgetAtomic = networkFeeBudget.toString();
+  settledQuote.payoutNetAmountAtomic = netPayoutAmount.toString();
   settledQuote.payoutFeePaidAtomic =
     (payoutReceipt.gasUsed * (payoutReceipt.gasPrice ?? maxFeePerGas)).toString();
   ledgerSha = await saveLedger(ledger, ledgerSha, "Confirm SOBYA payout and update price for " + quote.orderId);
