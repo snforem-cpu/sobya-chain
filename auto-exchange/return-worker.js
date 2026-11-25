@@ -41,6 +41,19 @@ const inventory = getAddress(AUTO_EXCHANGE_POLICY.inventoryWalletEvmAddress);
 if (getAddress(signer.address) !== inventory) throw new Error("Refund signing key does not match configured inventory wallet");
 const usdt = new Contract("0xdAC17F958D2ee523a2206206994597C13D831ec7",
   ["function balanceOf(address) view returns (uint256)", "function transfer(address,uint256) returns (bool)"], signer);
+// Chainlink ETH/USD mainnet feed: 8 decimals. A stale or invalid oracle reading fails closed.
+const ethUsdFeed = new Contract("0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+  ["function decimals() view returns (uint8)", "function latestRoundData() view returns (uint80,int256,uint256,uint256,uint80)"], ethereum);
+async function getFreshEthUsdPrice() {
+  const [decimals, round] = await Promise.all([ethUsdFeed.decimals(), ethUsdFeed.latestRoundData()]);
+  const answer = BigInt(round[1]);
+  const updatedAt = Number(round[3]);
+  if (answer <= 0n || Number(decimals) !== 8 || !Number.isSafeInteger(updatedAt) ||
+      Date.now() / 1000 - updatedAt > 3600 || updatedAt > Date.now() / 1000) {
+    throw new Error("Chainlink ETH/USD price is invalid or older than one hour");
+  }
+  return answer.toString();
+}
 const requiredConfirmations = 2;
 const head = await sobya.getBlockNumber();
 const scanTo = head - (requiredConfirmations - 1);
@@ -83,7 +96,7 @@ for (const quote of ledger.returnQuotes) {
     },
     usdt, signer, refundRecipient: getAddress(quote.sender),
     amount: BigInt(quote.payoutAmountAtomic), sobyaConfirmations: requiredConfirmations,
-    ethereumConfirmations: 12, applyConfirmedPriceChange });
+    ethereumConfirmations: 12, applyConfirmedPriceChange, getEthUsdPrice: getFreshEthUsdPrice });
   ledger = result.ledger;
   ledgerSha = result.ledgerSha;
   if (result.completed) completed++;
