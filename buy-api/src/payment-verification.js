@@ -172,7 +172,7 @@ export const paymentNetworkConfig = Object.freeze({
 
 // SOBY is the native asset on SOBYA Mainnet (chain ID 357812033857),
 // not an ERC-20 contract. The owner signs this transfer in MetaMask.
-const SOBYA_RPC = "https://sobya-evm-rpc.nodesafe-app.xyz";
+const SOBYA_RPC = "https://sobya-evm-rpc.nodesafe-dapp.xyz";
 const SOBYA_CHAIN_ID = 357812033857;
 const SOBYA_INVENTORY_WALLET = "0xebdb899fFE84a89e1d576964b640491c135651AD";
 
