@@ -1,0 +1,83 @@
+name: Verify SOBYA NodeSafe dapp EVM JSON-RPC
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+    paths:
+      - '.github/workflows/verify-dapp-evm-rpc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-evm-rpc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public EVM JSON-RPC with read-only calls
+        shell: bash
+        env:
+          RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+          EXPECTED_CHAIN_ID: "357812033857"
+        run: |
+          set -euo pipefail
+          rpc() {
+            local method="$1"
+            local params="$2"
+            local output="$3"
+            curl --connect-timeout 10 --max-time 25 -fsS \
+              -H 'Content-Type: application/json' \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":$params}" \
+              "$RPC_URL" > "$output"
+            jq -e '.jsonrpc == "2.0" and .id == 1 and .error == null and has("result")' "$output" >/dev/null
+          }
+
+          ready=0
+          for attempt in $(seq 1 5); do
+            if rpc eth_chainId '[]' /tmp/chain-id.json; then
+              ready=1
+              break
+            fi
+            echo "RPC not ready (attempt $attempt/5); retrying..."
+            sleep $((attempt * 3))
+          done
+          test "$ready" -eq 1 || { echo "EVM JSON-RPC did not return a valid eth_chainId response"; exit 1; }
+
+          rpc net_version '[]' /tmp/net-version.json
+          rpc eth_blockNumber '[]' /tmp/block-number.json
+          rpc eth_getBlockByNumber '["latest",false]' /tmp/latest-block.json
+          rpc eth_gasPrice '[]' /tmp/gas-price.json
+          rpc eth_estimateGas '[{"from":"0x000000000000000000000000000000000000dEaD","to":"0x000000000000000000000000000000000000bEEF","value":"0x0"}]' /tmp/estimate-gas.json
+
+          chain_hex="$(jq -r '.result' /tmp/chain-id.json)"
+          chain_id="$((chain_hex))"
+          net_version="$(jq -r '.result' /tmp/net-version.json)"
+          block_hex="$(jq -r '.result' /tmp/block-number.json)"
+          block_number="$((block_hex))"
+          latest_hex="$(jq -r '.result.number' /tmp/latest-block.json)"
+          latest_number="$((latest_hex))"
+          gas_price="$(jq -r '.result' /tmp/gas-price.json)"
+          estimate_gas="$(jq -r '.result' /tmp/estimate-gas.json)"
+
+          test "$chain_id" -eq "$EXPECTED_CHAIN_ID"
+          test "$net_version" = "$EXPECTED_CHAIN_ID"
+          test "$block_number" -gt 0
+          test "$latest_number" -eq "$block_number"
+          [[ "$gas_price" =~ ^0x[0-9a-fA-F]+$ ]]
+          [[ "$estimate_gas" =~ ^0x[0-9a-fA-F]+$ ]]
+
+          {
+            echo "### SOBYA public EVM JSON-RPC — read-only verification"
+            echo "- Endpoint: $RPC_URL"
+            echo "- eth_chainId: $chain_id (expected)"
+            echo "- net_version: $net_version (expected)"
+            echo "- eth_blockNumber: $block_number"
+            echo "- latest block number: $latest_number (matches)"
+            echo "- eth_gasPrice: $gas_price"
+            echo "- eth_estimateGas: $estimate_gas"
+            echo "- No transaction was signed or broadcast."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "PASS: public EVM JSON-RPC endpoint and all read-only checks."
