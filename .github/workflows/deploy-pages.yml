@@ -11,6 +11,7 @@ on:
       - 'buy/**'
       - 'tokenomics-studio/**'
       - 'dex/**'
+      - 'auto-exchange/**'
       - 'contracts/**'
       - 'assets/logo/**'
       - '.github/workflows/deploy-pages.yml'
