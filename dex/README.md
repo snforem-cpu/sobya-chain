@@ -1,36 +1,41 @@
-# SOBYA DEX (development)
+# SOBYA DEX
 
-This directory contains the first self-custody web interface for the planned SOBYA exchange.
+Public self-custody DEX interface for SOBYA Mainnet.
 
-## Network
+## Mainnet connection
+
 - Network: SOBYA Mainnet
-- EVM chain ID: 357812033857
-- Native asset: SOBY (18 decimals)
-- RPC: https://sobya-evm-rpc.nodesafe-dapp.xyz
+- EVM chain ID: `357812033857`
+- Native asset: SOBY (`asobya`, 18 decimals)
+- EVM JSON-RPC: https://sobya-evm-rpc.nodesafe-dapp.xyz
 - Explorer: https://explorer.nodesafe-app.xyz/sobya
 
-## Current status
-The UI is intentionally deployment-gated. `config.json` has empty Factory, Router and WSOBY addresses. The interface will not enable transactions until all three valid contract addresses are supplied. Do not fill these fields with mock, testnet, third-party, or guessed addresses.
+## Published contracts
 
-The existing `contracts/src/WSOBY.sol` is source code only; its presence in GitHub does not prove it is deployed. The DEX contracts (Factory, Pair, Router), their integration tests, bytecode verification and mainnet deployment are still required before trading can be enabled.
+The deployment configuration records these contract addresses as verified:
 
-## Safety
-- Never commit a wallet private key or seed phrase.
-- Never use an unverified token address. Token symbols are not proof of identity.
-- Pool creation and swaps require user-signed transactions and network gas.
-- Minimum received is explicitly supplied by the user; the UI does not silently choose a slippage tolerance.
-- The current liquidity action uses a conservative 2% minimum-amount bound, but production release must add a reviewed quote/reserve calculation and remove this provisional path if it is not acceptable.
-- No USDT contract is configured. Do not label a token as USDT unless its issuer and contract are independently verified.
+- Factory: `0x35f59c1Bb30e1FA29020294cB02Bd770D6e3fa8e`
+- Router: `0x9F3B4AeFbCb937227Dac641Bf7b9e8b42d6CA23D`
+- WSOBY: `0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c`
+- Oracle: `0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4`
 
-## Local preview
-Serve this directory over HTTP (for example, with Python's built-in static server) and open it in a browser with an EVM wallet installed. GitHub Pages serves the same static files once the branch is merged and Pages deploys.
+The public UI uses the current NodeSafe `nodesafe-dapp.xyz` EVM endpoint. Contract addresses in configuration are not, by themselves, proof of an active funded market.
 
-## Required before production
-1. Add a reviewed, license-compliant AMM core and router with pinned source/compiler settings.
-2. Add Foundry unit, fuzz and end-to-end tests for pool creation, LP mint/burn, swaps, fee accounting, deadlines, slippage and WSOBY native wrapping.
-3. Run CI and verify exact pair init-code hash compatibility.
-4. Deploy Factory, Router and WSOBY using a wallet controlled by the project owner; record transaction hashes and addresses.
-5. Verify contract source/bytecode on the explorer and publish the addresses in `config.json`.
-6. Audit the contracts and have an independent reviewer examine the deployment configuration before enabling public trading.
+## Current operating state
 
-No protocol upgrade, genesis change, or paid backend is needed for this architecture.
+- Wallet connection and read-only contract queries use SOBYA Mainnet.
+- Native SOBY / WSOBY wrapping is available when the connected wallet has sufficient SOBY for the amount and network fees.
+- Pool creation and liquidity operations are enabled for owner-directed initialization.
+- Public swaps are **disabled** until a funded pool, live reserves, quote accuracy, and controlled mainnet swap tests are verified.
+- Cross-chain order creation and customer deposits are **disabled**. No working HTTPS order gateway is currently configured; the previous Enzonic URL is intentionally removed.
+- Do not send USDT or other assets to a displayed address unless a live order service has been deployed and independently verified.
+
+## Safety requirements before opening swaps or cross-chain orders
+
+1. Verify the deployed bytecode and constructor relationships on the explorer.
+2. Confirm the intended pool exists and has the expected token pair and decimals.
+3. Add and verify initial liquidity using owner-controlled transactions.
+4. Confirm quotes against live reserves and execute a controlled, low-value mainnet swap.
+5. For cross-chain orders, deploy a reachable HTTPS gateway, enable finalized deposit watchers, prove inventory and payout controls, and pass end-to-end settlement tests.
+
+No network genesis change is required for these application-layer steps.
