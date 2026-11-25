@@ -1,0 +1,82 @@
+name: SOBYA Auto Exchange wallet preflight (read-only)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/auto-exchange-wallet-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sobya-auto-exchange-wallet-preflight
+  cancel-in-progress: false
+
+jobs:
+  wallet-preflight:
+    if: github.repository == 'snforem-cpu/sobya-chain' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated exchange dependencies
+        working-directory: auto-exchange
+        run: npm install --no-audit --no-fund
+      - name: Verify signing key and inventory balances (no transactions)
+        working-directory: auto-exchange
+        env:
+          SOBYA_PAYOUT_PRIVATE_KEY: ${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
+          ETHEREUM_RPC_URL: https://ethereum-rpc.publicnode.com
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+        run: |
+          node --input-type=module <<'NODE'
+          import { JsonRpcProvider, Wallet, getAddress, Contract, formatUnits } from "ethers";
+          import { AUTO_EXCHANGE_POLICY } from "./config.js";
+
+          const key = process.env.SOBYA_PAYOUT_PRIVATE_KEY;
+          if (!key) throw new Error("SOBYA_PAYOUT_PRIVATE_KEY is missing or unavailable to this workflow");
+
+          const expected = getAddress(AUTO_EXCHANGE_POLICY.inventoryWalletEvmAddress);
+          const wallet = new Wallet(key);
+          if (getAddress(wallet.address) !== expected) {
+            throw new Error("Signing key address does not match configured inventory wallet");
+          }
+          console.log("Signing key: PRESENT; derived address matches configured inventory wallet.");
+
+          const eth = new JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
+          const sobya = new JsonRpcProvider(process.env.SOBYA_EVM_RPC_URL);
+          try {
+            const [ethNetwork, sobyaNetwork] = await Promise.all([eth.getNetwork(), sobya.getNetwork()]);
+            if (Number(ethNetwork.chainId) !== AUTO_EXCHANGE_POLICY.ethereumChainId) {
+              throw new Error("Ethereum RPC chain ID mismatch: " + ethNetwork.chainId);
+            }
+            if (Number(sobyaNetwork.chainId) !== AUTO_EXCHANGE_POLICY.sobyaEvmChainId) {
+              throw new Error("SOBYA RPC chain ID mismatch: " + sobyaNetwork.chainId);
+            }
+
+            const usdtAddress = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+            const usdt = new Contract(usdtAddress, ["function balanceOf(address) view returns (uint256)"], eth);
+            const [ethHeight, sobyaHeight, ethBalance, usdtBalance, sobyaBalance] = await Promise.all([
+              eth.getBlockNumber(),
+              sobya.getBlockNumber(),
+              eth.getBalance(expected),
+              usdt.balanceOf(expected),
+              sobya.getBalance(expected)
+            ]);
+
+            console.log("Ethereum RPC: OK; chainId=" + ethNetwork.chainId + "; block=" + ethHeight);
+            console.log("SOBYA RPC: OK; chainId=" + sobyaNetwork.chainId + "; block=" + sobyaHeight);
+            console.log("Inventory ETH: " + formatUnits(ethBalance, 18));
+            console.log("Inventory Ethereum USDT: " + formatUnits(usdtBalance, 6));
+            console.log("Inventory SOBY (native): " + formatUnits(sobyaBalance, 18));
+            console.log("READ-ONLY PREFLIGHT COMPLETE; no transaction was signed or broadcast.");
+          } finally {
+            await Promise.all([eth.destroy(), sobya.destroy()]);
+          }
+          NODE
