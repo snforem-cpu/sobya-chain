@@ -4,18 +4,18 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import worker from "../src/index.js";
 
-test("public payment destinations match owner-confirmed addresses and stay distinct from inventory", async () => {
+test("manual BUY configuration preserves SOBYA network identity without fixed payment rails", async () => {
   const source = await readFile(new URL("../../buy/config.js", import.meta.url), "utf8");
   const context = { window: {} };
   vm.runInNewContext(source, context);
   const config = context.window.SOBYA_BUY_CONFIG;
-  assert.equal(config.paymentReceivingAddresses.ETH_ETHEREUM, "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f");
-  assert.equal(config.paymentReceivingAddresses.USDT_ETHEREUM, "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f");
-  assert.equal(config.paymentReceivingAddresses.BNB_BSC, "0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f");
-  assert.equal(config.paymentReceivingAddresses.SOL_SOLANA, "ACTkwKD9ZhHYgRSEoM7QWvp5ig1cUxDo3gMzB55rocdk");
-  assert.equal(config.inventoryWalletAddress, "0xebdb899fFE84a89e1d576964b640491c135651AD");
-  assert.notEqual(config.inventoryWalletAddress, config.paymentReceivingAddresses.ETH_ETHEREUM);
   assert.equal(config.paymentsEnabled, false);
+  assert.equal(config.sobyaChainId, 357812033857);
+  assert.equal(config.sobyaRpcUrl, "https://sobya-evm-rpc.nodesafe-dapp.xyz");
+  assert.equal(config.sobyaExplorerUrl, "https://explorer.nodesafe-app.xyz/sobya");
+  assert.equal(config.salePriceUsd, 0.005);
+  assert.equal("paymentReceivingAddresses" in config, false);
+  assert.equal("assets" in config, false);
 });
 
 test("health endpoint never reports commerce ready while sales are disabled", async () => {
