@@ -28,7 +28,7 @@ function fixture() {
   const usdt = { balanceOf: async () => 100000000n, transfer,
     interface: { parseLog: () => ({ name: "Transfer", args: {
       from: "0xebdb899fFE84a89e1d576964b640491c135651AD",
-      to: wallet, value: 9900000n
+      to: wallet, value: 9899999n
     } }) } };
   const signer = { address: "0xebdb899fFE84a89e1d576964b640491c135651AD" };
   const applyConfirmedPriceChange = ({ ledger: l, direction, settlementConfirmed }) => {
@@ -36,7 +36,8 @@ function fixture() {
     assert.equal(settlementConfirmed, true);
     return { ...l, currentPriceUsdtPerSoby: "0.00499" };
   };
-  return { quote, ledger, saveLedger, ethereum, usdt, signer, applyConfirmedPriceChange };
+  const getEthUsdPrice = async () => "200000000000";
+  return { quote, ledger, saveLedger, ethereum, usdt, signer, applyConfirmedPriceChange, getEthUsdPrice };
 }
 
 test("refund reserves nonce, verifies exact Transfer event, confirms, then applies downward price change", async () => {
@@ -48,6 +49,8 @@ test("refund reserves nonce, verifies exact Transfer event, confirms, then appli
   assert.equal(result.ledger.returnQuotes[0].refundNonce, 4);
   assert.equal(result.ledger.returnQuotes[0].refundTxHash, "0x" + "c".repeat(64));
   assert.equal(result.ledger.currentPriceUsdtPerSoby, "0.00499");
+  assert.equal(result.ledger.returnQuotes[0].actualRefundAmountAtomic, "9899999");
+  assert.equal(result.ledger.returnQuotes[0].estimatedNetworkFeeUsdtAtomic, "1");
 });
 
 test("USDT refund waits for inventory funding and resumes without a new SOBY transfer", async () => {
