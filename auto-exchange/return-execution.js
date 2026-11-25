@@ -1,4 +1,6 @@
 import { calculateRequiredPayoutBalance } from "./payout-policy.js";
+import { calculateNextPrice } from "./pricing.js";
+import { AUTO_EXCHANGE_POLICY } from "./config.js";
 
 export function isReturnRefundEligible(quote) {
   return quote?.status === "returned" && quote.refundTxHash === undefined && quote.refundNonce === undefined;
@@ -27,6 +29,13 @@ export async function executeReturnRefund({
   const returnHead = await ethereum.sobyaProvider.getBlockNumber();
   if (returnHead - returnReceipt.blockNumber + 1 < sobyaConfirmations) throw new Error("SOBYA return confirmation threshold not reached");
 
+  // Reject a return size that would mathematically drive the agreed price to zero
+  // before any USDT refund is broadcast.
+  calculateNextPrice({
+    currentPrice: ledger.currentPriceUsdtPerSoby ?? AUTO_EXCHANGE_POLICY.openingPriceUsdtPerSoby,
+    quantitySobyAtomic: quote.paymentAmountAtomic,
+    direction: "down"
+  });
   const balance = await usdt.balanceOf(signer.address);
   if (balance < amount) {
     quote.status = "review";
