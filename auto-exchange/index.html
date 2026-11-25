@@ -25,12 +25,13 @@
       <dt>Opening price</dt><dd>0.005 USDT / SOBY</dd>
       <dt>Exchange fee</dt><dd>1%</dd>
       <dt>Reference inventory</dt><dd>1,000,000 SOBY</dd>
+      <dt>Price movement</dt><dd>+100 BPS / −25 BPS per reference inventory</dd>
       <dt>Inventory wallet</dt><dd style="overflow-wrap:anywhere;max-width:65%">0xebdb899fFE84a89e1d576964b640491c135651AD</dd>
       <dt>Deposit network</dt><dd>Ethereum Mainnet</dd>
       <dt>Payout network</dt><dd>SOBYA EVM</dd>
       <dt>Quote validity</dt><dd>10 minutes</dd>
     </dl>
-    <div class="notice"><strong>Not accepting deposits.</strong> Quote requests can be recorded through GitHub Issues and reserved in a persistent ledger, with globally unique exact USDT amounts and serialized processing. However, this is not an instant API, the dynamic price-impact formula is not yet specified, and trading/payouts remain disabled. Do not send USDT.</div>
+    <div class="notice"><strong>Not accepting deposits.</strong> Quote requests can be recorded through GitHub Issues. Dynamic price math is specified, but automatic confirmed-trade price updates and SOBY payouts are not yet active. Trading/payouts remain disabled. Do not send USDT.</div>
     <p class="detail">Quote requests are queued and processed by GitHub Actions; a delayed run may delay the quote. The exact payment amount is assigned by the ledger and shown in the issue response. Expired amounts are not reused. A matching deposit engine exists, but no automatic SOBY transfer is enabled.</p>
     <p><a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-quote.yml">Request a quote (GitHub account required)</a></p>
   </main>
