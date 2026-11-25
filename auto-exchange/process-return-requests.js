@@ -1,5 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { createReturnQuote, parseReturnIssueBody, formatSobyAtomic, formatUsdtAtomic } from "./return-ledger.js";
+import { AUTO_EXCHANGE_POLICY } from "./config.js";
+
+if (!AUTO_EXCHANGE_POLICY.returnTradingEnabled) {
+  console.log("SOBY-to-USDT return quotes are currently disabled; no return requests will be accepted.");
+  process.exit(0);
+}
 
 const token = process.env.GH_TOKEN;
 const repository = process.env.GH_REPOSITORY;
@@ -46,7 +52,7 @@ function quoteComment(q) {
     "- **Return network:** SOBYA EVM",
     "- **Return address:** \`" + q.depositAddress + "\`",
     "- **Valid until:** " + q.expiresAt, "",
-    "**Important: this is a reservation test only. Return settlement and refunds remain disabled. Do not send SOBY.**"
+    "**Do not send SOBY:** the SOBY-to-USDT return direction is currently closed until USDT inventory and Ethereum gas reserves are funded."
   ].join("\n");
 }
 const ledger = JSON.parse(await readFile("auto-exchange/ledger.json", "utf8"));
