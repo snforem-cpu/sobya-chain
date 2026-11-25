@@ -1,0 +1,101 @@
+import { calculateRequiredPayoutBalance, isPayoutEligible } from "./payout-policy.js";
+
+// Executes one already-verified, confirmed deposit payout. All external effects are
+// injected so the exact production lifecycle can be exercised with deterministic mocks.
+export async function executePayout({
+  ledger,
+  quote,
+  ledgerSha,
+  saveLedger,
+  sobya,
+  signer,
+  payoutRecipient,
+  amount,
+  sobyaConfirmations = 2,
+  applyConfirmedPriceChange
+}) {
+  if (!isPayoutEligible(quote)) {
+    return { ledger, ledgerSha, completed: false, skipped: true };
+  }
+  if (!ledger.quotes.some(item => item.orderId === quote.orderId && item === quote)) {
+    throw new Error("Payout quote must belong to the supplied ledger");
+  }
+  if (typeof saveLedger !== "function" || typeof applyConfirmedPriceChange !== "function") {
+    throw new TypeError("persistence and confirmed-price adapters are required");
+  }
+
+  const estimatedGas = await sobya.estimateGas({
+    to: payoutRecipient, value: amount, from: signer.address
+  });
+  const gasLimit = (estimatedGas * 12_000n + 9_999n) / 10_000n;
+  const feeData = await sobya.getFeeData();
+  let maxFeePerGas;
+  let feeOverrides;
+  if (feeData.maxFeePerGas !== null && feeData.maxPriorityFeePerGas !== null) {
+    maxFeePerGas = feeData.maxFeePerGas;
+    feeOverrides = {
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
+    };
+  } else if (feeData.gasPrice !== null) {
+    maxFeePerGas = feeData.gasPrice;
+    feeOverrides = { gasPrice: feeData.gasPrice };
+  } else {
+    throw new Error("SOBYA RPC did not provide usable gas fee data");
+  }
+
+  const requiredBalance = calculateRequiredPayoutBalance({
+    payoutAmountAtomic: amount.toString(),
+    gasLimit: gasLimit.toString(),
+    maxFeePerGas: maxFeePerGas.toString()
+  });
+  const balance = await sobya.getBalance(signer.address);
+  if (balance < requiredBalance) {
+    quote.status = "review";
+    quote.payoutReviewReason = "Insufficient SOBY balance for payout plus estimated gas reserve";
+    quote.requiredNativeBalanceAtomic = requiredBalance.toString();
+    ledgerSha = await saveLedger(ledger, ledgerSha, "Flag SOBYA payout for insufficient balance " + quote.orderId);
+    return { ledger, ledgerSha, completed: false, review: true };
+  }
+
+  // Persist the nonce reservation before any broadcast. A crash from here onward
+  // leaves a non-eligible order, which must be reconciled rather than re-signed.
+  const nonce = await sobya.getTransactionCount(signer.address, "pending");
+  quote.payoutNonce = nonce;
+  quote.status = "payout_prepared";
+  quote.payoutPreparedAt = new Date().toISOString();
+  ledgerSha = await saveLedger(ledger, ledgerSha, "Reserve SOBYA payout nonce for " + quote.orderId);
+
+  const tx = await signer.sendTransaction({
+    to: payoutRecipient, value: amount, nonce, gasLimit, ...feeOverrides
+  });
+  quote.payoutTxHash = tx.hash;
+  quote.status = "payout_broadcast";
+  quote.payoutBroadcastAt = new Date().toISOString();
+  ledgerSha = await saveLedger(ledger, ledgerSha, "Record SOBYA payout broadcast for " + quote.orderId);
+
+  const payoutReceipt = await tx.wait(sobyaConfirmations);
+  if (payoutReceipt?.status !== 1) {
+    quote.status = "review";
+    quote.payoutReviewReason = "SOBYA payout transaction did not confirm successfully";
+    ledgerSha = await saveLedger(ledger, ledgerSha, "Flag SOBYA payout for review " + quote.orderId);
+    return { ledger, ledgerSha, completed: false, review: true };
+  }
+
+  ledger = applyConfirmedPriceChange({
+    ledger,
+    quantitySobyAtomic: amount.toString(),
+    direction: "up",
+    settlementConfirmed: true
+  });
+  const settledQuote = ledger.quotes.find(item => item.orderId === quote.orderId);
+  if (!settledQuote) throw new Error("Settled quote disappeared from ledger");
+  settledQuote.status = "settled";
+  settledQuote.settledAt = new Date().toISOString();
+  settledQuote.payoutBlockNumber = payoutReceipt.blockNumber;
+  settledQuote.payoutGasUsed = payoutReceipt.gasUsed.toString();
+  settledQuote.payoutFeePaidAtomic =
+    (payoutReceipt.gasUsed * (payoutReceipt.gasPrice ?? maxFeePerGas)).toString();
+  ledgerSha = await saveLedger(ledger, ledgerSha, "Confirm SOBYA payout and update price for " + quote.orderId);
+  return { ledger, ledgerSha, completed: true, review: false };
+}
