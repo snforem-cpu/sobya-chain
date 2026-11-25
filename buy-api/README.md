@@ -18,7 +18,7 @@ The owner desk uses authenticated owner challenges for order review and protecte
 
 ## Database
 
-The D1 migrations create the manual order records, price settings, inventory state, quote/order tables used by other disabled commerce paths, and audit records. The public manual order endpoint stores requests with status `submitted`; it does not mark payments as verified.
+The D1 migrations create the manual order records, manual price settings, admin sessions, and license-issuance reservations. Legacy quote/order tables from the retired automatic checkout are left untouched in existing databases for compatibility; the manual API does not read or write them. The public manual order endpoint stores requests with status `submitted`; it does not mark payments as verified.
 
 ## Tests
 
@@ -28,4 +28,4 @@ Run the API test suite with Node.js 20 or later:
 npm test
 ```
 
-Automatic checkout and automatic payouts are not enabled by the manual purchase page.
+Automatic quotes, external-chain payment verification, and automatic SOBY payout endpoints have been removed. Manual requests remain open to user-entered networks and assets; the owner independently verifies payment and fulfils approved requests manually.
