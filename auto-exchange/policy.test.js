@@ -21,6 +21,12 @@ test("price has no configured ceiling and does not move with time alone", () => 
   assert.equal(AUTO_EXCHANGE_POLICY.priceChangesRequireConfirmedTrades, true);
 });
 
+test("the same inventory EVM address is configured for Ethereum and SOBYA", () => {
+  assert.equal(AUTO_EXCHANGE_POLICY.inventoryWalletEvmAddress, "0xebdb899fFE84a89e1d576964b640491c135651AD");
+  assert.equal(AUTO_EXCHANGE_POLICY.ethereumChainId, 1);
+  assert.equal(AUTO_EXCHANGE_POLICY.sobyaEvmChainId, 357812033857);
+});
+
 test("real transfers remain disabled until settlement safeguards are implemented", () => {
   assert.equal(AUTO_EXCHANGE_POLICY.tradingEnabled, false);
   assert.equal(AUTO_EXCHANGE_POLICY.payoutEnabled, false);
