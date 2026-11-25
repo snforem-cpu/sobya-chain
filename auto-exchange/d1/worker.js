@@ -216,6 +216,19 @@ export default {
       return response({updated:statements.length},200,ORIGIN);
     }
     if (!origin) return response({error:"Origin not allowed"},403,ORIGIN);
+    if (url.pathname.startsWith("/v1/order/") && request.method === "GET") {
+      const orderId = decodeURIComponent(url.pathname.slice("/v1/order/".length));
+      if (!/^SOBYA-[A-F0-9-]{20,80}$/.test(orderId))
+        return response({error:"Invalid order ID"},400,origin);
+      const row = await env.DB.prepare("SELECT order_id,direction,status,created_at,expires_at,payment_tx_hash,settlement_tx_hash,last_error FROM exchange_quotes WHERE order_id=?1")
+        .bind(orderId).first();
+      if (!row) return response({error:"Order not found"},404,origin);
+      return response({orderId:row.order_id,direction:row.direction,status:row.status,
+        createdAt:row.created_at,expiresAt:row.expires_at,
+        paymentTxHash:row.payment_tx_hash || null,settlementTxHash:row.settlement_tx_hash || null,
+        message:row.status === "settled" || row.status === "refunded" ? "Exchange completed" :
+          row.status === "review" ? "Order requires review" : "Payment received or awaiting confirmation"},200,origin);
+    }
     if (url.pathname === "/v1/quote" && request.method === "POST") {
       try { return await createQuote(request,env); }
       catch (error) { return response({error:String(error.message || error)},400,origin); }
