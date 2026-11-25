@@ -1,0 +1,57 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { executeReturnRefund } from "./return-execution.js";
+
+const wallet = "0x1111111111111111111111111111111111111111";
+const hash = "0x" + "b".repeat(64);
+function fixture() {
+  const quote = { orderId: "return-1", sender: wallet, status: "returned",
+    returnTxHash: hash, returnBlockNumber: 100, paymentAmountAtomic: "2000000000000000000",
+    payoutAmountAtomic: "9900000" };
+  const ledger = { returnQuotes: [quote], currentPriceUsdtPerSoby: "0.005" };
+  let saves = 0;
+  const saveLedger = async () => "sha-" + (++saves);
+  const ethereum = { sobyaProvider: {
+    getTransactionReceipt: async () => ({ status: 1, blockNumber: 100 }),
+    getBlockNumber: async () => 102
+  }, getFeeData: async () => ({ gasPrice: 10n }),
+  getBalance: async () => 10n ** 18n,
+  getTransactionCount: async () => 4 };
+  const usdt = {
+    balanceOf: async () => 100000000n,
+    estimateGas: { transfer: async () => 50000n },
+    transfer: async (_to, _amount, opts) => {
+      assert.equal(opts.nonce, 4);
+      return { hash: "0x" + "c".repeat(64), wait: async () => ({
+        status: 1, blockNumber: 200, gasUsed: 45000n, gasPrice: 10n
+      }) };
+    }
+  };
+  const signer = { address: "0xebdb899fFE84a89e1d576964b640491c135651AD" };
+  const applyConfirmedPriceChange = ({ ledger: l, direction, settlementConfirmed }) => {
+    assert.equal(direction, "down");
+    assert.equal(settlementConfirmed, true);
+    return { ...l, currentPriceUsdtPerSoby: "0.00499" };
+  };
+  return { quote, ledger, saveLedger, ethereum, usdt, signer, applyConfirmedPriceChange };
+}
+
+test("refund reserves nonce, broadcasts once, confirms, then applies downward price change", async () => {
+  const f = fixture();
+  const result = await executeReturnRefund({ ...f, ledgerSha: "start",
+    refundRecipient: wallet, amount: 9900000n, ethereumConfirmations: 12 });
+  assert.equal(result.completed, true);
+  assert.equal(result.ledger.returnQuotes[0].status, "settled");
+  assert.equal(result.ledger.returnQuotes[0].refundNonce, 4);
+  assert.equal(result.ledger.returnQuotes[0].refundTxHash, "0x" + "c".repeat(64));
+  assert.equal(result.ledger.currentPriceUsdtPerSoby, "0.00499");
+});
+
+test("prepared refund cannot be blindly retried", async () => {
+  const f = fixture();
+  f.quote.refundNonce = 4;
+  const result = await executeReturnRefund({ ...f, ledgerSha: "start",
+    refundRecipient: wallet, amount: 9900000n });
+  assert.equal(result.skipped, true);
+  assert.equal(result.completed, false);
+});
