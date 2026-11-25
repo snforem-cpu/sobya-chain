@@ -31,7 +31,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
-          ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
-          SOBYA_EVM_RPC_URL: ${{ secrets.SOBYA_EVM_RPC_URL }}
+          ETHEREUM_RPC_URL: https://ethereum-rpc.publicnode.com
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
           SOBYA_PAYOUT_PRIVATE_KEY: ${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
         run: node return-worker.js
