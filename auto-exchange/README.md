@@ -13,7 +13,8 @@ Independent project under `auto-exchange/`. It does not modify `buy/`, `dex/`, e
 ## Recorded commercial policy
 - Opening price: 0.005 USDT per SOBY.
 - Reference inventory: 1,000,000 SOBY (not a claim about current wallet balance).
-- Exchange fee: 1% (100 bps).
+- Exchange fee: 1% (100 bps), separate from network fees.
+- Network fees are charged to the customer by deducting the estimated network cost from the outgoing asset: SOBYA gas from the SOBY payout, and Ethereum gas converted to USDT using the fresh Chainlink ETH/USD mainnet feed from the USDT refund. The refund path fails closed if the feed is invalid or older than one hour.
 - Directional coefficients: 100 upward / 25 downward (4:1).
 - Coefficients are basis points (BPS), scaled by trade quantity relative to the 1,000,000 SOBY reference inventory.
 - Quote validity: 10 minutes.
@@ -51,7 +52,7 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - Customers submit a separate GitHub Issue using `.github/ISSUE_TEMPLATE/auto-exchange-return.yml`.
 - The return quote reserves a unique exact SOBY atomic amount, fixes the refund price for ten minutes, and calculates the USDT refund after the same 1% fee.
 - The return worker scans confirmed native SOBY transfers to the inventory wallet on SOBYA EVM, matching exact sender, recipient, amount, chain, quote window, and transaction replay key.
-- After two SOBYA confirmations, the worker checks USDT inventory and the separate Ethereum ETH gas reserve, reserves the Ethereum nonce in the GitHub ledger, and sends the quoted USDT refund. If either inventory or gas funding is insufficient, the order remains in a retryable funding-wait state and resumes automatically on a later run after funds arrive; it does not reserve a nonce while waiting.
+- After two SOBYA confirmations, the worker estimates Ethereum gas, reads a fresh Chainlink ETH/USD mainnet price, converts the buffered gas cost into USDT atomic units, and deducts that network fee from the gross refund. It checks USDT inventory for the net amount and the separate ETH gas reserve, then reserves the Ethereum nonce in the GitHub ledger and sends the net USDT refund. If inventory or ETH gas is insufficient, the order remains in a retryable funding-wait state and resumes automatically on a later run after funds arrive; it does not reserve a nonce while waiting.
 - It marks the return settled and applies the 25-bps downward price movement only after 12 Ethereum confirmations and an exact USDT `Transfer` event from the inventory wallet to the customer's quoted address.
 - The return quote and refund workflows use GitHub Issues, GitHub Actions, and the same committed JSON ledger; they do not require a separate server.
 
@@ -64,7 +65,7 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - The payout worker is implemented but is not authorized for live use until the PR is reviewed and merged, GitHub Actions secrets are configured, and controlled end-to-end tests have passed. Do not send USDT or SOBY while disabled.
 - Required repository Actions secrets after review: `ETHEREUM_RPC_URL`, `SOBYA_EVM_RPC_URL`, and `SOBYA_PAYOUT_PRIVATE_KEY`. Set `SOBYA_EVM_RPC_URL` to the verified primary endpoint above. Never put the private key in an issue, chat, source file, or workflow output. The key must derive the configured inventory address.
 - Ethereum USDT deposits are matched by exact sender, destination, token, amount, chain, quote validity, 12 confirmations, and transaction-log replay key.
-- SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas and requires the payout amount plus a 20% buffered gas reserve. A zero gas price is accepted for the SOBYA network because its current RPC reports zero; negative fee values remain rejected.
+- SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas, deducts the buffered SOBYA network-fee budget from the gross quoted SOBY payout, and requires the gross amount in the inventory wallet. The customer receives the net SOBY amount; the network fee is paid by the sending wallet from the deducted portion. A zero gas price is accepted for the SOBYA network because its current RPC reports zero; negative fee values remain rejected.
 - A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger.
 - The reverse return worker and issue workflow are implemented in this branch, but both are also gated by the same disabled policy flags. No USDT refund can execute while either flag is false.
 - If execution stops after a payout/refund nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent. Insufficient balances before nonce reservation are recorded as retryable funding-wait states.
