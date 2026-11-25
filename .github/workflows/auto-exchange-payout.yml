@@ -5,14 +5,13 @@ on:
   schedule:
     - cron: "*/5 * * * *"
 
-# This workflow is deliberately separate from public issue/quote processing.
-# It must never run for pull requests or untrusted branch code.
 concurrency:
   group: sobya-auto-exchange-return-refund
   cancel-in-progress: false
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   payout:
@@ -28,6 +27,26 @@ jobs:
       - name: Install isolated exchange dependencies
         working-directory: auto-exchange
         run: npm install --no-audit --no-fund
+      - name: Request short-lived D1 bridge identity
+        id: d1-auth
+        env:
+          REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          TOKEN_JSON=$(curl -fsS -H "Authorization: bearer $REQUEST_TOKEN" "${REQUEST_URL}&audience=sobya-auto-exchange")
+          OIDC_TOKEN=$(echo "$TOKEN_JSON" | jq -r .value)
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
+          echo "::add-mask::$OIDC_TOKEN"
+          echo "token=$OIDC_TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Import D1 reservations and synchronize settlement ledger
+        working-directory: auto-exchange
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GITHUB_OIDC_TOKEN: ${{ steps.d1-auth.outputs.token }}
+          SOBYA_AUTO_EXCHANGE_API_URL: https://sobya-buy-api.snforem.workers.dev
+        run: node d1/sync-d1-quotes.js
       - name: Verify deposits and execute eligible SOBY payouts
         working-directory: auto-exchange
         env:
