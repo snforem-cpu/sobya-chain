@@ -38,10 +38,10 @@ export async function executeReturnRefund({
   const gasLimit = (estimatedGas * 12_000n + 9_999n) / 10_000n;
   const feeData = await ethereum.getFeeData();
   let maxFeePerGas, feeOverrides;
-  if (feeData.maxFeePerGas !== null && feeData.maxPriorityFeePerGas !== null) {
+  if (feeData.maxFeePerGas != null && feeData.maxPriorityFeePerGas != null) {
     maxFeePerGas = feeData.maxFeePerGas;
     feeOverrides = { maxFeePerGas: feeData.maxFeePerGas, maxPriorityFeePerGas: feeData.maxPriorityFeePerGas };
-  } else if (feeData.gasPrice !== null) {
+  } else if (feeData.gasPrice != null) {
     maxFeePerGas = feeData.gasPrice;
     feeOverrides = { gasPrice: feeData.gasPrice };
   } else throw new Error("Ethereum RPC did not provide usable gas fee data");
