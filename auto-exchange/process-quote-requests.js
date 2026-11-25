@@ -1,5 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { createQuote, parseQuoteIssueBody, formatUsdtAtomic } from "./quote-ledger.js";
+import { AUTO_EXCHANGE_POLICY } from "./config.js";
+
+if (!AUTO_EXCHANGE_POLICY.buyTradingEnabled) {
+  console.log("USDT-to-SOBY quote issuance is disabled by project policy.");
+  process.exit(0);
+}
 
 const token = process.env.GH_TOKEN;
 const repository = process.env.GH_REPOSITORY;
@@ -70,7 +76,7 @@ function quoteComment(q) {
     "- **Deposit address:** \`" + q.depositAddress + "\`",
     "- **Valid until:** " + q.expiresAt,
     "",
-    "**Important: this is a reservation test only. Trading and payouts remain disabled. Do not send USDT.**"
+    "**Next step:** send exactly the USDT amount above to the deposit address on Ethereum Mainnet before the quote expires. Only this quoted amount and address can be matched to this order. Do not send USDT after expiry or without a fresh quote."
   ].join("\n");
 }
 
