@@ -45,6 +45,15 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 ## Deposit matching core
 `settlement.js` checks Ethereum chain ID, sender, deposit address, USDT contract, exact atomic amount, one unique open quote, quote validity, confirmation threshold, and transaction-hash/log-index replay protection. It returns `matched_paid_not_settled`; it does not sign or send SOBY.
 
+## Reverse SOBY-return / USDT-refund flow
+- Customers submit a separate GitHub Issue using `.github/ISSUE_TEMPLATE/auto-exchange-return.yml`.
+- The return quote reserves a unique exact SOBY atomic amount, fixes the refund price for ten minutes, and calculates the USDT refund after the same 1% fee.
+- The return worker scans confirmed native SOBY transfers to the inventory wallet on SOBYA EVM, matching exact sender, recipient, amount, chain, quote window, and transaction replay key.
+- After two SOBYA confirmations, the worker checks USDT inventory and the separate Ethereum ETH gas reserve, reserves the Ethereum nonce in the GitHub ledger, and sends the quoted USDT refund.
+- It marks the return settled and applies the 25-bps downward price movement only after 12 Ethereum confirmations and an exact USDT `Transfer` event from the inventory wallet to the customer's quoted address.
+- A prepared or broadcast refund is never blindly retried. Missing receipt events, insufficient USDT, insufficient ETH gas, or uncertain outcomes go to manual review.
+- The return quote and refund workflows use GitHub Issues, GitHub Actions, and the same committed JSON ledger; they do not require a separate server.
+
 ## Security state — no live funds
 - `tradingEnabled: false`.
 - `payoutEnabled: false`.
@@ -53,11 +62,12 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 - Required repository Actions secrets after review: `ETHEREUM_RPC_URL`, `SOBYA_EVM_RPC_URL`, and `SOBYA_PAYOUT_PRIVATE_KEY`. Never put the private key in an issue, chat, source file, or workflow output. The key must derive the configured inventory address.
 - Ethereum USDT deposits are matched by exact sender, destination, token, amount, chain, quote validity, 12 confirmations, and transaction-log replay key.
 - SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas and requires the payout amount plus a 20% buffered gas reserve.
-- A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger. The reverse SOBY-return/USDT-refund path is not implemented; therefore the downward 25-bps price movement is not yet automatically triggered by a live return trade.
+- A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger.
+- The reverse return worker and issue workflow are implemented in this branch, but both are also gated by the same disabled policy flags. No USDT refund can execute while either flag is false.
 - If execution stops after a payout nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent. This favors avoiding duplicate payments over automatic recovery.
 - No private key is placed in frontend files, Git history, or workflow logs. The quote workflow handles untrusted issue text without wallet secrets.
 - No paid contract, paid hosting, or new paid service is part of this design.
 
 ## Tests
-Run `npm test` inside `auto-exchange/`. The GitHub Actions test workflow runs policy, quote allocation, settlement, pricing, payout gas-reserve, and mocked payout-lifecycle tests. `payout-execution.js` is the same injected lifecycle used by the production worker; its tests cover durable nonce reservation, broadcast, receipt confirmation, failed receipts, insufficient inventory, and interruption/restart no-blind-retry behavior. All RPC, signer, and ledger adapters in these tests are deterministic mocks. These tests do not verify live RPC endpoints or authorize real-money operation.
+Run `npm test` inside `auto-exchange/`. The GitHub Actions test workflow runs policy, quote allocation, settlement, pricing, payout gas-reserve, mocked payout-lifecycle, SOBY-return matching, and mocked USDT-refund lifecycle tests. `payout-execution.js` is the same injected lifecycle used by the production worker; its tests cover durable nonce reservation, broadcast, receipt confirmation, failed receipts, insufficient inventory, and interruption/restart no-blind-retry behavior. All RPC, signer, and ledger adapters in these tests are deterministic mocks. These tests do not verify live RPC endpoints or authorize real-money operation.
 
