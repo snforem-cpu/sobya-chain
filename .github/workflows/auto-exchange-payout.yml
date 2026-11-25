@@ -8,7 +8,7 @@ on:
 # This workflow is deliberately separate from public issue/quote processing.
 # It must never run for pull requests or untrusted branch code.
 concurrency:
-  group: sobya-auto-exchange-payout
+  group: sobya-auto-exchange-ledger
   cancel-in-progress: false
 
 permissions:
