@@ -17,3 +17,13 @@ test("rounds a fractional buffered gas reserve up", () => {
 test("rejects zero or negative funding inputs", () => {
   assert.throws(() => calculateRequiredPayoutBalance({ payoutAmountAtomic: "0", gasLimit: "1", maxFeePerGas: "1" }));
 });
+
+
+test("only a confirmed paid order without a reserved nonce is payout eligible", () => {
+  assert.equal(isPayoutEligible({ status: "paid" }), true);
+  assert.equal(isPayoutEligible({ status: "payout_prepared", payoutNonce: 4 }), false);
+  assert.equal(isPayoutEligible({ status: "payout_broadcast", payoutNonce: 4, payoutTxHash: "0xabc" }), false);
+  assert.equal(isPayoutEligible({ status: "paid", payoutNonce: 4 }), false);
+  assert.equal(isPayoutEligible({ status: "paid", payoutTxHash: "0xabc" }), false);
+  assert.equal(isPayoutEligible({ status: "open" }), false);
+});
