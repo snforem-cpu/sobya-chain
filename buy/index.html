@@ -1,9 +1,89 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071326"><meta name="description" content="Submit a manual SOBYA (SOBY) purchase request. Review the current manually maintained price and follow the official purchase process."><meta name="robots" content="index,follow"><link rel="canonical" href="https://snforem-cpu.github.io/sobya-chain/buy/"><title>SOBYA BUY — Manual Orders</title><style>
-:root{color-scheme:dark;--bg:#061225;--panel:#102541;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--green:#6ee7b7;--cyan:#66e0e8}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#153967,transparent 40%),var(--bg);color:var(--text);font:16px/1.6 system-ui,sans-serif}.wrap{max-width:760px;margin:24px auto;padding:0 16px}.card{background:#0d1d36;border:1px solid var(--line);border-radius:18px;padding:22px;margin:16px 0}h1{margin:0}.muted,small{color:var(--muted)}label{display:block;margin:14px 0 6px;color:var(--muted);font-size:13px}input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;background:#07172c;color:white;font:inherit}button{padding:12px 16px;border:0;border-radius:10px;background:linear-gradient(110deg,#397fe0,#4aa8d8);font-weight:800;color:#061225;font:inherit;cursor:pointer}.total{font-size:28px;color:var(--green);font-weight:900}.address{overflow-wrap:anywhere;background:#07172c;padding:12px;border-radius:10px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row button{flex:0 0 auto}.help{border-top:1px solid var(--line);margin-top:20px;padding-top:16px}.status{margin-top:12px;min-height:24px;color:var(--cyan)}a{color:#b9d7ff}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.grid{grid-template-columns:1fr}}</style></head><body><main class="wrap"><h1>SOBYA BUY</h1><p class="muted">Manual purchase requests · USD pricing</p><section class="card"><div class="muted">Current price per SOBY</div><div class="total" id="price">$0.005</div><label for="qty">SOBY quantity</label><input id="qty" type="number" min="1" step="any" placeholder="e.g. 10000"><div class="muted">Total amount</div><div class="total" id="total">— USD</div></section><section class="card"><h2>Send payment manually</h2><p class="muted">Transfer funds only through a network and asset your wallet supports. Contact support if unsure.</p><div class="address" id="wallet">0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f</div><div class="row"><button type="button" id="copy">Copy receiving address</button></div><div class="grid"><div><label for="network">Network</label><input id="network" placeholder="e.g. Ethereum, BNB Chain"></div><div><label for="asset">Currency / asset</label><input id="asset" placeholder="e.g. ETH, USDT, BNB"></div></div><label for="paid">Amount sent</label><input id="paid" placeholder="Amount and currency"><label for="tx">Transaction ID / hash</label><input id="tx" placeholder="Paste transaction hash or reference"><label for="buyer">Your EVM address to receive SOBY</label><input id="buyer" placeholder="0x..." autocomplete="off"><button id="submit" style="width:100%;margin-top:20px">Submit purchase request</button><div class="status" id="status" role="status"></div><div class="help"><strong>Support</strong><p>If you have a question, encounter a problem, or SOBY has not arrived within 24 hours after your payment is confirmed, contact <a href="mailto:sobya-coin@outlook.com">sobya-coin@outlook.com</a>. Include your order ID and transaction reference.</p></div></section><p class="muted"><small>Submitting a request does not automatically verify payment or send SOBY. The team reviews payment manually. Do not send funds until you have checked the network and receiving address.</small></p></main><script>
-const API="https://sobya-chain.snforem.workers.dev";const $=id=>document.getElementById(id);let price=.005;
-function recalc(){const q=Number($("qty").value);$("total").textContent=Number.isFinite(q)&&q>0?"$"+(q*price).toFixed(8).replace(/0+$/,"").replace(/\\.$/,""):"— USD"}
-async function load(){try{const r=await fetch(API+"/api/manual/price");if(!r.ok)throw Error();const d=await r.json();price=Number(d.priceUsd);if(!Number.isFinite(price)||price<=0)throw Error();$("price").textContent="$"+price.toFixed(8).replace(/0+$/,"").replace(/\\.$/,"");recalc()}catch{$("status").textContent="Price service is temporarily unavailable. Please try again later."}}
-$("qty").addEventListener("input",recalc);$("copy").onclick=async()=>{await navigator.clipboard.writeText($("wallet").textContent);$("status").textContent="Address copied."};
-$("submit").onclick=async()=>{try{const q=$("qty").value;const body={sobyAmount:q,paymentNetwork:$("network").value.trim(),paymentAsset:$("asset").value.trim(),paymentAmount:$("paid").value.trim(),paymentTx:$("tx").value.trim(),buyerAddress:$("buyer").value.trim()};if(!q||!body.paymentNetwork||!body.paymentAsset||!body.paymentAmount||!body.paymentTx||!body.buyerAddress)throw Error("Please complete all fields.");$("submit").disabled=true;$("status").textContent="Submitting request…";const r=await fetch(API+"/api/manual/orders",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error||"Could not submit request.");$("status").textContent="Request submitted. Order ID: "+d.orderId+". Save this ID and your transaction reference."; $("qty").value="";recalc()}catch(e){$("status").textContent=e.message||"Request failed."}finally{$("submit").disabled=false}};
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071326">
+<meta name="description" content="اطلب شراء SOBY باستخدام USDT على شبكة Ethereum عبر طلب يدوي ومراجعة التحويل.">
+<link rel="canonical" href="https://snforem-cpu.github.io/sobya-chain/buy/">
+<title>SOBYA BUY — مبادلة USDT مقابل SOBY</title>
+<style>
+:root{color-scheme:dark;--bg:#061225;--panel:#0d1d36;--line:#294362;--text:#f2f6ff;--muted:#a9bad4;--green:#6ee7b7;--cyan:#66e0e8;--blue:#397fe0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#153967,transparent 40%),var(--bg);color:var(--text);font:16px/1.75 system-ui,sans-serif}
+.wrap{max-width:760px;margin:26px auto;padding:0 16px}.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}.brand img{width:52px;height:52px;object-fit:contain}.brand h1{font-size:27px;margin:0}.muted,small{color:var(--muted)}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;margin:16px 0}
+h2{font-size:19px;margin:0 0 12px}.price{font-size:30px;color:var(--green);font-weight:900}.total{font-size:25px;color:var(--green);font-weight:900}
+label{display:block;margin:13px 0 6px;color:var(--muted);font-size:13px}input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;background:#07172c;color:white;font:inherit}
+button{padding:13px 16px;border:0;border-radius:10px;background:linear-gradient(110deg,#397fe0,#4aa8d8);font-weight:800;color:#061225;font:inherit;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}.address{direction:ltr;text-align:left;overflow-wrap:anywhere;background:#07172c;padding:12px;border-radius:10px;font-family:monospace}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row button{flex:0 0 auto}.status{margin-top:12px;min-height:25px;color:var(--cyan);overflow-wrap:anywhere}
+.notice{background:#132b45;border:1px solid #355575;padding:13px;border-radius:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+a{color:#b9d7ff}.ltr{direction:ltr;text-align:left}.help{border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
+@media(max-width:560px){.grid{grid-template-columns:1fr}.card{padding:17px}.brand h1{font-size:23px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header class="brand"><img src="../assets/logo/sobya-coin-128.png" alt="SOBYA"><div><h1>SOBYA BUY</h1><div class="muted">مبادلة USDT على Ethereum مقابل SOBY على SOBYA</div></div></header>
+<section class="card">
+<div class="muted">سعر SOBY الحالي</div><div class="price" id="price">$0.005</div>
+<label for="qty">كمية SOBY المطلوبة</label><input id="qty" type="number" min="1" step="any" inputmode="decimal" placeholder="مثال: 10000">
+<div class="muted">القيمة المطلوبة بالدولار / USDT</div><div class="total" id="total">— USDT</div>
+</section>
+<section class="card">
+<h2>1. تفاصيل الدفع</h2>
+<div class="notice"><strong>شبكة الدفع المعتمدة: Ethereum Mainnet</strong><br>الأصل: USDT (ERC-20) فقط. لا ترسل USDT عبر TRON أو BNB Chain أو أي شبكة أخرى.</div>
+<label>المبلغ المطلوب دفعه</label><div class="total" id="payAmount">— USDT</div>
+<label>عنوان استقبال USDT</label><div class="address" id="wallet">0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f</div>
+<div class="row" style="margin-top:10px"><button type="button" id="copy">نسخ عنوان الاستقبال</button><a href="https://etherscan.io/address/0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f" target="_blank" rel="noopener">عرض العنوان على Etherscan</a></div>
+</section>
+<section class="card">
+<h2>2. أرسل بيانات التحويل</h2>
+<p class="muted">بعد إرسال USDT من محفظتك على Ethereum، أدخل رقم المعاملة وعنوان SOBYA الذي تريد استلام SOBY عليه. سيُراجع التحويل على الشبكة قبل اعتماد الطلب وصرف SOBY.</p>
+<label for="paid">مبلغ USDT الذي أرسلته</label><input id="paid" class="ltr" inputmode="decimal" placeholder="مثال: 50.00">
+<label for="tx">هاش المعاملة على Ethereum</label><input id="tx" class="ltr" placeholder="0x..." autocomplete="off">
+<label for="buyer">عنوان محفظتك على SOBYA لاستلام SOBY</label><input id="buyer" class="ltr" placeholder="0x..." autocomplete="off">
+<button id="submit" style="width:100%;margin-top:20px">إرسال طلب المبادلة</button>
+<div class="status" id="status" role="status" aria-live="polite"></div>
+<div class="help"><strong>الدعم</strong><p>للاستفسارات أو عند تأخر وصول SOBY بعد تأكيد التحويل، راسل <a href="mailto:sobya-coin@outlook.com">sobya-coin@outlook.com</a> وأرفق رقم الطلب وهاش المعاملة.</p></div>
+</section>
+<p class="muted"><small>إرسال الطلب لا يعني اعتماد الدفع تلقائياً. تتم مراجعة هاش المعاملة والتأكد من وصول USDT على عقد USDT الرسمي في Ethereum قبل صرف SOBY. لا ترسل أموالاً قبل التأكد من الشبكة والعنوان والمبلغ.</small></p>
+</main>
+<script>
+const API="https://sobya-chain.snforem.workers.dev";
+const $=id=>document.getElementById(id);
+const RECEIVER="0x15f94a243Ed60536Db51aA993A67d3F2Ea03f60f";
+let price=.005;
+function money(v){return Number(v).toLocaleString("en-US",{maximumFractionDigits:8});}
+function recalc(){
+ const q=Number($("qty").value);
+ if(Number.isFinite(q)&&q>0){const total=q*price;$("total").textContent=money(total)+" USDT";$("payAmount").textContent=money(total)+" USDT";}
+ else{$("total").textContent="— USDT";$("payAmount").textContent="— USDT";}
+}
+async function load(){
+ try{const r=await fetch(API+"/api/manual/price");if(!r.ok)throw Error("تعذر تحميل السعر الحالي");const d=await r.json();price=Number(d.priceUsd);if(!Number.isFinite(price)||price<=0)throw Error("السعر غير صالح");$("price").textContent="$"+money(price);recalc();}
+ catch(e){$("status").textContent=e.message||"خدمة السعر غير متاحة حالياً.";}
+}
+$("qty").addEventListener("input",recalc);
+$("copy").onclick=async()=>{try{await navigator.clipboard.writeText(RECEIVER);$("status").textContent="تم نسخ عنوان استقبال USDT.";}catch{$("status").textContent="تعذر النسخ؛ انسخ العنوان يدوياً.";}};
+$("submit").onclick=async()=>{
+ const button=$("submit");
+ try{
+  const q=$("qty").value,paid=$("paid").value.trim(),tx=$("tx").value.trim(),buyer=$("buyer").value.trim();
+  if(!q||!paid||!tx||!buyer)throw Error("أكمل جميع الحقول أولاً.");
+  if(!/^\d+(?:\.\d{1,6})?$/.test(paid)||Number(paid)<=0)throw Error("أدخل مبلغ USDT صحيحاً حتى 6 منازل عشرية.");
+  if(!/^0x[0-9a-fA-F]{64}$/.test(tx))throw Error("هاش معاملة Ethereum غير صحيح.");
+  if(!/^0x[0-9a-fA-F]{40}$/.test(buyer))throw Error("عنوان محفظة SOBYA غير صحيح.");
+  const expected=Number(q)*price;
+  if(Math.abs(Number(paid)-expected)>0.000001)throw Error("مبلغ USDT لا يطابق إجمالي طلب SOBY.");
+  button.disabled=true;$("status").textContent="جارٍ إرسال الطلب…";
+  const body={sobyAmount:q,paymentNetwork:"Ethereum",paymentAsset:"USDT",paymentAmount:paid,paymentTx:tx,buyerAddress:buyer};
+  const r=await fetch(API+"/api/manual/orders",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({error:"invalid_api_response"}));
+  if(!r.ok)throw Error(d.error==="duplicate_payment_transaction"?"تم إرسال هاش هذه المعاملة سابقاً.":d.error||"تعذر إرسال الطلب.");
+  $("status").textContent="تم استلام طلبك. رقم الطلب: "+d.orderId+". احتفظ به؛ سيتم التحقق من تحويل USDT قبل صرف SOBY.";
+  $("qty").value="";$("paid").value="";$("tx").value="";$("buyer").value="";recalc();
+ }catch(e){$("status").textContent=e.message||"فشل إرسال الطلب.";}
+ finally{button.disabled=false;}
+};
 load();
-</script></body></html>
+</script>
+</body></html>
