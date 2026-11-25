@@ -48,12 +48,16 @@ The issue queue and committed JSON ledger are durable GitHub records. This is no
 ## Security state — no live funds
 - `tradingEnabled: false`.
 - `payoutEnabled: false`.
-- The quote ledger is operationally a reservation/quote record only. No USDT deposit should be sent.
-- No private key, signing secret, live RPC signer, or automatic payout code is present.
-- No private key is placed in frontend files, Git history, or workflow logs.
-- The quote workflow handles untrusted issue text but has no wallet secret and only creates validated quote records/comments.
+- Both `tradingEnabled` and `payoutEnabled` remain false by default. The payout worker exits before reading RPC credentials or the signing key while either flag is false.
+- The payout worker is implemented but is not authorized for live use until the PR is merged, GitHub Secrets are configured, and an end-to-end controlled test has passed. Do not send USDT while disabled.
+- Required repository Actions secrets after review: `ETHEREUM_RPC_URL`, `SOBYA_EVM_RPC_URL`, and `SOBYA_PAYOUT_PRIVATE_KEY`. Never put the private key in an issue, chat, source file, or workflow output. The key must derive the configured inventory address.
+- Ethereum USDT deposits are matched by exact sender, destination, token, amount, chain, quote validity, 12 confirmations, and transaction-log replay key.
+- SOBY payouts wait for 2 SOBYA confirmations. Before broadcast, the worker estimates gas and requires the payout amount plus a 20% buffered gas reserve.
+- A successful confirmed SOBY payout records the receipt and applies the upward price movement once to the persisted ledger. The reverse SOBY-return/USDT-refund path is not implemented; therefore the downward 25-bps price movement is not yet automatically triggered by a live return trade.
+- If execution stops after a payout nonce is durably reserved or a transaction is broadcast, the order is held for manual reconciliation and is not blindly resent. This favors avoiding duplicate payments over automatic recovery.
+- No private key is placed in frontend files, Git history, or workflow logs. The quote workflow handles untrusted issue text without wallet secrets.
 - No paid contract, paid hosting, or new paid service is part of this design.
 
 ## Tests
-Run `npm test` inside `auto-exchange/`. The test workflow runs the isolated policy, quote allocation, settlement, and price-movement tests.
+Run `npm test` inside `auto-exchange/`. The GitHub Actions test workflow runs policy, quote allocation, settlement, pricing, and payout gas-reserve unit tests. These are unit tests, not an end-to-end live-money test.
 
