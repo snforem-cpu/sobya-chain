@@ -1,0 +1,8 @@
+{
+  "name": "sobya-auto-exchange",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
