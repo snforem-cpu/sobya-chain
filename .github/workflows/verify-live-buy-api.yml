@@ -1,0 +1,44 @@
+name: Verify live SOBYA BUY service
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "buy/**"
+      - "buy-api/**"
+      - ".github/workflows/verify-live-buy-api.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public BUY API and manual pricing
+        run: |
+          node <<'NODE'
+          const base = 'https://sobya-chain.snforem.workers.dev';
+          const origin = 'https://snforem-cpu.github.io';
+          const healthResponse = await fetch(base + '/health', { headers: { Origin: origin } });
+          if (!healthResponse.ok) throw new Error('BUY API health returned HTTP ' + healthResponse.status);
+          const health = await healthResponse.json();
+          if (health.service !== 'sobya-buy-api' || health.status !== 'online') throw new Error('Unexpected BUY API health response');
+          if (health.databaseConfigured !== true) throw new Error('BUY API database is not configured');
+          if (health.salesEnabled !== false || health.commerceReady !== false) throw new Error('Automatic checkout must remain fail-closed');
+          const priceResponse = await fetch(base + '/api/manual/price', { headers: { Origin: origin } });
+          if (!priceResponse.ok) throw new Error('Manual price endpoint returned HTTP ' + priceResponse.status);
+          const price = await priceResponse.json();
+          if (!Number.isFinite(Number(price.priceUsd)) || Number(price.priceUsd) <= 0) throw new Error('Manual SOBY price is invalid');
+          const preflight = await fetch(base + '/api/manual/orders', {
+            method: 'OPTIONS',
+            headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' }
+          });
+          if (preflight.status !== 204 || preflight.headers.get('access-control-allow-origin') !== origin) {
+            throw new Error('BUY form CORS preflight failed');
+          }
+          console.log('PASS: BUY API online; database configured; manual price available; GitHub Pages CORS allowed; automatic checkout remains disabled.');
+          console.log('Manual price USD/SOBY: ' + price.priceUsd);
+          NODE
