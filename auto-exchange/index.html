@@ -4,36 +4,64 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#081226">
   <title>SOBYA Auto Exchange</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #081226; color: #eef4ff; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-    main { width: min(720px, 100%); padding: 28px; border: 1px solid #304568; border-radius: 18px; background: #101f39; box-sizing: border-box; }
-    h1 { margin-top: 0; } .muted { color: #b9c8df; line-height: 1.6; }
-    dl { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
-    dt { color: #b9c8df; } dd { margin: 0; font-weight: 650; text-align: right; }
-    .notice { margin-top: 22px; padding: 14px; border-radius: 10px; background: #352b16; color: #ffe5a3; line-height: 1.55; }
-    .detail { margin-top: 18px; color: #c5d2e7; line-height: 1.65; }
-    a { color: #9ecbff; }
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #071225; color: #eef4ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 28px 16px; display: grid; place-items: center; }
+    main { width: min(780px, 100%); padding: clamp(22px, 5vw, 38px); border: 1px solid #2b4265; border-radius: 22px; background: linear-gradient(145deg,#122441,#0b1830 72%); box-shadow: 0 22px 70px #0006; }
+    .eyebrow { color: #91b9f1; font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; font-weight: 750; }
+    h1 { margin: 10px 0 8px; font-size: clamp(2rem, 7vw, 3rem); letter-spacing: -.04em; }
+    .intro { color: #bdcce2; line-height: 1.7; max-width: 62ch; }
+    h2 { margin: 28px 0 12px; font-size: 1.05rem; }
+    .stats { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 22px; }
+    .stat { padding: 14px; border: 1px solid #2b4265; border-radius: 13px; background: #0b1930; }
+    .stat span { display: block; color: #9fb2cf; font-size: .82rem; margin-bottom: 6px; }
+    .stat strong { font-size: 1rem; }
+    .wallet { overflow-wrap: anywhere; font-size: .84rem !important; }
+    .directions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 22px; }
+    .direction { border: 1px solid #2b4265; border-radius: 15px; padding: 17px; background: #0a1830; }
+    .direction p { color: #b9c9df; line-height: 1.6; min-height: 72px; }
+    a { color: #a8ceff; font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+    .notice { margin-top: 22px; padding: 16px; border: 1px solid #8b6b2b; border-radius: 13px; background: #302713; color: #ffe7ae; line-height: 1.65; }
+    .detail { color: #aebfd8; line-height: 1.7; font-size: .92rem; margin-top: 18px; }
+    footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #2b4265; color: #8fa4c2; font-size: .82rem; }
+    @media (max-width: 560px) { .stats,.directions { grid-template-columns: 1fr; } .direction p { min-height: 0; } }
   </style>
 </head>
 <body>
   <main>
+    <div class="eyebrow">SOBYA ecosystem</div>
     <h1>SOBYA Auto Exchange</h1>
-    <p class="muted">Independent Ethereum USDT → SOBYA SOBY exchange project. Separate from SOBYA Buy and SOBYA DEX.</p>
-    <dl>
-      <dt>Opening price</dt><dd>0.005 USDT / SOBY</dd>
-      <dt>Exchange fee</dt><dd>1%</dd>
-      <dt>Reference inventory</dt><dd>1,000,000 SOBY</dd>
-      <dt>Price movement</dt><dd>+100 BPS / −25 BPS per reference inventory</dd>
-      <dt>Inventory wallet</dt><dd style="overflow-wrap:anywhere;max-width:65%">0xebdb899fFE84a89e1d576964b640491c135651AD</dd>
-      <dt>Deposit network</dt><dd>Ethereum Mainnet</dd>
-      <dt>Payout network</dt><dd>SOBYA EVM</dd>
-      <dt>Quote validity</dt><dd>10 minutes</dd>
-    </dl>
-    <div class="notice"><strong>Not accepting deposits.</strong> Quote requests can be recorded through GitHub Issues. Dynamic price math is specified, but automatic confirmed-trade price updates and SOBY payouts are not yet active. Trading/payouts remain disabled. Do not send USDT.</div>
-    <p class="detail">Quote requests are queued and processed by GitHub Actions; a delayed run may delay the quote. The exact payment amount is assigned by the ledger and shown in the issue response. Expired amounts are not reused. A matching deposit engine exists, but no automatic SOBY transfer is enabled.</p>
-    <p><a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-quote.yml">Request a quote (GitHub account required)</a></p>
+    <p class="intro">A GitHub-powered, two-way exchange workflow. Customers request a fixed quote, and GitHub Actions processes the request and records each order in a durable project ledger. This service is separate from SOBYA Buy and SOBYA DEX.</p>
+
+    <section class="stats" aria-label="Exchange policy">
+      <div class="stat"><span>Opening price</span><strong>0.005 USDT / SOBY</strong></div>
+      <div class="stat"><span>Exchange fee</span><strong>1%</strong></div>
+      <div class="stat"><span>Reference inventory</span><strong>1,000,000 SOBY</strong></div>
+      <div class="stat"><span>Price movement</span><strong>+100 / −25 BPS</strong></div>
+      <div class="stat"><span>Quote validity</span><strong>10 minutes</strong></div>
+      <div class="stat"><span>Deposit / return wallet</span><strong class="wallet">0xebdb899fFE84a89e1d576964b640491c135651AD</strong></div>
+    </section>
+
+    <h2>Choose an exchange direction</h2>
+    <section class="directions">
+      <div class="direction">
+        <h2>Buy SOBY with USDT</h2>
+        <p>Request an Ethereum USDT quote. The reserved quote specifies the exact USDT amount and the SOBY amount payable after the fee.</p>
+        <a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-quote.yml">Request USDT → SOBY quote</a>
+      </div>
+      <div class="direction">
+        <h2>Return SOBY for USDT</h2>
+        <p>Request a SOBYA EVM return quote. The reserved quote specifies the exact SOBY amount to return and the USDT refund after the fee.</p>
+        <a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-return.yml">Request SOBY → USDT quote</a>
+      </div>
+    </section>
+
+    <div class="notice"><strong>Not accepting deposits or returns.</strong> Quote reservation and the automated settlement code are being prepared, but live trading, SOBY payouts, and USDT refunds remain deliberately disabled. Do not send USDT or SOBY to the inventory wallet.</div>
+    <p class="detail">The project uses GitHub Issues, GitHub Actions, and a versioned JSON ledger; it does not require a separate hosting provider. Price changes are tied to confirmed settled quantities: +100 BPS for SOBY sold and −25 BPS for SOBY returned, proportionally to the 1,000,000 SOBY reference inventory. No time-only price changes are applied. Automated workers remain disabled until both network connections and controlled end-to-end tests are verified.</p>
+    <footer>Network routes: Ethereum Mainnet for USDT deposits/refunds · SOBYA EVM for native SOBY payouts/returns.</footer>
   </main>
 </body>
 </html>
