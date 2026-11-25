@@ -10,7 +10,7 @@ on:
 # One writer only. The periodic full queue scan recovers events that were
 # coalesced while another run was active/pending.
 concurrency:
-  group: sobya-auto-exchange-quote-ledger
+  group: sobya-auto-exchange-ledger
   cancel-in-progress: false
 
 permissions:
