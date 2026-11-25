@@ -58,9 +58,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Verify new NodeSafe SOBYA EVM RPC without sending transactions
+      - name: Verify proposed NodeSafe SOBYA EVM JSON-RPC (read-only)
         env:
-          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-app.xyz
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
         run: |
           set -euo pipefail
           CHAIN_ID=""
@@ -68,7 +68,7 @@ jobs:
             if CHAIN_ID="$(cast chain-id --rpc-url "$SOBYA_EVM_RPC_URL" 2>/tmp/sobya-rpc-error.txt)"; then
               break
             fi
-            echo "SOBYA RPC attempt $attempt failed:"
+            echo "SOBYA EVM JSON-RPC attempt $attempt failed:"
             cat /tmp/sobya-rpc-error.txt
             sleep 10
           done
@@ -76,12 +76,12 @@ jobs:
           BLOCK_NUMBER="$(cast block-number --rpc-url "$SOBYA_EVM_RPC_URL")"
           GAS_PRICE="$(cast gas-price --rpc-url "$SOBYA_EVM_RPC_URL")"
           echo "SOBYA EVM chain ID: $CHAIN_ID"
-          echo "Latest block: $BLOCK_NUMBER"
+          echo "Latest EVM block: $BLOCK_NUMBER"
           echo "RPC gas price (wei): $GAS_PRICE"
       - name: Simulate deployment and contract wiring on disposable SOBYA mainnet fork
         working-directory: contracts
         env:
-          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-app.xyz
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
         run: |
           forge test --fork-url "$SOBYA_EVM_RPC_URL" --match-path test/SobyaMainnetFork.t.sol -vvv
       - name: Confirm production deployment is enabled for owner-controlled deployment
