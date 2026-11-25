@@ -1,4 +1,5 @@
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
+import { parsePriceAtomic } from "./pricing.js";
 
 export const ETHEREUM_USDT = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 const USDT_SCALE = 1_000_000n;
@@ -16,12 +17,13 @@ export function formatUsdtAtomic(value) {
   const n = BigInt(value);
   return String(n / USDT_SCALE) + "." + String(n % USDT_SCALE).padStart(6, "0");
 }
-export function calculateOpeningQuote(paymentAmountAtomic) {
+export function calculateOpeningQuote(paymentAmountAtomic, price = AUTO_EXCHANGE_POLICY.openingPriceUsdtPerSoby) {
   const payment = BigInt(paymentAmountAtomic);
+  const priceAtomic = parsePriceAtomic(price);
   if (payment <= 0n) throw new TypeError("payment amount must be positive");
-  // At the agreed opening price: SOBY = USDT / 0.005, less the 1% fee.
-  return payment * SOBY_SCALE * 1000n * BigInt(10_000 - AUTO_EXCHANGE_POLICY.exchangeFeeBps) /
-    (USDT_SCALE * 5n * 10_000n);
+  // SOBY output = USDT / quoted price, less the configured 1% fee.
+  return payment * SOBY_SCALE * (10_000n - BigInt(AUTO_EXCHANGE_POLICY.exchangeFeeBps)) *
+    (10n ** 18n) / (USDT_SCALE * priceAtomic * 10_000n);
 }
 export function allocateUniquePaymentAmount(requestedAmountAtomic, quotes) {
   const used = new Set(quotes.map(q => String(q.paymentAmountAtomic)));
@@ -44,6 +46,7 @@ export function createQuote({ ledger, issueNumber, sender, requestedAmount, now 
   const created = new Date(now);
   if (!Number.isFinite(created.getTime())) throw new TypeError("invalid quote creation time");
   const expires = new Date(created.getTime() + AUTO_EXCHANGE_POLICY.quoteValiditySeconds * 1000);
+  const quotedPrice = String(ledger.currentPriceUsdtPerSoby ?? AUTO_EXCHANGE_POLICY.openingPriceUsdtPerSoby);
   const quote = {
     orderId: "SOBYA-" + created.toISOString().replace(/[-:.TZ]/g, "") + "-" + issueNumber,
     requestIssueNumber: issueNumber,
@@ -54,8 +57,8 @@ export function createQuote({ ledger, issueNumber, sender, requestedAmount, now 
     requestedAmountAtomic: requestedAmountAtomic.toString(),
     paymentAmountAtomic: allocated.paymentAmountAtomic,
     uniqueMarkerAtomic: allocated.markerAtomic,
-    payoutAmountAtomic: calculateOpeningQuote(allocated.paymentAmountAtomic).toString(),
-    quotedPrice: "0.005",
+    payoutAmountAtomic: calculateOpeningQuote(allocated.paymentAmountAtomic, quotedPrice).toString(),
+    quotedPrice,
     exchangeFeeBps: AUTO_EXCHANGE_POLICY.exchangeFeeBps,
     createdAt: created.toISOString(),
     expiresAt: expires.toISOString(),
