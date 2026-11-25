@@ -25,11 +25,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: auto-exchange/package-lock.json
       - name: Install isolated exchange dependencies
         working-directory: auto-exchange
-        run: npm ci
+        run: npm install
       - name: Verify deposits and execute eligible SOBY payouts
         working-directory: auto-exchange
         env:
