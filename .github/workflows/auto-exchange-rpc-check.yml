@@ -34,6 +34,6 @@ jobs:
         working-directory: auto-exchange
         env:
           ETHEREUM_RPC_URL: https://ethereum-rpc.publicnode.com
-          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-app.xyz
-          SOBYA_EVM_RPC_FALLBACK_URL: https://sobya-rpc.nodesafe-dapp.xyz
+          SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
+          SOBYA_EVM_RPC_FALLBACK_URL: https://sobya-evm-rpc.nodesafe-app.xyz
         run: node verify-rpc.js
