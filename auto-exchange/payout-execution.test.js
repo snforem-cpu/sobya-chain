@@ -23,7 +23,7 @@ function fixture(overrides = {}) {
     address: "0x1111111111111111111111111111111111111111",
     sendTransaction: async request => {
       assert.equal(request.nonce, 7);
-      assert.equal(request.value, 100_000n);
+      assert.equal(request.value, 49_600n);
       return {
         hash: "0x" + "a".repeat(64),
         wait: async confirmations => {
@@ -42,7 +42,7 @@ function fixture(overrides = {}) {
       return "sha-" + saves.length;
     },
     applyConfirmedPriceChange: ({ ledger: current, quantitySobyAtomic, settlementConfirmed }) => {
-      assert.equal(quantitySobyAtomic, "100000");
+      assert.equal(quantitySobyAtomic, "49600");
       assert.equal(settlementConfirmed, true);
       return { ...current, priceState: { marker: "changed-after-confirmation" } };
     },
@@ -86,6 +86,8 @@ test("executes and persists prepared, broadcast, and confirmed settlement lifecy
   assert.equal(result.ledger.quotes[0].payoutTxHash, "0x" + "a".repeat(64));
   assert.equal(result.ledger.quotes[0].payoutBlockNumber, 123);
   assert.equal(result.ledger.quotes[0].payoutFeePaidAtomic, "42000");
+  assert.equal(result.ledger.quotes[0].payoutNetAmountAtomic, "49600");
+  assert.equal(result.ledger.quotes[0].payoutNetworkFeeBudgetAtomic, "50400");
   assert.equal(result.ledger.priceState.marker, "changed-after-confirmation");
   assert.deepEqual(saves.map(x => x.snapshot.quotes[0].status),
     ["payout_prepared", "payout_broadcast", "settled"]);
