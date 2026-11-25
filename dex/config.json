@@ -1,18 +1,18 @@
 {
   "chainId": 357812033857,
   "chainName": "SOBYA Mainnet",
-  "rpcUrl": "https://sobya-evm-rpc.nodesafe-app.xyz",
+  "rpcUrl": "https://sobya-evm-rpc.nodesafe-dapp.xyz",
   "explorerUrl": "https://explorer.nodesafe-app.xyz/sobya",
   "factory": "0x35f59c1Bb30e1FA29020294cB02Bd770D6e3fa8e",
   "router": "0x9F3B4AeFbCb937227Dac641Bf7b9e8b42d6CA23D",
   "wrappedSoby": "0x9669a3d516B3423d90F1Ce81eAcF0B363369E09c",
   "oracle": "0xb76Aa2fe9459aEF38EB31D687c13D80bCf4716A4",
   "deploymentStatus": "verified",
-  "notice": "Cross-chain USDT-to-SOBY customer deposits are enabled for operator-directed live testing. Use only amounts you are prepared to risk; settlement depends on the live Enzonic deposit watcher and SOBYA payout inventory.",
+  "notice": "Cross-chain orders and customer deposits are disabled until a reachable HTTPS order service, finalized deposit verification, funded payout inventory, and end-to-end settlement tests are independently confirmed.",
   "liquidityEnabled": true,
-  "tradingEnabled": true,
-  "custodialApiUrl": "https://sobya-chain.enzonic.dev",
-  "custodialApiNotice": "USDT-to-SOBY deposit submission is enabled in the DEX for live testing. The HTTPS gateway and Enzonic worker must be online and correctly configured to accept and settle orders.",
-  "crossChainOrdersEnabled": true,
-  "customerDepositsEnabled": true
+  "tradingEnabled": false,
+  "custodialApiUrl": "",
+  "custodialApiNotice": "Order gateway is not configured. Do not send deposits; order creation remains unavailable until the service is deployed and verified.",
+  "crossChainOrdersEnabled": false,
+  "customerDepositsEnabled": false
 }
