@@ -34,7 +34,7 @@ The pure price engine is in `pricing.js`. New quotes read `ledger.currentPriceUs
 ## Durable quote requests and unique payment amounts
 - Customers submit a GitHub Issue using `.github/ISSUE_TEMPLATE/auto-exchange-quote.yml`.
 - GitHub Actions scans all open quote-request issues on each event and every five minutes.
-- The workflow uses one concurrency group and a single writer to update `auto-exchange/ledger.json`.
+- All four quote, payout, and refund workflows share one repository concurrency group, serializing every writer that updates `auto-exchange/ledger.json`.
 - Issue number is the idempotency key: reprocessing the same issue cannot create a second quote.
 - Each quote reserves a globally unused exact USDT atomic-unit amount. The small micro-USDT routing tail is included in the displayed quoted total; it is not a separate fee.
 - Amounts remain reserved in the ledger even after expiry, so a late payment can never accidentally match a later customer's quote.
