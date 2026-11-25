@@ -2,7 +2,7 @@ import { JsonRpcProvider, Wallet, Interface, getAddress, id, zeroPadValue } from
 import { matchDeposit } from "./settlement.js";
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
 import { applyConfirmedPriceChange } from "./pricing.js";
-import { calculateRequiredPayoutBalance } from "./payout-policy.js";
+import { calculateRequiredPayoutBalance, isPayoutEligible } from "./payout-policy.js";
 
 const enabled = AUTO_EXCHANGE_POLICY.tradingEnabled && AUTO_EXCHANGE_POLICY.payoutEnabled;
 if (!enabled) {
@@ -106,7 +106,7 @@ if (scanTo >= scanFrom) {
 }
 
 for (const quote of ledger.quotes) {
-  if (quote.status !== "paid" || quote.payoutTxHash || quote.payoutNonce !== undefined) continue;
+  if (!isPayoutEligible(quote)) continue;
   if (!quote.depositTxHash || !Number.isSafeInteger(quote.depositLogIndex) || quote.depositLogIndex < 0) continue;
   if (quote.chainId !== AUTO_EXCHANGE_POLICY.ethereumChainId ||
       getAddress(quote.depositAddress) !== inventoryAddress ||
