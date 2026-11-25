@@ -138,6 +138,7 @@ test("insufficient payout inventory is held safely and resumes automatically aft
   assert.equal(quote.payoutNonce, undefined);
   assert.equal(saves.length, 1);
   deps.sobya.getBalance = async () => 1_000_000n;
+  deps.sobya.getTransactionCount = async () => 7;
   const resumed = await executePayout(deps);
   assert.equal(resumed.completed, true);
   assert.equal(quote.status, "settled");
