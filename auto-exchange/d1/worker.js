@@ -208,7 +208,7 @@ export default {
       }
       if (body.currentPriceUsdtPerSoby !== undefined) {
         const price = String(body.currentPriceUsdtPerSoby);
-        if (!/^\\d+(?:\\.\\d{1,18})?$/.test(price) || /^0(?:\\.0*)?$/.test(price))
+        if (!/^\d+(?:\.\d{1,18})?$/.test(price) || /^0(?:\\.0*)?$/.test(price))
           return response({error:"Invalid current exchange price"},400,ORIGIN);
         statements.push(env.DB.prepare("UPDATE exchange_state SET current_price_usdt_per_soby=?1,updated_at=?2 WHERE id=1")
           .bind(price,new Date().toISOString()));
