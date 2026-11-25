@@ -1,4 +1,4 @@
-import { JsonRpcProvider, getAddress } from "ethers";
+import { JsonRpcProvider, Contract, getAddress } from "ethers";
 import { AUTO_EXCHANGE_POLICY } from "./config.js";
 import { ETHEREUM_USDT } from "./quote-ledger.js";
 
@@ -23,6 +23,15 @@ async function verifyEthereum() {
     const code = await provider.getCode(ETHEREUM_USDT);
     if (code === "0x") throw new Error("Ethereum USDT contract has no bytecode at configured address");
     console.log("Ethereum USDT contract: OK; bytecodeLength=" + (code.length - 2));
+    const usdt = new Contract(ETHEREUM_USDT, ["function balanceOf(address) view returns (uint256)"], provider);
+    const tokenBalance = await usdt.balanceOf(inventory);
+    const nativeBalance = await provider.getBalance(inventory);
+    console.log("Ethereum inventory balances: USDT atomic=" + tokenBalance.toString() + "; ETH wei=" + nativeBalance.toString());
+    const ethFees = await provider.getFeeData();
+    console.log("Ethereum fee RPC: " + (ethFees.maxFeePerGas != null || ethFees.gasPrice != null ? "OK" : "UNAVAILABLE") +
+      "; gasPriceWei=" + (ethFees.gasPrice?.toString() ?? "null") +
+      "; maxFeePerGasWei=" + (ethFees.maxFeePerGas?.toString() ?? "null") +
+      "; maxPriorityFeePerGasWei=" + (ethFees.maxPriorityFeePerGas?.toString() ?? "null"));
   } catch (error) {
     failed = true;
     console.error("Ethereum RPC: FAILED; " + String(error.message || error));
@@ -43,8 +52,21 @@ async function verifySobya() {
       }
       if (!Number.isSafeInteger(height) || height <= 0) throw new Error("invalid latest block height");
       const balance = await provider.getBalance(inventory);
+      const fees = await provider.getFeeData();
+      if (fees.maxFeePerGas == null && fees.gasPrice == null) throw new Error("RPC did not return usable EVM fee data");
+      // eth_estimateGas simulates a transfer; it does not sign or broadcast a transaction.
+      const estimatedGas = await provider.estimateGas({ from: inventory, to: inventory, value: 1n });
+      if (estimatedGas <= 0n) throw new Error("eth_estimateGas returned a non-positive estimate");
+      const maxFee = fees.maxFeePerGas ?? fees.gasPrice;
+      const requiredGasReserve = estimatedGas * maxFee;
       console.log("SOBYA EVM RPC: OK; endpoint=" + url + "; chainId=" + network.chainId +
         "; latestBlock=" + height + "; inventoryNativeBalanceAtomic=" + balance.toString());
+      console.log("SOBYA write-path simulation: OK; eth_estimateGas=" + estimatedGas.toString() +
+        "; gasPriceWei=" + (fees.gasPrice?.toString() ?? "null") +
+        "; maxFeePerGasWei=" + (fees.maxFeePerGas?.toString() ?? "null") +
+        "; maxPriorityFeePerGasWei=" + (fees.maxPriorityFeePerGas?.toString() ?? "null") +
+        "; estimatedGasReserveAtomic=" + requiredGasReserve.toString() +
+        "; inventoryCoversSimulation=" + String(balance >= requiredGasReserve));
       return;
     } catch (error) {
       errors.push(url + " => " + String(error.message || error));
