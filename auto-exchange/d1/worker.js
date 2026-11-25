@@ -92,8 +92,10 @@ function quoteForLedger(row) {
     quotedPrice: row.quoted_price, exchangeFeeBps: Number(row.exchange_fee_bps),
     createdAt: row.created_at, expiresAt: row.expires_at, status: row.status
   };
-  if (row.direction === "buy") return { ...base, tokenAddress: row.token_address };
-  return base;
+  if (row.direction === "buy") return { ...base, tokenAddress: row.token_address,
+    depositTxHash: row.payment_tx_hash || undefined, payoutTxHash: row.settlement_tx_hash || undefined };
+  return { ...base, returnTxHash: row.payment_tx_hash || undefined,
+    refundTxHash: row.settlement_tx_hash || undefined };
 }
 async function createQuote(request, env) {
   const body = await request.json();
@@ -110,6 +112,14 @@ async function createQuote(request, env) {
   const expiresAt = new Date(now.getTime() + QUOTE_TTL_SECONDS*1000).toISOString();
   await env.DB.prepare("UPDATE exchange_quotes SET status = 'expired', updated_at = ?1 WHERE status = 'open' AND expires_at <= ?1").bind(createdAt).run();
   const sender = body.sender.toLowerCase();
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS total FROM exchange_quotes WHERE sender=?1 AND direction=?2 AND status='open' AND created_at>=?3")
+    .bind(sender,direction,new Date(now.getTime()-60_000).toISOString()).first();
+  if (Number(recent?.total || 0) >= 3)
+    return response({error:"Too many active quote requests. Please wait before requesting another quote."},429);
+  const active = await env.DB.prepare("SELECT COUNT(*) AS total FROM exchange_quotes WHERE sender=?1 AND direction=?2 AND status='open'")
+    .bind(sender,direction).first();
+  if (Number(active?.total || 0) >= 3)
+    return response({error:"You already have three active quotes in this direction. Complete or let one expire first."},429);
   const orderId = "SOBYA-" + crypto.randomUUID().replaceAll("-","").toUpperCase();
   for (let marker=1n; marker<=1000n; marker++) {
     const payment = requested + marker;
@@ -186,13 +196,21 @@ export default {
       const updates = Array.isArray(body.quotes) ? body.quotes : [];
       const returns = Array.isArray(body.returnQuotes) ? body.returnQuotes : [];
       const statements = [];
+      const allowedStatuses = new Set(["open","paid","returned","review","payout_waiting_funds","payout_prepared","payout_broadcast","settled","expired","refund_waiting_funds","refund_prepared","refund_broadcast","refunded"]);
       for (const q of [...updates.map(q => ({...q,direction:"buy"})), ...returns.map(q => ({...q,direction:"return"}))]) {
         if (typeof q.orderId !== "string" || !["buy","return"].includes(q.direction) ||
-            typeof q.status !== "string") continue;
+            !allowedStatuses.has(q.status)) continue;
         statements.push(env.DB.prepare("UPDATE exchange_quotes SET status=?1,payment_tx_hash=?2,settlement_tx_hash=?3,last_error=?4,updated_at=?5 WHERE order_id=?6 AND direction=?7")
           .bind(q.status, q.depositTxHash || q.returnTxHash || null, q.payoutTxHash || q.refundTxHash || null,
             q.payoutReviewReason || q.refundWaitReason || q.payoutWaitReason || null,
             new Date().toISOString(), q.orderId, q.direction));
+      }
+      if (body.currentPriceUsdtPerSoby !== undefined) {
+        const price = String(body.currentPriceUsdtPerSoby);
+        if (!/^\\d+(?:\\.\\d{1,18})?$/.test(price) || /^0(?:\\.0*)?$/.test(price))
+          return response({error:"Invalid current exchange price"},400,ORIGIN);
+        statements.push(env.DB.prepare("UPDATE exchange_state SET current_price_usdt_per_soby=?1,updated_at=?2 WHERE id=1")
+          .bind(price,new Date().toISOString()));
       }
       if (statements.length) await env.DB.batch(statements);
       return response({updated:statements.length},200,ORIGIN);
