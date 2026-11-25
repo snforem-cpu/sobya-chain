@@ -121,6 +121,13 @@ export default {
     if (url.pathname === "/health" && request.method === "GET") {
       return response({service:"SOBYA Auto Exchange API",status:"ok"},200,origin || ORIGIN);
     }
+    if (url.pathname === "/internal/open-quotes" && request.method === "GET") {
+      const auth = request.headers.get("Authorization") || "";
+      if (!env.D1_SYNC_TOKEN || auth !== "Bearer " + env.D1_SYNC_TOKEN)
+        return response({error:"Unauthorized"},401,ORIGIN);
+      const result = await env.DB.prepare("SELECT * FROM exchange_quotes WHERE status IN ('open','paid','returned','refund_waiting_funds') ORDER BY created_at").all();
+      return response({quotes:result.results || []},200,ORIGIN);
+    }
     if (!origin) return response({error:"Origin not allowed"},403,ORIGIN);
     if (url.pathname === "/v1/quote" && request.method === "POST") {
       try { return await createQuote(request,env); }
@@ -129,13 +136,6 @@ export default {
     if (url.pathname === "/v1/price" && request.method === "GET") {
       const row = await env.DB.prepare("SELECT current_price_usdt_per_soby FROM exchange_state WHERE id=1").first();
       return response({price:row?.current_price_usdt_per_soby || "0.005",quoteValiditySeconds:QUOTE_TTL_SECONDS,feeBps:FEE_BPS},200,origin);
-    }
-    if (url.pathname === "/internal/open-quotes" && request.method === "GET") {
-      const auth = request.headers.get("Authorization") || "";
-      if (!env.D1_SYNC_TOKEN || auth !== "Bearer " + env.D1_SYNC_TOKEN)
-        return response({error:"Unauthorized"},401,ORIGIN);
-      const result = await env.DB.prepare("SELECT * FROM exchange_quotes WHERE status IN ('open','paid','returned','refund_waiting_funds') ORDER BY created_at").all();
-      return response({quotes:result.results || []},200,ORIGIN);
     }
     return response({error:"Not found"},404,origin || ORIGIN);
   }
