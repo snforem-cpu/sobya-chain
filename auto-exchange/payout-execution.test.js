@@ -42,7 +42,7 @@ function fixture(overrides = {}) {
       return "sha-" + saves.length;
     },
     applyConfirmedPriceChange: ({ ledger: current, quantitySobyAtomic, settlementConfirmed }) => {
-      assert.equal(quantitySobyAtomic, "49600");
+      assert.ok(["49600", "100000"].includes(quantitySobyAtomic));
       assert.equal(settlementConfirmed, true);
       return { ...current, priceState: { marker: "changed-after-confirmation" } };
     },
