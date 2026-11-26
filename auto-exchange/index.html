@@ -11,7 +11,7 @@
     :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#071426;color:#f4f7ff;font-synthesis:none}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;padding:25px 16px;background:radial-gradient(ellipse at 50% -15%,#173b66 0,#0a1d35 42%,#071426 78%)}
     main{width:min(760px,100%);margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 40px}
-    .brand{display:flex;align-items:center;gap:12px;font-weight:850;letter-spacing:.16em}.mark{width:38px;height:38px;border:1px solid #5279a8;border-radius:12px;display:grid;place-items:center;color:#9cc8ff;background:linear-gradient(145deg,#183c68,#101e39);font-size:19px}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:850;letter-spacing:.16em}.brand-logo{width:46px;height:46px;display:block;object-fit:contain;border-radius:12px;border:1px solid #294665;background:#071426}.brand-name{font-size:1rem}
     .network{color:#a9bad2;font-size:.78rem;border:1px solid #29415f;border-radius:99px;padding:8px 11px}
     .hero{text-align:center;margin:0 auto 28px}.eyebrow{color:#8ebaff;text-transform:uppercase;letter-spacing:.2em;font-size:.7rem;font-weight:750}
     h1{font-size:clamp(2.15rem,7vw,3.4rem);letter-spacing:-.055em;line-height:1.05;margin:13px 0}.subtitle{color:#aebed4;font-size:1rem;line-height:1.6;margin:0}
@@ -35,7 +35,7 @@
 <body>
 <main>
   <header>
-    <div class="brand"><span class="mark" aria-hidden="true">◇</span><span>SOBYA</span></div>
+    <div class="brand"><img class="brand-logo" src="../assets/logo/sobya-coin-128.png" alt="Official SOBYA logo" width="46" height="46"><span class="brand-name">SOBYA</span></div>
     <div class="network">Ethereum · SOBYA Network</div>
   </header>
   <section class="hero">
@@ -75,7 +75,7 @@
 
   <div class="status" id="status" aria-live="polite">Connect MetaMask to begin. Your wallet signs each payment; SOBYA never receives your private key.</div>
   <p class="safety">Network fees are paid by your wallet. Always review the network, token, amount and recipient in MetaMask before confirming. Never send funds without a valid quote.</p>
-  <footer><span>Powered by SOBYA</span><span>Ethereum Mainnet · SOBYA EVM</span></footer>
+  <footer><span>Powered by SOBYA</span><span>Ethereum Mainnet · SOBYA EVM</span><span>Need help or missing SOBY after payment? <a href="mailto:sobya-coin@outlook.com?subject=SOBYA%20Auto%20Exchange%20Support" style="color:#9cc8ff;text-decoration:underline">sobya-coin@outlook.com</a></span><span>For payment issues, include your order ID and transaction hash.</span></footer>
 </main>
 <script>
 (function(){
