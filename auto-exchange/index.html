@@ -3,65 +3,118 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex">
-  <meta name="theme-color" content="#081226">
+  <meta name="theme-color" content="#071426">
+  <meta name="description" content="Exchange SOBY and USDT through SOBYA Auto Exchange.">
   <title>SOBYA Auto Exchange</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #071225; color: #eef4ff; }
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #071426;
+      color: #f4f7ff;
+      font-synthesis: none;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; padding: 28px 16px; display: grid; place-items: center; }
-    main { width: min(780px, 100%); padding: clamp(22px, 5vw, 38px); border: 1px solid #2b4265; border-radius: 22px; background: linear-gradient(145deg,#122441,#0b1830 72%); box-shadow: 0 22px 70px #0006; }
-    .eyebrow { color: #91b9f1; font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; font-weight: 750; }
-    h1 { margin: 10px 0 8px; font-size: clamp(2rem, 7vw, 3rem); letter-spacing: -.04em; }
-    .intro { color: #bdcce2; line-height: 1.7; max-width: 62ch; }
-    h2 { margin: 28px 0 12px; font-size: 1.05rem; }
-    .stats { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 22px; }
-    .stat { padding: 14px; border: 1px solid #2b4265; border-radius: 13px; background: #0b1930; }
-    .stat span { display: block; color: #9fb2cf; font-size: .82rem; margin-bottom: 6px; }
-    .stat strong { font-size: 1rem; }
-    .wallet { overflow-wrap: anywhere; font-size: .84rem !important; }
-    .directions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 22px; }
-    .direction { border: 1px solid #2b4265; border-radius: 15px; padding: 17px; background: #0a1830; }
-    .direction p { color: #b9c9df; line-height: 1.6; min-height: 72px; }
-    a { color: #a8ceff; font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 4px; }
-    .notice { margin-top: 22px; padding: 16px; border: 1px solid #8b6b2b; border-radius: 13px; background: #302713; color: #ffe7ae; line-height: 1.65; }
-    .detail { color: #aebfd8; line-height: 1.7; font-size: .92rem; margin-top: 18px; }
-    footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #2b4265; color: #8fa4c2; font-size: .82rem; }
-    @media (max-width: 560px) { .stats,.directions { grid-template-columns: 1fr; } .direction p { min-height: 0; } }
+    body {
+      margin: 0; min-height: 100vh; padding: 28px 18px;
+      display: grid; place-items: center;
+      background: radial-gradient(ellipse at 50% -15%, #173b66 0, #0a1d35 42%, #071426 78%);
+    }
+    main { width: min(920px, 100%); }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 54px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .16em; }
+    .mark {
+      width: 38px; height: 38px; border: 1px solid #5279a8; border-radius: 12px;
+      display: grid; place-items: center; color: #9cc8ff;
+      background: linear-gradient(145deg, #183c68, #101e39); font-size: 19px;
+      box-shadow: 0 8px 24px #0004;
+    }
+    .network { color: #a9bad2; font-size: .82rem; border: 1px solid #29415f; border-radius: 99px; padding: 8px 12px; }
+    .hero { text-align: center; margin: 0 auto 34px; }
+    .eyebrow { color: #8ebaff; text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; font-weight: 750; }
+    h1 { font-size: clamp(2.2rem, 7vw, 3.8rem); letter-spacing: -.055em; line-height: 1.05; margin: 14px 0; }
+    .subtitle { color: #aebed4; font-size: 1.04rem; line-height: 1.6; margin: 0; }
+    .ratebar {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0;
+      margin: 30px auto 42px; width: fit-content; max-width: 100%;
+      border: 1px solid #29415f; border-radius: 14px; background: #0c2039;
+    }
+    .rate { padding: 14px 24px; text-align: center; }
+    .rate + .rate { border-left: 1px solid #29415f; }
+    .rate span { display: block; color: #91a8c5; font-size: .75rem; margin-bottom: 5px; }
+    .rate strong { font-size: .98rem; }
+    .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .choice {
+      padding: 26px; border: 1px solid #294665; border-radius: 20px;
+      background: linear-gradient(145deg, #102944, #0b1c32);
+      box-shadow: 0 18px 48px #0003;
+    }
+    .pair { color: #8fbaff; font-size: .78rem; font-weight: 750; letter-spacing: .12em; }
+    .choice h2 { font-size: 1.45rem; letter-spacing: -.025em; margin: 13px 0 8px; }
+    .choice p { color: #aebed4; line-height: 1.6; min-height: 52px; margin: 0 0 24px; font-size: .94rem; }
+    .action {
+      display: flex; justify-content: center; align-items: center; min-height: 48px;
+      padding: 12px 16px; border-radius: 11px; background: #8fc0ff; color: #071426;
+      font-weight: 800; text-decoration: none; transition: background .15s ease, transform .15s ease;
+    }
+    .action:hover { background: #b4d6ff; transform: translateY(-1px); }
+    .safety {
+      display: flex; gap: 12px; align-items: flex-start; margin: 22px 0 0;
+      padding: 16px 18px; border: 1px solid #344a62; border-radius: 13px;
+      color: #c2d0e2; background: #0b1a2d; font-size: .88rem; line-height: 1.55;
+    }
+    .safety b { color: #f0f5ff; }
+    footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 28px; color: #8298b5; font-size: .78rem; }
+    @media (max-width: 620px) {
+      body { padding: 22px 15px; }
+      header { margin-bottom: 42px; }
+      .choices { grid-template-columns: 1fr; }
+      .choice p { min-height: 0; }
+      .rate { padding: 12px 16px; }
+      .network { font-size: .72rem; }
+    }
+    @media (max-width: 390px) { .network { display: none; } .ratebar { width: 100%; } .rate { flex: 1 1 40%; } .rate + .rate { border-left: 0; } }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">SOBYA ecosystem</div>
-    <h1>SOBYA Auto Exchange</h1>
-    <p class="intro">A GitHub-powered, two-way exchange workflow. Customers request a fixed quote, and GitHub Actions processes the request and records each order in a durable project ledger. This service is separate from SOBYA Buy and SOBYA DEX.</p>
+    <header>
+      <div class="brand"><span class="mark" aria-hidden="true">◇</span><span>SOBYA</span></div>
+      <div class="network">Ethereum · SOBYA Network</div>
+    </header>
 
-    <section class="stats" aria-label="Exchange policy">
-      <div class="stat"><span>Opening price</span><strong>0.005 USDT / SOBY</strong></div>
-      <div class="stat"><span>Exchange fee</span><strong>1%</strong></div>
-      <div class="stat"><span>Reference inventory</span><strong>1,000,000 SOBY</strong></div>
-      <div class="stat"><span>Price movement</span><strong>+100 / −25 BPS</strong></div>
-      <div class="stat"><span>Quote validity</span><strong>10 minutes</strong></div>
-      <div class="stat"><span>Deposit / return wallet</span><strong class="wallet">0xebdb899fFE84a89e1d576964b640491c135651AD</strong></div>
-    </section>
-
-    <h2>Choose an exchange direction</h2>
-    <section class="directions">
-      <div class="direction">
-        <h2>Buy SOBY with USDT</h2>
-        <p>Request an Ethereum USDT quote. The reserved quote specifies the exact USDT amount and the SOBY amount payable after the fee.</p>
-        <a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-quote.yml">Request USDT → SOBY quote</a>
-      </div>
-      <div class="direction">
-        <h2>Return SOBY for USDT</h2>
-        <p>Request a SOBYA EVM return quote and send the exact SOBY amount shown. The USDT refund is processed after confirmation; if USDT or Ethereum gas is not yet funded, the order waits safely and resumes when funds arrive.</p>
-        <a href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-return.yml">Request SOBY → USDT return quote</a>
+    <section class="hero">
+      <div class="eyebrow">Auto Exchange</div>
+      <h1>Exchange with SOBYA</h1>
+      <p class="subtitle">A simple way to buy or return SOBY.</p>
+      <div class="ratebar" aria-label="Exchange terms">
+        <div class="rate"><span>Opening rate</span><strong>0.005 USDT / SOBY</strong></div>
+        <div class="rate"><span>Exchange fee</span><strong>1%</strong></div>
+        <div class="rate"><span>Quote validity</span><strong>10 minutes</strong></div>
       </div>
     </section>
 
-    <div class="notice"><strong>Both exchange directions are enabled.</strong> For USDT → SOBY, request a quote and send only the exact USDT amount to the quoted Ethereum address before its 10-minute expiry. For SOBY → USDT, request a return quote and send only the exact SOBY amount to the quoted SOBYA address. Refunds are made after confirmation. If USDT inventory or Ethereum gas is not yet sufficient, the return order remains in a funding-wait state and is retried automatically after the initial purchases fund the wallet. Never send funds without a valid quote.</div>
-    <p class="detail">The project uses GitHub Issues, GitHub Actions, and a versioned JSON ledger; it does not require a separate hosting provider. Price changes are tied to confirmed settled quantities: +100 BPS for SOBY sold and −25 BPS for SOBY returned, proportionally to the 1,000,000 SOBY reference inventory. No time-only price changes are applied. Both directions use the same inventory wallet, signing key, and shared activation policy.</p>
-    <footer>Network routes: Ethereum Mainnet for USDT deposits/refunds · SOBYA EVM for native SOBY payouts/returns.</footer>
+    <section class="choices" aria-label="Choose exchange direction">
+      <article class="choice">
+        <div class="pair">USDT <span aria-hidden="true">→</span> SOBY</div>
+        <h2>Buy SOBY</h2>
+        <p>Pay with USDT on Ethereum and receive SOBY on the SOBYA network.</p>
+        <a class="action" href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-quote.yml">Buy SOBY <span aria-hidden="true">&nbsp;→</span></a>
+      </article>
+      <article class="choice">
+        <div class="pair">SOBY <span aria-hidden="true">→</span> USDT</div>
+        <h2>Return SOBY</h2>
+        <p>Send SOBY from the SOBYA network and receive USDT on Ethereum.</p>
+        <a class="action" href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-return.yml">Return SOBY <span aria-hidden="true">&nbsp;→</span></a>
+      </article>
+    </section>
+
+    <div class="safety"><span aria-hidden="true">ⓘ</span><div><b>Before you send</b><br>Always request a quote first. Send only the exact amount to the deposit address shown in your valid quote. Return payments depend on available USDT and network gas.</div></div>
+
+    <footer>
+      <span>Powered by SOBYA</span>
+      <span>Ethereum Mainnet · SOBYA EVM</span>
+    </footer>
   </main>
 </body>
 </html>
