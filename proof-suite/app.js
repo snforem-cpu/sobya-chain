@@ -183,7 +183,7 @@ async function recordProof() {
   const data = encodeProofPayload(state.hash);
   // Estimate the exact self-record transaction before opening MetaMask.
   // Supplying an explicit gas limit avoids wallet-side estimation failures
-  // on RPC providers that do not reliably estimate data-bearing self-transfers.
+  // on RPC providers that do not reliably estimate data-bearing service-fee transfers.
   const txRequest = {
     from: state.account,
     to: SERVICE_WALLET,
