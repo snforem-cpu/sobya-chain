@@ -39,6 +39,24 @@ jobs:
           ];
           const expectedChainId = "0x534f425941";
           for (const url of endpoints) {
+            const preflight = await fetch(url, {
+              method: "OPTIONS",
+              headers: {
+                "Origin": "https://snforem-cpu.github.io",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type"
+              },
+              signal: AbortSignal.timeout(15000)
+            });
+            const allowOrigin = preflight.headers.get("access-control-allow-origin");
+            const allowMethods = preflight.headers.get("access-control-allow-methods") || "";
+            const allowHeaders = preflight.headers.get("access-control-allow-headers") || "";
+            if (!preflight.ok || !(allowOrigin === "*" || allowOrigin === "https://snforem-cpu.github.io")) {
+              throw new Error(url + " does not allow browser CORS from SOBYA GitHub Pages (status " + preflight.status + ", ACAO " + allowOrigin + ")");
+            }
+            if (!allowMethods.toUpperCase().includes("POST") || !allowHeaders.toLowerCase().includes("content-type")) {
+              throw new Error(url + " CORS preflight does not allow POST with content-type");
+            }
             const response = await fetch(url, {
               method: "POST",
               headers: { "content-type": "application/json" },
