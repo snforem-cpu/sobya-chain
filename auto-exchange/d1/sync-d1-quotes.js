@@ -28,7 +28,7 @@ if (!Array.isArray(ledger.quotes) || !Array.isArray(ledger.returnQuotes)) throw 
 const remote = await d1("/internal/open-quotes");
 const priceState = await d1("/v1/price");
 const validPrice = value => typeof value === "string" &&
-  /^\\d+(?:\\.\\d{1,18})?$/.test(value) && Number.isFinite(Number(value)) && Number(value) > 0;
+  /^\d+(?:\.\d{1,18})?$/.test(value) && Number.isFinite(Number(value)) && Number(value) > 0;
 if (!priceState || !validPrice(priceState.price)) {
   throw new Error("D1 did not return a valid confirmed exchange price; refusing to replace it with the opening price");
 }
