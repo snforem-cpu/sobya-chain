@@ -1,0 +1,96 @@
+name: SOBYA Proof Suite tests
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "proof-suite/**"
+      - ".github/workflows/proof-suite-tests.yml"
+  pull_request:
+    paths:
+      - "proof-suite/**"
+      - ".github/workflows/proof-suite-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check JavaScript syntax
+        run: node --check proof-suite/app.js && node --check proof-suite/proof-core.js
+      - name: Run proof payload tests
+        run: node --test proof-suite/tests/*.test.mjs
+
+  sobya-rpc-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check SOBYA EVM RPC endpoints and browser CORS
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoints = [
+            "https://sobya-evm-rpc.nodesafe-dapp.xyz",
+            "https://sobya-evm-rpc.nodesafe-app.xyz"
+          ];
+          const expectedChainId = "0x534f425941";
+          const successes = [];
+          for (const url of endpoints) {
+            try {
+              const preflight = await fetch(url, {
+                method: "OPTIONS",
+                headers: {
+                  "Origin": "https://snforem-cpu.github.io",
+                  "Access-Control-Request-Method": "POST",
+                  "Access-Control-Request-Headers": "content-type"
+                },
+                signal: AbortSignal.timeout(15000)
+              });
+              const allowOrigin = preflight.headers.get("access-control-allow-origin");
+              const allowMethods = preflight.headers.get("access-control-allow-methods") || "";
+              const allowHeaders = preflight.headers.get("access-control-allow-headers") || "";
+              if (!preflight.ok || !(allowOrigin === "*" || allowOrigin === "https://snforem-cpu.github.io")) {
+                throw new Error("CORS preflight failed: HTTP " + preflight.status + ", allow-origin=" + allowOrigin);
+              }
+              if (!allowMethods.toUpperCase().includes("POST") || !allowHeaders.toLowerCase().includes("content-type")) {
+                throw new Error("CORS preflight does not allow POST/content-type (methods=" + allowMethods + ", headers=" + allowHeaders + ")");
+              }
+              const response = await fetch(url, {
+                method: "POST",
+                headers: { "content-type": "application/json", "Origin": "https://snforem-cpu.github.io" },
+                body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+                signal: AbortSignal.timeout(15000)
+              });
+              if (!response.ok) throw new Error("RPC returned HTTP " + response.status);
+              const body = await response.json();
+              if (body.error) throw new Error("RPC error: " + body.error.message);
+              if (String(body.result).toLowerCase() !== expectedChainId.toLowerCase()) {
+                throw new Error("Unexpected chain ID: " + body.result);
+              }
+              const blockResponse = await fetch(url, {
+                method: "POST",
+                headers: { "content-type": "application/json", "Origin": "https://snforem-cpu.github.io" },
+                body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "eth_blockNumber", params: [] }),
+                signal: AbortSignal.timeout(15000)
+              });
+              if (!blockResponse.ok) throw new Error("Block query returned HTTP " + blockResponse.status);
+              const blockBody = await blockResponse.json();
+              if (blockBody.error || !/^0x[0-9a-f]+$/i.test(blockBody.result || "")) {
+                throw new Error("Invalid block height response");
+              }
+              const block = BigInt(blockBody.result).toString();
+              successes.push(url);
+              console.log("PASS " + url + " — chainId " + body.result + ", block " + block + ", CORS preflight allowed");
+            } catch (error) {
+              console.log("FAIL " + url + " — " + (error?.stack || error?.message || String(error)));
+            }
+          }
+          if (successes.length === 0) {
+            throw new Error("No SOBYA EVM RPC endpoint passed the chain ID, block height, and browser CORS checks.");
+          }
+          console.log("RPC smoke check passed on " + successes.length + " of " + endpoints.length + " endpoints.");
+          NODE
