@@ -179,9 +179,34 @@ async function recordProof() {
   if (!state.wallet || !state.account) await connectWallet();
   await ensureSobyaNetwork(state.wallet);
   const data = encodeProofPayload(state.hash);
+  // Estimate the exact self-record transaction before opening MetaMask.
+  // Supplying an explicit gas limit avoids wallet-side estimation failures
+  // on RPC providers that do not reliably estimate data-bearing self-transfers.
+  const txRequest = {
+    from: state.account,
+    to: state.account,
+    value: "0x0",
+    data
+  };
+  let estimatedGas;
+  try {
+    estimatedGas = await rpc("eth_estimateGas", [txRequest]);
+  } catch (rpcError) {
+    try {
+      estimatedGas = await state.wallet.request({ method: "eth_estimateGas", params: [txRequest] });
+    } catch (walletEstimateError) {
+      const detail = walletEstimateError?.data?.message ||
+        walletEstimateError?.message || rpcError?.message || "Gas estimation failed.";
+      throw new Error(`MetaMask could not prepare the SOBYA Proof transaction: ${detail}`);
+    }
+  }
+  if (typeof estimatedGas !== "string" || !/^0x[0-9a-f]+$/i.test(estimatedGas)) {
+    throw new Error("The SOBYA RPC returned an invalid gas estimate. No transaction was sent.");
+  }
+  const gasLimit = (BigInt(estimatedGas) * 120n + 99n) / 100n;
   const txHash = await state.wallet.request({
     method: "eth_sendTransaction",
-    params: [{ from: state.account, to: state.account, value: "0x0", data }]
+    params: [{ ...txRequest, gas: "0x" + gasLimit.toString(16) }]
   });
   $("tx-hash").value = txHash;
   const result = $("verify-result");
