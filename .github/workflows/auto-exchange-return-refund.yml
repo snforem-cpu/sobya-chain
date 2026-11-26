@@ -1,6 +1,11 @@
 name: SOBYA Auto Exchange USDT refund worker
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "auto-exchange/d1/**"
+      - ".github/workflows/auto-exchange-return-refund.yml"
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
@@ -14,8 +19,38 @@ permissions:
   id-token: write
 
 jobs:
+  d1-bridge-preflight:
+    if: github.event_name == 'push' && github.repository == 'snforem-cpu/sobya-chain' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Request D1 identity for bridge preflight
+        id: d1-auth
+        run: |
+          set -euo pipefail
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?GitHub OIDC request URL is unavailable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?GitHub OIDC request token is unavailable}"
+          TOKEN_JSON=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sobya-auto-exchange")
+          OIDC_TOKEN=$(echo "$TOKEN_JSON" | jq -r .value)
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
+          echo "::add-mask::$OIDC_TOKEN"
+          echo "token=$OIDC_TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Synchronize D1 reservations without executing payouts
+        working-directory: auto-exchange
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GITHUB_OIDC_TOKEN: ${{ steps.d1-auth.outputs.token }}
+          SOBYA_AUTO_EXCHANGE_API_URL: https://sobya-buy-api.snforem.workers.dev
+        run: node d1/sync-d1-quotes.js
+
   refund:
-    if: github.repository == 'snforem-cpu/sobya-chain' && github.ref == 'refs/heads/main'
+    if: ${{ github.event_name != 'push' && github.repository == 'snforem-cpu/sobya-chain' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
