@@ -88,7 +88,7 @@
   const ETH_RPC='https://ethereum-rpc.publicnode.com';
   const SOBYA_RPC='https://sobya-evm-rpc.nodesafe-dapp.xyz';
   const $=id=>document.getElementById(id);
-  let rawProvider=null, provider=null, signer=null, address=null, evmClient=null, connectorPromise=null;
+  let rawProvider=null, provider=null, signer=null, address=null, evmClient=null, connectorPromise=null, boundProvider=null;
   let activeQuotes={buy:null,return:null};
   const usdtAbi=['function transfer(address to,uint256 amount) returns(bool)'];
   const say=message=>$('status').textContent=message;
@@ -112,15 +112,21 @@
       let connected=false;
       try{
         const client=await Promise.race([connectorPromise,new Promise(resolve=>setTimeout(()=>resolve(null),7000))]);
-        if(client){await client.connect({chainIds:[SOBYA_HEX],forceRequest:true});rawProvider=client.getProvider();if(rawProvider)connected=true;}
+        if(client){
+        const session=await client.connect({chainIds:[SOBYA_HEX],forceRequest:true});
+        rawProvider=client.getProvider();
+        if(rawProvider){window.__sobyaConnectAccounts=session&&Array.isArray(session.accounts)?session.accounts:[];connected=true;}
+      }
       }catch(error){console.warn('MetaMask Connect fallback:',error);}
       if(!connected){
         rawProvider=window.ethereum||null;
         if(!rawProvider)throw new Error('MetaMask was not found. Open this page in the MetaMask browser or install the MetaMask extension.');
-        await rawProvider.request({method:'eth_requestAccounts',params:[]});
+        window.__sobyaConnectAccounts=await rawProvider.request({method:'eth_requestAccounts',params:[]});
       }
       provider=new ethers.BrowserProvider(rawProvider);
-      const accounts=await rawProvider.request({method:'eth_accounts',params:[]});
+      const accounts=window.__sobyaConnectAccounts&&window.__sobyaConnectAccounts.length
+        ?window.__sobyaConnectAccounts:await rawProvider.request({method:'eth_accounts',params:[]});
+      window.__sobyaConnectAccounts=[];
       if(!accounts||!accounts.length)throw new Error('Wallet connection was not approved.');
       address=ethers.getAddress(accounts[0]);signer=await provider.getSigner(address);
       $('walletTitle').textContent='Wallet connected';
@@ -128,9 +134,37 @@
       $('connect').textContent=address.slice(0,6)+'…'+address.slice(-4);
       $('buyQuote').disabled=false;$('returnQuote').disabled=false;
       say('Wallet connected. Choose Buy SOBY or Return SOBY to request a live quote.');
-      if(rawProvider&&typeof rawProvider.on==='function'){
-        rawProvider.on('accountsChanged',()=>window.location.reload());
-        rawProvider.on('chainChanged',()=>{activeQuotes={buy:null,return:null};window.location.reload();});
+      if(rawProvider&&typeof rawProvider.on==='function'&&boundProvider!==rawProvider){
+        boundProvider=rawProvider;
+        rawProvider.on('accountsChanged',accounts=>{
+          activeQuotes={buy:null,return:null};
+          $('buyQuoteBox').classList.remove('visible');$('returnQuoteBox').classList.remove('visible');
+          if(!accounts||!accounts.length){
+            address=null;signer=null;provider=null;
+            $('walletTitle').textContent='Wallet not connected';
+            $('walletAddress').textContent='Reconnect MetaMask to request a quote.';
+            $('connect').textContent='Connect MetaMask';
+            $('buyQuote').disabled=true;$('returnQuote').disabled=true;
+            say('Wallet disconnected. Reconnect MetaMask to continue. No payment was sent.');
+            return;
+          }
+          address=ethers.getAddress(accounts[0]);
+          provider=new ethers.BrowserProvider(rawProvider);
+          provider.getSigner(address).then(nextSigner=>{
+            signer=nextSigner;
+            $('walletTitle').textContent='Wallet connected';
+            $('walletAddress').textContent=address;
+            $('connect').textContent=address.slice(0,6)+'…'+address.slice(-4);
+            $('buyQuote').disabled=false;$('returnQuote').disabled=false;
+            say('Wallet account updated. Request a fresh quote before continuing.');
+          }).catch(error=>{signer=null;say(error.message||'Could not refresh the wallet signer. Reconnect MetaMask.');});
+        });
+        rawProvider.on('chainChanged',chain=>{
+          provider=new ethers.BrowserProvider(rawProvider);
+          if(address)provider.getSigner(address).then(nextSigner=>{signer=nextSigner;})
+            .catch(error=>{signer=null;console.warn('Could not refresh signer after network change:',error);});
+          say('MetaMask network changed to '+chain+'. Your quote is preserved; continue to the required network when ready.');
+        });
       }
     }catch(error){say(error.shortMessage||error.message||String(error));}
     finally{$('connect').disabled=false;}
