@@ -163,17 +163,24 @@
     return Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:max||6}):String(value);
   }
   async function loadPrice(){
-    const openingRate='0.005';
-    $('rate').textContent=openingRate+' USDT / SOBY';
+    const cacheKey='sobya-auto-exchange-last-confirmed-price';
+    const validPrice=value=>typeof value==='string'&&/^\\d+(?:\\.\\d{1,18})?$/.test(value)&&Number.isFinite(Number(value))&&Number(value)>0;
+    let lastConfirmedPrice=null;
+    try{
+      const cached=localStorage.getItem(cacheKey);
+      if(validPrice(cached)) lastConfirmedPrice=cached;
+    }catch(error){console.warn('Could not read cached exchange price:',error);}
+    $('rate').textContent=(lastConfirmedPrice||'0.005')+' USDT / SOBY';
     try{
       const data=await apiRequest('/v1/price');
-      if(data&&typeof data.price==='string'&&Number.isFinite(Number(data.price))&&Number(data.price)>0){
+      if(data&&validPrice(data.price)){
         $('rate').textContent=data.price+' USDT / SOBY';
+        try{localStorage.setItem(cacheKey,data.price);}catch(error){console.warn('Could not cache confirmed exchange price:',error);}
       }else{
-        console.warn('Price endpoint returned no valid price; keeping opening rate.');
+        console.warn('Price endpoint returned no valid confirmed price; retaining the last known price.');
       }
     }catch(error){
-      console.warn('Price endpoint unavailable; keeping opening rate:',error);
+      console.warn('Price endpoint unavailable; retaining the last known price:',error);
     }
   }
   function quoteMarkup(q,direction){
