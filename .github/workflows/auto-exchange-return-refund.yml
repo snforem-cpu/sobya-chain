@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   refund:
@@ -26,6 +27,26 @@ jobs:
       - name: Install isolated exchange dependencies
         working-directory: auto-exchange
         run: npm install --no-audit --no-fund
+      - name: Request D1 identity before refund processing
+        id: d1-auth-before
+        env:
+          REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          TOKEN_JSON=$(curl -fsS -H "Authorization: bearer $REQUEST_TOKEN" "${REQUEST_URL}&audience=sobya-auto-exchange")
+          OIDC_TOKEN=$(echo "$TOKEN_JSON" | jq -r .value)
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
+          echo "::add-mask::$OIDC_TOKEN"
+          echo "token=$OIDC_TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Import D1 reservations before refund processing
+        working-directory: auto-exchange
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GITHUB_OIDC_TOKEN: ${{ steps.d1-auth-before.outputs.token }}
+          SOBYA_AUTO_EXCHANGE_API_URL: https://sobya-buy-api.snforem.workers.dev
+        run: node d1/sync-d1-quotes.js
       - name: Verify SOBY returns and execute eligible USDT refunds
         working-directory: auto-exchange
         env:
@@ -35,3 +56,23 @@ jobs:
           SOBYA_EVM_RPC_URL: https://sobya-evm-rpc.nodesafe-dapp.xyz
           SOBYA_PAYOUT_PRIVATE_KEY: ${{ secrets.SOBYA_PAYOUT_PRIVATE_KEY }}
         run: node return-worker.js
+      - name: Request fresh D1 identity after refund processing
+        id: d1-auth-after
+        env:
+          REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          TOKEN_JSON=$(curl -fsS -H "Authorization: bearer $REQUEST_TOKEN" "${REQUEST_URL}&audience=sobya-auto-exchange")
+          OIDC_TOKEN=$(echo "$TOKEN_JSON" | jq -r .value)
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
+          echo "::add-mask::$OIDC_TOKEN"
+          echo "token=$OIDC_TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Synchronize refund results to D1
+        working-directory: auto-exchange
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GITHUB_OIDC_TOKEN: ${{ steps.d1-auth-after.outputs.token }}
+          SOBYA_AUTO_EXCHANGE_API_URL: https://sobya-buy-api.snforem.workers.dev
+        run: node d1/sync-d1-quotes.js
