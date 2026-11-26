@@ -88,7 +88,7 @@
   const ETH_RPC='https://ethereum-rpc.publicnode.com';
   const SOBYA_RPC='https://sobya-evm-rpc.nodesafe-dapp.xyz';
   const $=id=>document.getElementById(id);
-  let rawProvider=null, provider=null, signer=null, address=null, evmClient=null, connectorPromise=null, boundProvider=null;
+  let rawProvider=null, provider=null, signer=null, address=null, evmClient=null, connectorPromise=null, boundProvider=null, connectedViaSdk=false;
   let activeQuotes={buy:null,return:null};
   const usdtAbi=['function transfer(address to,uint256 amount) returns(bool)'];
   const say=message=>$('status').textContent=message;
@@ -117,12 +117,14 @@
       rawProvider=injectedProviders.find(p=>p&&p.isMetaMask)||injected||null;
       let accounts=[];
       if(rawProvider&&typeof rawProvider.request==='function'){
+        connectedViaSdk=false;
         accounts=await rawProvider.request({method:'eth_requestAccounts',params:[]});
       }else{
         const client=await Promise.race([connectorPromise,new Promise(resolve=>setTimeout(()=>resolve(null),7000))]);
         if(!client)throw new Error('MetaMask connection is unavailable. Open this page in MetaMask and try again.');
         const session=await client.connect({chainIds:[SOBYA_HEX],forceRequest:true});
         rawProvider=client.getProvider();
+        connectedViaSdk=true;
         const sessionAccounts=session&&Array.isArray(session.accounts)?session.accounts:[];
         accounts=sessionAccounts.map(item=>typeof item==='string'?item:(item&&typeof item.address==='string'?item.address:null)).filter(Boolean);
         if(!accounts.length&&rawProvider)accounts=await rawProvider.request({method:'eth_accounts',params:[]});
@@ -189,19 +191,28 @@
   async function switchNetwork(chainId){
     if(!rawProvider)throw new Error('Connect MetaMask first.');
     const chainHex=hexChain(chainId);
+    say('Checking MetaMask network…');
     const current=await rawProvider.request({method:'eth_chainId'});
-    if(current.toLowerCase()===chainHex.toLowerCase())return;
-    try{await rawProvider.request({method:'wallet_switchEthereumChain',params:[{chainId:chainHex}]});}
-    catch(error){
-      if(error.code!==4902)throw error;
+    if(String(current).toLowerCase()!==chainHex.toLowerCase()){
+      say('Requesting MetaMask to switch to '+(chainId===ETH_CHAIN?'Ethereum Mainnet':'SOBYA Mainnet')+'…');
       const params=chainId===ETH_CHAIN?
         {chainId:ETH_HEX,chainName:'Ethereum Mainnet',nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:[ETH_RPC],blockExplorerUrls:['https://etherscan.io']}:
         {chainId:SOBYA_HEX,chainName:'SOBYA Mainnet',nativeCurrency:{name:'SOBY',symbol:'SOBY',decimals:18},rpcUrls:[SOBYA_RPC],blockExplorerUrls:['https://explorer.nodesafe-app.xyz/sobya']};
-      await rawProvider.request({method:'wallet_addEthereumChain',params:[params]});
+      if(connectedViaSdk&&evmClient&&typeof evmClient.switchChain==='function'){
+        await evmClient.switchChain({chainId:chainHex,chainConfiguration:params});
+      }else{
+        try{await rawProvider.request({method:'wallet_switchEthereumChain',params:[{chainId:chainHex}]});}
+        catch(error){
+          if(error.code!==4902)throw error;
+          await rawProvider.request({method:'wallet_addEthereumChain',params:[params]});
+        }
+      }
     }
     const after=await rawProvider.request({method:'eth_chainId'});
-    if(after.toLowerCase()!==chainHex.toLowerCase())throw new Error('Please switch MetaMask to the requested network to continue.');
-    provider=new ethers.BrowserProvider(rawProvider);signer=await provider.getSigner(address);
+    if(String(after).toLowerCase()!==chainHex.toLowerCase())throw new Error('MetaMask did not switch networks. Reopen this page inside the MetaMask browser and try again.');
+    provider=new ethers.BrowserProvider(rawProvider);
+    signer=await provider.getSigner(address);
+    say('MetaMask is connected to the correct network. Preparing the payment request…');
   }
   async function apiRequest(path,options){
     const response=await fetch(API+path,Object.assign({cache:'no-store'},options||{}));
@@ -271,6 +282,7 @@
     if(q.depositAddress.toLowerCase()!==INVENTORY.toLowerCase())throw new Error('The quoted recipient does not match the configured inventory address. Payment cancelled.');
     if(direction==='buy'){
       if(!q.tokenAddress||q.tokenAddress.toLowerCase()!==USDT.toLowerCase())throw new Error('The quote does not specify the verified Ethereum USDT contract. Payment cancelled.');
+      say('Sending the USDT payment request to MetaMask. Review the exact amount and recipient in the wallet; nothing is sent until you confirm.');
       const token=new ethers.Contract(USDT,usdtAbi,signer);
       const tx=await token.transfer(q.depositAddress,BigInt(q.paymentAmountAtomic));
       say('USDT transfer submitted in MetaMask: '+tx.hash+'. Waiting for the first confirmation…');
