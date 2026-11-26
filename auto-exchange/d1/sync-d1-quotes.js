@@ -26,6 +26,18 @@ const ledgerFile = await gh("/contents/auto-exchange/ledger.json?ref=main");
 const ledger = JSON.parse(Buffer.from(ledgerFile.content, "base64").toString("utf8"));
 if (!Array.isArray(ledger.quotes) || !Array.isArray(ledger.returnQuotes)) throw new Error("Invalid exchange ledger schema");
 const remote = await d1("/internal/open-quotes");
+const priceState = await d1("/v1/price");
+const validPrice = value => typeof value === "string" &&
+  /^\\d+(?:\\.\\d{1,18})?$/.test(value) && Number.isFinite(Number(value)) && Number(value) > 0;
+if (!priceState || !validPrice(priceState.price)) {
+  throw new Error("D1 did not return a valid confirmed exchange price; refusing to replace it with the opening price");
+}
+if (ledger.currentPriceUsdtPerSoby === undefined || ledger.currentPriceUsdtPerSoby === null) {
+  ledger.currentPriceUsdtPerSoby = priceState.price;
+}
+if (!validPrice(ledger.currentPriceUsdtPerSoby)) {
+  throw new Error("Settlement ledger contains an invalid current exchange price");
+}
 let changed = false;
 for (const quote of remote.quotes || []) {
   const collection = quote.chainId === 1 ? ledger.quotes : ledger.returnQuotes;
@@ -49,6 +61,6 @@ if (changed) {
   ledgerSha = saved.content.sha;
 }
 const sync = await d1("/internal/sync-ledger", { method: "POST",
-  body: JSON.stringify({ quotes: ledger.quotes, returnQuotes: ledger.returnQuotes, currentPriceUsdtPerSoby: ledger.currentPriceUsdtPerSoby || "0.005" }) });
+  body: JSON.stringify({ quotes: ledger.quotes, returnQuotes: ledger.returnQuotes, currentPriceUsdtPerSoby: ledger.currentPriceUsdtPerSoby }) });
 console.log("D1 quote bridge complete. Imported " + (changed ? "new" : "no new") +
   " reservations; synchronized " + sync.updated + " order states.");
