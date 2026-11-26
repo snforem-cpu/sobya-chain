@@ -96,7 +96,12 @@ for (const quote of ledger.returnQuotes) {
       sobyaProvider: sobya,
       getFeeData: () => ethereum.getFeeData(),
       getBalance: address => ethereum.getBalance(address),
-      getTransactionCount: (address, tag) => ethereum.getTransactionCount(address, tag)
+      getTransactionCount: (address, tag) => ethereum.getTransactionCount(address, tag),
+      getTransactionReceipt: hash => ethereum.getTransactionReceipt(hash),
+      getTransaction: hash => ethereum.getTransaction(hash),
+      broadcastTransaction: rawTransaction => ethereum.broadcastTransaction(rawTransaction),
+      waitForTransaction: (hash, confirmations) => ethereum.waitForTransaction(hash, confirmations),
+      getBlockNumber: () => ethereum.getBlockNumber()
     },
     usdt, signer, refundRecipient: getAddress(quote.sender),
     amount: BigInt(quote.payoutAmountAtomic), sobyaConfirmations: requiredConfirmations,
