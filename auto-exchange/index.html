@@ -107,67 +107,84 @@
   }
   connectorPromise=initConnector();
   async function connect(){
-    $('connect').disabled=true;say('Opening MetaMask connection…');
+    $('connect').disabled=true;
+    say('Connecting to MetaMask…');
     try{
-      let connected=false;
-      try{
+      // Prefer MetaMask's injected provider on mobile and desktop. The Connect SDK
+      // is only a fallback, so an SDK session shape cannot silently block the UI.
+      const injected=window.ethereum;
+      const injectedProviders=injected&&Array.isArray(injected.providers)?injected.providers:[];
+      rawProvider=injectedProviders.find(p=>p&&p.isMetaMask)||injected||null;
+      let accounts=[];
+      if(rawProvider&&typeof rawProvider.request==='function'){
+        accounts=await rawProvider.request({method:'eth_requestAccounts',params:[]});
+      }else{
         const client=await Promise.race([connectorPromise,new Promise(resolve=>setTimeout(()=>resolve(null),7000))]);
-        if(client){
+        if(!client)throw new Error('MetaMask connection is unavailable. Open this page in MetaMask and try again.');
         const session=await client.connect({chainIds:[SOBYA_HEX],forceRequest:true});
         rawProvider=client.getProvider();
-        if(rawProvider){window.__sobyaConnectAccounts=session&&Array.isArray(session.accounts)?session.accounts:[];connected=true;}
+        const sessionAccounts=session&&Array.isArray(session.accounts)?session.accounts:[];
+        accounts=sessionAccounts.map(item=>typeof item==='string'?item:(item&&typeof item.address==='string'?item.address:null)).filter(Boolean);
+        if(!accounts.length&&rawProvider)accounts=await rawProvider.request({method:'eth_accounts',params:[]});
       }
-      }catch(error){console.warn('MetaMask Connect fallback:',error);}
-      if(!connected){
-        rawProvider=window.ethereum||null;
-        if(!rawProvider)throw new Error('MetaMask was not found. Open this page in the MetaMask browser or install the MetaMask extension.');
-        window.__sobyaConnectAccounts=await rawProvider.request({method:'eth_requestAccounts',params:[]});
-      }
+      if(!rawProvider||!accounts||!accounts.length)throw new Error('MetaMask did not return an account. Unlock your wallet and reconnect.');
+      address=ethers.getAddress(typeof accounts[0]==='string'?accounts[0]:accounts[0].address);
       provider=new ethers.BrowserProvider(rawProvider);
-      const accounts=window.__sobyaConnectAccounts&&window.__sobyaConnectAccounts.length
-        ?window.__sobyaConnectAccounts:await rawProvider.request({method:'eth_accounts',params:[]});
-      window.__sobyaConnectAccounts=[];
-      if(!accounts||!accounts.length)throw new Error('Wallet connection was not approved.');
-      address=ethers.getAddress(accounts[0]);signer=await provider.getSigner(address);
+      signer=await provider.getSigner(address);
       $('walletTitle').textContent='Wallet connected';
       $('walletAddress').textContent=address;
       $('connect').textContent=address.slice(0,6)+'…'+address.slice(-4);
-      $('buyQuote').disabled=false;$('returnQuote').disabled=false;
-      say('Wallet connected. Choose Buy SOBY or Return SOBY to request a live quote.');
+      $('buyQuote').disabled=false;
+      $('returnQuote').disabled=false;
+      say('Wallet connected. Enter an amount and request a fresh quote.');
       if(rawProvider&&typeof rawProvider.on==='function'&&boundProvider!==rawProvider){
         boundProvider=rawProvider;
-        rawProvider.on('accountsChanged',accounts=>{
+        rawProvider.on('accountsChanged',async nextAccounts=>{
           activeQuotes={buy:null,return:null};
-          $('buyQuoteBox').classList.remove('visible');$('returnQuoteBox').classList.remove('visible');
-          if(!accounts||!accounts.length){
+          $('buyQuoteBox').classList.remove('visible');
+          $('returnQuoteBox').classList.remove('visible');
+          if(!nextAccounts||!nextAccounts.length){
             address=null;signer=null;provider=null;
             $('walletTitle').textContent='Wallet not connected';
             $('walletAddress').textContent='Reconnect MetaMask to request a quote.';
             $('connect').textContent='Connect MetaMask';
-            $('buyQuote').disabled=true;$('returnQuote').disabled=true;
+            $('buyQuote').disabled=true;
+            $('returnQuote').disabled=true;
             say('Wallet disconnected. Reconnect MetaMask to continue. No payment was sent.');
             return;
           }
-          address=ethers.getAddress(accounts[0]);
-          provider=new ethers.BrowserProvider(rawProvider);
-          provider.getSigner(address).then(nextSigner=>{
-            signer=nextSigner;
+          try{
+            address=ethers.getAddress(typeof nextAccounts[0]==='string'?nextAccounts[0]:nextAccounts[0].address);
+            provider=new ethers.BrowserProvider(rawProvider);
+            signer=await provider.getSigner(address);
             $('walletTitle').textContent='Wallet connected';
             $('walletAddress').textContent=address;
             $('connect').textContent=address.slice(0,6)+'…'+address.slice(-4);
-            $('buyQuote').disabled=false;$('returnQuote').disabled=false;
+            $('buyQuote').disabled=false;
+            $('returnQuote').disabled=false;
             say('Wallet account updated. Request a fresh quote before continuing.');
-          }).catch(error=>{signer=null;say(error.message||'Could not refresh the wallet signer. Reconnect MetaMask.');});
+          }catch(error){
+            signer=null;
+            $('buyQuote').disabled=true;
+            $('returnQuote').disabled=true;
+            say(error.message||'Could not refresh the wallet account. Reconnect MetaMask.');
+          }
         });
         rawProvider.on('chainChanged',chain=>{
           provider=new ethers.BrowserProvider(rawProvider);
           if(address)provider.getSigner(address).then(nextSigner=>{signer=nextSigner;})
             .catch(error=>{signer=null;console.warn('Could not refresh signer after network change:',error);});
-          say('MetaMask network changed to '+chain+'. Your quote is preserved; continue to the required network when ready.');
+          say('MetaMask network changed to '+chain+'. Request a fresh quote if the current quote no longer matches your network.');
         });
       }
-    }catch(error){say(error.shortMessage||error.message||String(error));}
-    finally{$('connect').disabled=false;}
+    }catch(error){
+      console.error('SOBYA wallet connection failed:',error);
+      say(error.shortMessage||error.message||String(error));
+      $('buyQuote').disabled=true;
+      $('returnQuote').disabled=true;
+    }finally{
+      $('connect').disabled=false;
+    }
   }
   async function switchNetwork(chainId){
     if(!rawProvider)throw new Error('Connect MetaMask first.');
