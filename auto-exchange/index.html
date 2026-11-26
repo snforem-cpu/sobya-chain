@@ -163,8 +163,18 @@
     return Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:max||6}):String(value);
   }
   async function loadPrice(){
-    try{const data=await apiRequest('/v1/price');$('rate').textContent=data.price+' USDT / SOBY';}
-    catch(error){$('rate').textContent='Unavailable';console.warn('Price endpoint unavailable:',error);}
+    const openingRate='0.005';
+    $('rate').textContent=openingRate+' USDT / SOBY';
+    try{
+      const data=await apiRequest('/v1/price');
+      if(data&&typeof data.price==='string'&&Number.isFinite(Number(data.price))&&Number(data.price)>0){
+        $('rate').textContent=data.price+' USDT / SOBY';
+      }else{
+        console.warn('Price endpoint returned no valid price; keeping opening rate.');
+      }
+    }catch(error){
+      console.warn('Price endpoint unavailable; keeping opening rate:',error);
+    }
   }
   function quoteMarkup(q,direction){
     const inputLabel=direction==='buy'?'Exact USDT payment':'Exact SOBY return';
