@@ -38,11 +38,49 @@ function setLanguage(lang) {
   $("file-hash").textContent = state.hash || (lang === "ar" ? "لم تُحسب بعد" : "Not calculated yet");
   $("file-name").textContent = state.file?.name || (lang === "ar" ? "تتم معالجة الملف محلياً ولا يتم رفعه." : "The file is processed locally and is never uploaded.");
 }
-function requireWallet() {
-  if (!window.ethereum || typeof window.ethereum.request !== "function") {
-    throw new Error("No EVM wallet was detected. Open this page in a browser with MetaMask installed.");
+let evmClient = null;
+let connectorPromise = null;
+let boundProvider = null;
+
+async function initWalletConnector() {
+  try {
+    const mod = await import("https://esm.sh/@metamask/connect-evm@2.1.1?bundle");
+    evmClient = await mod.createEVMClient({
+      dapp: {
+        name: "SOBYA Proof",
+        url: window.location.href,
+        iconUrl: new URL("../assets/logo/sobya-coin-128.png", window.location.href).href
+      },
+      api: { supportedNetworks: { [CHAIN_HEX]: RPCS[0] } },
+      analytics: { enabled: false }
+    });
+    return evmClient;
+  } catch (error) {
+    console.warn("MetaMask Connect unavailable; injected wallet connection remains available.", error);
+    return null;
   }
-  return window.ethereum;
+}
+connectorPromise = initWalletConnector();
+
+function findInjectedProvider() {
+  const injected = window.ethereum;
+  const providers = injected && Array.isArray(injected.providers) ? injected.providers : [];
+  return providers.find(provider => provider && provider.isMetaMask) || injected || null;
+}
+
+function bindWalletEvents(provider) {
+  if (!provider || typeof provider.on !== "function" || boundProvider === provider) return;
+  boundProvider = provider;
+  provider.on("accountsChanged", accounts => {
+    state.account = accounts?.[0] || null;
+    setWallet(state.account ? `Connected: ${state.account}` : "Wallet disconnected. Reconnect to continue.");
+    $("record-button").disabled = !state.hash || !state.account;
+  });
+  provider.on("chainChanged", () => {
+    state.account = null;
+    $("record-button").disabled = true;
+    setWallet("Network changed. Reconnect to SOBYA Mainnet.");
+  });
 }
 async function ensureSobyaNetwork(provider) {
   const current = await provider.request({ method: "eth_chainId" });
@@ -65,12 +103,40 @@ async function ensureSobyaNetwork(provider) {
   }
 }
 async function connectWallet() {
-  const provider = requireWallet();
-  const accounts = await provider.request({ method: "eth_requestAccounts" });
-  if (!accounts?.[0]) throw new Error("The wallet did not return an account.");
-  await ensureSobyaNetwork(provider);
+  let provider = findInjectedProvider();
+  let accounts = [];
+
+  // Match SOBYA Auto Exchange: use the injected MetaMask provider first.
+  if (provider && typeof provider.request === "function") {
+    accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
+  } else {
+    const client = await Promise.race([
+      connectorPromise,
+      new Promise(resolve => setTimeout(() => resolve(null), 7000))
+    ]);
+    if (!client) {
+      throw new Error("MetaMask connection is unavailable. Open MetaMask or use its in-app browser, then try again.");
+    }
+    const session = await client.connect({ chainIds: [CHAIN_HEX], forceRequest: true });
+    provider = client.getProvider();
+    const sessionAccounts = session && Array.isArray(session.accounts) ? session.accounts : [];
+    accounts = sessionAccounts
+      .map(item => typeof item === "string" ? item : (item && typeof item.address === "string" ? item.address : null))
+      .filter(Boolean);
+    if (!accounts.length && provider) {
+      accounts = await provider.request({ method: "eth_accounts", params: [] });
+    }
+  }
+
+  if (!provider || !accounts?.[0]) {
+    throw new Error("MetaMask did not return an account. Unlock your wallet and approve the connection.");
+  }
+
   state.wallet = provider;
-  state.account = accounts[0];
+  await ensureSobyaNetwork(provider);
+  const currentAccounts = await provider.request({ method: "eth_accounts", params: [] });
+  state.account = currentAccounts?.[0] || accounts[0];
+  bindWalletEvents(provider);
   setWallet(`Connected: ${state.account}`);
   $("record-button").disabled = !state.hash;
 }
@@ -171,9 +237,23 @@ async function verifyProof() {
 $("file").addEventListener("change", async () => {
   state.file = $("file").files?.[0] || null;
   state.hash = null;
-  $("file-name").textContent = state.file?.name || (state.lang === "ar" ? "لم يتم اختيار ملف." : "No file selected.");
-  $("file-hash").textContent = state.lang === "ar" ? "لم تُحسب بعد" : "Not calculated yet";
   $("record-button").disabled = true;
+  if (!state.file) {
+    $("file-name").textContent = state.lang === "ar" ? "لم يتم اختيار ملف." : "No file selected.";
+    $("file-hash").textContent = state.lang === "ar" ? "لم تُحسب بعد" : "Not calculated yet";
+    return;
+  }
+  $("file-name").textContent = state.file.name;
+  $("file-hash").textContent = state.lang === "ar" ? "جارٍ حساب البصمة محلياً…" : "Calculating locally…";
+  try {
+    await calculateSelectedFile();
+    setWallet(state.lang === "ar"
+      ? "تم اختيار الملف وحساب بصمته على جهازك. لم يتم رفع الملف."
+      : "File selected and fingerprint calculated on your device. The file was not uploaded.");
+  } catch (error) {
+    $("file-hash").textContent = state.lang === "ar" ? "تعذر حساب البصمة" : "Fingerprint calculation failed";
+    setWallet(error.message);
+  }
 });
 $("hash-button").addEventListener("click", async () => {
   const button = $("hash-button");
@@ -204,11 +284,4 @@ $("verify-button").addEventListener("click", async () => {
   finally { setBusy(button, false); }
 });
 $("language").addEventListener("click", () => setLanguage(state.lang === "en" ? "ar" : "en"));
-if (window.ethereum) {
-  window.ethereum.on?.("accountsChanged", accounts => {
-    state.account = accounts?.[0] || null;
-    setWallet(state.account ? `Connected: ${state.account}` : "Wallet disconnected.");
-    $("record-button").disabled = !state.hash || !state.account;
-  });
-  window.ethereum.on?.("chainChanged", () => { state.account = null; $("record-button").disabled = true; setWallet("Network changed. Reconnect to SOBYA Mainnet."); });
-}
+bindWalletEvents(findInjectedProvider());
