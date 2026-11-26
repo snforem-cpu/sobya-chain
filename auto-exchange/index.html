@@ -170,7 +170,7 @@
       const cached=localStorage.getItem(cacheKey);
       if(validPrice(cached)) lastConfirmedPrice=cached;
     }catch(error){console.warn('Could not read cached exchange price:',error);}
-    $('rate').textContent=(lastConfirmedPrice||'0.005')+' USDT / SOBY';
+    $('rate').textContent=lastConfirmedPrice ? lastConfirmedPrice+' USDT / SOBY' : 'Last confirmed price unavailable';
     try{
       const data=await apiRequest('/v1/price');
       if(data&&validPrice(data.price)){
