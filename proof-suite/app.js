@@ -1,7 +1,9 @@
-import { encodeProofPayload, decodeProofPayload, isTransactionHash, isSuccessfulSelfRecord } from "./proof-core.js";
+import { encodeProofPayload, decodeProofPayload, isTransactionHash, isPaidProofRecord } from "./proof-core.js";
 
 const CHAIN_ID = 357812033857n;
 const CHAIN_HEX = "0x534f425941";
+const SERVICE_WALLET = "0xd316993423Fc6268038F4EE3EA7C0C5038513C18";
+const SERVICE_FEE_WEI = 1000000000000000000n;
 const RPCS = [
   "https://sobya-evm-rpc.nodesafe-dapp.xyz",
   "https://sobya-evm-rpc.nodesafe-app.xyz"
@@ -184,8 +186,8 @@ async function recordProof() {
   // on RPC providers that do not reliably estimate data-bearing self-transfers.
   const txRequest = {
     from: state.account,
-    to: state.account,
-    value: "0x0",
+    to: SERVICE_WALLET,
+    value: "0x" + SERVICE_FEE_WEI.toString(16),
     data
   };
   let estimatedGas;
@@ -210,9 +212,9 @@ async function recordProof() {
   });
   $("tx-hash").value = txHash;
   const result = $("verify-result");
-  message(result, `Transaction submitted. Wait for confirmation, then verify it here. Transaction: ${txHash}`);
+  message(result, `1 SOBY service fee submitted to ${SERVICE_WALLET}. Wait for confirmation, then verify your paid proof here. Transaction: ${txHash}`);
   result.classList.add("success");
-  setWallet(`Proof transaction submitted: ${txHash}`);
+  setWallet(`Proof submitted with 1 SOBY service fee: ${txHash}`);
 }
 async function verifyProof() {
   const txHash = $("tx-hash").value.trim();
@@ -227,8 +229,8 @@ async function verifyProof() {
   if (!receipt) throw new Error("The transaction has not been confirmed yet.");
   if (receipt.status !== "0x1") throw new Error("The transaction failed on-chain.");
   const decoded = decodeProofPayload(tx.input || tx.data);
-  if (!decoded || !isSuccessfulSelfRecord(tx, receipt, CHAIN_ID)) {
-    throw new Error("This transaction is not a valid SOBYA Proof document record.");
+  if (!decoded || !isPaidProofRecord(tx, receipt, CHAIN_ID, SERVICE_WALLET, SERVICE_FEE_WEI)) {
+    throw new Error("This transaction is not a valid paid SOBYA Proof record. It must send exactly 1 SOBY to the official Proof service wallet.");
   }
   const block = await rpc("eth_getBlockByNumber", [receipt.blockNumber, false]);
   const timestamp = block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toLocaleString(state.lang === "ar" ? "ar" : "en") : "Confirmed";
