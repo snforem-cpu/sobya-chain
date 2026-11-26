@@ -203,7 +203,7 @@ export default {
             !allowedStatuses.has(q.status)) continue;
         statements.push(env.DB.prepare("UPDATE exchange_quotes SET status=?1,payment_tx_hash=?2,settlement_tx_hash=?3,last_error=?4,updated_at=?5 WHERE order_id=?6 AND direction=?7")
           .bind(q.status, q.depositTxHash || q.returnTxHash || null, q.payoutTxHash || q.refundTxHash || null,
-            q.payoutReviewReason || q.refundWaitReason || q.payoutWaitReason || null,
+            q.payoutReviewReason || q.refundReviewReason || q.refundWaitReason || q.payoutWaitReason || null,
             new Date().toISOString(), q.orderId, q.direction));
       }
       if (body.currentPriceUsdtPerSoby !== undefined) {
