@@ -164,7 +164,7 @@
   }
   async function loadPrice(){
     const cacheKey='sobya-auto-exchange-last-confirmed-price';
-    const validPrice=value=>typeof value==='string'&&/^\\d+(?:\\.\\d{1,18})?$/.test(value)&&Number.isFinite(Number(value))&&Number(value)>0;
+    const validPrice=value=>typeof value==='string'&&/^\d+(?:\.\d{1,18})?$/.test(value)&&Number.isFinite(Number(value))&&Number(value)>0;
     let lastConfirmedPrice=null;
     try{
       const cached=localStorage.getItem(cacheKey);
