@@ -323,3 +323,27 @@ $("verify-button").addEventListener("click", async () => {
 });
 $("language").addEventListener("click", () => setLanguage(state.lang === "en" ? "ar" : "en"));
 bindWalletEvents(findInjectedProvider());
+
+// Restore an already-approved wallet session after MetaMask's mobile app handoff
+// or a browser reload. This is read-only: eth_accounts never opens an approval prompt.
+async function restoreWalletSession() {
+  try {
+    let provider = findInjectedProvider();
+    if (!provider) {
+      const client = await connectorPromise;
+      provider = client && typeof client.getProvider === "function" ? client.getProvider() : null;
+      connectedViaSdk = Boolean(provider);
+    }
+    if (!provider || typeof provider.request !== "function") return;
+    const accounts = await provider.request({ method: "eth_accounts", params: [] });
+    if (!accounts || !accounts.length) return;
+    state.wallet = provider;
+    state.account = accounts[0];
+    bindWalletEvents(provider);
+    setWallet(`Connected: ${state.account}`);
+    $("record-button").disabled = !state.hash;
+  } catch (error) {
+    console.warn("Could not restore the existing MetaMask session:", error);
+  }
+}
+restoreWalletSession();
