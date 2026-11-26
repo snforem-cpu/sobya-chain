@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeProofPayload, decodeProofPayload, isTransactionHash, isSuccessfulSelfRecord } from "../proof-core.js";
+import { encodeProofPayload, decodeProofPayload, isTransactionHash, isPaidProofRecord } from "../proof-core.js";
 
 const sampleHash = "0x" + "ab".repeat(32);
 const account = "0x" + "12".repeat(20);
@@ -24,11 +24,19 @@ test("recognizes transaction hashes only in 32-byte hex form", () => {
   assert.equal(isTransactionHash("0x1234"), false);
 });
 
-test("accepts only successful self-transactions carrying a valid proof payload", () => {
-  const tx = { from: account, to: account, input: encodeProofPayload(sampleHash), chainId: "0x534f425941" };
+test("accepts only successful 1 SOBY payments to the service wallet carrying a proof payload", () => {
+  const serviceWallet = "0xd316993423Fc6268038F4EE3EA7C0C5038513C18";
+  const fee = 1000000000000000000n;
+  const tx = {
+    from: account, to: serviceWallet, value: "0xde0b6b3a7640000",
+    input: encodeProofPayload(sampleHash), chainId: "0x534f425941"
+  };
   const receipt = { status: "0x1" };
-  assert.equal(isSuccessfulSelfRecord(tx, receipt, 357812033857n), true);
-  assert.equal(isSuccessfulSelfRecord({ ...tx, to: "0x" + "34".repeat(20) }, receipt, 357812033857n), false);
-  assert.equal(isSuccessfulSelfRecord(tx, { status: "0x0" }, 357812033857n), false);
-  assert.equal(isSuccessfulSelfRecord({ ...tx, chainId: "0x1" }, receipt, 357812033857n), false);
+  assert.equal(isPaidProofRecord(tx, receipt, 357812033857n, serviceWallet, fee), true);
+  assert.equal(isPaidProofRecord({ ...tx, value: "0x0" }, receipt, 357812033857n, serviceWallet, fee), false);
+  assert.equal(isPaidProofRecord({ ...tx, value: "0x1" }, receipt, 357812033857n, serviceWallet, fee), false);
+  assert.equal(isPaidProofRecord({ ...tx, to: account }, receipt, 357812033857n, serviceWallet, fee), false);
+  assert.equal(isPaidProofRecord({ ...tx, to: "0x" + "34".repeat(20) }, receipt, 357812033857n, serviceWallet, fee), false);
+  assert.equal(isPaidProofRecord(tx, { status: "0x0" }, 357812033857n, serviceWallet, fee), false);
+  assert.equal(isPaidProofRecord({ ...tx, chainId: "0x1" }, receipt, 357812033857n, serviceWallet, fee), false);
 });

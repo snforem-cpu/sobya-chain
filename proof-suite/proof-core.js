@@ -39,10 +39,16 @@ export function isTransactionHash(value) {
   return typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value);
 }
 
-export function isSuccessfulSelfRecord(tx, receipt, expectedChainId) {
+export function isPaidProofRecord(tx, receipt, expectedChainId, serviceWallet, serviceFeeWei) {
   if (!tx || !receipt || receipt.status !== "0x1") return false;
   if (!/^0x[0-9a-fA-F]{40}$/.test(tx.from || "") || !/^0x[0-9a-fA-F]{40}$/.test(tx.to || "")) return false;
-  if (tx.from.toLowerCase() !== tx.to.toLowerCase()) return false;
-  if (tx.chainId && BigInt(tx.chainId) !== BigInt(expectedChainId)) return false;
+  if (typeof serviceWallet !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(serviceWallet)) return false;
+  if (tx.to.toLowerCase() !== serviceWallet.toLowerCase()) return false;
+  try {
+    if (BigInt(tx.value || "0x0") !== BigInt(serviceFeeWei)) return false;
+    if (tx.chainId && BigInt(tx.chainId) !== BigInt(expectedChainId)) return false;
+  } catch {
+    return false;
+  }
   return decodeProofPayload(tx.input || tx.data) !== null;
 }
