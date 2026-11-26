@@ -43,6 +43,7 @@ function setLanguage(lang) {
 let evmClient = null;
 let connectorPromise = null;
 let boundProvider = null;
+let connectedViaSdk = false;
 
 async function initWalletConnector() {
   try {
@@ -87,21 +88,27 @@ function bindWalletEvents(provider) {
 async function ensureSobyaNetwork(provider) {
   const current = await provider.request({ method: "eth_chainId" });
   if (BigInt(current) === CHAIN_ID) return;
-  try {
-    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
-  } catch (error) {
-    if (error.code !== 4902) throw error;
-    await provider.request({
-      method: "wallet_addEthereumChain",
-      params: [{
-        chainId: CHAIN_HEX,
-        chainName: "SOBYA Mainnet",
-        nativeCurrency: { name: "SOBY", symbol: "SOBY", decimals: 18 },
-        rpcUrls: RPCS,
-        blockExplorerUrls: ["https://explorer.nodesafe-app.xyz/sobya"]
-      }]
-    });
-    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
+  const chainConfiguration = {
+    chainId: CHAIN_HEX,
+    chainName: "SOBYA Mainnet",
+    nativeCurrency: { name: "SOBY", symbol: "SOBY", decimals: 18 },
+    rpcUrls: RPCS,
+    blockExplorerUrls: ["https://explorer.nodesafe-app.xyz/sobya"]
+  };
+  if (connectedViaSdk && evmClient && typeof evmClient.switchChain === "function") {
+    await evmClient.switchChain({ chainId: CHAIN_HEX, chainConfiguration });
+  } else {
+    try {
+      await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
+    } catch (error) {
+      if (error.code !== 4902) throw error;
+      await provider.request({ method: "wallet_addEthereumChain", params: [chainConfiguration] });
+      await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
+    }
+  }
+  const verifiedChain = await provider.request({ method: "eth_chainId" });
+  if (BigInt(verifiedChain) !== CHAIN_ID) {
+    throw new Error("MetaMask did not switch to SOBYA Mainnet. Reconnect the wallet and try again.");
   }
 }
 async function connectWallet() {
@@ -110,6 +117,7 @@ async function connectWallet() {
 
   // Match SOBYA Auto Exchange: use the injected MetaMask provider first.
   if (provider && typeof provider.request === "function") {
+    connectedViaSdk = false;
     accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
   } else {
     const client = await Promise.race([
@@ -121,6 +129,7 @@ async function connectWallet() {
     }
     const session = await client.connect({ chainIds: [CHAIN_HEX], forceRequest: true });
     provider = client.getProvider();
+    connectedViaSdk = true;
     const sessionAccounts = session && Array.isArray(session.accounts) ? session.accounts : [];
     accounts = sessionAccounts
       .map(item => typeof item === "string" ? item : (item && typeof item.address === "string" ? item.address : null))
@@ -178,7 +187,9 @@ async function calculateSelectedFile(inputId = "file") {
 }
 async function recordProof() {
   if (!state.hash) throw new Error("Calculate the file fingerprint first.");
-  if (!state.wallet || !state.account) await connectWallet();
+  if (!state.wallet || !state.account) {
+    throw new Error("Connect MetaMask first. Once the wallet is connected and its address appears here, press Register on SOBYA again to request the payment approval.");
+  }
   await ensureSobyaNetwork(state.wallet);
   const data = encodeProofPayload(state.hash);
   // Estimate the exact self-record transaction before opening MetaMask.
