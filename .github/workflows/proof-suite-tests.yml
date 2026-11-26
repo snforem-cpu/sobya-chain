@@ -26,3 +26,52 @@ jobs:
         run: node --check proof-suite/app.js && node --check proof-suite/proof-core.js
       - name: Run proof payload tests
         run: node --test proof-suite/tests/*.test.mjs
+
+  sobya-rpc-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check SOBYA EVM RPC endpoints
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoints = [
+            "https://sobya-evm-rpc.nodesafe-dapp.xyz",
+            "https://sobya-evm-rpc.nodesafe-app.xyz"
+          ];
+          const expectedChainId = "0x534f425941";
+          for (const url of endpoints) {
+            const response = await fetch(url, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 1,
+                method: "eth_chainId",
+                params: []
+              }),
+              signal: AbortSignal.timeout(15000)
+            });
+            if (!response.ok) throw new Error(url + " returned HTTP " + response.status);
+            const body = await response.json();
+            if (body.error) throw new Error(url + " RPC error: " + body.error.message);
+            if (String(body.result).toLowerCase() !== expectedChainId.toLowerCase()) {
+              throw new Error(url + " returned unexpected chain ID: " + body.result);
+            }
+            const blockResponse = await fetch(url, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 2,
+                method: "eth_blockNumber",
+                params: []
+              }),
+              signal: AbortSignal.timeout(15000)
+            });
+            if (!blockResponse.ok) throw new Error(url + " block query returned HTTP " + blockResponse.status);
+            const blockBody = await blockResponse.json();
+            if (blockBody.error || !/^0x[0-9a-f]+$/i.test(blockBody.result || "")) {
+              throw new Error(url + " did not return a valid block height");
+            }
+            console.log(url + " OK — chainId " + body.result + ", block " + BigInt(blockBody.result));
+          }
+          NODE
