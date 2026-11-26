@@ -4,117 +4,251 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="Exchange SOBY and USDT through SOBYA Auto Exchange.">
+  <meta name="description" content="Buy SOBY with USDT or return SOBY through SOBYA Auto Exchange.">
   <title>SOBYA Auto Exchange</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
   <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #071426;
-      color: #f4f7ff;
-      font-synthesis: none;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; padding: 28px 18px;
-      display: grid; place-items: center;
-      background: radial-gradient(ellipse at 50% -15%, #173b66 0, #0a1d35 42%, #071426 78%);
-    }
-    main { width: min(920px, 100%); }
-    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 54px; }
-    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .16em; }
-    .mark {
-      width: 38px; height: 38px; border: 1px solid #5279a8; border-radius: 12px;
-      display: grid; place-items: center; color: #9cc8ff;
-      background: linear-gradient(145deg, #183c68, #101e39); font-size: 19px;
-      box-shadow: 0 8px 24px #0004;
-    }
-    .network { color: #a9bad2; font-size: .82rem; border: 1px solid #29415f; border-radius: 99px; padding: 8px 12px; }
-    .hero { text-align: center; margin: 0 auto 34px; }
-    .eyebrow { color: #8ebaff; text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; font-weight: 750; }
-    h1 { font-size: clamp(2.2rem, 7vw, 3.8rem); letter-spacing: -.055em; line-height: 1.05; margin: 14px 0; }
-    .subtitle { color: #aebed4; font-size: 1.04rem; line-height: 1.6; margin: 0; }
-    .ratebar {
-      display: flex; flex-wrap: wrap; justify-content: center; gap: 0;
-      margin: 30px auto 42px; width: fit-content; max-width: 100%;
-      border: 1px solid #29415f; border-radius: 14px; background: #0c2039;
-    }
-    .rate { padding: 14px 24px; text-align: center; }
-    .rate + .rate { border-left: 1px solid #29415f; }
-    .rate span { display: block; color: #91a8c5; font-size: .75rem; margin-bottom: 5px; }
-    .rate strong { font-size: .98rem; }
-    .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-    .choice {
-      padding: 26px; border: 1px solid #294665; border-radius: 20px;
-      background: linear-gradient(145deg, #102944, #0b1c32);
-      box-shadow: 0 18px 48px #0003;
-    }
-    .pair { color: #8fbaff; font-size: .78rem; font-weight: 750; letter-spacing: .12em; }
-    .choice h2 { font-size: 1.45rem; letter-spacing: -.025em; margin: 13px 0 8px; }
-    .choice p { color: #aebed4; line-height: 1.6; min-height: 52px; margin: 0 0 24px; font-size: .94rem; }
-    .action {
-      display: flex; justify-content: center; align-items: center; min-height: 48px;
-      padding: 12px 16px; border-radius: 11px; background: #8fc0ff; color: #071426;
-      font-weight: 800; text-decoration: none; transition: background .15s ease, transform .15s ease;
-    }
-    .action:hover { background: #b4d6ff; transform: translateY(-1px); }
-    .safety {
-      display: flex; gap: 12px; align-items: flex-start; margin: 22px 0 0;
-      padding: 16px 18px; border: 1px solid #344a62; border-radius: 13px;
-      color: #c2d0e2; background: #0b1a2d; font-size: .88rem; line-height: 1.55;
-    }
-    .safety b { color: #f0f5ff; }
-    footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 28px; color: #8298b5; font-size: .78rem; }
-    @media (max-width: 620px) {
-      body { padding: 22px 15px; }
-      header { margin-bottom: 42px; }
-      .choices { grid-template-columns: 1fr; }
-      .choice p { min-height: 0; }
-      .rate { padding: 12px 16px; }
-      .network { font-size: .72rem; }
-    }
-    @media (max-width: 390px) { .network { display: none; } .ratebar { width: 100%; } .rate { flex: 1 1 40%; } .rate + .rate { border-left: 0; } }
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#071426;color:#f4f7ff;font-synthesis:none}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;padding:25px 16px;background:radial-gradient(ellipse at 50% -15%,#173b66 0,#0a1d35 42%,#071426 78%)}
+    main{width:min(760px,100%);margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 40px}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:850;letter-spacing:.16em}.mark{width:38px;height:38px;border:1px solid #5279a8;border-radius:12px;display:grid;place-items:center;color:#9cc8ff;background:linear-gradient(145deg,#183c68,#101e39);font-size:19px}
+    .network{color:#a9bad2;font-size:.78rem;border:1px solid #29415f;border-radius:99px;padding:8px 11px}
+    .hero{text-align:center;margin:0 auto 28px}.eyebrow{color:#8ebaff;text-transform:uppercase;letter-spacing:.2em;font-size:.7rem;font-weight:750}
+    h1{font-size:clamp(2.15rem,7vw,3.4rem);letter-spacing:-.055em;line-height:1.05;margin:13px 0}.subtitle{color:#aebed4;font-size:1rem;line-height:1.6;margin:0}
+    .ratebar{display:flex;flex-wrap:wrap;justify-content:center;margin:25px auto 30px;width:fit-content;max-width:100%;border:1px solid #29415f;border-radius:14px;background:#0c2039}
+    .rate{padding:12px 20px;text-align:center}.rate+.rate{border-left:1px solid #29415f}.rate span{display:block;color:#91a8c5;font-size:.72rem;margin-bottom:4px}.rate strong{font-size:.94rem}
+    .walletbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:14px 16px;border:1px solid #294665;border-radius:15px;background:#0b1e34}
+    .walletinfo{min-width:0}.walletinfo strong{display:block;font-size:.9rem}.walletinfo span{display:block;color:#9fb2cb;font-size:.75rem;overflow-wrap:anywhere;margin-top:3px}
+    button,input{font:inherit}.btn{min-height:45px;border:1px solid #355779;border-radius:11px;padding:10px 15px;background:#142b46;color:#f4f7ff;font-weight:750;cursor:pointer}
+    .btn.primary{border:0;background:#8fc0ff;color:#071426}.btn:disabled{opacity:.45;cursor:not-allowed}
+    .choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.choice{padding:22px;border:1px solid #294665;border-radius:18px;background:linear-gradient(145deg,#102944,#0b1c32);box-shadow:0 18px 48px #0003}
+    .pair{color:#8fbaff;font-size:.75rem;font-weight:750;letter-spacing:.12em}.choice h2{font-size:1.35rem;margin:10px 0 6px}.choice p{color:#aebed4;line-height:1.55;min-height:48px;margin:0 0 18px;font-size:.9rem}
+    .field{display:block;margin:0 0 13px}.field span{display:block;color:#aebed4;font-size:.78rem;margin-bottom:7px}.field input{width:100%;height:46px;padding:10px 12px;border:1px solid #35516f;border-radius:10px;background:#07182b;color:#fff;outline:none}.field input:focus{border-color:#8fc0ff}
+    .choice .btn{width:100%}.quote{display:none;margin-top:14px;padding:13px;border:1px solid #355779;border-radius:12px;background:#081a2d;font-size:.82rem;line-height:1.6}.quote.visible{display:block}.quote strong{color:#fff}.quote .muted{color:#9fb2cb}.quote .btn{margin-top:12px}
+    .status{margin:17px 0 0;padding:13px 15px;border:1px solid #344a62;border-radius:12px;color:#c2d0e2;background:#0b1a2d;font-size:.84rem;line-height:1.55;overflow-wrap:anywhere}
+    .safety{margin:14px 0 0;color:#aebed4;font-size:.78rem;line-height:1.55;text-align:center}
+    footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin-top:25px;color:#8298b5;font-size:.75rem}
+    @media(max-width:620px){body{padding:20px 13px}.choices{grid-template-columns:1fr}.choice p{min-height:0}header{margin-bottom:32px}.rate{padding:11px 13px}.walletbar{align-items:flex-start}.network{font-size:.68rem}}
+    @media(max-width:390px){.network{display:none}.ratebar{width:100%}.rate{flex:1 1 40%}.rate+.rate{border-left:0}}
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <div class="brand"><span class="mark" aria-hidden="true">◇</span><span>SOBYA</span></div>
-      <div class="network">Ethereum · SOBYA Network</div>
-    </header>
+<main>
+  <header>
+    <div class="brand"><span class="mark" aria-hidden="true">◇</span><span>SOBYA</span></div>
+    <div class="network">Ethereum · SOBYA Network</div>
+  </header>
+  <section class="hero">
+    <div class="eyebrow">Auto Exchange</div>
+    <h1>Exchange with SOBYA</h1>
+    <p class="subtitle">Connect your wallet. Choose an amount. Confirm the transfer securely in MetaMask.</p>
+    <div class="ratebar" aria-label="Exchange terms">
+      <div class="rate"><span>Current rate</span><strong id="rate">Loading…</strong></div>
+      <div class="rate"><span>Exchange fee</span><strong>1%</strong></div>
+      <div class="rate"><span>Quote validity</span><strong>10 minutes</strong></div>
+    </div>
+  </section>
 
-    <section class="hero">
-      <div class="eyebrow">Auto Exchange</div>
-      <h1>Exchange with SOBYA</h1>
-      <p class="subtitle">A simple way to buy or return SOBY.</p>
-      <div class="ratebar" aria-label="Exchange terms">
-        <div class="rate"><span>Opening rate</span><strong>0.005 USDT / SOBY</strong></div>
-        <div class="rate"><span>Exchange fee</span><strong>1%</strong></div>
-        <div class="rate"><span>Quote validity</span><strong>10 minutes</strong></div>
-      </div>
-    </section>
+  <section class="walletbar">
+    <div class="walletinfo"><strong id="walletTitle">Wallet not connected</strong><span id="walletAddress">Connect MetaMask to request a quote.</span></div>
+    <button class="btn primary" id="connect">Connect MetaMask</button>
+  </section>
 
-    <section class="choices" aria-label="Choose exchange direction">
-      <article class="choice">
-        <div class="pair">USDT <span aria-hidden="true">→</span> SOBY</div>
-        <h2>Buy SOBY</h2>
-        <p>Pay with USDT on Ethereum and receive SOBY on the SOBYA network.</p>
-        <a class="action" href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-quote.yml">Buy SOBY <span aria-hidden="true">&nbsp;→</span></a>
-      </article>
-      <article class="choice">
-        <div class="pair">SOBY <span aria-hidden="true">→</span> USDT</div>
-        <h2>Return SOBY</h2>
-        <p>Send SOBY from the SOBYA network and receive USDT on Ethereum.</p>
-        <a class="action" href="https://github.com/snforem-cpu/sobya-chain/issues/new?template=auto-exchange-return.yml">Return SOBY <span aria-hidden="true">&nbsp;→</span></a>
-      </article>
-    </section>
+  <section class="choices" aria-label="Choose exchange direction">
+    <article class="choice">
+      <div class="pair">USDT <span aria-hidden="true">→</span> SOBY</div>
+      <h2>Buy SOBY</h2>
+      <p>Pay USDT on Ethereum and receive SOBY in your connected wallet.</p>
+      <label class="field"><span>Amount of USDT</span><input id="buyAmount" type="number" min="0.000001" step="0.000001" placeholder="e.g. 10"></label>
+      <button class="btn" id="buyQuote" disabled>Get buy quote</button>
+      <div class="quote" id="buyQuoteBox" aria-live="polite"></div>
+    </article>
+    <article class="choice">
+      <div class="pair">SOBY <span aria-hidden="true">→</span> USDT</div>
+      <h2>Return SOBY</h2>
+      <p>Return SOBY on SOBYA Mainnet and receive USDT on Ethereum.</p>
+      <label class="field"><span>Amount of SOBY</span><input id="returnAmount" type="number" min="0.000000000000000001" step="any" placeholder="e.g. 100"></label>
+      <button class="btn" id="returnQuote" disabled>Get return quote</button>
+      <div class="quote" id="returnQuoteBox" aria-live="polite"></div>
+    </article>
+  </section>
 
-    <div class="safety"><span aria-hidden="true">ⓘ</span><div><b>Before you send</b><br>Always request a quote first. Send only the exact amount to the deposit address shown in your valid quote. Return payments depend on available USDT and network gas.</div></div>
-
-    <footer>
-      <span>Powered by SOBYA</span>
-      <span>Ethereum Mainnet · SOBYA EVM</span>
-    </footer>
-  </main>
+  <div class="status" id="status" aria-live="polite">Connect MetaMask to begin. Your wallet signs each payment; SOBYA never receives your private key.</div>
+  <p class="safety">Network fees are paid by your wallet. Always review the network, token, amount and recipient in MetaMask before confirming. Never send funds without a valid quote.</p>
+  <footer><span>Powered by SOBYA</span><span>Ethereum Mainnet · SOBYA EVM</span></footer>
+</main>
+<script>
+(function(){
+  'use strict';
+  const API='https://sobya-buy-api.snforem.workers.dev';
+  const INVENTORY='0xebdb899fFE84a89e1d576964b640491c135651AD';
+  const USDT='0xdAC17F958D2ee523a2206206994597C13D831ec7';
+  const ETH_CHAIN=1, SOBYA_CHAIN=357812033857;
+  const ETH_HEX='0x1', SOBYA_HEX='0x534f425941';
+  const ETH_RPC='https://ethereum-rpc.publicnode.com';
+  const SOBYA_RPC='https://sobya-evm-rpc.nodesafe-dapp.xyz';
+  const $=id=>document.getElementById(id);
+  let rawProvider=null, provider=null, signer=null, address=null, evmClient=null, connectorPromise=null;
+  let activeQuotes={buy:null,return:null};
+  const usdtAbi=['function transfer(address to,uint256 amount) returns(bool)'];
+  const say=message=>$('status').textContent=message;
+  const validAddress=value=>/^0x[0-9a-fA-F]{40}$/.test(String(value||''));
+  const hexChain=id=>'0x'+BigInt(id).toString(16);
+  async function initConnector(){
+    try{
+      const mod=await import('https://esm.sh/@metamask/connect-evm@2.1.1?bundle');
+      evmClient=await mod.createEVMClient({
+        dapp:{name:'SOBYA Auto Exchange',url:window.location.href,iconUrl:new URL('../assets/logo/sobya-coin-128.png',window.location.href).href},
+        api:{supportedNetworks:{[ETH_HEX]:ETH_RPC,[SOBYA_HEX]:SOBYA_RPC}},
+        analytics:{enabled:false}
+      });
+      return evmClient;
+    }catch(error){console.warn('MetaMask Connect SDK unavailable; injected wallet fallback will be used.',error);return null;}
+  }
+  connectorPromise=initConnector();
+  async function connect(){
+    $('connect').disabled=true;say('Opening MetaMask connection…');
+    try{
+      let connected=false;
+      try{
+        const client=await Promise.race([connectorPromise,new Promise(resolve=>setTimeout(()=>resolve(null),7000))]);
+        if(client){await client.connect({chainIds:[SOBYA_HEX],forceRequest:true});rawProvider=client.getProvider();if(rawProvider)connected=true;}
+      }catch(error){console.warn('MetaMask Connect fallback:',error);}
+      if(!connected){
+        rawProvider=window.ethereum||null;
+        if(!rawProvider)throw new Error('MetaMask was not found. Open this page in the MetaMask browser or install the MetaMask extension.');
+        await rawProvider.request({method:'eth_requestAccounts',params:[]});
+      }
+      provider=new ethers.BrowserProvider(rawProvider);
+      const accounts=await rawProvider.request({method:'eth_accounts',params:[]});
+      if(!accounts||!accounts.length)throw new Error('Wallet connection was not approved.');
+      address=ethers.getAddress(accounts[0]);signer=await provider.getSigner(address);
+      $('walletTitle').textContent='Wallet connected';
+      $('walletAddress').textContent=address;
+      $('connect').textContent=address.slice(0,6)+'…'+address.slice(-4);
+      $('buyQuote').disabled=false;$('returnQuote').disabled=false;
+      say('Wallet connected. Choose Buy SOBY or Return SOBY to request a live quote.');
+      if(rawProvider&&typeof rawProvider.on==='function'){
+        rawProvider.on('accountsChanged',()=>window.location.reload());
+        rawProvider.on('chainChanged',()=>{activeQuotes={buy:null,return:null};window.location.reload();});
+      }
+    }catch(error){say(error.shortMessage||error.message||String(error));}
+    finally{$('connect').disabled=false;}
+  }
+  async function switchNetwork(chainId){
+    if(!rawProvider)throw new Error('Connect MetaMask first.');
+    const chainHex=hexChain(chainId);
+    const current=await rawProvider.request({method:'eth_chainId'});
+    if(current.toLowerCase()===chainHex.toLowerCase())return;
+    try{await rawProvider.request({method:'wallet_switchEthereumChain',params:[{chainId:chainHex}]});}
+    catch(error){
+      if(error.code!==4902)throw error;
+      const params=chainId===ETH_CHAIN?
+        {chainId:ETH_HEX,chainName:'Ethereum Mainnet',nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:[ETH_RPC],blockExplorerUrls:['https://etherscan.io']}:
+        {chainId:SOBYA_HEX,chainName:'SOBYA Mainnet',nativeCurrency:{name:'SOBY',symbol:'SOBY',decimals:18},rpcUrls:[SOBYA_RPC],blockExplorerUrls:['https://explorer.nodesafe-app.xyz/sobya']};
+      await rawProvider.request({method:'wallet_addEthereumChain',params:[params]});
+    }
+    const after=await rawProvider.request({method:'eth_chainId'});
+    if(after.toLowerCase()!==chainHex.toLowerCase())throw new Error('Please switch MetaMask to the requested network to continue.');
+    provider=new ethers.BrowserProvider(rawProvider);signer=await provider.getSigner(address);
+  }
+  async function apiRequest(path,options){
+    const response=await fetch(API+path,Object.assign({cache:'no-store'},options||{}));
+    const data=await response.json().catch(()=>({error:'The exchange service returned an invalid response.'}));
+    if(!response.ok)throw new Error(data.error||('Exchange API error '+response.status));
+    return data;
+  }
+  function fmt(value,max){
+    const n=Number(value);
+    return Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:max||6}):String(value);
+  }
+  async function loadPrice(){
+    try{const data=await apiRequest('/v1/price');$('rate').textContent=data.price+' USDT / SOBY';}
+    catch(error){$('rate').textContent='Unavailable';console.warn('Price endpoint unavailable:',error);}
+  }
+  function quoteMarkup(q,direction){
+    const inputLabel=direction==='buy'?'Exact USDT payment':'Exact SOBY return';
+    const outputLabel=direction==='buy'?'Estimated SOBY received':'Estimated USDT refund';
+    const outputUnit=direction==='buy'?'SOBY':'USDT';
+    const network=direction==='buy'?'Ethereum Mainnet':'SOBYA Mainnet';
+    return '<strong>Quote ready</strong><br>Order: <strong>'+q.orderId+'</strong><br>'+
+      inputLabel+': <strong>'+q.paymentAmount+' '+(direction==='buy'?'USDT':'SOBY')+'</strong><br>'+
+      outputLabel+': <strong>'+q.payoutAmount+' '+outputUnit+'</strong><br>'+
+      'Rate: '+q.quotedPrice+' USDT / SOBY · Fee: 1%<br>'+
+      'Send on: '+network+'<br>Recipient: <span class="muted">'+q.depositAddress+'</span><br>'+
+      'Valid until: '+new Date(q.expiresAt).toLocaleTimeString()+
+      '<br><button class="btn primary" type="button" id="'+direction+'Pay">Continue in MetaMask</button>';
+  }
+  async function requestQuote(direction){
+    if(!address||!signer)throw new Error('Connect MetaMask first.');
+    const amount=$(direction==='buy'?'buyAmount':'returnAmount').value.trim();
+    if(!amount||!Number.isFinite(Number(amount))||Number(amount)<=0)throw new Error('Enter a valid amount.');
+    const q=await apiRequest('/v1/quote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({direction,sender:address,amount})});
+    if(q.sender&&q.sender.toLowerCase()!==address.toLowerCase())throw new Error('The quote wallet does not match your connected account.');
+    if(!q.orderId||!validAddress(q.depositAddress)||!q.paymentAmountAtomic||!q.expiresAt)throw new Error('The quote response is incomplete. No payment was sent.');
+    activeQuotes[direction]=q;
+    const box=$(direction==='buy'?'buyQuoteBox':'returnQuoteBox');
+    box.innerHTML=quoteMarkup(q,direction);box.classList.add('visible');
+    $(direction+'Pay').addEventListener('click',()=>pay(direction).catch(error=>say(error.shortMessage||error.message||String(error))));
+    say('Quote '+q.orderId+' is ready. Review the exact amount and recipient before continuing.');
+  }
+  async function pay(direction){
+    const q=activeQuotes[direction];
+    if(!q)throw new Error('Request a fresh quote first.');
+    if(Date.now()>=Date.parse(q.expiresAt)){activeQuotes[direction]=null;throw new Error('This quote has expired. Request a new quote; no transfer was sent.');}
+    if(!address||q.sender.toLowerCase()!==address.toLowerCase())throw new Error('The quote belongs to a different wallet. Reconnect the quoted wallet.');
+    const chainId=direction==='buy'?ETH_CHAIN:SOBYA_CHAIN;
+    await switchNetwork(chainId);
+    if(Date.now()>=Date.parse(q.expiresAt)){activeQuotes[direction]=null;throw new Error('The quote expired while switching networks. Request a new quote.');}
+    if(q.depositAddress.toLowerCase()!==INVENTORY.toLowerCase())throw new Error('The quoted recipient does not match the configured inventory address. Payment cancelled.');
+    if(direction==='buy'){
+      if(!q.tokenAddress||q.tokenAddress.toLowerCase()!==USDT.toLowerCase())throw new Error('The quote does not specify the verified Ethereum USDT contract. Payment cancelled.');
+      const token=new ethers.Contract(USDT,usdtAbi,signer);
+      const tx=await token.transfer(q.depositAddress,BigInt(q.paymentAmountAtomic));
+      say('USDT transfer submitted in MetaMask: '+tx.hash+'. Waiting for the first confirmation…');
+      const receipt=await tx.wait(1);
+      if(!receipt||receipt.status!==1)throw new Error('USDT transfer did not confirm successfully.');
+      say('USDT transfer confirmed. Order '+q.orderId+' is awaiting the exchange settlement confirmations.');
+    }else{
+      const tx=await signer.sendTransaction({to:q.depositAddress,value:BigInt(q.paymentAmountAtomic)});
+      say('SOBY transfer submitted in MetaMask: '+tx.hash+'. Waiting for the first confirmation…');
+      const receipt=await tx.wait(1);
+      if(!receipt||receipt.status!==1)throw new Error('SOBY transfer did not confirm successfully.');
+      say('SOBY return confirmed. Order '+q.orderId+' is awaiting the USDT refund process.');
+    }
+    activeQuotes[direction]=null;
+    const box=$(direction==='buy'?'buyQuoteBox':'returnQuoteBox');
+    box.innerHTML='<strong>Payment submitted</strong><br>Order: '+q.orderId+'<br>Transaction: '+(direction==='buy'?'USDT':'SOBY')+' confirmed in your wallet.<br><span class="muted">Settlement status will update automatically as the network confirmations complete.</span>';
+    monitorOrder(q.orderId,direction);
+  }
+  async function monitorOrder(orderId,direction){
+    const label=direction==='buy'?'SOBY payout':'USDT refund';
+    let attempts=0;
+    const timer=setInterval(async()=>{
+      attempts++;
+      try{
+        const state=await apiRequest('/v1/order/'+encodeURIComponent(orderId));
+        if(state.status==='settled'||state.status==='refunded'){
+          say('Exchange complete. '+label+' processed for order '+orderId+'.');
+          clearInterval(timer);
+        }else if(state.status==='review'){
+          say('Order '+orderId+' requires manual review. Do not send another payment.');
+          clearInterval(timer);
+        }else if(state.status==='expired'){
+          say('Order '+orderId+' expired before a matching payment was recorded. Contact SOBYA support with the transaction hash if you already paid.');
+          clearInterval(timer);
+        }else if(attempts%4===0){
+          say('Payment detected or awaiting network confirmations. Order '+orderId+' · Status: '+state.status+'.');
+        }
+      }catch(error){console.warn('Order status check failed:',error);}
+      if(attempts>=80)clearInterval(timer);
+    },15000);
+  }
+  $('connect').addEventListener('click',connect);
+  $('buyQuote').addEventListener('click',()=>requestQuote('buy').catch(error=>say(error.message||String(error))));
+  $('returnQuote').addEventListener('click',()=>requestQuote('return').catch(error=>say(error.message||String(error))));
+  loadPrice();
+})();
+</script>
 </body>
 </html>
