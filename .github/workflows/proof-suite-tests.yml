@@ -1,0 +1,28 @@
+name: SOBYA Proof Suite tests
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "proof-suite/**"
+      - ".github/workflows/proof-suite-tests.yml"
+  pull_request:
+    paths:
+      - "proof-suite/**"
+      - ".github/workflows/proof-suite-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check JavaScript syntax
+        run: node --check proof-suite/app.js && node --check proof-suite/proof-core.js
+      - name: Run proof payload tests
+        run: node --test proof-suite/tests/*.test.mjs

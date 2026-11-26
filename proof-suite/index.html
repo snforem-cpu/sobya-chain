@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071426">
+  <meta name="description" content="Create and verify SHA-256 document proofs on SOBYA Mainnet without uploading your files.">
+  <title>SOBYA Proof — Verifiable Document Records</title>
+  <link rel="icon" type="image/png" href="../assets/logo/sobya-coin-128.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="../"><img src="../assets/logo/sobya-coin-128.png" alt="SOBYA official logo"><span>SOBYA <i>PROOF</i></span></a>
+      <div class="top-actions">
+        <span class="network-pill">SOBYA MAINNET</span>
+        <button class="lang-button" id="language" type="button" aria-label="Switch language">العربية</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow" data-en="DOCUMENT INTEGRITY · ON-CHAIN PROOF" data-ar="سلامة الوثائق · إثبات على البلوكشين">DOCUMENT INTEGRITY · ON-CHAIN PROOF</p>
+      <h1 data-en="Prove a file. Keep it private." data-ar="أثبت تطابق ملفك. واحتفظ به خاصاً.">Prove a file. Keep it private.</h1>
+      <p class="intro" data-en="Create a SHA-256 fingerprint in your browser and register that fingerprint on SOBYA Mainnet. Your document never leaves your device." data-ar="أنشئ بصمة SHA-256 في متصفحك وسجّلها على شبكة SOBYA الرئيسية. لا يغادر مستندك جهازك أبداً.">Create a SHA-256 fingerprint in your browser and register that fingerprint on SOBYA Mainnet. Your document never leaves your device.</p>
+      <div class="trust-points">
+        <span data-en="✓ No file uploads" data-ar="✓ لا رفع للملفات">✓ No file uploads</span>
+        <span data-en="✓ Wallet-signed record" data-ar="✓ تسجيل بتوقيع محفظتك">✓ Wallet-signed record</span>
+        <span data-en="✓ Public verification" data-ar="✓ تحقق عام">✓ Public verification</span>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="create-title">
+      <div class="section-heading">
+        <div><p class="step">01 · CREATE</p><h2 id="create-title" data-en="Create a document proof" data-ar="إنشاء إثبات لملف">Create a document proof</h2></div>
+        <span class="tag">SHA-256</span>
+      </div>
+      <label class="file-picker" for="file">
+        <span class="file-icon">↥</span>
+        <strong data-en="Choose a file from your device" data-ar="اختر ملفاً من جهازك">Choose a file from your device</strong>
+        <small id="file-name" data-en="The file is processed locally and is never uploaded." data-ar="تتم معالجة الملف محلياً ولا يتم رفعه.">The file is processed locally and is never uploaded.</small>
+        <input id="file" type="file">
+      </label>
+      <div class="hash-row">
+        <div class="hash-label" data-en="SHA-256 fingerprint" data-ar="بصمة SHA-256">SHA-256 fingerprint</div>
+        <code id="file-hash">Not calculated yet</code>
+      </div>
+      <div class="button-row">
+        <button class="button secondary" id="hash-button" type="button" data-en="Calculate fingerprint" data-ar="احسب البصمة">Calculate fingerprint</button>
+        <button class="button primary" id="connect-button" type="button" data-en="Connect wallet" data-ar="اربط المحفظة">Connect wallet</button>
+        <button class="button primary" id="record-button" type="button" disabled data-en="Register on SOBYA" data-ar="سجّل على SOBYA">Register on SOBYA</button>
+      </div>
+      <p class="wallet-state" id="wallet-state" aria-live="polite" data-en="Wallet not connected." data-ar="المحفظة غير متصلة.">Wallet not connected.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="verify-title">
+      <div class="section-heading">
+        <div><p class="step">02 · VERIFY</p><h2 id="verify-title" data-en="Verify an existing proof" data-ar="تحقق من إثبات مسجل">Verify an existing proof</h2></div>
+        <span class="tag">READ-ONLY</span>
+      </div>
+      <label class="field-label" for="tx-hash" data-en="SOBYA transaction hash" data-ar="معرّف معاملة SOBYA">SOBYA transaction hash</label>
+      <input class="text-input" id="tx-hash" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…">
+      <div class="verify-file">
+        <label class="field-label" for="verify-file" data-en="Optional: choose the file to compare" data-ar="اختياري: اختر الملف للمقارنة">Optional: choose the file to compare</label>
+        <input id="verify-file" type="file">
+      </div>
+      <button class="button secondary" id="verify-button" type="button" data-en="Verify transaction" data-ar="تحقق من المعاملة">Verify transaction</button>
+      <div class="result" id="verify-result" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="notice">
+      <strong data-en="What this proves — and what it does not" data-ar="ما الذي يثبته هذا السجل وما الذي لا يثبته">What this proves — and what it does not</strong>
+      <p data-en="A matching fingerprint shows that the selected file has the same bytes as the file fingerprint recorded in this transaction. It does not prove who created the file, that its contents are true, or that the signer had legal ownership." data-ar="تطابق البصمة يعني أن الملف المختار يحتوي على البايتات نفسها التي سُجلت بصمتها في المعاملة. لكنه لا يثبت هوية المنشئ أو صحة المحتوى أو الملكية القانونية.">A matching fingerprint shows that the selected file has the same bytes as the file fingerprint recorded in this transaction. It does not prove who created the file, that its contents are true, or that the signer had legal ownership.</p>
+      <p data-en="The fingerprint and wallet address are public on-chain. File names and file contents are not sent. You pay the SOBYA network fee shown by your wallet when registering." data-ar="البصمة وعنوان المحفظة بيانات عامة على السلسلة. لا يتم إرسال اسم الملف أو محتواه. تدفع رسوم شبكة SOBYA التي تعرضها محفظتك عند التسجيل.">The fingerprint and wallet address are public on-chain. File names and file contents are not sent. You pay the SOBYA network fee shown by your wallet when registering.</p>
+    </section>
+
+    <footer><a href="../" data-en="← SOBYA home" data-ar="العودة إلى SOBYA ←">← SOBYA home</a><a href="https://github.com/snforem-cpu/sobya-chain/tree/main/proof-suite" target="_blank" rel="noopener">Open-source implementation ↗</a><span>Powered by SOBYA Mainnet</span></footer>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

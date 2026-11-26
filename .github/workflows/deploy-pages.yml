@@ -12,6 +12,7 @@ on:
       - 'tokenomics-studio/**'
       - 'dex/**'
       - 'auto-exchange/**'
+      - 'proof-suite/**'
       - 'contracts/**'
       - 'assets/logo/**'
       - '.github/workflows/deploy-pages.yml'
