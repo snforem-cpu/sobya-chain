@@ -2,6 +2,12 @@ name: SOBYA Auto Exchange payout worker
 
 on:
   workflow_dispatch:
+    inputs:
+      run_payouts:
+        description: "Allow real payouts (leave false for a safe verification run)"
+        required: true
+        type: boolean
+        default: false
   schedule:
     - cron: "*/5 * * * *"
 
@@ -29,15 +35,16 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Request short-lived D1 bridge identity
         id: d1-auth
-        run: |
-          set -euo pipefail
-          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?GitHub OIDC request URL is unavailable}"
-          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?GitHub OIDC request token is unavailable}"
-          TOKEN_JSON=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sobya-auto-exchange")
-          OIDC_TOKEN=$(echo "$TOKEN_JSON" | jq -r .value)
-          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
-          echo "::add-mask::$OIDC_TOKEN"
-          echo "token=$OIDC_TOKEN" >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken("sobya-auto-exchange");
+            if (!token) {
+              core.setFailed("GitHub OIDC did not return an identity token");
+              return;
+            }
+            core.setSecret(token);
+            core.setOutput("token", token);
       - name: Import D1 reservations and synchronize settlement ledger
         working-directory: auto-exchange
         env:
@@ -46,7 +53,11 @@ jobs:
           GITHUB_OIDC_TOKEN: ${{ steps.d1-auth.outputs.token }}
           SOBYA_AUTO_EXCHANGE_API_URL: https://sobya-buy-api.snforem.workers.dev
         run: node d1/sync-d1-quotes.js
+      - name: Validate payout worker syntax without executing payouts
+        working-directory: auto-exchange
+        run: node --check payout-worker.js
       - name: Verify deposits and execute eligible SOBY payouts
+        if: github.event_name == 'schedule' || inputs.run_payouts == true
         working-directory: auto-exchange
         env:
           GH_TOKEN: ${{ github.token }}
