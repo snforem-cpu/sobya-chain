@@ -17,7 +17,7 @@ async function gh(path, options = {}) {
 }
 async function d1(path, options = {}) {
   const response = await fetch(apiBase + path, { ...options,
-    headers: { authorization: "Bearer " + oidc, ...(options.body ? { "content-type": "application/json" } : {}) } });
+    headers: { authorization: "Bearer " + oidc, origin: "https://snforem-cpu.github.io", ...(options.body ? { "content-type": "application/json" } : {}) } });
   const body = await response.json();
   if (!response.ok) throw new Error("SOBYA D1 API " + response.status + ": " + JSON.stringify(body));
   return body;
