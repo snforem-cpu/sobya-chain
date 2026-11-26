@@ -1,10 +1,42 @@
 {
   "schemaVersion": 1,
-  "quotes": [],
+  "quotes": [
+    {
+      "orderId": "SOBYA-F2CE268875DB47B39B1E6AEA5F292611",
+      "sender": "0x15f94a243ed60536db51aa993a67d3f2ea03f60f",
+      "depositAddress": "0xebdb899ffe84a89e1d576964b640491c135651ad",
+      "chainId": 1,
+      "requestedAmountAtomic": "100000",
+      "paymentAmountAtomic": "100001",
+      "payoutAmountAtomic": "19800198000000000000",
+      "quotedPrice": "0.005",
+      "exchangeFeeBps": 100,
+      "createdAt": "2026-11-26T08:41:27.904Z",
+      "expiresAt": "2026-11-26T08:51:27.904Z",
+      "status": "open",
+      "tokenAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+    },
+    {
+      "orderId": "SOBYA-1871D00883414005965E183D37879BE0",
+      "sender": "0xebdb899ffe84a89e1d576964b640491c135651ad",
+      "depositAddress": "0xebdb899ffe84a89e1d576964b640491c135651ad",
+      "chainId": 1,
+      "requestedAmountAtomic": "100000",
+      "paymentAmountAtomic": "100002",
+      "payoutAmountAtomic": "19800396000000000000",
+      "quotedPrice": "0.005",
+      "exchangeFeeBps": 100,
+      "createdAt": "2026-11-26T08:44:01.801Z",
+      "expiresAt": "2026-11-26T08:54:01.801Z",
+      "status": "open",
+      "tokenAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+    }
+  ],
   "processedTransfers": [],
-  "lastUpdatedAt": null,
+  "lastUpdatedAt": "2026-11-26T09:22:22.346Z",
   "returnQuotes": [],
   "processedReturns": [],
   "lastScannedSobyBlock": 254515,
-  "lastScannedEthereumBlock": 26497664
+  "lastScannedEthereumBlock": 26497664,
+  "currentPriceUsdtPerSoby": "0.005"
 }
