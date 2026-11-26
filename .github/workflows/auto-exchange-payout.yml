@@ -2,12 +2,6 @@ name: SOBYA Auto Exchange payout worker
 
 on:
   workflow_dispatch:
-    inputs:
-      run_payouts:
-        description: "Allow real payouts (leave false for a safe verification run)"
-        required: true
-        type: boolean
-        default: false
   schedule:
     - cron: "*/5 * * * *"
 
@@ -57,7 +51,7 @@ jobs:
         working-directory: auto-exchange
         run: node --check payout-worker.js
       - name: Verify deposits and execute eligible SOBY payouts
-        if: github.event_name == 'schedule' || inputs.run_payouts == true
+        if: github.event_name == 'schedule'
         working-directory: auto-exchange
         env:
           GH_TOKEN: ${{ github.token }}
