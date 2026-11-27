@@ -12,7 +12,7 @@ export function normalizeInvoiceMetadata(input) {
   const parsedDate = new Date(issueDate + "T00:00:00Z");
   if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== issueDate) throw new TypeError("Enter a valid invoice date in YYYY-MM-DD format.");
   if (!/^[A-Z]{3}$/.test(currency)) throw new TypeError("Enter a three-letter currency code, such as USD.");
-  if (!AMOUNT_RE.test(amount) || Number(amount) <= 0) throw new TypeError("Enter a positive amount with up to 6 decimal places.");
+  if (!AMOUNT_RE.test(amount) || amount.length > 24 || Number(amount) <= 0 || !Number.isFinite(Number(amount))) throw new TypeError("Enter a positive amount with up to 6 decimal places (maximum 24 characters).");
   return { invoiceRef, issueDate, currency, amount };
 }
 
