@@ -96,9 +96,9 @@ jobs:
           test -s scripts/initialize-production-genesis.py
           test -s docs/RELEASE_PROCESS.md
           test -s docs/ANNOUNCEMENTS.md
-          grep -qi '150M SOBY lifetime allocation' docs/STAGE_THREE_OPERATOR_KIT.md
-          grep -qi '95% signing eligibility' docs/STAGE_THREE_OPERATOR_KIT.md
-          grep -q '777777' docs/GENESIS_CEREMONY.md
+          grep -qi 'SOBYA Mainnet is live' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi 'live-chain transaction' docs/STAGE_THREE_OPERATOR_KIT.md
+          grep -qi 'historical reference only' docs/GENESIS_CEREMONY.md
 
       - name: Run focused Go CLI configuration tests
         working-directory: sobya
