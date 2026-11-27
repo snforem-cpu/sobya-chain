@@ -1,6 +1,6 @@
 # SOBYA Validator Onboarding
 
-This guide separates expression of interest from permission to execute live-chain transactions. The chain ID used in the operator launch materials is sobya-1, but every applicant-facing operational instruction must be checked against current live evidence first.
+This guide covers joining the already-running SOBYA Mainnet. The production CometBFT chain ID is `sobya-1`; the production EVM chain ID is `357812033857`. New operators join the existing chain and must not generate a new genesis or genesis gentx.
 
 ## 1. Apply (manual intake)
 
@@ -10,25 +10,16 @@ The issue is public. Provide only public operator details, public addresses, pub
 
 There is no application fee. Applying does not guarantee admission or a support grant. The issue form is a manual GitHub workflow; it is not connected to the experimental Go support API.
 
-## 2. Mandatory live-network preflight (team-owned)
+## 2. Live network connection details
 
-Before telling an applicant to synchronize or create a validator, the team must publish and verify all of the following:
-
-1. A read-only public RPC endpoint reachable from outside the validator host.
-2. A recent successful query showing chain ID sobya-1, current block height, and advancing blocks on repeated checks.
-3. The exact supported binary release and its SHA-256 checksum.
-4. The approved live Genesis SHA-256 and a verified P2P/bootstrap peer list.
-5. Current staking parameters, minimum self-delegation, denomination, transaction fees, and validator eligibility rules read from the running chain.
-6. A documented operator support contact and incident procedure.
-
-**Published public endpoints (NodeSafe):**
+SOBYA Mainnet is live. Use these public endpoints:
 
 - EVM JSON-RPC for MetaMask, EVM wallets and EVM applications: `https://sobya-evm-rpc.nodesafe-dapp.xyz` (EVM chain ID `357812033857`).
-- CometBFT RPC for consensus/node queries: `https://sobya-rpc.nodesafe-dapp.xyz`.
+- CometBFT RPC for consensus/node queries: `https://sobya-rpc.nodesafe-dapp.xyz` (CometBFT chain ID `sobya-1`).
 - REST API: `https://sobya-api.nodesafe-dapp.xyz`.
 - Explorer: `https://explorer.nodesafe-app.xyz/sobya`.
 
-These are different interfaces: applicants must not configure the CometBFT RPC or REST API as an EVM wallet RPC. Publishing an endpoint does not by itself complete the live-network preflight. Before issuing validator synchronization or transaction instructions, the team must still confirm external reachability, `sobya-1`, recent block height and block advancement, binary and Genesis checksums, peers, and current on-chain staking/fee parameters.
+These are different interfaces: do not configure CometBFT RPC or REST as an EVM wallet RPC. Confirm the current release, peer information, sync height, staking parameters, minimum self-delegation and fees with the project before creating a validator.
 
 ## 3. Review applications
 
@@ -39,23 +30,24 @@ The team reviews each application manually:
 - Verify the applicant can securely hold its own validator keys and operate independently.
 - Do not fetch applicant-supplied URLs automatically; verify endpoints through controlled tooling.
 
-## 4. Joining after chain launch
+## 4. Join the existing live chain
 
-A validator joining after chain launch is not a genesis validator:
+A validator joining after launch is not a genesis validator:
 
-- Use only the approved live Genesis and peer/bootstrap information published by the project after verification.
-- Synchronize to the live chain and verify chain ID and height before attempting validator creation.
-- Do not generate or submit a new genesis gentx for a network that is already running.
-- Only after the preflight and eligibility checks are complete may the operator use its own wallet and the supported binary's live-chain validator-creation transaction.
-- The operator signs its own transactions. The SOBYA team must never request a seed phrase or private validator key.
+- Install the exact supported SOBYA release and verify its published checksum.
+- Configure the production CometBFT chain ID `sobya-1` and EVM chain ID `357812033857`.
+- Obtain the current verified peer/bootstrap information from the project.
+- Synchronize to the existing live chain and confirm the expected chain ID and advancing height.
+- Read current staking parameters, denomination, minimum self-delegation and transaction fees from the live network.
+- Create the validator using the supported live-chain transaction with the operator's own wallet. The operator signs its own transaction.
 
-The exact command, denomination, required amount, and transaction fees are intentionally omitted until they are confirmed against the current live binary and on-chain parameters.
+Do not generate or submit a new genesis gentx, create a replacement genesis, or start a separate network. Never send a seed phrase or private validator key to the SOBYA team.
 
 ## 5. Conditional support
 
 Support is separate from technical admission. No applicant pays an application fee or sends funds to an individual to be considered. A grant can be considered only after eligibility is verified, a separate spendable support budget is independently confirmed, and the amount/milestones are approved by the required humans.
 
-The consensus-controlled validator reserve is not an onboarding wallet. The experimental support service records administrative decisions only; it does not sign or broadcast transfers.
+The consensus-controlled validator reserve is not an onboarding wallet. The separate off-chain support service is administrative only; it does not sign or broadcast validator transactions or alter consensus.
 
 ## 6. Safety boundary
 
