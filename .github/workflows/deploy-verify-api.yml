@@ -1,0 +1,33 @@
+name: Deploy SOBYA Verify API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "proof-suite/verify-api/**"
+      - ".github/workflows/deploy-verify-api.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Worker dependencies
+        working-directory: proof-suite/verify-api
+        run: npm install
+      - name: Run Worker tests
+        working-directory: proof-suite/verify-api
+        run: npm test
+      - name: Deploy to Cloudflare Workers
+        working-directory: proof-suite/verify-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
