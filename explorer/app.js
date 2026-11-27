@@ -4,8 +4,8 @@ const $ = id => document.getElementById(id);
 const rpc = createRpc();
 const setText = (id, value) => { $(id).textContent = value; };
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[c]);
-function row(label, value, { link = false, mono = true } = {}) {
-  const rendered = link ? '<a class="link" href="' + escapeHtml(link) + '">' + escapeHtml(value) + '</a>' : escapeHtml(value);
+function row(label, value, { link = false, mono = true, html = false } = {}) {
+  const rendered = html ? String(value) : link ? '<a class="link" href="' + escapeHtml(link) + '">' + escapeHtml(value) + '</a>' : escapeHtml(value);
   return '<div class="detail-row"><span>' + escapeHtml(label) + '</span><strong' + (mono ? ' class="mono"' : '') + '>' + rendered + '</strong></div>';
 }
 function showResult(title, html) {
@@ -32,7 +32,7 @@ async function getTransaction(hash) {
   const timestamp = block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toLocaleString() : "—";
   const details = [
     row("Transaction hash", tx.hash),
-    row("Status", '<span class="pill ' + (status === "Success" ? "success" : status === "Failed" ? "failure" : "pending") + '">' + status + '</span>', { mono:false }),
+    row("Status", '<span class="pill ' + (status === "Success" ? "success" : status === "Failed" ? "failure" : "pending") + '">' + status + '</span>', { mono:false, html:true }),
     row("Block", tx.blockNumber ? toDecimal(tx.blockNumber) : "Pending", { link: tx.blockNumber ? "?block=" + toDecimal(tx.blockNumber) : null }),
     row("Timestamp", timestamp, { mono:false }),
     row("From", tx.from, { link: "?address=" + tx.from }),
