@@ -1,68 +1,67 @@
 # SOBYA Verify API
 
-A read-only JavaScript verification client for SOBYA Proof and SOBYA Invoice Proof. It reads confirmed transactions from SOBYA Mainnet RPC endpoints and validates the deployed Proof Registry call, exact 1 SOBY service fee, successful receipt, and matching `ProofRecorded` event.
+A read-only HTTP API and browser verification tool for SOBYA Proof and Invoice Proof on SOBYA Mainnet.
 
-## Important architecture
+## Try it
 
-This is a client-side SDK, not a hosted REST server. GitHub Pages is static hosting and cannot execute server-side API routes. The SDK calls the public SOBYA EVM JSON-RPC endpoints directly. It requires no API key, account, subscription, wallet connection, or transaction signing.
+Open the Verify API page in the SOBYA Proof Suite. It lets a person paste a transaction hash, select the original file, and see whether the on-chain record is valid and whether the file matches. Invoice checks additionally require the same invoice metadata entered during registration. Files are fingerprinted locally and are never uploaded.
 
-The file and invoice metadata are processed locally. No file, filename, or invoice details are uploaded. The only remote requests are read-only JSON-RPC queries for public blockchain data. The SDK never broadcasts transactions.
+## Hosted API routes
 
-## Browser usage
+- `GET /v1/health` — service/network status.
+- `POST /v1/verify/proof` — verify a document proof.
+- `POST /v1/verify/invoice` — verify an invoice proof using the original file fingerprint and exact metadata used at registration.
 
-Load the module from the published Proof Suite after deployment:
+### Document proof
 
-```js
-import { createSobyaVerifyClient } from "./verify-api/client.js";
+The caller computes SHA-256 locally and sends only the fingerprint (never the file):
 
-const sobya = createSobyaVerifyClient();
+```http
+POST /v1/verify/proof
+Content-Type: application/json
 
-const result = await sobya.verifyProof({
-  txHash: "0xYOUR_TRANSACTION_HASH",
-  file: document.querySelector("#file").files[0] // optional
-});
-
-console.log(result.valid, result.match, result.fingerprint);
+{"txHash":"0x…","fileHash":"0x…"}
 ```
 
-For Invoice Proof, provide the original invoice and the same metadata entered at registration:
+`fileHash` is optional. Without it, the API validates the on-chain record and returns `match: null`.
 
-```js
-const result = await sobya.verifyInvoiceProof({
-  txHash: "0xYOUR_INVOICE_TRANSACTION_HASH",
-  file: invoiceFile,
-  metadata: {
-    reference: "INV-2026-0042",
-    issueDate: "2026-11-27",
-    amount: "1250.50",
-    currency: "USD",
-    issuer: "Supplier",
-    recipient: "Customer"
+### Invoice proof
+
+```json
+{
+  "txHash": "0x…",
+  "fileHash": "0x…",
+  "metadata": {
+    "reference": "INV-2026-0042",
+    "issueDate": "2026-11-27",
+    "amount": "1250.50",
+    "currency": "USD",
+    "issuer": "Supplier",
+    "recipient": "Customer"
   }
-});
+}
 ```
 
-## Result semantics
+### Response
 
-- `valid: true`: the transaction is a confirmed, successful SOBYA Proof Registry record that paid exactly 1 SOBY and emitted the matching event.
-- `match: true`: the optional file (Proof) or required invoice file plus metadata (Invoice Proof) reproduces the on-chain fingerprint.
-- `match: false`: the chain record is valid, but the supplied file or invoice details do not match.
-- `match: null`: the chain record is valid; no file comparison was requested.
+Success returns `{ ok: true, result: { valid, match, type, txHash, fingerprint, signer, blockNumber, timestamp, chainId, registry, feeRecipient } }`.
 
-A rejected transaction throws an Error with a reason. A valid on-chain record does not establish the truth of a document, legal ownership, issuer identity, payment of an invoice, or legal/tax compliance.
+`valid` means the transaction is a confirmed registry record with the expected contract, service recipient, 1 SOBY fee and matching event. `match` means the supplied fingerprint (and invoice metadata) matches the recorded fingerprint. It does not prove document truth, legal ownership, issuer identity, invoice payment or legal/tax compliance.
 
-## Configuration
+Errors use `{ "ok": false, "error": { "message": "..." } }` with HTTP status codes.
 
-The default client uses the two published SOBYA EVM RPC endpoints. A custom list of HTTPS-compatible RPC endpoints can be supplied with `createSobyaVerifyClient({ rpcUrls })`. The client verifies chain ID `357812033857` and the deployed registry address configured in `core.js`.
+## Privacy and limits
 
-## Privacy and security
+- Files and filenames are never uploaded. Only a transaction hash, SHA-256 fingerprint and (for invoices) invoice metadata are sent.
+- No wallet connection, signing, write transaction, or API secret is required.
+- This is a public beta endpoint. It currently has no API-key system, usage dashboard, SLA, or per-customer quota. Do not advertise paid plans or production SLAs until abuse controls and monitoring are added.
+- CORS is open for public read-only integration. Request bodies are limited to 16 KB. RPC provider availability remains an external dependency.
 
-- Read-only; no wallet provider or private key is used.
-- No files or invoice fields are sent to a server.
-- Uses HTTPS RPC endpoints and validates the chain ID before accepting a result.
-- Verifies transaction destination, exact service fee, contract call, successful receipt, submitter/event consistency, and event fingerprint.
-- RPC availability and CORS policy remain external dependencies. The SDK tries configured endpoints in order.
+## Deploy to Cloudflare Workers (free tier)
 
-## Scope
+1. Create a Cloudflare account and a Workers API token with permission to edit Workers.
+2. Add repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+3. Run the **Deploy SOBYA Verify API** workflow from GitHub Actions, or deploy manually from this directory with `npm install` then `npx wrangler deploy`.
+4. Cloudflare assigns a `workers.dev` URL. Confirm `/v1/health` responds with chain ID `357812033857` before publishing that endpoint as the hosted API base URL.
 
-The first release is a browser-native ES module. It is not an authenticated hosted REST API and does not promise uptime, rate limits, API keys, or a service-level agreement. Those would require separately operated backend infrastructure.
+GitHub Pages hosts the interface and documentation; Cloudflare Workers runs the HTTP API. No paid domain is required. The hosted endpoint is not live until a Cloudflare account is connected and the deployment workflow succeeds.
