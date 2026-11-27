@@ -44,8 +44,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// DefaultEVMChainID is a development default only. Operators must set a
-// network-specific EVM chain ID in app.toml before creating a public genesis.
+// DefaultEVMChainID is used only by freshly generated local development homes.
+// The deployed SOBYA Mainnet uses EVM chain ID 357812033857, supplied by its
+// production app.toml/genesis configuration; this local default is not a
+// network readiness flag or a production chain identifier.
 const DefaultEVMChainID uint64 = 777777
 
 // evmAppModuleBasic supplies the address codec required by the EVM CLI while
