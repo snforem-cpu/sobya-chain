@@ -1,38 +1,36 @@
-# SOBYA Operator Release Process
+# SOBYA Operator Release and Upgrade Process
 
-This process describes how to create a versioned operator binary. A source commit or successful CI run is not itself a published release.
+SOBYA Mainnet is live. This document governs versioned binaries and safe upgrades to the existing network. A source commit or successful CI run is not itself a published release.
 
 ## Release rules
 
-- Release only from a reviewed, exact source commit on the approved branch.
-- Use a version tag such as `v0.1.0-rc.1` only after the release candidate passes the agreed tests.
-- The dedicated `.github/workflows/validator-binary-release.yml` workflow runs the full Go test suite, builds Linux amd64 and arm64 binaries from the exact tag, packages both, combines their SHA-256 checksums, and publishes a GitHub prerelease.
-- A prerelease is a pre-mainnet operator candidate, not launch authorization. Release notes must state the exact source commit and that operators must wait for the signed launch bundle and genesis.
-- Never attach genesis files containing private data or any operator keys/secrets.
+- Release from a reviewed, exact source commit on the approved branch.
+- Run the full Go test suite and relevant localnet, multi-validator, EVM, fee-routing, reserve and network-configuration regression workflows on that exact commit.
+- The dedicated `.github/workflows/validator-binary-release.yml` workflow builds Linux amd64 and arm64 binaries, packages them, produces SHA-256 checksums and publishes the GitHub release.
+- Clearly identify whether a release is an upgrade candidate, a production-approved version, or a development build. Do not call an RC the active network version unless it is actually deployed.
+- Never attach validator keys, wallet secrets, mnemonics or private genesis material.
 
-## Candidate validation
+## Validate a release
 
-Before tagging:
-1. Confirm the source tree is clean and the commit SHA is recorded.
-2. Run Go unit tests and the relevant localnet, multi-validator, EVM, fee-routing, reserve, and network-config workflows on that exact SHA.
+1. Confirm the source tree is clean and record the commit SHA.
+2. Run unit and integration tests on that exact SHA.
 3. Review dependency changes and vulnerability findings.
 4. Confirm `sobyad version` reports the intended version and commit.
-5. Confirm the binary starts and its help/version commands work.
-6. Have an independent reviewer reproduce the build or verify the published checksum.
+5. Verify the binary starts and its help/version commands work.
+6. Reproduce the build or independently verify the published checksum.
+7. Compare the candidate with the currently running network version and document compatibility and upgrade requirements.
 
-## Publish
+## Publish and deploy
 
-After approval, create and push the agreed version tag on the reviewed commit. The release workflow builds `linux/amd64` and `linux/arm64`, packages `sobyad`, emits one combined `SHA256SUMS`, and creates a GitHub prerelease. Inspect the release assets and checksum before sharing them with operators.
-
-No tag is created by this preparation change. No binary is claimed as released until the workflow actually completes and the release page contains the assets.
+After review, create and push the agreed version tag. Inspect the release assets and checksum before distributing the binary. Production deployment is a coordinated network operation: confirm upgrade height/time, validator instructions, state compatibility, rollback/recovery plan and operator communications. Never imply that publishing a GitHub release automatically upgrades the live network.
 
 ## Operator verification
 
-Download the binary and checksum file from the same GitHub release:
+Download the binary and checksum file from the same official GitHub release:
 
 ```bash
 sha256sum -c SHA256SUMS
 ./sobyad version
 ```
 
-Operators must compare the reported version/commit with the coordinator's launch bundle. Do not install binaries from chat attachments, unofficial mirrors, or mutable branch downloads.
+Operators must compare the reported version/commit with the project's approved upgrade announcement. Do not install binaries from chat attachments, unofficial mirrors or mutable branch downloads.
