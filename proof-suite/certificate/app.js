@@ -1,6 +1,6 @@
 import { Interface } from "https://esm.sh/ethers@6.13.5";
 import QRCode from "https://esm.sh/qrcode@1.5.4?bundle";
-import { computeCertificateHash, generateCertificateId, isCertificateId } from "./core.js";
+import { computeCertificateHash, generateCertificateId } from "./core.js";
 import { isTransactionHash, isValidRegistryRecord } from "../invoice-proof/core.js";
 
 const CHAIN_ID = 357812033857n;
@@ -252,7 +252,6 @@ async function verifyCertificate() {
   const txHash = $("verify-cert-tx").value.trim();
   if (!isTransactionHash(txHash)) throw new Error("Enter a valid SOBYA transaction hash.");
   const metadata = getMetadata("verify-cert-");
-  if (!isCertificateId(metadata.certificateId)) throw new Error("Enter a valid SOBYA certificate ID.");
   const expected = await computeCertificateHash(metadata);
   const [chain, tx, receipt] = await Promise.all([
     rpc("eth_chainId", []), rpc("eth_getTransactionByHash", [txHash]), rpc("eth_getTransactionReceipt", [txHash])
@@ -285,8 +284,7 @@ async function verifyCertificate() {
   const block = await rpc("eth_getBlockByNumber", [receipt.blockNumber, false]);
   const timestamp = block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toLocaleString(state.lang === "ar" ? "ar" : "en") : "Confirmed";
   say("certificate-verify-result",
-    "MATCH — certificate details reproduce the registered fingerprint.\nCertificate ID: " + metadata.certificateId +
-    "\nIssuer: " + metadata.issuer + "\nRecipient: " + metadata.recipient +
+    "MATCH — certificate details reproduce the registered fingerprint.\nIssuer: " + metadata.issuer + "\nRecipient: " + metadata.recipient +
     "\nSigner: " + tx.from + "\nBlock: " + BigInt(receipt.blockNumber).toString() +
     "\nRecorded: " + timestamp + "\nTransaction: " + txHash, "success");
 }
