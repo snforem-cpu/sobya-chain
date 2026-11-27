@@ -9,7 +9,7 @@ SOBYA Proof is a simple browser-based tool for recording and verifying document 
 | Service | Status | Scope |
 | --- | --- | --- |
 | SOBYA Proof | Phase 1 — current service | SHA-256 file/document fingerprints and public transaction verification. |
-| SOBYA Invoice Proof | Phase 2 — integrated in the unified app | Private invoice file + reference/date/total/currency and optional issuer/recipient fingerprint; verification against a SOBYA Mainnet registry transaction. Not released until CI passes and the feature is merged and deployed. |
+| SOBYA Invoice Proof | Phase 2 — integrated in the unified app | Private invoice file + reference/date/total/currency and optional issuer/recipient fingerprint; verification against a SOBYA Mainnet registry transaction. Available inside the unified app. |
 | SOBYA Certificate | Phase 3 — implementation in progress | Issue digital certificates with random unique IDs, printable certificate output, QR links, and public transaction verification. |
 | SOBYA Verify API | Planned — Phase 4 | Developer interfaces for automated verification of all supported proof types. |
 
