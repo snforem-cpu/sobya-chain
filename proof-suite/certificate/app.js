@@ -24,11 +24,21 @@ function say(id, text, kind = "") {
   element.hidden = false;
 }
 function setWallet(text) { $("certificate-wallet-state").textContent = text; }
-function getMetadata(prefix = "cert-") {
+function getMetadata(prefix = "cert-", txHash = "") {
   const verify = prefix === "verify-cert-";
-  const id = verify ? "verify-cert-id" : "cert-id";
+  let certificateId = state.certificateId;
+  if (verify) {
+    const queryId = new URLSearchParams(window.location.search).get("cert");
+    const saved = readCertificateRecord();
+    const savedId = saved?.txHash && saved.txHash.toLowerCase() === txHash.toLowerCase()
+      ? saved.certificateId : null;
+    certificateId = queryId || savedId || "";
+    if (!certificateId) {
+      throw new Error("Certificate ID is not required as an input, but this older certificate's fingerprint includes its ID. Open its original verification link or verify it on the device where it was issued.");
+    }
+  }
   return {
-    certificateId: verify ? $(id).value.trim() : state.certificateId,
+    certificateId,
     issuer: $(verify ? "verify-cert-issuer" : "cert-issuer").value,
     recipient: $(verify ? "verify-cert-recipient" : "cert-recipient").value,
     title: $(verify ? "verify-cert-title" : "cert-title").value,
@@ -251,7 +261,7 @@ async function issueCertificate() {
 async function verifyCertificate() {
   const txHash = $("verify-cert-tx").value.trim();
   if (!isTransactionHash(txHash)) throw new Error("Enter a valid SOBYA transaction hash.");
-  const metadata = getMetadata("verify-cert-");
+  const metadata = getMetadata("verify-cert-", txHash);
   const expected = await computeCertificateHash(metadata);
   const [chain, tx, receipt] = await Promise.all([
     rpc("eth_chainId", []), rpc("eth_getTransactionByHash", [txHash]), rpc("eth_getTransactionReceipt", [txHash])
@@ -307,7 +317,6 @@ const today = new Date().toISOString().slice(0, 10);
 $("cert-issue-date").value = today;
 $("verify-cert-issue-date").value = today;
 const query = new URLSearchParams(window.location.search);
-if (query.has("cert")) $("verify-cert-id").value = query.get("cert");
 if (query.has("tx")) $("verify-cert-tx").value = query.get("tx");
 restoreCertificateRecord();
 restoreWallet();
