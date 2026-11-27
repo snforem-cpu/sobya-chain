@@ -109,7 +109,7 @@ async function verifyRecord(txHash, expectedFingerprint, env) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "*";
-    if (request.method === "OPTIONS") return response({}, 204, origin);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type", "vary": "Origin" } });
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/v1/health") {
       return response({ ok: true, service: "SOBYA Verify API", network: "SOBYA Mainnet", chainId: VERIFY_CONFIG.chainId.toString(), readOnly: true }, 200, origin);
