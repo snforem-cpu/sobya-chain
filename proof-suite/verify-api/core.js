@@ -64,10 +64,11 @@ export async function computeInvoiceProofHash(fileHash, metadata, cryptoProvider
   return sha256Hex(new TextEncoder().encode(canonicalInvoiceRecord(fileHash, metadata)), cryptoProvider);
 }
 
-export function isValidRegistryRecord({ tx, receipt, decodedCall, recordedEvent, expectedChainId = VERIFY_CONFIG.chainId }) {
+export function isValidRegistryRecord({ tx, receipt, decodedCall, recordedEvent, feeRecipient, expectedChainId = VERIFY_CONFIG.chainId }) {
   if (!tx || !receipt || receipt.status !== "0x1") return false;
   if (!ADDRESS_RE.test(tx.from || "") || !ADDRESS_RE.test(tx.to || "")) return false;
   if (tx.to.toLowerCase() !== VERIFY_CONFIG.registry.toLowerCase()) return false;
+  if (typeof feeRecipient !== "string" || feeRecipient.toLowerCase() !== VERIFY_CONFIG.serviceWallet.toLowerCase()) return false;
   if (!decodedCall || decodedCall.name !== "recordProof" || !recordedEvent || recordedEvent.name !== "ProofRecorded") return false;
   try {
     if (BigInt(tx.value || "0x0") !== VERIFY_CONFIG.feeWei) return false;
