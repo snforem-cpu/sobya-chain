@@ -48,7 +48,11 @@ The Proof Registry emits a `ProofRecorded` event identifying the wallet address 
 - A blockchain record proves the fingerprint was recorded; it does not certify the document's contents or confer legal status.
 - Invoice Proof is available inside the unified Proof Suite application at `#invoice-register`. Its fingerprint and verification logic remains in `invoice-proof/` and shares the application shell, language control and wallet session. Verify API is the next service to build.
 
-## Invoice Proof details\n\nInvoice Proof uses the same deployed Proof Registry and the same 1 SOBY service fee. It binds the invoice file digest to a normalized invoice reference, issue date, total, currency, and optional issuer/recipient labels. All invoice bytes and entered metadata remain local; only the final combined SHA-256 digest is public on-chain. Because that digest is public, a party with a known invoice copy may be able to compare it against the chain record. A matching record does not prove payment, delivery, issuer identity, tax compliance, or legal validity.\n\n## Service fee
+## Invoice Proof details
+
+Invoice Proof uses the same deployed Proof Registry and the same 1 SOBY service fee. It binds the invoice file digest to a normalized invoice reference, issue date, total, currency, and optional issuer/recipient labels. All invoice bytes and entered metadata remain local; only the final combined SHA-256 digest is public on-chain. Because that digest is public, a party with a known invoice copy may be able to compare it against the chain record. A matching record does not prove payment, delivery, issuer identity, tax compliance, or legal validity.
+
+## Service fee
 
 - Fixed fee: `1 SOBY` per proof (`1000000000000000000` wei; SOBY has 18 decimals).
 - Recipient: `0xd316993423Fc6268038F4EE3EA7C0C5038513C18`.
