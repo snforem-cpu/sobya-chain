@@ -48,7 +48,7 @@ function validRecord(overrides = {}) {
   const receipt = { status: "0x1" };
   const decodedCall = { name: "recordProof", args: [hash] };
   const recordedEvent = { name: "ProofRecorded", args: [signer, hash, VERIFY_CONFIG.feeWei, 1n] };
-  return { tx, receipt, decodedCall, recordedEvent, ...overrides };
+  return { tx, receipt, decodedCall, recordedEvent, feeRecipient: VERIFY_CONFIG.serviceWallet, ...overrides };
 }
 
 test("accepts a valid paid registry record", () => {
@@ -61,4 +61,5 @@ test("rejects failed, unpaid, wrong-contract and mismatched-event records", () =
   assert.equal(isValidRegistryRecord(validRecord({ tx: { ...validRecord().tx, to: signer } })), false);
   assert.equal(isValidRegistryRecord(validRecord({ recordedEvent: { name: "ProofRecorded", args: [signer, "0x" + "b".repeat(64), VERIFY_CONFIG.feeWei, 1n] } })), false);
   assert.equal(isValidRegistryRecord(validRecord({ recordedEvent: { name: "ProofRecorded", args: [signer, hash, 0n, 1n] } })), false);
+  assert.equal(isValidRegistryRecord(validRecord({ feeRecipient: signer })), false);
 });
