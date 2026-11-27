@@ -217,16 +217,13 @@ async function recordProof() {
   let txHash;
   const transaction = { from: state.account, to: REGISTRY_ADDRESS, value: "0x" + SERVICE_FEE_WEI.toString(16), data };
   try {
-    if (connectedViaSdk && evmClient && typeof evmClient.connectWith === "function") {
-      const response = await evmClient.connectWith({
-        method: "eth_sendTransaction",
-        params: account => [{ ...transaction, from: account }],
-        chainIds: [CHAIN_HEX]
-      });
-      txHash = response?.result;
-    } else {
-      txHash = await state.wallet.request({ method: "eth_sendTransaction", params: [transaction] });
-    }
+    // Use the connected EIP-1193 provider for the transaction approval.
+    // This avoids the SDK connectWith handoff path, which can return a rejection
+    // before MetaMask displays the transaction details on mobile browsers.
+    txHash = await state.wallet.request({
+      method: "eth_sendTransaction",
+      params: [transaction]
+    });
     if (!isTransactionHash(txHash)) throw new Error("MetaMask returned no valid transaction hash.");
   } catch (error) {
     const code = error?.rpcCode ?? error?.code;
