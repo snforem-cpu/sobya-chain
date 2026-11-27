@@ -9,7 +9,7 @@ const hash = "0x" + "a".repeat(64);
 const signer = "0x" + "1".repeat(40);
 
 test("prefers the current SOBYA Mainnet RPC endpoint", () => {
-  assert.equal(VERIFY_CONFIG.rpcUrls[0], "https://sobya-evm-rpc.nodesafe-app.xyz");
+  assert.equal(VERIFY_CONFIG.rpcUrls[0], "https://sobya-evm-rpc.nodesafe-dapp.xyz");
 });
 
 test("accepts only 32-byte transaction hashes", () => {
