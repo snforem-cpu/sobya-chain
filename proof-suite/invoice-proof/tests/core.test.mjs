@@ -17,6 +17,7 @@ test("normalizes invoice metadata deterministically", () => {
 test("rejects missing or malformed invoice fields", () => {
   assert.throws(() => normalizeInvoiceMetadata({...invoice, reference:""}), /reference/i);
   assert.throws(() => normalizeInvoiceMetadata({...invoice, issueDate:"27-11-2026"}), /date/i);
+  assert.throws(() => normalizeInvoiceMetadata({...invoice, issueDate:"2026-02-31"}), /date/i);
   assert.throws(() => normalizeInvoiceMetadata({...invoice, amount:"1,250.50"}), /amount/i);
   assert.throws(() => normalizeInvoiceMetadata({...invoice, currency:"US"}), /currency/i);
   assert.throws(() => canonicalInvoiceRecord("0x1234", invoice), /SHA-256/i);
