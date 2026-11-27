@@ -1,75 +1,23 @@
-# SOBYA Cosmos EVM Integration
+# Cosmos EVM integration — production network
 
-Status: **partially wired; EVM runtime acceptance tests are not yet passing because the EVM RPC/mempool server path is not integrated.** Do not treat this branch as a public EVM network or claim wallet compatibility yet.
+**SOBYA Mainnet is live with Cosmos EVM enabled.** The production EVM chain ID is `357812033857` (`0x534f425941`). The public EVM JSON-RPC endpoint is `https://sobya-evm-rpc.nodesafe-dapp.xyz`.
 
-## Confirmed on the current feature branch
+This document describes the code integration and historical engineering checks. It is not a pre-launch checklist. Local CI fixtures may use chain ID `777777` or `777778`; these are not production identifiers.
 
-The feature branch pins github.com/cosmos/evm v0.6.0 and has passed compile/build validation with the current Cosmos SDK / CometBFT dependency set.
+## Production EVM access
 
-The SOBYA application currently contains:
+Use the public EVM JSON-RPC endpoint for MetaMask, Ethereum-compatible wallets, dApps and JSON-RPC clients. Use CometBFT RPC (`https://sobya-rpc.nodesafe-dapp.xyz`) for consensus and node queries. The REST API is `https://sobya-api.nodesafe-dapp.xyz`.
 
-- EVM, FeeMarket, and ERC-20 store keys and keepers in app/evm.go.
-- Manual registration of the EVM, FeeMarket, and ERC-20 application modules.
-- EVM ante-handler installation through evmante.NewAnteHandler.
-- Runtime module lifecycle entries for EVM, FeeMarket, and ERC-20 in app/app_config.go.
-- A development EVM chain ID default of 777777; this is not a production network ID.
-- Native coin metadata configured as SOBY / asobya with 18 decimals.
+The live application includes Cosmos EVM execution, EVM-aware transaction handling, Ethereum JSON-RPC, fee-market and ERC-20 module integration. EVM chain identity is separate from the CometBFT chain ID `sobya-1`.
 
-The 3 November 2026 GitHub Actions runs on commit 5734ecfc92987e5bc866a4a97ab4067de06bada5 passed:
-- Feature source validation, tests, and binary builds.
-- 18-decimal native localnet initialization and block production.
-- Two-validator P2P synchronization, validator-set query, and a signed native SOBYA bank transfer with exact integer balance-delta verification.
+## Development and CI
 
-These tests prove Cosmos-native chain functionality only. They do not prove Ethereum transaction execution, EVM JSON-RPC, contract deployment, or wallet connectivity.
+The repository retains local test configurations and smoke tests. Their temporary nodes and test chain IDs are deliberately isolated from Mainnet. A passing or failing local CI run describes that specific source commit and test environment; it does not change the operational status of the already-running network.
 
-## Remaining EVM runtime work
+## Feature boundaries
 
-1. **Ethereum-compatible encoding and transaction configuration**
-   - Review the account, validator, and consensus address codecs.
-   - Register Ethereum transaction decoding/signing correctly without duplicate protobuf signer extractors.
-   - Verify the native SOBYA denomination maps to the EVM gas coin without a second supply.
+Core EVM network operation does not imply that every optional EVM ecosystem feature is deployed. IBC routes, individual token bridges, third-party wallet registries, contract products and external dApps have independent implementation, deployment and verification status. Report those separately and do not describe an optional feature gate as an EVM launch blocker.
 
-2. **EVM mempool and proposal path**
-   - Integrate the Cosmos EVM experimental mempool and its CheckTx / PrepareProposal handlers.
-   - Wire pending-transaction notifications and CometBFT event-bus lifecycle.
-   - Verify Cosmos SDK transactions continue to work through the same mempool.
+## Security
 
-3. **Node server and RPC**
-   - Use the Cosmos EVM server startup path rather than the standard SDK-only start command.
-   - Add explicit JSON-RPC and WebSocket configuration, API namespace allow-list, timeouts, gas caps, and safe CORS defaults.
-   - Verify eth_chainId, net_version, eth_blockNumber, eth_getBalance, and WebSocket subscriptions on a running local node.
-
-4. **EVM execution tests**
-   - Submit an EIP-155 signed native-value Ethereum transaction through JSON-RPC.
-   - Verify sender/recipient balances and nonce changes.
-   - Deploy a small Solidity contract, call it, and verify stored state and emitted logs.
-   - Test ERC-20 representation/conversion against the one canonical native supply.
-   - Test fee-market charging and ensure no mint path can exceed the 1-billion-SOBY cap.
-
-5. **Precompiles and IBC**
-   - Review and add only the required Cosmos EVM static precompiles.
-   - Integrate and test ERC-20/IBC transfer middleware and callbacks only after the keeper/address-codec wiring is validated.
-
-6. **Production readiness**
-   - Select and collision-check a permanent EVM chain ID before public genesis.
-   - Finalize fee policy, including the agreed 50/30/20 fee allocation through explicit custom distribution logic.
-   - Review validator economics, genesis allocation, upgrade safety, RPC exposure, monitoring, backups, and permanent validator hosting.
-
-## Token rules that must remain invariant
-
-- Native token: SOBY; base denomination: asobya.
-- Precision: 18 decimal places.
-- Maximum supply: 1,000,000,000 SOBY = 10^27 asobya, enforced with arbitrary-precision integers.
-- Founder allocation: 40% (400 million SOBY), as previously agreed.
-- Network fee allocation: 50% treasury, 30% validators, 20% community. This is separate from initial token allocation and is not yet implemented.
-- Do not invent allocations for the remaining initial supply. Do not add a presale or imply exchange listings.
-
-## Wallet and network claims
-
-MetaMask/Rabby compatibility can only be claimed after a persistent public EVM JSON-RPC endpoint, the chosen EVM chain ID, and signed transaction tests are available. Cosmos wallet support requires working Cosmos RPC/gRPC/REST and published chain metadata. Trust Wallet and Phantom must not be claimed compatible without their own network/token requirements and tests.
-
-A GitHub Actions runner is temporary infrastructure. A successful two-validator CI test is not a continuously available public network.
-
-## Dependency note
-
-The compatibility workflow pins Sonic v1.15.5 together with its matching github.com/bytedance/sonic/loader v0.5.3 module. Dependency compatibility and compilation do not establish EVM runtime functionality.
+Keep JSON-RPC administrative methods, account unlocking, profiling and debug namespaces disabled on public endpoints. Expose only the required read-only methods through a secured reverse proxy, with TLS, origin restrictions and rate limiting appropriate to the deployment.
