@@ -59,9 +59,10 @@ Errors use `{ "ok": false, "error": { "message": "..." } }` with HTTP status cod
 
 ## Deploy to Cloudflare Workers (free tier)
 
-1. Create a Cloudflare account and a Workers API token with permission to edit Workers.
-2. Add repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-3. Run the **Deploy SOBYA Verify API** workflow from GitHub Actions, or deploy manually from this directory with `npm install` then `npx wrangler deploy`.
-4. Cloudflare assigns a `workers.dev` URL. Confirm `/v1/health` responds with chain ID `357812033857` before publishing that endpoint as the hosted API base URL.
+1. Reuse the existing SOBYA Cloudflare account. Do not create another account or another D1 database for this service.
+2. The Verify API uses its own Worker name (`sobya-verify-api`) and does not bind to or modify the existing `sobya-buy-db` D1 database. The current BUY API and its D1 migrations remain separate and unchanged.
+3. Reuse the repository Actions secrets already used by the existing Cloudflare deployments: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Do not paste either secret into source files or chat.
+4. After this change is merged to `main`, the **Deploy SOBYA Verify API** workflow runs automatically. It installs dependencies, runs the Worker tests, and deploys the new Worker. A manual run is also available in GitHub Actions.
+5. Cloudflare assigns a `workers.dev` URL. Confirm `/v1/health` responds with chain ID `357812033857` before publishing that endpoint as the hosted API base URL.
 
-GitHub Pages hosts the interface and documentation; Cloudflare Workers runs the HTTP API. No paid domain is required. The hosted endpoint is not live until a Cloudflare account is connected and the deployment workflow succeeds.
+GitHub Pages hosts the interface and documentation; Cloudflare Workers runs the HTTP API. No paid domain or additional D1 database is required. The hosted endpoint is not live until the deployment workflow succeeds and its `/v1/health` response is checked.
