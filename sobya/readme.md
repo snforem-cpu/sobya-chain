@@ -1,36 +1,44 @@
-# SOBYA blockchain (development)
+# SOBYA blockchain — Mainnet
 
-SOBYA is an in-development Cosmos SDK application using CometBFT, with a partially integrated Cosmos EVM execution environment. It is not a launched public network.
+**SOBYA Mainnet is live.** This repository contains the Cosmos SDK / CometBFT application and Cosmos EVM execution environment used by the production network.
 
-## Native token
+## Production network
 
-- Display: `SOBY`
-- Base denomination: `asobya`
-- Precision: 18 decimals (`1 SOBY = 10^18 asobya`)
-- Intended maximum native supply: `1,000,000,000 SOBY`
-- Automatic mint inflation is disabled by current genesis normalization.
+- CometBFT chain ID: `sobya-1`
+- EVM chain ID: `357812033857`
+- Network name: `SOBYA Mainnet`
+- Native display asset: `SOBY`
+- Native base denomination: `asobya`
+- Precision: 18 decimals
+- Maximum native supply: 1,000,000,000 SOBY
+- Automatic mint inflation: disabled under the network token rules.
 
-The genesis guard checks the initial native allocation against the cap. Runtime issuance invariants and the validator reserve release mechanism still require complete end-to-end verification before launch. See [TOKENOMICS.md](TOKENOMICS.md).
+Public endpoints:
+- EVM JSON-RPC: `https://sobya-evm-rpc.nodesafe-dapp.xyz`
+- CometBFT RPC: `https://sobya-rpc.nodesafe-dapp.xyz`
+- REST API: `https://sobya-api.nodesafe-dapp.xyz`
+- Explorer: `https://explorer.nodesafe-app.xyz/sobya`
+
+Use the EVM JSON-RPC endpoint for MetaMask and EVM applications. CometBFT RPC and REST serve different protocols.
 
 ## EVM and fee routing
 
-The development branch includes Cosmos EVM modules and EVM-aware transaction handling. CI workflows exercise EVM JSON-RPC, signed EVM transactions, contract deployment/calls, and actual Cosmos/EVM transaction-fee routing. The current EVM chain ID `777777` is for development and CI only.
+The production application includes Cosmos EVM, EVM JSON-RPC execution, ERC-20 and fee-market modules, EVM-aware transaction handling, and unified EVM/Cosmos transaction processing. Mainnet EVM chain ID is `357812033857`. Local development and CI fixtures may use `777777` or `777778`; those values are not production network IDs.
 
-The fee router currently sends the combined treasury/community portion (70%) to the configured shared management wallet and leaves 30% for the Cosmos distribution module. Because treasury and community use the same wallet, their internal accounting remains separate off-chain.
+The agreed network transaction-fee distribution is 50% Treasury, 30% Validators and 20% Community. The shared on-chain management destination may aggregate Treasury and Community transfers; their accounting categories remain separate in the project's allocation ledger.
 
-## Development
+## Local development
 
-Run locally with Ignite only for disposable development environments:
+Run local disposable development environments with Ignite:
 
 ```sh
 ignite chain serve
 ```
 
-The values in `config.yml` are development-only test allocations. They are not the agreed public launch distribution or a final genesis file.
+Localnet configuration and CI fixtures are not production genesis or production network endpoints. Never connect a production wallet to a local test chain or confuse a CI chain ID with the mainnet EVM chain ID.
 
-## Safety and status
+## Operational distinction
 
-- CI/localnet success is not proof of independent public validators or production readiness.
-- The public testnet chain ID, EVM chain ID, genesis ceremony, validator reserve rules, and public infrastructure are not finalized.
-- Do not use real funds on this development chain.
-- Never commit private validator keys, node keys, mnemonics, or wallet secrets.
+SOBYA Mainnet and its EVM are live. Individual optional features—such as particular IBC routes, third-party listings, independently deployed dApps, and local developer tooling—have their own feature and verification status. A limitation in one optional feature does not mean the chain or EVM is not launched.
+
+Never commit private validator keys, node keys, mnemonics, or wallet secrets.
