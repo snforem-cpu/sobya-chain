@@ -80,19 +80,21 @@ export function createSobyaVerifyClient({ rpcUrls, fetchImpl = globalThis.fetch,
       throw new Error("Transaction is not a valid SOBYA Proof Registry record.");
     }
     const fingerprint = String(decodedCall.args[0]).toLowerCase();
-    if (expectedFingerprint && fingerprint !== expectedFingerprint.toLowerCase()) {
-      return {
-        valid: true, match: false, type: "proof", txHash,
-        fingerprint, signer: tx.from, blockNumber: BigInt(receipt.blockNumber).toString()
-      };
-    }
     const block = await rpc("eth_getBlockByNumber", [receipt.blockNumber, false]);
-    return {
-      valid: true, match: expectedFingerprint ? true : null, type: "proof", txHash,
-      fingerprint, signer: tx.from, blockNumber: BigInt(receipt.blockNumber).toString(),
+    const result = {
+      valid: true,
+      match: expectedFingerprint ? fingerprint === expectedFingerprint.toLowerCase() : null,
+      type: "proof",
+      txHash,
+      fingerprint,
+      signer: tx.from,
+      blockNumber: BigInt(receipt.blockNumber).toString(),
       timestamp: block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toISOString() : null,
-      chainId: VERIFY_CONFIG.chainId.toString(), registry: VERIFY_CONFIG.registry
+      chainId: VERIFY_CONFIG.chainId.toString(),
+      registry: VERIFY_CONFIG.registry,
+      feeRecipient
     };
+    return result;
   }
 
   return Object.freeze({
