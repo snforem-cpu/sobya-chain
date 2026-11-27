@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071426">
+<meta name="description" content="Register and verify private invoice fingerprints on SOBYA Mainnet.">
+<title>SOBYA Invoice Proof</title>
+<link rel="icon" type="image/png" href="../assets/logo/sobya-coin-128.png">
+<link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./suite.css"><link rel="stylesheet" href="./invoice.css">
+</head>
+<body>
+<main class="shell">
+<header class="topbar"><a class="brand" href="./" aria-label="SOBYA Proof Suite"><img src="../assets/logo/sobya-coin-128.png" alt="Official SOBYA logo"><span>SOBYA <i>INVOICE PROOF</i></span></a><a class="lang-button" href="./">Proof Suite</a></header>
+<section class="hero"><p class="eyebrow">INVOICE INTEGRITY · SOBYA MAINNET</p><h1>Register an invoice fingerprint.</h1><p class="intro">Create a tamper-evident fingerprint from your invoice file and its reference details. Your file and invoice fields stay on your device; only the combined SHA-256 fingerprint is recorded on-chain.</p></section>
+<section class="panel">
+<div class="section-heading"><div><p class="step">01 · INVOICE DETAILS</p><h2>Prepare invoice record</h2></div><span class="tag">PRIVATE METADATA</span></div>
+<label class="field-label" for="invoice-file">Invoice file (PDF or image)</label><input class="text-input" id="invoice-file" type="file" accept=".pdf,image/*">
+<div class="invoice-fields">
+<div><label class="field-label" for="invoice-ref">Invoice reference</label><input class="text-input" id="invoice-ref" maxlength="120" placeholder="INV-2026-001"></div>
+<div><label class="field-label" for="invoice-date">Issue date</label><input class="text-input" id="invoice-date" type="date"></div>
+<div><label class="field-label" for="invoice-amount">Total amount</label><input class="text-input" id="invoice-amount" inputmode="decimal" placeholder="1250.00"></div>
+<div><label class="field-label" for="invoice-currency">Currency (ISO 4217)</label><input class="text-input" id="invoice-currency" maxlength="3" placeholder="USD"></div>
+</div>
+<div class="hash-row"><div class="hash-label">Combined invoice SHA-256</div><code id="invoice-hash">Not calculated</code></div>
+<p class="privacy-note">Privacy: invoice file, reference, date, currency and amount are never uploaded or written on-chain. They are combined locally with the file fingerprint. Keep these details to reproduce the same fingerprint during verification.</p>
+<div class="fee-summary"><div><span>Invoice Proof service fee</span><strong>1 SOBY</strong></div><small>Paid atomically in the existing SOBYA Proof Registry call. Network gas is separate and shown by MetaMask.</small><small>Registry: 0x9B1C6Cc504DEb8FA7aB9DAe499aB3D042fEC97b9</small></div>
+<div class="button-row"><button class="button secondary" id="calculate" type="button">Calculate fingerprint</button><button class="button primary" id="connect" type="button">Connect wallet</button><button class="button primary" id="register" type="button" disabled>Register invoice</button></div>
+<p class="wallet-state" id="wallet-state" aria-live="polite">Wallet not connected.</p>
+</section>
+<section class="panel"><div class="section-heading"><div><p class="step">02 · VERIFY</p><h2>Verify an invoice record</h2></div><span class="tag">READ-ONLY</span></div>
+<label class="field-label" for="tx-hash">SOBYA transaction hash</label><input class="text-input" id="tx-hash" placeholder="0x…" autocomplete="off">
+<button class="button secondary" id="verify" type="button">Verify invoice transaction</button><div class="result" id="result" aria-live="polite" hidden></div>
+<p class="privacy-note">For a full match check, enter the same invoice details above and select the original invoice file before verifying. A valid on-chain record confirms only that a fingerprint was registered; it does not certify invoice accuracy, payment, or legal status.</p>
+</section>
+<footer><a href="./">← SOBYA Proof Suite</a><a href="https://explorer.nodesafe-app.xyz/sobya" target="_blank" rel="noopener">SOBYA Explorer ↗</a><span>Official SOBYA logo · SOBYA Mainnet</span></footer>
+</main>
+<script type="module" src="./invoice.js"></script>
+</body></html>
