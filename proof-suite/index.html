@@ -100,14 +100,14 @@
         <div><p class="step">02 · VERIFY</p><h2 id="verify-title" data-en="Verify an existing proof" data-ar="تحقق من إثبات مسجل">Verify an existing proof</h2></div>
         <span class="tag">READ-ONLY</span>
       </div>
-      <label class="field-label" for="tx-hash" data-en="SOBYA transaction hash" data-ar="معرّف معاملة SOBYA">SOBYA transaction hash</label>
+      <label class="field-label" for="invoice-tx-hash" data-en="SOBYA transaction hash" data-ar="معرّف معاملة SOBYA">SOBYA transaction hash</label>
       <input class="text-input" id="tx-hash" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…">
       <div class="verify-file">
-        <label class="field-label" for="verify-file" data-en="Optional: choose the file to compare" data-ar="اختياري: اختر الملف للمقارنة">Optional: choose the file to compare</label>
-        <input id="verify-file" type="file">
+        <label class="field-label" for="invoice-verify-file" data-en="Optional: choose the file to compare" data-ar="اختياري: اختر الملف للمقارنة">Optional: choose the file to compare</label>
+        <input id="invoice-verify-file" type="file">
       </div>
       <button class="button secondary" id="verify-button" type="button" data-en="Verify transaction" data-ar="تحقق من المعاملة">Verify transaction</button>
-      <div class="result" id="verify-result" aria-live="polite" hidden></div>
+      <div class="result" id="invoice-verify-result" aria-live="polite" hidden></div>
     </section>
 
     <section class="panel invoice-app" id="invoice-register" aria-labelledby="invoice-title"><div class="section-heading"><div><p class="step">02 · INVOICE PROOF</p><h2 id="invoice-title" data-en="Invoice Proof" data-ar="إثبات الفواتير">Invoice Proof</h2></div><span class="tag">SHA-256</span></div>
@@ -140,7 +140,7 @@
 <div class="field"><label for="verify-recipient" data-en="Recipient / customer (if used)" data-ar="المستلم / العميل (إن استُخدم)">Recipient / customer (if used)</label><input id="verify-recipient"></div>
 </div>
 <p class="help" data-en="Enter the same invoice details used at registration. Verification runs locally and reads the transaction from SOBYA Mainnet." data-ar="أدخل بيانات الفاتورة نفسها المستخدمة عند التسجيل. يتم التحقق محلياً وقراءة المعاملة من شبكة SOBYA الرئيسية.">Enter the same invoice details used at registration. Verification runs locally and reads the transaction from SOBYA Mainnet.</p>
-<button class="button primary" id="verify" type="button" data-en="Verify invoice" data-ar="تحقق من الفاتورة">Verify invoice</button><div class="result" id="verify-result" aria-live="polite" hidden></div>
+<button class="button primary" id="invoice-verify" type="button" data-en="Verify invoice" data-ar="تحقق من الفاتورة">Verify invoice</button><div class="result" id="verify-result" aria-live="polite" hidden></div>
 </section>
 <section class="notice"><strong data-en="Privacy and evidence scope" data-ar="الخصوصية ونطاق الإثبات">Privacy and evidence scope</strong><p data-en="The invoice file, invoice number, date, amount, currency and party names are processed in your browser only. The blockchain receives a one-way SHA-256 fingerprint, the submitting wallet address and the transaction timestamp. A match proves that the supplied file and details reproduce the registered fingerprint; it does not prove payment, delivery, tax compliance, authenticity of the issuer or legal validity." data-ar="تتم معالجة ملف الفاتورة ورقمها وتاريخها ومبلغها وعملتها وأسماء الأطراف داخل متصفحك فقط. تستقبل البلوكشين بصمة SHA-256 أحادية الاتجاه وعنوان المحفظة ووقت المعاملة. التطابق يثبت أن الملف والبيانات المقدمة ينتجان البصمة المسجلة؛ ولا يثبت الدفع أو التسليم أو الامتثال الضريبي أو صحة هوية المصدر أو الصلاحية القانونية.">The invoice file, invoice number, date, amount, currency and party names are processed in your browser only. The blockchain receives a one-way SHA-256 fingerprint, the submitting wallet address and the transaction timestamp. A match proves that the supplied file and details reproduce the registered fingerprint; it does not prove payment, delivery, tax compliance, authenticity of the issuer or legal validity.</p></section>
 </section>
@@ -160,5 +160,6 @@
     <footer><a href="../" data-en="← SOBYA home" data-ar="العودة إلى SOBYA ←">← SOBYA home</a><a href="https://github.com/snforem-cpu/sobya-chain/tree/main/proof-suite" target="_blank" rel="noopener">Open-source implementation ↗</a><span>Powered by SOBYA Mainnet</span></footer>
   </main>
   <script type="module" src="./app.js"></script>
+  <script type="module" src="./invoice-proof/app.js"></script>
 </body>
 </html>
