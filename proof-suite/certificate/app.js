@@ -151,12 +151,17 @@ async function issueCertificate() {
   $("certificate-preview-notes").textContent = metadata.notes;
   $("certificate-preview-id").textContent = metadata.certificateId;
   $("certificate-preview-tx").textContent = tx;
+  let receipt = null;
+  try { receipt = await rpc("eth_getTransactionReceipt", [tx]); } catch {}
+  if (receipt && receipt.status !== "0x1") throw new Error("The certificate transaction failed on SOBYA Mainnet.");
+  $("certificate-preview-status").textContent = receipt ? "ON-CHAIN RECORD CONFIRMED" : "PENDING CONFIRMATION — VERIFY AFTER BLOCK";
   const verifyUrl = new URL("./?cert=" + encodeURIComponent(metadata.certificateId) + "&tx=" + encodeURIComponent(tx) + "#certificate-verify", window.location.href).href;
   await QRCode.toCanvas($("certificate-qr"), verifyUrl, {
     width: 160, margin: 1, color: { dark: "#071426", light: "#ffffff" }
   });
   $("certificate-preview").hidden = false;
   say("certificate-issue-result", "Certificate fingerprint submitted to SOBYA Mainnet. Wait for confirmation before treating it as verified. Transaction: " + tx, "success");
+  state.certificateId = null;
   setWallet("Certificate submitted. Its QR code opens the public verification form.");
 }
 async function verifyCertificate() {
