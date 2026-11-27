@@ -130,6 +130,38 @@ function issueMetadata() {
     notes: $("cert-notes").value
   };
 }
+const CERTIFICATE_STORAGE_KEY = "sobya:last-issued-certificate:v1";
+function displayCertificatePreview(metadata, tx, status) {
+  $("certificate-preview-title").textContent = metadata.title;
+  $("certificate-preview-recipient").textContent = metadata.recipient;
+  $("certificate-preview-issuer").textContent = metadata.issuer;
+  $("certificate-preview-issue-date").textContent = metadata.issueDate;
+  $("certificate-preview-expiry").textContent = metadata.expiryDate ? " · Expires: " + metadata.expiryDate : "";
+  $("certificate-preview-notes").textContent = metadata.notes;
+  $("certificate-preview-id").textContent = metadata.certificateId;
+  $("certificate-preview-tx").textContent = tx || "Pending transaction hash";
+  $("certificate-preview-status").textContent = status;
+  $("certificate-preview").hidden = false;
+  if (tx) {
+    const verifyUrl = new URL("./?cert=" + encodeURIComponent(metadata.certificateId) + "&tx=" + encodeURIComponent(tx) + "#certificate-verify", window.location.href).href;
+    return QRCode.toCanvas($("certificate-qr"), verifyUrl, {
+      width: 160, margin: 1, color: { dark: "#071426", light: "#ffffff" }
+    });
+  }
+  return Promise.resolve();
+}
+function saveCertificateRecord(metadata, tx, status) {
+  try {
+    localStorage.setItem(CERTIFICATE_STORAGE_KEY, JSON.stringify({ metadata, tx, status, savedAt: Date.now() }));
+  } catch (error) { console.warn("Could not save certificate recovery data locally:", error); }
+}
+async function restoreCertificatePreview() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CERTIFICATE_STORAGE_KEY) || "null");
+    if (!saved?.metadata?.certificateId || !isTransactionHash(saved.tx)) return;
+    await displayCertificatePreview(saved.metadata, saved.tx, saved.status || "SUBMITTED — CHECK CONFIRMATION");
+  } catch (error) { console.warn("Certificate preview restore failed:", error); }
+}
 async function issueCertificate() {
   if (!state.provider || !state.account) throw new Error("Connect your wallet in the SOBYA Proof section above first.");
   const metadata = issueMetadata();
@@ -159,26 +191,29 @@ async function issueCertificate() {
   });
   if (!isTransactionHash(tx)) throw new Error("MetaMask did not return a valid transaction hash.");
   state.certificateId = metadata.certificateId;
-  $("certificate-preview-title").textContent = metadata.title;
-  $("certificate-preview-recipient").textContent = metadata.recipient;
-  $("certificate-preview-issuer").textContent = metadata.issuer;
-  $("certificate-preview-issue-date").textContent = metadata.issueDate;
-  $("certificate-preview-expiry").textContent = metadata.expiryDate ? " · Expires: " + metadata.expiryDate : "";
-  $("certificate-preview-notes").textContent = metadata.notes;
-  $("certificate-preview-id").textContent = metadata.certificateId;
-  $("certificate-preview-tx").textContent = tx;
+  saveCertificateRecord(metadata, tx, "PENDING CONFIRMATION — VERIFY AFTER BLOCK");
+  // Reveal and persist the certificate before optional QR generation or receipt polling.
+  await displayCertificatePreview(metadata, tx, "PENDING CONFIRMATION — VERIFY AFTER BLOCK");
+  say("certificate-issue-result", "Certificate transaction submitted. Save the certificate ID and transaction hash shown below. Transaction: " + tx, "success");
   let receipt = null;
-  try { receipt = await rpc("eth_getTransactionReceipt", [tx]); } catch {}
-  if (receipt && receipt.status !== "0x1") throw new Error("The certificate transaction failed on SOBYA Mainnet.");
-  $("certificate-preview-status").textContent = receipt ? "ON-CHAIN RECORD CONFIRMED" : "PENDING CONFIRMATION — VERIFY AFTER BLOCK";
-  const verifyUrl = new URL("./?cert=" + encodeURIComponent(metadata.certificateId) + "&tx=" + encodeURIComponent(tx) + "#certificate-verify", window.location.href).href;
-  await QRCode.toCanvas($("certificate-qr"), verifyUrl, {
-    width: 160, margin: 1, color: { dark: "#071426", light: "#ffffff" }
-  });
-  $("certificate-preview").hidden = false;
-  say("certificate-issue-result", "Certificate fingerprint submitted to SOBYA Mainnet. Wait for confirmation before treating it as verified. Transaction: " + tx, "success");
+  try { receipt = await rpc("eth_getTransactionReceipt", [tx]); } catch (error) { console.warn("Receipt lookup delayed:", error); }
+  if (receipt && receipt.status !== "0x1") {
+    $("certificate-preview-status").textContent = "TRANSACTION FAILED";
+    saveCertificateRecord(metadata, tx, "TRANSACTION FAILED");
+    throw new Error("The certificate transaction failed on SOBYA Mainnet. The transaction details remain visible for reference.");
+  }
+  const status = receipt ? "ON-CHAIN RECORD CONFIRMED" : "PENDING CONFIRMATION — VERIFY AFTER BLOCK";
+  $("certificate-preview-status").textContent = status;
+  saveCertificateRecord(metadata, tx, status);
+  try {
+    await displayCertificatePreview(metadata, tx, status);
+  } catch (error) {
+    console.warn("QR generation failed; certificate details remain available:", error);
+    say("certificate-issue-result", "Certificate submitted. The QR code could not be generated, but the Certificate ID and transaction hash are displayed below and saved in this browser.", "success");
+  }
   state.certificateId = null;
-  setWallet("Certificate submitted. Its QR code opens the public verification form.");
+  setWallet("Certificate submitted. Its details are saved in this browser and can be restored on this device.");
+
 }
 async function verifyCertificate() {
   const txHash = $("verify-cert-tx").value.trim();
@@ -243,4 +278,5 @@ $("verify-cert-issue-date").value = today;
 const query = new URLSearchParams(window.location.search);
 if (query.has("cert")) $("verify-cert-id").value = query.get("cert");
 if (query.has("tx")) $("verify-cert-tx").value = query.get("tx");
+restoreCertificatePreview();
 restoreWallet();
