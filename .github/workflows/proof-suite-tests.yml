@@ -33,13 +33,10 @@ jobs:
       - name: Check SOBYA EVM RPC endpoints and browser CORS
         run: |
           node --input-type=module <<'NODE'
-          const endpoints = [
-            "https://sobya-evm-rpc.nodesafe-dapp.xyz",
-            "https://sobya-evm-rpc.nodesafe-app.xyz"
-          ];
+          const primary = "https://sobya-evm-rpc.nodesafe-dapp.xyz";
+          const secondary = "https://sobya-evm-rpc.nodesafe-app.xyz";
           const expectedChainId = "0x534f425941";
-          const successes = [];
-          for (const url of endpoints) {
+          async function checkEndpoint(url) {
             try {
               const preflight = await fetch(url, {
                 method: "OPTIONS",
@@ -83,14 +80,20 @@ jobs:
                 throw new Error("Invalid block height response");
               }
               const block = BigInt(blockBody.result).toString();
-              successes.push(url);
               console.log("PASS " + url + " — chainId " + body.result + ", block " + block + ", CORS preflight allowed");
+              return { ok: true, block };
             } catch (error) {
               console.log("FAIL " + url + " — " + (error?.stack || error?.message || String(error)));
+              return { ok: false, error };
             }
           }
-          if (successes.length === 0) {
-            throw new Error("No SOBYA EVM RPC endpoint passed the chain ID, block height, and browser CORS checks.");
+          const primaryResult = await checkEndpoint(primary);
+          if (!primaryResult.ok) {
+            throw new Error("Required primary SOBYA RPC failed: " + primary);
           }
-          console.log("RPC smoke check passed on " + successes.length + " of " + endpoints.length + " endpoints.");
+          const secondaryResult = await checkEndpoint(secondary);
+          if (!secondaryResult.ok) {
+            console.log("WARNING: optional fallback RPC is unavailable; primary RPC is healthy.");
+          }
+          console.log("Required primary RPC passed; fallback status: " + (secondaryResult.ok ? "healthy" : "unavailable") + ".");
           NODE
