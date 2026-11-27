@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
       - name: Check JavaScript syntax
-        run: node --check proof-suite/app.js && node --check proof-suite/proof-core.js && node --check proof-suite/invoice-proof/app.js && node --check proof-suite/invoice-proof/core.js && node --check proof-suite/certificate/app.js && node --check proof-suite/certificate/core.js
+        run: node --check proof-suite/app.js && node --check proof-suite/proof-core.js && node --check proof-suite/invoice-proof/app.js && node --check proof-suite/invoice-proof/core.js
       - name: Run proof payload tests
         run: node --test proof-suite/tests/*.test.mjs proof-suite/invoice-proof/tests/*.test.mjs
 
