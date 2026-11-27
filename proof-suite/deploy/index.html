@@ -33,6 +33,16 @@
 <div class="status" id="status" aria-live="polite">Deployment is disabled until the build and wallet checks pass.</div>
 </section>
 <section class="panel">
+<strong>Recover an existing deployment by transaction hash</strong>
+<p class="muted">Read-only recovery. Enter the MetaMask transaction hash to retrieve its receipt directly from the SOBYA EVM RPC, extract the created contract address, and verify its bytecode and fee recipient. This never sends a transaction.</p>
+<div class="item"><div class="muted">Existing deployment transaction hash</div><input id="recoverHash" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" value="0xe5329ca7a908d6924b627c430feb40b6fdc84251712aa6ef8f12ca2a136703ac" style="width:100%;padding:12px;background:#07182b;color:#f2f6ff;border:1px solid var(--line);border-radius:9px;font-family:ui-monospace,monospace"></div>
+<button class="btn secondary" id="recover" type="button">Check and recover existing transaction</button>
+<div class="status" id="recoverStatus" aria-live="polite">Ready to check the existing transaction. No transaction will be sent.</div>
+<div class="item"><div class="muted">Recovered contract address</div><div class="value" id="recoveredAddress">Not checked</div></div>
+<div class="item"><div class="muted">Recovered transaction</div><div class="value" id="recoveredHash">—</div></div>
+<div class="item"><div class="muted">Fee recipient verification</div><div class="value" id="recoveredRecipient">Not checked</div></div>
+</section>
+<section class="panel">
 <strong>Deployment result</strong>
 <div class="item"><div class="muted">Contract address</div><div class="value" id="contractAddress">Not deployed</div></div>
 <div class="item"><div class="muted">Transaction hash</div><div class="value" id="txHash">—</div></div>
@@ -49,6 +59,37 @@ const $=id=>document.getElementById(id);
 let walletProvider=null, signer=null, account=null, client=null, artifact=null, ready=false, busy=false;
 const say=m=>$("status").textContent=m, connectSay=m=>$("connectStatus").textContent=m;
 const err=e=>e?.shortMessage||e?.reason||e?.message||String(e);
+async function recoverExisting(){
+ const hash=$("recoverHash").value.trim(), out=$("recoverStatus");
+ $("recover").disabled=true;out.textContent="Querying the SOBYA EVM RPC for the existing transaction and receipt…";
+ $("recoveredAddress").textContent="Checking…";$("recoveredHash").textContent=hash;$("recoveredRecipient").textContent="Checking…";
+ try{
+  if(!/^0x[a-fA-F0-9]{64}$/.test(hash))throw Error("Enter a valid 32-byte transaction hash.");
+  if(!artifact)await loadArtifact();
+  const readProvider=new ethers.JsonRpcProvider(RPC,CHAIN,{staticNetwork:true});
+  const tx=await readProvider.getTransaction(hash);
+  if(!tx)throw Error("The RPC cannot find this transaction yet. The hash is retained; do not redeploy.");
+  if(tx.to!==null)throw Error("This transaction is not a contract-creation transaction (its destination is not empty).");
+  if(!tx.data||!tx.data.toLowerCase().startsWith(artifact.bytecode.toLowerCase()))throw Error("The transaction creation bytecode does not match the published SobyaProofRegistry artifact.");
+  const receipt=await readProvider.getTransactionReceipt(hash);
+  if(!receipt)throw Error("The transaction is not mined yet or its receipt is not available. Keep the hash and retry later.");
+  if(receipt.status!==1)throw Error("The deployment transaction was mined but failed (receipt status 0); no contract was created.");
+  if(!receipt.contractAddress)throw Error("The successful receipt does not contain a contract address.");
+  const address=receipt.contractAddress;
+  $("recoveredAddress").textContent=address;
+  const code=await readProvider.getCode(address);
+  if(!code||code==="0x")throw Error("The receipt contains an address, but deployed bytecode is not visible from the RPC yet.");
+  const deployed=new ethers.Contract(address,artifact.abi,readProvider);
+  const recipient=await deployed.feeRecipient();
+  if(recipient.toLowerCase()!==FEE_RECIPIENT.toLowerCase())throw Error("A contract exists at this address, but its fee recipient does not match the official SOBYA Proof service wallet.");
+  $("recoveredRecipient").textContent="Verified: "+recipient;
+  $("contractAddress").textContent=address;$("txHash").textContent=hash;$("recipientCheck").textContent="Verified: "+recipient;
+  out.textContent="SUCCESS: deployment receipt confirmed, contract creation bytecode matched, runtime bytecode exists, and fee recipient verified. No transaction was sent.";
+ }catch(e){
+  out.textContent="Recovery check did not complete: "+err(e)+". No transaction was sent; keep the hash and do not redeploy until resolved.";
+  $("recoveredAddress").textContent="Not verified";$("recoveredRecipient").textContent="Not verified";
+ }finally{$("recover").disabled=false}
+}
 async function digest(s){const b=new TextEncoder().encode(s.toLowerCase());const h=await crypto.subtle.digest("SHA-256",b);return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 async function loadArtifact(){
  const response=await fetch("../../dex/deploy/artifacts.json",{cache:"no-store"});
@@ -114,7 +155,7 @@ async function deploy(){
  }catch(e){say("Deployment stopped: "+err(e)+". If a transaction hash is shown, save it and do not submit a duplicate deployment.");}
  finally{busy=false;$("deploy").disabled=!ready}
 }
-$("connect").addEventListener("click",connect);$("deploy").addEventListener("click",deploy);
+$("connect").addEventListener("click",connect);$("deploy").addEventListener("click",deploy);$("recover").addEventListener("click",recoverExisting);
 (async()=>{
  try{
   const mod=await import("https://esm.sh/@metamask/connect-evm@2.1.1?bundle");
