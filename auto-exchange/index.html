@@ -197,7 +197,7 @@
       say('Requesting MetaMask to switch to '+(chainId===ETH_CHAIN?'Ethereum Mainnet':'SOBYA Mainnet')+'…');
       const params=chainId===ETH_CHAIN?
         {chainId:ETH_HEX,chainName:'Ethereum Mainnet',nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:[ETH_RPC],blockExplorerUrls:['https://etherscan.io']}:
-        {chainId:SOBYA_HEX,chainName:'SOBYA Mainnet',nativeCurrency:{name:'SOBY',symbol:'SOBY',decimals:18},rpcUrls:[SOBYA_RPC],blockExplorerUrls:['https://explorer.nodesafe-app.xyz/sobya']};
+        {chainId:SOBYA_HEX,chainName:'SOBYA Mainnet',nativeCurrency:{name:'SOBY',symbol:'SOBY',decimals:18},rpcUrls:[SOBYA_RPC],blockExplorerUrls:['https://snforem-cpu.github.io/sobya-chain/explorer/']};
       if(connectedViaSdk&&evmClient&&typeof evmClient.switchChain==='function'){
         await evmClient.switchChain({chainId:chainHex,chainConfiguration:params});
       }else{
