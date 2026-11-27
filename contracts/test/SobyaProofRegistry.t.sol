@@ -8,6 +8,8 @@ interface VmProof {
     function prank(address sender) external;
 }
 
+contract RevertingFeeRecipient { receive() external payable { revert(); } }
+
 contract SobyaProofRegistryTest {
     VmProof private constant vm =
         VmProof(address(uint160(uint256(keccak256("hevm cheat code")))));
@@ -61,14 +63,15 @@ contract SobyaProofRegistryTest {
         require(FEE_RECIPIENT.balance == 1 ether, "DUPLICATE_CHARGED");
     }
 
-    function testOnlyAcceptsOneSobyAndKeepsAtomicityOnTransferFailure() public {
-        SobyaProofRegistry rejecting = new SobyaProofRegistry(address(0x1));
+    function testFeeTransferFailureRevertsTheEntireRecord() public {
+        RevertingFeeRecipient rejecting = new RevertingFeeRecipient();
+        SobyaProofRegistry rejectingRegistry = new SobyaProofRegistry(address(rejecting));
         vm.prank(SUBMITTER);
-        (bool ok,) = address(rejecting).call{value: 1 ether}(
-            abi.encodeCall(rejecting.recordProof, (DOCUMENT_HASH))
+        (bool ok,) = address(rejectingRegistry).call{value: 1 ether}(
+            abi.encodeCall(rejectingRegistry.recordProof, (DOCUMENT_HASH))
         );
-        // A normal EOA recipient accepts native SOBY; this confirms successful forwarding.
-        require(ok, "EOA_FEE_RECIPIENT_REJECTED");
-        require(rejecting.isRecorded(DOCUMENT_HASH), "RECORD_MISSING");
+        require(!ok, "ACCEPTED_FAILED_FEE_TRANSFER");
+        require(!rejectingRegistry.isRecorded(DOCUMENT_HASH), "STATE_NOT_ROLLED_BACK");
+        require(address(rejectingRegistry).balance == 0, "FEE_RETAINED");
     }
 }
