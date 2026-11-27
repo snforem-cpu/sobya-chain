@@ -1,6 +1,10 @@
 # SOBYA Independent Validator Recruitment
 
-**Status: SOBYA Mainnet is live. This document describes joining the existing network, not pre-launch recruitment.**\n\nSOBYA operates a public Cosmos SDK / CometBFT mainnet with Cosmos EVM enabled. Independent operators may apply to join as additional validators or full nodes. Each operator controls their own Linux host and keeps their own signing keys.\n\n## Recruitment target
+**Status: SOBYA Mainnet is live. This document describes joining the existing network, not pre-launch recruitment.**
+
+SOBYA operates a public Cosmos SDK / CometBFT mainnet with Cosmos EVM enabled. Independent operators may apply to join as additional validators or full nodes. Each operator controls their own Linux host and keeps their own signing keys.
+
+## Recruitment target
 
 The initial target is four independent validator operators, plus one non-validator RPC/full-node operator. A separate seed node is useful. Operators should be distributed across providers/networks where practical.
 
@@ -14,7 +18,7 @@ The operator pays for and controls their own infrastructure. No reimbursement, f
 
 ## Safe participation
 
-Each operator creates account, node, and private-validator keys locally. Never send mnemonic phrases, private keys, keyring directories, `priv_validator_key.json`, or `node_key.json` to the project. During the official genesis ceremony, only public account information, node ID, public P2P endpoint, and signed gentx material are exchanged.
+Each operator creates account, node, and private-validator keys locally. Never send mnemonic phrases, private keys, keyring directories, `priv_validator_key.json`, or `node_key.json` to the project. During live-chain onboarding, share only the public account address, public node information and other details explicitly requested by the operator coordinator.
 
 ## Joining the live network
 
@@ -30,4 +34,8 @@ SOBYA Mainnet is already running. A new operator must use the existing live chai
 - [Ready-to-publish X and Telegram messages](ANNOUNCEMENTS.md)
 - [P2P/RPC security and connectivity](testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md)
 
-## Live-network operating checks\n\nBefore an operator creates a validator, verify the current binary release, CometBFT chain ID `sobya-1`, EVM chain ID `357812033857`, public peer information, current staking parameters, minimum self-delegation and transaction fees. Public endpoints are listed in the repository [README](../README.md).\n\nNo placeholder IDs, peer addresses, genesis files or RPC URLs may be presented as live. Validator rewards follow protocol rules and are not a promise of fiat income, market price, liquidity, exchange listing or infrastructure reimbursement.\n
+## Live-network operating checks
+
+Before an operator creates a validator, verify the current binary release, CometBFT chain ID `sobya-1`, EVM chain ID `357812033857`, public peer information, current staking parameters, minimum self-delegation and transaction fees. Public endpoints are listed in the repository [README](../README.md).
+
+No placeholder IDs, peer addresses, genesis files or RPC URLs may be presented as live. Validator rewards follow protocol rules and are not a promise of fiat income, market price, liquidity, exchange listing or infrastructure reimbursement.
