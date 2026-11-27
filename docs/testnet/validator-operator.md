@@ -1,15 +1,17 @@
-# SOBYA Validator Operator Guide
+# Historical validator notes — use the live onboarding guide
 
-This page is retained as a stable entry point. The complete current operator instructions are maintained in:
+SOBYA Mainnet is live. This historical path is retained for older links; current operators must use [the live validator onboarding guide](../validator-support/ONBOARDING.md) and [the operator kit](../STAGE_THREE_OPERATOR_KIT.md).
 
-- [Independent operator onboarding kit](../STAGE_THREE_OPERATOR_KIT.md)
-- [Genesis ceremony and launch bundle](../GENESIS_CEREMONY.md)
-- [Release verification process](../RELEASE_PROCESS.md)
-- [Recruitment announcements and application template](../ANNOUNCEMENTS.md)
-- [P2P/RPC connectivity and security guide](NETWORK_CONNECTIVITY_STAGE_TWO.md)
+Production identifiers:
+- CometBFT chain ID: `sobya-1`
+- EVM chain ID: `357812033857`
 
-**Important:** the SOBYA mainnet is not live yet. Do not use a proposed/example chain ID, development EVM ID `777777`, draft genesis, or guessed peer address. Wait for the official versioned launch bundle and verify its binary and genesis SHA-256 checksums.
+Public endpoints:
+- EVM JSON-RPC: `https://sobya-evm-rpc.nodesafe-dapp.xyz`
+- CometBFT RPC: `https://sobya-rpc.nodesafe-dapp.xyz`
+- REST API: `https://sobya-api.nodesafe-dapp.xyz`
+- Explorer: `https://explorer.nodesafe-app.xyz/sobya`
 
-Generate and retain all account, node, and private-validator keys locally. Never send mnemonic phrases, keyrings, private keys, `priv_validator_key.json`, or `node_key.json` to the coordinator. Operators share only public information and the signed gentx when the official genesis ceremony requests it.
+A joining operator synchronizes to the existing chain and creates a validator through the supported live-chain transaction flow after confirming the current release, peers, staking parameters and fees. Do not use a draft genesis, local testnet chain ID, genesis gentx or guessed peer address.
 
-Validator distributions follow the protocol reserve and signing-eligibility rules; no fiat return, market price, liquidity, or infrastructure reimbursement is promised.
+Generate and retain all account, node and private-validator keys locally. Never send mnemonic phrases, keyrings, private keys, `priv_validator_key.json`, or `node_key.json` to the coordinator.
