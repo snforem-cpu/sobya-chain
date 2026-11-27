@@ -39,3 +39,30 @@ body[dir=rtl] .suite-card-top{flex-direction:row-reverse}
 .invoice-app .fee small{display:block;color:var(--muted);font-size:11px}
 .invoice-app .notice{margin-top:18px}
 @media(max-width:620px){.invoice-app .grid{grid-template-columns:1fr}.invoice-app>.invoice-inner{padding:15px}.invoice-app .button-row .button{flex:1 1 100%}}
+
+
+/* Professional three-service layout */
+.tools-intro{margin:34px 0 18px;max-width:760px}
+.tools-intro h2{font-size:clamp(25px,4vw,34px);line-height:1.2;margin:7px 0}
+.tools-intro>p:last-child{color:var(--muted);font-size:14px;margin:8px 0 0}
+.tool-card{margin:16px 0 22px;scroll-margin-top:20px}
+.tool-card>.section-heading{margin-bottom:20px}
+.verify-tool>p{color:var(--muted);font-size:14px;line-height:1.8}
+.verify-capabilities{margin:14px 0 22px;padding-inline-start:22px;color:#c9d9ef;font-size:13px;line-height:2}
+.verify-launch{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;margin-top:2px}
+.education-section{margin:46px 0 30px}
+.education-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:20px 0}
+.education-card{padding:20px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(17,43,75,.72),rgba(8,23,42,.82))}
+.education-icon{display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;border:1px solid rgba(102,224,232,.32);border-radius:10px;color:var(--cyan);font-size:11px;font-weight:900}
+.education-card h3{font-size:16px;margin:14px 0 7px}
+.education-card p{color:var(--muted);font-size:12px;line-height:1.75;margin:0}
+.trust-notice{margin-top:22px}
+.exchange-panel{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:38px 0 20px;padding:26px;border:1px solid rgba(232,199,123,.28);border-radius:20px;background:linear-gradient(120deg,rgba(232,199,123,.09),rgba(17,43,75,.5))}
+.exchange-panel>div:first-child{max-width:620px}
+.exchange-panel h2{font-size:clamp(22px,3vw,29px);margin:7px 0}
+.exchange-panel p:not(.step){color:var(--muted);font-size:13px;line-height:1.8;margin:8px 0 0}
+.exchange-actions{display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-width:210px}
+.exchange-actions a{text-decoration:none}
+.exchange-secondary{color:var(--cyan);font-size:12px;font-weight:800}
+body[dir=rtl] .exchange-panel{flex-direction:row-reverse}
+@media(max-width:720px){.education-grid{grid-template-columns:1fr}.exchange-panel{display:block;padding:20px}.exchange-actions{margin-top:18px;min-width:0}.exchange-actions .button{width:100%;text-align:center}.verify-launch{width:100%}}
