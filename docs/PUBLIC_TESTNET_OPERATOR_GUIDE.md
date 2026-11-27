@@ -1,14 +1,15 @@
-# Legacy operator guide — superseded
+# Legacy public-testnet guide — archived
 
-This file name is retained so older links do not break. Its former testnet instructions are not the current SOBYA launch plan.
+This historical filename is retained so older repository links do not break. **It is not an operator guide for the current network. SOBYA Mainnet is live and this repository's public testnet launch-preparation process is obsolete.**
 
-The current project objective is preparation for the SOBYA public mainnet launch. Use these maintained documents instead:
+Use these current resources instead:
 
-- [Independent operator onboarding kit](STAGE_THREE_OPERATOR_KIT.md)
-- [Validator recruitment](VALIDATOR_RECRUITMENT.md)
-- [Genesis ceremony and self-bond reconciliation](GENESIS_CEREMONY.md)
-- [Production Genesis preparation and allocation ledger](PRODUCTION_GENESIS_PREPARATION.md)
+- [Main repository overview and live network endpoints](../README.md)
+- [Live validator onboarding](validator-support/ONBOARDING.md)
+- [Network identity and EVM configuration](../sobya/readme.md)
 - [Release process](RELEASE_PROCESS.md)
-- [P2P/RPC connectivity and security](testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md)
+- [P2P/RPC connectivity and security reference](testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md)
 
-No public network is live yet. Do not use the old testnet command examples, guessed chain IDs, placeholder peers, or a draft Genesis. Operators should wait for the versioned mainnet launch bundle. Never send private keys, mnemonics, keyrings, or validator signing files to the coordinator.
+Production network identifiers are CometBFT `sobya-1` and EVM `357812033857`. Do not use the historical testnet examples or local CI identifiers `777777` / `777778` to connect to Mainnet. A validator joining the running network must synchronize to the existing chain and use the supported live-chain validator-creation transaction; it must not create a new genesis or submit a genesis gentx.
+
+All operators retain their own private keys and signing files. Never send mnemonics, keyrings, validator private keys, or node keys to the coordinator.
