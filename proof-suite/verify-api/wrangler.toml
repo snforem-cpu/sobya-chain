@@ -1,0 +1,7 @@
+name = "sobya-verify-api"
+main = "worker.js"
+compatibility_date = "2026-11-27"
+workers_dev = true
+
+[vars]
+SOBYA_RPC_URL = "https://sobya-evm-rpc.nodesafe-dapp.xyz"
