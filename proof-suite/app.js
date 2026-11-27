@@ -1,8 +1,15 @@
-import { encodeProofPayload, decodeProofPayload, isTransactionHash, isPaidProofRecord } from "./proof-core.js";
+import { Interface } from "https://esm.sh/ethers@6.13.5";
+import { isTransactionHash, isContractProofRecord } from "./proof-core.js";
 
 const CHAIN_ID = 357812033857n;
 const CHAIN_HEX = "0x534f425941";
+const REGISTRY_ADDRESS = "0x9B1C6Cc504DEb8FA7aB9DAe499aB3D042fEC97b9";
 const SERVICE_WALLET = "0xd316993423Fc6268038F4EE3EA7C0C5038513C18";
+const proofInterface = new Interface([
+  "function recordProof(bytes32 documentHash) payable",
+  "function feeRecipient() view returns (address)",
+  "event ProofRecorded(address indexed submitter, bytes32 indexed documentHash, uint256 fee, uint256 timestamp)"
+]);
 const SERVICE_FEE_WEI = 1000000000000000000n;
 const RPCS = [
   "https://sobya-evm-rpc.nodesafe-dapp.xyz",
@@ -198,17 +205,17 @@ async function recordProof() {
     throw new Error("Connect MetaMask first. Once the wallet is connected and its address appears here, press Register on SOBYA again to request the payment approval.");
   }
   await ensureSobyaNetwork(state.wallet);
-  const data = encodeProofPayload(state.hash);
-  // Submit through MetaMask Connect native EIP-1193 transaction method.
-  // This avoids routing the mobile approval through ethers' signer wrapper.
+  const code = await rpc("eth_getCode", [REGISTRY_ADDRESS, "latest"]);
+  if (!code || code === "0x") throw new Error("The official SOBYA Proof Registry contract is not available at its configured address.");
+  const recipient = await rpc("eth_call", [{ to: REGISTRY_ADDRESS, data: proofInterface.encodeFunctionData("feeRecipient") }, "latest"]);
+  const verifiedRecipient = "0x" + recipient.slice(-40);
+  if (verifiedRecipient.toLowerCase() !== SERVICE_WALLET.toLowerCase()) {
+    throw new Error("The deployed Proof Registry fee recipient does not match the official service wallet. Registration is disabled.");
+  }
+  const data = proofInterface.encodeFunctionData("recordProof", [state.hash]);
   setWallet("Opening MetaMask transaction approval…");
   let txHash;
-  const transaction = {
-    from: state.account,
-    to: SERVICE_WALLET,
-    value: "0x" + SERVICE_FEE_WEI.toString(16),
-    data
-  };
+  const transaction = { from: state.account, to: REGISTRY_ADDRESS, value: "0x" + SERVICE_FEE_WEI.toString(16), data };
   try {
     if (connectedViaSdk && evmClient && typeof evmClient.connectWith === "function") {
       const response = await evmClient.connectWith({
@@ -224,7 +231,7 @@ async function recordProof() {
   } catch (error) {
     const code = error?.rpcCode ?? error?.code;
     const dataDetail = error?.rpcData ?? error?.data;
-    const detail = error?.shortMessage || error?.info?.error?.message || error?.message || "MetaMask did not approve the transaction."; 
+    const detail = error?.shortMessage || error?.info?.error?.message || error?.message || "MetaMask did not approve the transaction.";
     if (code === 4001 || code === "ACTION_REJECTED") throw new Error("Transaction approval was rejected in MetaMask.");
     if (code === -32002) throw new Error("A MetaMask request is already pending. Open MetaMask and finish or cancel it.");
     const extra = dataDetail ? " Details: " + (typeof dataDetail === "string" ? dataDetail : JSON.stringify(dataDetail)) : "";
@@ -248,10 +255,27 @@ async function verifyProof() {
   if (!tx) throw new Error("Transaction not found. It may still be pending or the hash may be incorrect.");
   if (!receipt) throw new Error("The transaction has not been confirmed yet.");
   if (receipt.status !== "0x1") throw new Error("The transaction failed on-chain.");
-  const decoded = decodeProofPayload(tx.input || tx.data);
-  if (!decoded || !isPaidProofRecord(tx, receipt, CHAIN_ID, SERVICE_WALLET, SERVICE_FEE_WEI)) {
-    throw new Error("This transaction is not a valid paid SOBYA Proof record. It must send exactly 1 SOBY to the official Proof service wallet.");
+  if (tx.to?.toLowerCase() !== REGISTRY_ADDRESS.toLowerCase()) {
+    throw new Error("This transaction does not call the official SOBYA Proof Registry contract.");
   }
+  let decodedCall;
+  try { decodedCall = proofInterface.parseTransaction({ data: tx.input || tx.data, value: tx.value }); }
+  catch { decodedCall = null; }
+  let recordedEvent = null;
+  for (const log of receipt.logs || []) {
+    if (log.address?.toLowerCase() !== REGISTRY_ADDRESS.toLowerCase()) continue;
+    try {
+      const parsed = proofInterface.parseLog({ topics: log.topics, data: log.data });
+      if (parsed?.name === "ProofRecorded") {
+        recordedEvent = { name: parsed.name, args: [parsed.args.submitter, parsed.args.documentHash, parsed.args.fee, parsed.args.timestamp] };
+        break;
+      }
+    } catch {}
+  }
+  if (!decodedCall || !recordedEvent || !isContractProofRecord(tx, receipt, CHAIN_ID, REGISTRY_ADDRESS, SERVICE_FEE_WEI, { name: decodedCall.name, args: [...decodedCall.args] }, recordedEvent)) {
+    throw new Error("This transaction is not a valid SOBYA Proof Registry record. It must call recordProof, pay exactly 1 SOBY, and emit a matching ProofRecorded event.");
+  }
+  const decoded = { sha256: String(decodedCall.args[0]) };
   const block = await rpc("eth_getBlockByNumber", [receipt.blockNumber, false]);
   const timestamp = block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toLocaleString(state.lang === "ar" ? "ar" : "en") : "Confirmed";
   let comparison = "Fingerprint recorded on-chain.";
@@ -269,7 +293,7 @@ async function verifyProof() {
   const hash = document.createElement("code");
   hash.textContent = decoded.sha256;
   const details = document.createElement("p");
-  details.textContent = `Signer: ${tx.from} · Block: ${BigInt(receipt.blockNumber).toString()} · ${timestamp}`;
+  details.textContent = `Signer: ${tx.from} · Registry: ${REGISTRY_ADDRESS} · Block: ${BigInt(receipt.blockNumber).toString()} · ${timestamp}`;
   const match = document.createElement("p");
   match.textContent = comparison;
   const explorer = document.createElement("a");
