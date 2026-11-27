@@ -52,3 +52,24 @@ export function isPaidProofRecord(tx, receipt, expectedChainId, serviceWallet, s
   }
   return decodeProofPayload(tx.input || tx.data) !== null;
 }
+
+
+export function isContractProofRecord(tx, receipt, expectedChainId, registryAddress, serviceFeeWei, decodedCall, recordedEvent) {
+  if (!tx || !receipt || receipt.status !== "0x1") return false;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(tx.from || "") || !/^0x[0-9a-fA-F]{40}$/.test(tx.to || "")) return false;
+  if (typeof registryAddress !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(registryAddress)) return false;
+  if (tx.to.toLowerCase() !== registryAddress.toLowerCase()) return false;
+  if (!decodedCall || decodedCall.name !== "recordProof" || !recordedEvent || recordedEvent.name !== "ProofRecorded") return false;
+  try {
+    if (BigInt(tx.value || "0x0") !== BigInt(serviceFeeWei)) return false;
+    if (tx.chainId && BigInt(tx.chainId) !== BigInt(expectedChainId)) return false;
+    const callHash = String(decodedCall.args?.[0] || "").toLowerCase();
+    const eventSubmitter = String(recordedEvent.args?.[0] || "").toLowerCase();
+    const eventHash = String(recordedEvent.args?.[1] || "").toLowerCase();
+    const eventFee = BigInt(recordedEvent.args?.[2] ?? 0);
+    if (!/^0x[0-9a-f]{64}$/.test(callHash) || callHash === "0x" + "0".repeat(64)) return false;
+    if (eventSubmitter !== tx.from.toLowerCase() || eventHash !== callHash) return false;
+    if (eventFee !== BigInt(serviceFeeWei)) return false;
+    return true;
+  } catch { return false; }
+}
