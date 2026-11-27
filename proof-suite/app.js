@@ -192,35 +192,28 @@ async function recordProof() {
   }
   await ensureSobyaNetwork(state.wallet);
   const data = encodeProofPayload(state.hash);
-  // Estimate the exact self-record transaction before opening MetaMask.
-  // Supplying an explicit gas limit avoids wallet-side estimation failures
-  // on RPC providers that do not reliably estimate data-bearing service-fee transfers.
+  // Let MetaMask Connect / MetaMask Mobile estimate gas and prepare the
+  // approval request. A separate RPC eth_estimateGas preflight can fail or
+  // interrupt the mobile handoff before eth_sendTransaction is ever invoked.
   const txRequest = {
     from: state.account,
     to: SERVICE_WALLET,
     value: "0x" + SERVICE_FEE_WEI.toString(16),
     data
   };
-  let estimatedGas;
+  setWallet("Opening MetaMask transaction approval…");
+  let txHash;
   try {
-    estimatedGas = await rpc("eth_estimateGas", [txRequest]);
-  } catch (rpcError) {
-    try {
-      estimatedGas = await state.wallet.request({ method: "eth_estimateGas", params: [txRequest] });
-    } catch (walletEstimateError) {
-      const detail = walletEstimateError?.data?.message ||
-        walletEstimateError?.message || rpcError?.message || "Gas estimation failed.";
-      throw new Error(`MetaMask could not prepare the SOBYA Proof transaction: ${detail}`);
-    }
+    txHash = await state.wallet.request({
+      method: "eth_sendTransaction",
+      params: [txRequest]
+    });
+  } catch (error) {
+    const detail = error?.data?.message || error?.message || "MetaMask did not approve the transaction request.";
+    if (error?.code === 4001) throw new Error("Transaction approval was rejected in MetaMask.");
+    if (error?.code === -32002) throw new Error("A MetaMask request is already pending. Open MetaMask and finish or cancel it.");
+    throw new Error(`MetaMask did not submit the transaction: ${detail}`);
   }
-  if (typeof estimatedGas !== "string" || !/^0x[0-9a-f]+$/i.test(estimatedGas)) {
-    throw new Error("The SOBYA RPC returned an invalid gas estimate. No transaction was sent.");
-  }
-  const gasLimit = (BigInt(estimatedGas) * 120n + 99n) / 100n;
-  const txHash = await state.wallet.request({
-    method: "eth_sendTransaction",
-    params: [{ ...txRequest, gas: "0x" + gasLimit.toString(16) }]
-  });
   $("tx-hash").value = txHash;
   const result = $("verify-result");
   message(result, `1 SOBY service fee submitted to ${SERVICE_WALLET}. Wait for confirmation, then verify your paid proof here. Transaction: ${txHash}`);
