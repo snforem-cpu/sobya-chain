@@ -39,3 +39,34 @@ body[dir=rtl] .suite-card-top{flex-direction:row-reverse}
 .invoice-app .fee small{display:block;color:var(--muted);font-size:11px}
 .invoice-app .notice{margin-top:18px}
 @media(max-width:620px){.invoice-app .grid{grid-template-columns:1fr}.invoice-app>.invoice-inner{padding:15px}.invoice-app .button-row .button{flex:1 1 100%}}
+
+/* SOBYA Certificate — integrated issuance, preview and public verification. */
+.certificate-app{scroll-margin-top:24px}
+.certificate-intro{color:var(--muted);font-size:13px;margin:0 0 18px}
+.certificate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.certificate-app .field{display:grid;gap:6px;margin-bottom:10px}
+.certificate-app .field label{font-size:12px;color:var(--muted);font-weight:750}
+.certificate-app .field input,.certificate-app .field textarea{width:100%;min-height:45px;border:1px solid #35516f;border-radius:10px;background:#07182b;color:#fff;padding:10px 12px;font:inherit;font-size:13px;resize:vertical}
+.certificate-app .field input:focus,.certificate-app .field textarea:focus{outline:2px solid #66e0e855;border-color:var(--cyan)}
+.certificate-fee{margin-top:10px}
+.certificate-preview{margin-top:20px;padding:14px;border:1px solid rgba(232,199,123,.38);border-radius:16px;background:#eef3fa;color:#14243a}
+.certificate-preview[hidden]{display:none}
+.certificate-print{max-width:760px;margin:auto;padding:34px;border:7px double #b18a42;background:#fff;color:#14243a;text-align:center}
+.certificate-brand{display:flex;justify-content:center;align-items:center;gap:10px;font-weight:900;letter-spacing:.12em}
+.certificate-brand img{width:54px;height:54px;object-fit:contain}
+.certificate-brand small{display:block;font-size:9px;letter-spacing:.16em;color:#a17b37}
+.certificate-kicker{margin:28px 0 8px;color:#a17b37;font-size:11px;font-weight:900;letter-spacing:.22em}
+.certificate-print h2{font-family:Georgia,serif;font-size:clamp(27px,5vw,42px);color:#14243a;margin:8px 0 22px}
+.certificate-print h3{font-family:Georgia,serif;font-size:clamp(23px,4vw,34px);color:#85652c;margin:8px 0 18px}
+.certificate-print>p{color:#526176}
+.certificate-print>strong{color:#14243a}
+.certificate-details{margin-top:24px}
+.certificate-footer{display:flex;align-items:center;justify-content:space-between;gap:20px;text-align:left;margin-top:28px;padding-top:18px;border-top:1px solid #d9e0e9}
+.certificate-footer small,.certificate-footer code{display:block;overflow-wrap:anywhere}
+.certificate-footer small{margin-top:8px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#8b6b35}
+.certificate-footer code{font-size:10px;color:#14243a}
+.certificate-footer canvas{width:140px;height:140px;flex:0 0 140px}
+.certificate-disclaimer{font-size:10px!important;color:#718096!important;margin-top:20px!important}
+.certificate-print-actions{justify-content:center;margin-top:12px}
+@media(max-width:620px){.certificate-grid{grid-template-columns:1fr}.certificate-print{padding:20px 12px;border-width:4px}.certificate-footer{align-items:flex-start;gap:10px}.certificate-footer canvas{width:112px;height:112px;flex-basis:112px}.certificate-footer code{font-size:8px}}
+@media print{body *{visibility:hidden!important}#certificate-preview,#certificate-preview *{visibility:visible!important}#certificate-preview{display:block!important;position:absolute;left:0;top:0;width:100%;margin:0;padding:0;border:0;background:#fff!important}#certificate-preview .certificate-print{max-width:none;min-height:95vh;padding:38px;border:7px double #b18a42}#certificate-preview .certificate-print-actions{display:none!important}}
