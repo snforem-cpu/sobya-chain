@@ -238,73 +238,10 @@ async function recordProof() {
     const extra = dataDetail ? " Details: " + (typeof dataDetail === "string" ? dataDetail : JSON.stringify(dataDetail)) : "";
     throw new Error("MetaMask transaction request failed" + (code !== undefined ? " (code " + code + ")" : "") + ": " + detail + extra);
   }
-  $("tx-hash").value = txHash;
-  const result = $("verify-result");
+  const result = $("record-result");
   message(result, `1 SOBY service fee submitted to ${SERVICE_WALLET}. Wait for confirmation, then verify your paid proof here. Transaction: ${txHash}`);
   result.classList.add("success");
   setWallet(`Proof submitted with 1 SOBY service fee: ${txHash}`);
-}
-async function verifyProof() {
-  const txHash = $("tx-hash").value.trim();
-  if (!isTransactionHash(txHash)) throw new Error("Enter a valid 32-byte transaction hash.");
-  const [chain, tx, receipt] = await Promise.all([
-    rpc("eth_chainId", []),
-    rpc("eth_getTransactionByHash", [txHash]),
-    rpc("eth_getTransactionReceipt", [txHash])
-  ]);
-  if (BigInt(chain) !== CHAIN_ID) throw new Error("The RPC endpoint is not connected to SOBYA Mainnet.");
-  if (!tx) throw new Error("Transaction not found. It may still be pending or the hash may be incorrect.");
-  if (!receipt) throw new Error("The transaction has not been confirmed yet.");
-  if (receipt.status !== "0x1") throw new Error("The transaction failed on-chain.");
-  if (tx.to?.toLowerCase() !== REGISTRY_ADDRESS.toLowerCase()) {
-    throw new Error("This transaction does not call the official SOBYA Proof Registry contract.");
-  }
-  let decodedCall;
-  try { decodedCall = proofInterface.parseTransaction({ data: tx.input || tx.data, value: tx.value }); }
-  catch { decodedCall = null; }
-  let recordedEvent = null;
-  for (const log of receipt.logs || []) {
-    if (log.address?.toLowerCase() !== REGISTRY_ADDRESS.toLowerCase()) continue;
-    try {
-      const parsed = proofInterface.parseLog({ topics: log.topics, data: log.data });
-      if (parsed?.name === "ProofRecorded") {
-        recordedEvent = { name: parsed.name, args: [parsed.args.submitter, parsed.args.documentHash, parsed.args.fee, parsed.args.timestamp] };
-        break;
-      }
-    } catch {}
-  }
-  if (!decodedCall || !recordedEvent || !isContractProofRecord(tx, receipt, CHAIN_ID, REGISTRY_ADDRESS, SERVICE_FEE_WEI, { name: decodedCall.name, args: [...decodedCall.args] }, recordedEvent)) {
-    throw new Error("This transaction is not a valid SOBYA Proof Registry record. It must call recordProof, pay exactly 1 SOBY, and emit a matching ProofRecorded event.");
-  }
-  const decoded = { sha256: String(decodedCall.args[0]) };
-  const block = await rpc("eth_getBlockByNumber", [receipt.blockNumber, false]);
-  const timestamp = block?.timestamp ? new Date(Number(BigInt(block.timestamp)) * 1000).toLocaleString(state.lang === "ar" ? "ar" : "en") : "Confirmed";
-  let comparison = "Fingerprint recorded on-chain.";
-  const selected = $("verify-file").files?.[0];
-  if (selected) {
-    const candidate = await fingerprint(selected);
-    comparison = candidate.toLowerCase() === decoded.sha256.toLowerCase()
-      ? "MATCH: the selected file has the same SHA-256 fingerprint."
-      : "NO MATCH: the selected file differs from the registered fingerprint.";
-  }
-  const result = $("verify-result");
-  result.replaceChildren();
-  const heading = document.createElement("strong");
-  heading.textContent = "Valid SOBYA Proof record";
-  const hash = document.createElement("code");
-  hash.textContent = decoded.sha256;
-  const details = document.createElement("p");
-  details.textContent = `Signer: ${tx.from} · Registry: ${REGISTRY_ADDRESS} · Block: ${BigInt(receipt.blockNumber).toString()} · ${timestamp}`;
-  const match = document.createElement("p");
-  match.textContent = comparison;
-  const explorer = document.createElement("a");
-  explorer.href = "https://explorer.nodesafe-app.xyz/sobya";
-  explorer.target = "_blank";
-  explorer.rel = "noopener";
-  explorer.textContent = "Open SOBYA Explorer ↗";
-  result.append(heading, hash, details, match, explorer);
-  result.className = "result success";
-  result.hidden = false;
 }
 $("file").addEventListener("change", async () => {
   state.file = $("file").files?.[0] || null;
@@ -346,14 +283,6 @@ $("record-button").addEventListener("click", async () => {
     await recordProof();
   } catch (error) { setWallet(error.message); }
   finally { button.textContent = state.lang === "ar" ? "سجّل على SOBYA" : "Register on SOBYA"; button.disabled = !state.hash || !state.account; }
-});
-$("verify-button").addEventListener("click", async () => {
-  const button = $("verify-button");
-  try {
-    setBusy(button, true, state.lang === "ar" ? "جارٍ التحقق…" : "Verifying…");
-    await verifyProof();
-  } catch (error) { message($("verify-result"), error.message, "error"); }
-  finally { setBusy(button, false); }
 });
 $("language").addEventListener("click", () => setLanguage(state.lang === "en" ? "ar" : "en"));
 bindWalletEvents(findInjectedProvider());

@@ -1,6 +1,6 @@
 # SOBYA Proof Suite
 
-SOBYA Proof Suite is the unified product family for document integrity and digital verification on SOBYA Mainnet. The three-service product family consists of SOBYA Proof, Invoice Proof, and SOBYA Verify API. SOBYA Proof and Invoice Proof are integrated; Verify API is under development as a read-only JavaScript SDK. See [developer preview](./verify-api/) and [SDK documentation](./verify-api/README.md).
+SOBYA Proof Suite is one platform with three connected services for document integrity and digital verification on SOBYA Mainnet: SOBYA Proof, SOBYA Invoice Proof, and SOBYA Verify API. The first two services register file and invoice fingerprints; the third provides one shared verification interface and read-only HTTP endpoints for websites and applications. Open the [unified platform](./) or read the [Verify API documentation](./verify-api/README.md).
 
 SOBYA Proof is a simple browser-based tool for recording and verifying document fingerprints on SOBYA Mainnet.
 
@@ -8,9 +8,9 @@ SOBYA Proof is a simple browser-based tool for recording and verifying document 
 
 | Service | Status | Scope |
 | --- | --- | --- |
-| SOBYA Proof | Phase 1 — current service | SHA-256 file/document fingerprints and public transaction verification. |
-| SOBYA Invoice Proof | Phase 2 — integrated in the unified app | Private invoice file + reference/date/total/currency and optional issuer/recipient fingerprint; verification against a SOBYA Mainnet registry transaction. Available inside the unified app. |
-| SOBYA Verify API | Phase 3 — next to build | Developer API for automated verification of SOBYA Proof and Invoice Proof records. |
+| SOBYA Proof | Available | Register SHA-256 file/document fingerprints with a wallet-signed SOBYA Mainnet transaction. |
+| SOBYA Invoice Proof | Available | Register a private invoice-file and metadata fingerprint against a SOBYA Mainnet transaction. |
+| SOBYA Verify API | Available | Shared verification page and read-only HTTP API for checking SOBYA Proof and Invoice Proof records. |
 
 All services share the SOBYA Proof Suite identity and are intended to reuse common fingerprinting, record-verification, wallet, and network infrastructure. Future services must not be presented as available until implemented and tested.
 
@@ -46,7 +46,15 @@ The Proof Registry emits a `ProofRecorded` event identifying the wallet address 
 - The Proof Registry contract is deployed at `0x9B1C6Cc504DEb8FA7aB9DAe499aB3D042fEC97b9`. Verification checks the contract call, exact 1 SOBY fee, successful receipt, and matching `ProofRecorded` event.
 - Verification depends on access to a configured public SOBYA EVM RPC endpoint.
 - A blockchain record proves the fingerprint was recorded; it does not certify the document's contents or confer legal status.
-- Invoice Proof is available inside the unified Proof Suite application at `#invoice-register`. Its fingerprint and verification logic remains in `invoice-proof/` and shares the application shell, language control and wallet session. Verify API is the next service to build.
+- Invoice Proof is available inside the unified Proof Suite application at `#invoice-register`. Its fingerprint and verification logic remains in `invoice-proof/` and shares the application shell, language control and wallet session. Verify API is available as a read-only HTTP service for automated checks of both record types.
+
+## Verify API
+
+- Base URL: `https://sobya-verify-api.snforem.workers.dev`.
+- Health: `GET /v1/health`.
+- File proof: `POST /v1/verify/proof`.
+- Invoice proof: `POST /v1/verify/invoice`.
+- The API is read-only and does not require a wallet signature or API key in the current version. Send a SHA-256 file fingerprint and, for invoices, the matching metadata fields; never send the document bytes.
 
 ## Invoice Proof details
 
