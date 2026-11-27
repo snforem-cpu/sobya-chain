@@ -1,6 +1,6 @@
 # SOBYA Proof Suite
 
-SOBYA Proof Suite is the unified product family for document integrity and digital verification on SOBYA Mainnet. The three-service product family consists of SOBYA Proof, Invoice Proof, and SOBYA Verify API. SOBYA Proof and Invoice Proof are integrated; Verify API is the next service to build.
+SOBYA Proof Suite is the unified product family for document integrity and digital verification on SOBYA Mainnet. The three-service product family consists of SOBYA Proof, Invoice Proof, and SOBYA Verify API. SOBYA Proof and Invoice Proof are integrated; Verify API is under development as a read-only JavaScript SDK. See [developer preview](./verify-api/) and [SDK documentation](./verify-api/README.md).
 
 SOBYA Proof is a simple browser-based tool for recording and verifying document fingerprints on SOBYA Mainnet.
 
