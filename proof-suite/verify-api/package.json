@@ -1,0 +1,15 @@
+{
+  "name": "@sobya/verify-api-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/worker.test.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "ethers": "6.13.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
