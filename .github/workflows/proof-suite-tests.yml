@@ -24,8 +24,14 @@ jobs:
           node-version: 20
       - name: Check JavaScript syntax
         run: node --check proof-suite/app.js && node --check proof-suite/proof-core.js && node --check proof-suite/invoice-proof/app.js && node --check proof-suite/invoice-proof/core.js && node --check proof-suite/verify-api/client.js && node --check proof-suite/verify-api/core.js
-      - name: Run proof payload tests
+      - name: Install integration test dependencies
+        run: npm install --no-save --package-lock=false ethers@6.13.5 playwright@1.52.0
+      - name: Run proof payload and live-chain integration tests
         run: node --test proof-suite/tests/*.test.mjs proof-suite/invoice-proof/tests/*.test.mjs proof-suite/verify-api/tests/*.test.mjs
+      - name: Install Chromium for browser integration
+        run: npx playwright install --with-deps chromium
+      - name: Run browser SDK integration test
+        run: node proof-suite/verify-api/tests/browser-smoke.mjs
 
   sobya-rpc-smoke:
     runs-on: ubuntu-latest
