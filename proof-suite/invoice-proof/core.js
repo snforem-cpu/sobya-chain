@@ -10,10 +10,11 @@ export function normalizeInvoiceMetadata(input) {
   const currency = clean(input.currency).toUpperCase();
   const issuer = clean(input.issuer);
   const recipient = clean(input.recipient);
-  if (!reference) throw new TypeError("Invoice reference is required.");
+  if (!reference || reference.length > 120) throw new TypeError("Invoice reference must be 1–120 characters.");
   if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(issueDate) || Number.isNaN(Date.parse(issueDate + "T00:00:00Z")) || new Date(issueDate + "T00:00:00Z").toISOString().slice(0, 10) !== issueDate) throw new TypeError("Enter a valid invoice issue date.");
-  if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(amount)) throw new TypeError("Enter an amount using digits and an optional decimal point (up to 6 decimal places).");
+  if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(amount) || amount.length > 24 || !Number.isFinite(Number(amount)) || Number(amount) <= 0) throw new TypeError("Enter a positive amount with up to 6 decimal places (maximum 24 characters).");
   if (!/^[A-Z]{3}$/.test(currency)) throw new TypeError("Enter a three-letter currency code, such as USD or EUR.");
+  if (issuer.length > 160 || recipient.length > 160) throw new TypeError("Issuer and recipient fields must be 160 characters or fewer.");
   return { version: 1, reference, issueDate, amount, currency, issuer, recipient };
 }
 
