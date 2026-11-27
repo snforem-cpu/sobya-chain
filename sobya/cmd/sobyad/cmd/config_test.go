@@ -5,7 +5,7 @@ import "testing"
 func TestDefaultAppConfigKeepsRPCPrivateAndLocked(t *testing.T) {
 	cfg := defaultAppConfig()
 	if cfg.JSONRPC.Enable {
-		t.Fatal("EVM JSON-RPC must remain disabled until an operator explicitly enables it")
+		t.Fatal("fresh node templates must keep the JSON-RPC backend private by default; designated public RPC nodes enable read-only access behind a hardened proxy")
 	}
 	if cfg.JSONRPC.Address != "127.0.0.1:8545" {
 		t.Fatalf("JSON-RPC address = %q, want loopback", cfg.JSONRPC.Address)
@@ -23,7 +23,7 @@ func TestDefaultAppConfigKeepsRPCPrivateAndLocked(t *testing.T) {
 		t.Fatalf("JSON-RPC max connections = %d, want 100", cfg.JSONRPC.MaxOpenConnections)
 	}
 	if cfg.EVM.EVMChainID != 777777 {
-		t.Fatalf("development EVM chain ID changed unexpectedly: %d", cfg.EVM.EVMChainID)
+		t.Fatalf("local development EVM chain ID default changed unexpectedly: %d", cfg.EVM.EVMChainID)
 	}
 }
 
