@@ -156,9 +156,11 @@ async function showCertificatePreview(record) {
       $("certificate-qr").setAttribute("aria-label", "Certificate verification QR code");
     } catch (error) {
       console.warn("Certificate QR generation failed:", error);
-      say("certificate-issue-result", "Certificate ID and transaction were saved, but QR generation failed. Use the verification link: " + verifyUrl, "error");
+      return false;
     }
+    return true;
   }
+  return false;
 }
 function restoreCertificateRecord() {
   const record = readCertificateRecord();
@@ -189,6 +191,12 @@ function issueMetadata() {
   };
 }
 async function issueCertificate() {
+  const previous = readCertificateRecord();
+  if (previous?.txHash) {
+    state.certificateId = previous.certificateId;
+    await showCertificatePreview(previous);
+    throw new Error("A certificate transaction is already saved on this device. Its ID and transaction have been restored; do not issue it again.");
+  }
   if (!state.provider || !state.account) throw new Error("Connect your wallet in the SOBYA Proof section above first.");
   const metadata = issueMetadata();
   const hash = await computeCertificateHash(metadata);
@@ -222,8 +230,9 @@ async function issueCertificate() {
   const savedRecord = { ...metadata, txHash: tx, confirmed: false, savedAt: new Date().toISOString() };
   saveCertificateRecord(savedRecord);
   // Reveal the ID and transaction immediately; QR or receipt lookups must not hide them.
-  await showCertificatePreview(savedRecord);
-  say("certificate-issue-result", "Certificate submitted. Save this Certificate ID: " + metadata.certificateId + " · Transaction: " + tx, "success");
+  const qrReady = await showCertificatePreview(savedRecord);
+  const verifyUrl = new URL("./?cert=" + encodeURIComponent(metadata.certificateId) + "&tx=" + encodeURIComponent(tx) + "#certificate-verify", window.location.href).href;
+  say("certificate-issue-result", "Certificate submitted. Save this Certificate ID: " + metadata.certificateId + " · Transaction: " + tx + (qrReady ? "" : " · QR unavailable; verification link: " + verifyUrl), "success");
   setWallet("Certificate ID and transaction saved on this device. Keep a separate copy of the Certificate ID.");
   let receipt = null;
   try { receipt = await rpc("eth_getTransactionReceipt", [tx]); } catch (error) { console.warn("Certificate receipt lookup pending:", error); }
