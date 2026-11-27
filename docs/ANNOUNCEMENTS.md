@@ -1,6 +1,8 @@
 # SOBYA Validator Recruitment — Publication Pack
 
-**Current wording: SOBYA Mainnet is live. This publication pack invites independent operators to join the existing network.**\n\n## X post (English)
+**Current wording: SOBYA Mainnet is live. This publication pack invites independent operators to join the existing network.**
+
+## X post (English)
 
 SOBYA Mainnet is live (CometBFT chain ID `sobya-1`, EVM chain ID `357812033857`). We invite experienced Cosmos SDK / CometBFT operators to join the existing network as independent validators or full nodes.
 
@@ -56,7 +58,7 @@ Do not include credentials, account IDs, private keys, mnemonics, seed phrases, 
 
 **Is SOBYA Mainnet live?** Yes. The production network is live with CometBFT chain ID `sobya-1` and EVM chain ID `357812033857`. New validators join the existing chain.
 
-**Do I need to send my validator key to the project?** Never. Generate and retain it locally. Only public details and the signed gentx are shared when the official ceremony begins.
+**Do I need to send my validator key to the project?** Never. Generate and retain it locally. Share only public operator details requested for joining the existing network.
 
 **Will I earn money or guaranteed tokens?** Validator distributions follow the protocol reserve and signing-eligibility rules in `sobya/TOKENOMICS.md`; no fiat return, market price, liquidity, exchange listing, or infrastructure reimbursement is promised.
 
