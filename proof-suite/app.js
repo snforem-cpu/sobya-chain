@@ -38,6 +38,7 @@ async function fingerprint(file) {
 }
 function setLanguage(lang) {
   state.lang = lang;
+  window.dispatchEvent(new CustomEvent("sobya:language", { detail: lang }));
   document.documentElement.lang = lang;
   document.body.dir = lang === "ar" ? "rtl" : "ltr";
   document.querySelectorAll("[data-en][data-ar]").forEach(node => {
