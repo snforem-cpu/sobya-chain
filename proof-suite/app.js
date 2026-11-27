@@ -1,4 +1,3 @@
-import { BrowserProvider } from "https://esm.sh/ethers@6.13.5";
 import { encodeProofPayload, decodeProofPayload, isTransactionHash, isPaidProofRecord } from "./proof-core.js";
 
 const CHAIN_ID = 357812033857n;
@@ -10,7 +9,7 @@ const RPCS = [
   "https://sobya-evm-rpc.nodesafe-app.xyz"
 ];
 const $ = id => document.getElementById(id);
-const state = { wallet: null, ethersProvider: null, signer: null, account: null, file: null, hash: null, lang: "en" };
+const state = { wallet: null, account: null, file: null, hash: null, lang: "en" };
 
 function message(element, text, kind = "") {
   element.textContent = text;
@@ -77,15 +76,11 @@ function bindWalletEvents(provider) {
   boundProvider = provider;
   provider.on("accountsChanged", accounts => {
     state.account = accounts?.[0] || null;
-    state.signer = null;
-    state.ethersProvider = null;
     setWallet(state.account ? `Connected: ${state.account}` : "Wallet disconnected. Reconnect to continue.");
     $("record-button").disabled = !state.hash || !state.account;
   });
   provider.on("chainChanged", () => {
     state.account = null;
-    state.signer = null;
-    state.ethersProvider = null;
     $("record-button").disabled = true;
     setWallet("Network changed. Reconnect to SOBYA Mainnet.");
   });
@@ -159,8 +154,6 @@ async function connectWallet() {
   await ensureSobyaNetwork(provider);
   const currentAccounts = await provider.request({ method: "eth_accounts", params: [] });
   state.account = currentAccounts?.[0] || accounts[0];
-  state.ethersProvider = new BrowserProvider(provider);
-  state.signer = await state.ethersProvider.getSigner(state.account);
   bindWalletEvents(provider);
   setWallet(`Connected: ${state.account}`);
   $("record-button").disabled = !state.hash;
@@ -206,27 +199,37 @@ async function recordProof() {
   }
   await ensureSobyaNetwork(state.wallet);
   const data = encodeProofPayload(state.hash);
-  // Use the same ethers BrowserProvider + signer flow as SOBYA Auto Exchange.
-  // MetaMask handles gas estimation and presents the transaction approval UI.
-  if (!state.signer) {
-    state.ethersProvider = new BrowserProvider(state.wallet);
-    state.signer = await state.ethersProvider.getSigner(state.account);
-  }
+  // Submit through MetaMask Connect native EIP-1193 transaction method.
+  // This avoids routing the mobile approval through ethers' signer wrapper.
   setWallet("Opening MetaMask transaction approval…");
-  let transaction;
+  let txHash;
+  const transaction = {
+    from: state.account,
+    to: SERVICE_WALLET,
+    value: "0x" + SERVICE_FEE_WEI.toString(16),
+    data
+  };
   try {
-    transaction = await state.signer.sendTransaction({
-      to: SERVICE_WALLET,
-      value: SERVICE_FEE_WEI,
-      data
-    });
+    if (connectedViaSdk && evmClient && typeof evmClient.connectWith === "function") {
+      const response = await evmClient.connectWith({
+        method: "eth_sendTransaction",
+        params: account => [{ ...transaction, from: account }],
+        chainIds: [CHAIN_HEX]
+      });
+      txHash = response?.result;
+    } else {
+      txHash = await state.wallet.request({ method: "eth_sendTransaction", params: [transaction] });
+    }
+    if (!isTransactionHash(txHash)) throw new Error("MetaMask returned no valid transaction hash.");
   } catch (error) {
-    const detail = error?.shortMessage || error?.info?.error?.message || error?.message || "MetaMask did not approve the transaction.";
-    if (error?.code === 4001 || error?.code === "ACTION_REJECTED") throw new Error("Transaction approval was rejected in MetaMask.");
-    if (error?.code === -32002) throw new Error("A MetaMask request is already pending. Open MetaMask and finish or cancel it.");
-    throw new Error(`MetaMask did not submit the transaction: ${detail}`);
+    const code = error?.rpcCode ?? error?.code;
+    const dataDetail = error?.rpcData ?? error?.data;
+    const detail = error?.shortMessage || error?.info?.error?.message || error?.message || "MetaMask did not approve the transaction."; 
+    if (code === 4001 || code === "ACTION_REJECTED") throw new Error("Transaction approval was rejected in MetaMask.");
+    if (code === -32002) throw new Error("A MetaMask request is already pending. Open MetaMask and finish or cancel it.");
+    const extra = dataDetail ? " Details: " + (typeof dataDetail === "string" ? dataDetail : JSON.stringify(dataDetail)) : "";
+    throw new Error("MetaMask transaction request failed" + (code !== undefined ? " (code " + code + ")" : "") + ": " + detail + extra);
   }
-  const txHash = transaction.hash;
   $("tx-hash").value = txHash;
   const result = $("verify-result");
   message(result, `1 SOBY service fee submitted to ${SERVICE_WALLET}. Wait for confirmation, then verify your paid proof here. Transaction: ${txHash}`);
@@ -345,8 +348,6 @@ async function restoreWalletSession() {
     if (!accounts || !accounts.length) return;
     state.wallet = provider;
     state.account = accounts[0];
-    state.ethersProvider = new BrowserProvider(provider);
-    state.signer = await state.ethersProvider.getSigner(state.account);
     bindWalletEvents(provider);
     setWallet(`Connected: ${state.account}`);
     $("record-button").disabled = !state.hash;
