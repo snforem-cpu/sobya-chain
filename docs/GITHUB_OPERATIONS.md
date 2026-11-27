@@ -27,7 +27,7 @@ GitHub Actions can build the SOBYA node, run automated tests, create disposable
 local networks, and publish short-lived downloadable build artifacts.
 GitHub-hosted runners are temporary CI machines. They are **not** persistent
 blockchain validators, seed nodes, RPC servers, or public network infrastructure.
-A workflow passing does not mean a public testnet is running.
+SOBYA Mainnet is already live; a workflow result applies only to the specific source commit and CI environment tested.
 
 ## Token and EVM development status
 
@@ -43,28 +43,4 @@ A workflow passing does not mean a public testnet is running.
 - The official logo is stored in `assets/logo/`; wallet display requires each
   wallet's own metadata and listing process.
 
-## Public testnet readiness
-
-Do not announce a public testnet until all of the following are true:
-
-1. A stable Cosmos chain ID and EVM chain ID and a reviewed, reproducible
-   genesis file are published.
-2. At least two independently operated nodes can connect over public P2P.
-3. The P2P endpoint is reachable from outside the hosting network.
-4. Nodes agree on chain ID and block height and remain synchronized.
-5. A test transfer between separately controlled wallets succeeds.
-6. EVM JSON-RPC and Cosmos APIs are reachable and pass security checks.
-7. Node operators have documented backup, restore, upgrade, and recovery
-   procedures.
-8. Validator signing keys are generated and kept by their operators. Never put
-   mnemonics, validator private keys, or keyring files in Git, workflow logs,
-   public artifacts, or routine CI secrets.
-
-## Important limitations
-
-- GitHub Actions jobs are time-limited and ephemeral.
-- Workflow artifacts expire according to their retention setting.
-- A localnet smoke test is not a multi-node public testnet.
-- No workflow in this repository should be used to keep a validator running.
-- Never store real validator keys or wallet secrets in CI.
-- Do not merge the feature branch to `main` without explicit approval.
+## Live Mainnet status\n\nSOBYA Mainnet is live with CometBFT chain ID `sobya-1` and EVM chain ID `357812033857`. Public endpoints are listed in the root README. GitHub Actions is used for source validation, builds and regression tests; CI runners are not production validator hosts. Local CI identifiers `777777` and `777778` are not production identifiers.\n\nUse the live validator onboarding guide for new operators. Do not create a replacement genesis or run a new-chain ceremony to join the existing network.\n
