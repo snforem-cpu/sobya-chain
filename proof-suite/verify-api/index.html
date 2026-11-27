@@ -1,76 +1,152 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="SOBYA Verify API developer documentation for read-only verification of SOBYA Proof and Invoice Proof records.">
-  <title>SOBYA Verify API — Developer Documentation</title>
+  <meta name="description" content="تحقق بنفسك من إثباتات الملفات والفواتير المسجلة على شبكة SOBYA Mainnet.">
+  <title>SOBYA Verify API — تحقق من إثباتاتك</title>
   <link rel="icon" type="image/png" href="../../assets/logo/sobya-coin-128.png">
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="../suite.css">
+  <style>
+    .verify-wrap{max-width:850px;margin:0 auto}
+    .verify-form{display:grid;gap:16px}
+    .verify-form label{display:grid;gap:7px;font-weight:650;color:#eaf1ff}
+    .verify-form input,.verify-form select{width:100%;box-sizing:border-box;padding:13px 14px;border:1px solid #31445f;border-radius:12px;background:#091a30;color:#fff;font:inherit}
+    .verify-form input[type=file]{padding:10px}
+    .verify-form .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .verify-submit{border:0;border-radius:12px;padding:15px 20px;background:linear-gradient(110deg,#2c73d8,#7655c8);color:white;font:inherit;font-weight:750;cursor:pointer}
+    .verify-submit:disabled{opacity:.55;cursor:wait}
+    .verify-result{display:none;margin-top:18px;padding:18px;border:1px solid #334c6d;border-radius:14px;background:#091a30;overflow-wrap:anywhere}
+    .verify-result.show{display:block}
+    .verify-result pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#cbd9ee}
+    .verify-result.good{border-color:#248d70}.verify-result.bad{border-color:#b66a49}
+    .privacy-note{color:#aabbd2;font-size:.94rem;line-height:1.8}
+    .field-hint{font-size:.85rem;color:#9eb1cb;font-weight:400}
+    @media(max-width:600px){.verify-form .grid{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <a class="brand" href="../" aria-label="SOBYA Proof Suite"><img src="../../assets/logo/sobya-coin-128.png" alt="Official SOBYA logo"><span>SOBYA <i>VERIFY API</i></span></a>
-      <span class="network-pill">READ-ONLY · SOBYA MAINNET</span>
+      <a class="brand" href="../" aria-label="SOBYA Proof Suite"><img src="../../assets/logo/sobya-coin-128.png" alt="شعار SOBYA الرسمي"><span>SOBYA <i>VERIFY</i></span></a>
+      <span class="network-pill">SOBYA MAINNET</span>
     </header>
     <section class="hero">
-      <p class="eyebrow">PHASE 03 · DEVELOPER INTEGRATION</p>
-      <h1>Verify SOBYA records from your app.</h1>
-      <p class="intro">A read-only JavaScript client for checking SOBYA Proof and Invoice Proof records directly against SOBYA Mainnet.</p>
+      <p class="eyebrow">الخدمة الثالثة · التحقق الآلي</p>
+      <h1>تحقق من إثبات SOBYA بنفسك</h1>
+      <p class="intro">أدخل رقم معاملة الإثبات واختر الملف الأصلي. سنفحص سجل البلوكشين ونقارن بصمة الملف دون رفعه إلى أي خادم.</p>
     </section>
-    <section class="panel">
-      <div class="section-heading"><div><p class="step">CURRENT STATUS</p><h2>Developer preview</h2></div><span class="tag">IN DEVELOPMENT</span></div>
-      <p>The first implementation is a browser-native ES module. It does not require a wallet, API key, subscription, or transaction signing. It reads public blockchain data through SOBYA EVM JSON-RPC.</p>
-      <p><strong>Important:</strong> this is a client SDK, not a hosted REST server. GitHub Pages is static hosting and cannot execute server-side API routes. The SDK talks directly to the public RPC endpoints.</p>
-    </section>
-    <section class="panel">
-      <div class="section-heading"><div><p class="step">01 · INSTALL / IMPORT</p><h2>Verify a document proof</h2></div></div>
-      <pre><code>import { createSobyaVerifyClient } from "./verify-api/client.js";
 
-const sobya = createSobyaVerifyClient();
-const result = await sobya.verifyProof({
-  txHash: "0xYOUR_TRANSACTION_HASH",
-  file: document.querySelector("#file").files[0] // optional
-});
+    <div class="verify-wrap">
+      <section class="panel">
+        <div class="section-heading"><div><p class="step">01 · نوع الإثبات</p><h2>ماذا تريد أن تتحقق منه؟</h2></div><span class="tag">READ ONLY</span></div>
+        <form class="verify-form" id="verify-form">
+          <label>نوع الإثبات
+            <select id="proof-type">
+              <option value="proof">إثبات ملف — SOBYA Proof</option>
+              <option value="invoice">إثبات فاتورة — SOBYA Invoice Proof</option>
+            </select>
+          </label>
+          <label>رقم معاملة الإثبات (Transaction Hash)
+            <input id="tx-hash" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x..." required>
+          </label>
+          <label>الملف الأصلي
+            <input id="original-file" type="file" required>
+            <span class="field-hint">اختر نفس الملف الذي تم تسجيل إثباته. لا يتم رفع الملف؛ تُحسب بصمته داخل متصفحك.</span>
+          </label>
+          <div id="invoice-fields" hidden>
+            <div class="section-heading"><div><p class="step">02 · بيانات الفاتورة</p><h2>أدخل البيانات نفسها المستخدمة عند التسجيل</h2></div></div>
+            <div class="grid">
+              <label>رقم الفاتورة<input id="invoice-reference" autocomplete="off" placeholder="INV-2026-0042"></label>
+              <label>تاريخ الإصدار<input id="invoice-date" type="date"></label>
+              <label>المبلغ<input id="invoice-amount" inputmode="decimal" placeholder="1250.50"></label>
+              <label>العملة<input id="invoice-currency" maxlength="3" placeholder="USD"></label>
+              <label>المُصدِر<input id="invoice-issuer" placeholder="اسم المورد"></label>
+              <label>المستلم<input id="invoice-recipient" placeholder="اسم العميل"></label>
+            </div>
+          </div>
+          <button class="verify-submit" id="verify-button" type="submit">تحقق الآن على شبكة SOBYA</button>
+        </form>
+        <div class="verify-result" id="verify-result" role="status" aria-live="polite"></div>
+      </section>
 
-if (result.valid && result.match === true) {
-  console.log("File matches the on-chain fingerprint");
-}</code></pre>
-    </section>
-    <section class="panel">
-      <div class="section-heading"><div><p class="step">02 · INVOICE PROOF</p><h2>Verify an invoice record</h2></div></div>
-      <pre><code>const result = await sobya.verifyInvoiceProof({
-  txHash: "0xYOUR_INVOICE_TRANSACTION_HASH",
-  file: invoiceFile,
-  metadata: {
-    reference: "INV-2026-0042",
-    issueDate: "2026-11-27",
-    amount: "1250.50",
-    currency: "USD",
-    issuer: "Supplier",
-    recipient: "Customer"
-  }
-});</code></pre>
-      <p>Supply the original invoice file and the exact metadata used when registering it. All fingerprint calculations happen locally.</p>
-    </section>
-    <section class="panel">
-      <div class="section-heading"><div><p class="step">03 · RESPONSE</p><h2>Understand the result</h2></div></div>
-      <ul>
-        <li><code>valid: true</code> — a successful SOBYA Proof Registry transaction with the exact 1 SOBY fee and matching event.</li>
-        <li><code>match: true</code> — the supplied file (and invoice metadata, where applicable) reproduces the recorded fingerprint.</li>
-        <li><code>match: false</code> — the on-chain record is valid, but the supplied data differs.</li>
-        <li><code>match: null</code> — the transaction is valid; no file comparison was requested.</li>
-      </ul>
-      <p>A blockchain match does not prove document truth, legal ownership, issuer identity, invoice payment, delivery, or legal/tax compliance.</p>
-    </section>
-    <section class="notice">
-      <strong>Privacy and security</strong>
-      <p>The SDK never uploads documents or invoice details, never requests wallet access, and never broadcasts transactions. It checks SOBYA Mainnet chain ID, registry destination, transaction success, exact service fee, call data, and the matching registry event. RPC availability and browser CORS remain external dependencies.</p>
-    </section>
-    <footer><span>SOBYA Proof Suite · Phase 03</span><a href="../">← Back to SOBYA Proof Suite</a><a href="README.md">Full SDK documentation</a></footer>
+      <section class="notice">
+        <strong>كيف تقرأ النتيجة؟</strong>
+        <p><b>الإثبات صحيح:</b> توجد معاملة ناجحة في عقد SOBYA الرسمي، دفعت الرسوم المطلوبة وأصدرت حدث التسجيل الصحيح.</p>
+        <p><b>الملف مطابق:</b> بصمة الملف الذي اخترته تطابق البصمة المسجلة على الشبكة. أما إذا كان الإثبات صحيحاً والملف غير مطابق، فالمعاملة موجودة لكن الملف المختار مختلف.</p>
+        <p class="privacy-note">التحقق لا يثبت صحة محتوى الوثيقة أو الملكية القانونية أو هوية الأطراف أو سداد الفاتورة. لا نرفع الملف أو اسمه إلى الخادم؛ تُرسل استعلامات قراءة فقط إلى RPC العام.</p>
+      </section>
+
+      <section class="panel">
+        <p class="step">للمطورين والشركات</p>
+        <h2>اربط التحقق بموقعك أو تطبيقك</h2>
+        <p>تتضمن المنظومة أيضاً HTTP API للطلبات الآلية بصيغة JSON. الخادم الخلفي قيد إعداد النشر؛ ستُعرض نقطة الاتصال العامة هنا بعد نشرها واجتياز اختبار الصحة الفعلي.</p>
+        <p><a class="suite-link" href="README.md">اقرأ توثيق API وأمثلة التكامل</a></p>
+      </section>
+    </div>
+    <footer><span>SOBYA Proof Suite · Verify API</span><a href="../">العودة إلى منظومة SOBYA Proof Suite</a></footer>
   </main>
+  <script type="module">
+    import { createSobyaVerifyClient } from "./client.js";
+    const client = createSobyaVerifyClient();
+    const form = document.querySelector("#verify-form");
+    const type = document.querySelector("#proof-type");
+    const invoiceFields = document.querySelector("#invoice-fields");
+    const resultBox = document.querySelector("#verify-result");
+    const button = document.querySelector("#verify-button");
+    type.addEventListener("change", () => {
+      const invoice = type.value === "invoice";
+      invoiceFields.hidden = !invoice;
+      for (const field of invoiceFields.querySelectorAll("input")) field.required = invoice;
+    });
+    const show = (html, kind) => {
+      resultBox.className = "verify-result show " + kind;
+      resultBox.innerHTML = html;
+    };
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const txHash = document.querySelector("#tx-hash").value.trim();
+      const file = document.querySelector("#original-file").files[0];
+      if (!file) return;
+      button.disabled = true;
+      button.textContent = "جارٍ فحص المعاملة والملف…";
+      show("نتصل بشبكة SOBYA ونفحص سجل الإثبات. قد يستغرق ذلك بضع ثوانٍ.", "");
+      try {
+        let data;
+        if (type.value === "invoice") {
+          const metadata = {
+            reference: document.querySelector("#invoice-reference").value,
+            issueDate: document.querySelector("#invoice-date").value,
+            amount: document.querySelector("#invoice-amount").value,
+            currency: document.querySelector("#invoice-currency").value,
+            issuer: document.querySelector("#invoice-issuer").value,
+            recipient: document.querySelector("#invoice-recipient").value
+          };
+          data = await client.verifyInvoiceProof({ txHash, file, metadata });
+        } else {
+          data = await client.verifyProof({ txHash, file });
+        }
+        const matched = data.match === true;
+        const status = matched ? "الإثبات صحيح والملف مطابق تماماً." : data.match === false ? "المعاملة مسجلة، لكن الملف أو بيانات الفاتورة لا تطابق البصمة المسجلة." : "المعاملة صحيحة على الشبكة؛ لم تتم مقارنة ملف.";
+        const details = [
+          "نوع الإثبات: " + (data.type === "invoice" ? "فاتورة" : "ملف"),
+          "رقم الكتلة: " + data.blockNumber,
+          "عنوان المرسل: " + data.signer,
+          "بصمة السجل: " + data.fingerprint,
+          "رقم المعاملة: " + data.txHash
+        ].join("\n");
+        show("<h2>" + (matched ? "✓ تم التحقق بنجاح" : "نتيجة التحقق") + "</h2><p>" + status + "</p><pre></pre>", matched ? "good" : "bad");
+        resultBox.querySelector("pre").textContent = details;
+      } catch (error) {
+        show("<h2>تعذر تأكيد الإثبات</h2><p></p>", "bad");
+        resultBox.querySelector("p").textContent = error?.message || "حدث خطأ غير متوقع أثناء التحقق.";
+      } finally {
+        button.disabled = false;
+        button.textContent = "تحقق الآن على شبكة SOBYA";
+      }
+    });
+  </script>
 </body>
 </html>
