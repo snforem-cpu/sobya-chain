@@ -2,61 +2,68 @@
 
 # SOBYA Chain
 
-SOBYA is a Cosmos SDK / CometBFT blockchain project. The configured public chain identifier in the operator launch materials is sobya-1. Repository status, an accepted Genesis file, and a scheduled startup are not by themselves proof that a public network is currently producing blocks; live operation must be confirmed from independent, read-only network evidence.
+**SOBYA Mainnet is live and publicly accessible.** The production CometBFT network uses chain ID `sobya-1`; the EVM network uses chain ID `357812033857` (`0x534f425941`). The native asset is SOBY (`asobya`, 18 decimals). The public EVM JSON-RPC, CometBFT RPC, REST API and explorer endpoints are listed below.
 
-## Native token and agreed tokenomics
+## Connect to SOBYA Mainnet
 
-- Display symbol: SOBY
-- Base denomination: asobya
-- Precision: 18 decimal places (1 SOBY = 10^18 asobya)
-- Intended maximum native supply: 1,000,000,000 SOBY (10^27 asobya)
-- Agreed allocation: Founder 40%, Community 20%, Validators 15%, Development 10%, Liquidity 10%, Treasury 3%, Emergency 2%.
-- Transaction fees: 50% Treasury, 30% Validators, 20% Community.
-- Automatic inflation is disabled under the current token rules.
+| Service | Endpoint |
+|---|---|
+| EVM JSON-RPC (MetaMask, EVM wallets and dApps) | `https://sobya-evm-rpc.nodesafe-dapp.xyz` |
+| CometBFT RPC (consensus and node queries) | `https://sobya-rpc.nodesafe-dapp.xyz` |
+| REST API | `https://sobya-api.nodesafe-dapp.xyz` |
+| Block explorer | `https://explorer.nodesafe-app.xyz/sobya` |
 
-See [tokenomics and launch rules](sobya/TOKENOMICS.md). Production wallet destinations and validator allocations must be validated against the approved Genesis package; development balances are not production allocations.
+Use the EVM JSON-RPC endpoint for MetaMask. CometBFT RPC and REST are different protocols and must not be entered as an EVM wallet RPC. If an endpoint is temporarily unavailable, use the explorer or the alternative endpoint officially published by the project; do not infer network failure from one provider URL.
 
-## Development capabilities and evidence
+## Network identity and native token
 
-The repository contains Cosmos SDK transaction-processing code, native 18-decimal denomination configuration, fee-routing and validator-reserve logic, local multi-validator workflows, and Cosmos EVM integration work. These capabilities must be judged against completed CI runs on the exact commit.
+- Network name: **SOBYA Mainnet**
+- CometBFT chain ID: `sobya-1`
+- EVM chain ID: `357812033857`
+- Display symbol: `SOBY`
+- Base denomination: `asobya`
+- Precision: 18 decimals (1 SOBY = 10^18 asobya)
+- Maximum native supply: 1,000,000,000 SOBY
+- Automatic inflation: disabled under the network's token rules
+- Transaction-fee distribution: 50% Treasury, 30% Validators, 20% Community
 
-A passing build or local CI network does not establish public consensus, continuous hosting, or full wallet compatibility. See [EVM integration status](docs/COSMOS_EVM_INTEGRATION.md) and the current [GitHub Actions runs](https://github.com/snforem-cpu/sobya-chain/actions).
+The values `777777` and `777778` are reserved for local development and CI fixtures only. They are not SOBYA Mainnet identifiers.
 
-## SOBYA Tokenomics Studio
+## EVM compatibility
 
-A browser-only tokenomics planning tool is available at [SOBYA Tokenomics Studio](https://snforem-cpu.github.io/sobya-chain/tokenomics-studio/). It supports allocation design, TGE/cliff/linear vesting schedules, unlock forecasts, scenario comparison, JSON/CSV export, and print-to-PDF reports. Calculations run locally; it does not connect to wallets, RPC endpoints, external APIs, or a server. See [the tool documentation](tokenomics-studio/README.md) for formulas and limitations. The planned individual perpetual license is priced at 100 SOBY (one user, one-time payment). The pricing page currently keeps sales paused until the receiving address and live payment network are independently verified. Payment collection and in-app SOBY license verification are not enabled yet; see [sales and licensing status](tokenomics-studio/LICENSING.md).
+SOBYA Mainnet includes the Cosmos EVM execution environment. The public EVM JSON-RPC supports compatible wallets and applications, including Ethereum JSON-RPC methods, signed EVM transactions, native SOBY transfers, smart-contract execution and ERC-20 interactions supported by the deployed network version. Use EVM chain ID `357812033857`; do not use the local CI chain ID.
 
-## SOBYA DEX
+EVM access is distinct from optional ecosystem features such as IBC routes, third-party wallet listings, token bridges, and individual dApp deployments. Those features must be described according to their own deployment and verification status and do not determine whether the live EVM network is operational.
 
-A self-custody decentralized exchange interface and AMM contracts are included in the repository. The [SOBYA DEX interface](https://snforem-cpu.github.io/sobya-chain/dex/) is published as a static GitHub Pages site. **Trading is not enabled yet**: Factory, Router, and WSOBY contract addresses remain intentionally blank until deployment receipts are verified. Independent smart-contract security review is required before public liquidity is added. See the [DEX deployment and safety guide](contracts/DEPLOYMENT.md). No official USDT contract is currently provided or claimed.
+## SOBYA Proof Suite
+
+The repository includes the published SOBYA Proof Suite:
+1. [SOBYA Proof](https://snforem-cpu.github.io/sobya-chain/proof-suite/) — on-chain proof for files and documents.
+2. [SOBYA Invoice Proof](https://snforem-cpu.github.io/sobya-chain/proof-suite/) — proof records for commercial invoices.
+3. [SOBYA Verify API](https://snforem-cpu.github.io/sobya-chain/proof-suite/verify-api/) — automated verification API for websites and applications.
+
+The former SOBYA Certificate service has been removed and is not part of the current suite.
+
+## SOBYA DEX and other applications
+
+The [SOBYA DEX interface](https://snforem-cpu.github.io/sobya-chain/dex/) is published. The interface, contract deployment state, liquidity and public swap availability are separate from mainnet readiness; consult the DEX documentation for the exact current contract and market status. Do not interpret a DEX feature gate as an EVM or network launch gate.
+
+The [SOBYA Auto Exchange](https://snforem-cpu.github.io/sobya-chain/auto-exchange/) provides the project's exchange workflow and live SOBY price source. [SOBYA Tokenomics Studio](https://snforem-cpu.github.io/sobya-chain/tokenomics-studio/) is a browser-based planning tool.
 
 ## Validator participation
 
-Independent operators may submit a no-fee expression of interest through the [public GitHub validator application form](https://github.com/snforem-cpu/sobya-chain/issues/new?template=validator-application.yml). Intake is manual: submitting an issue does not call the separate Go support service, approve a grant, or create a validator.
+SOBYA Mainnet is already running. Additional independent validators can join the existing network through the live-chain validator creation process; they do not participate in a new genesis ceremony and must not create a replacement genesis. Read [Validator Onboarding](docs/validator-support/ONBOARDING.md) and confirm the current binary, sync state, staking parameters, self-delegation requirement, fees and peer details with the project before submitting a live-chain transaction.
 
-Read the [validator onboarding guide](docs/validator-support/ONBOARDING.md) before applying. Do not generate a new genesis gentx to join a network that has already started. A joining operator must synchronize to the verified live chain and create its validator using the supported live-chain transaction flow only after the team confirms the current binary, chain state, staking parameters, minimum self-delegation, and fees.
+Each operator generates and retains their own account, node and validator signing keys. Never send mnemonics, private keys, keyring directories, `priv_validator_key.json`, or `node_key.json` to the project.
 
-## Current operational status (documentation review: 2026-11-11)
+## Development and CI
 
-- Chain ID in the operator launch materials: sobya-1.
-- NodeSafe reported acceptance of the single-validator launch Genesis with SHA-256 35207c189ee5548cb376cb4d5d9dbe4aa0509b3daf85b057e8e59db1c4b0314a, scheduled for 2026-11-10T16:00:00Z. This is an operator-reported launch artifact, not independent proof of current block production.
-- NodeSafe previously supplied P2P endpoint 188.68.36.11:36656. Its current reachability and the current peer set must be checked before distributing connection instructions.
-- Public network endpoints currently published by NodeSafe:
-  - EVM JSON-RPC (MetaMask, EVM wallets and EVM applications): `https://sobya-evm-rpc.nodesafe-dapp.xyz` (EVM chain ID `357812033857`).
-  - CometBFT RPC (consensus/node queries): `https://sobya-rpc.nodesafe-dapp.xyz`.
-  - REST API: `https://sobya-api.nodesafe-dapp.xyz`.
-  - Explorer: `https://explorer.nodesafe-app.xyz/sobya`.
-- These endpoints serve different protocols. Do not enter the CometBFT RPC or REST URL as the EVM RPC in MetaMask. Endpoint availability and continuous block production should still be checked independently before issuing validator operating instructions.
-- The earlier two-validator Genesis draft is not the final launch artifact identified above. Do not use its validator list or hash for joining instructions.
-- The EVM chain ID 777777 is development/CI only and must not be reused for a public network.
-- GitHub Actions runners are temporary CI machines, not validator hosting.
-- No mainnet investment, token sale, return, or exchange-listing claim is authorized by this repository.
+The repository also contains local development networks, automated tests, CI fixtures and tooling. Those environments are isolated from SOBYA Mainnet. A test that uses chain ID `777777` or `777778` is a local test fixture, not a statement that the live network is experimental or unpublished. GitHub Actions runners are temporary build/test machines and are not the production validator host.
 
-## Validator support service status
+## Separate service status
 
-The Go service under ops/validator-support is an isolated experimental administrative MVP. It is not deployed, is not connected to the GitHub issue form, does not query a live RPC, and cannot sign or broadcast transactions. GitHub Issues are the only currently documented application intake path. Do not treat an example/configured budget cap as evidence of spendable funds.
+Some optional repository tools and administrative services have their own deployment or security gates. For example, the off-chain validator-support MVP is not the live validator protocol, and DEX public swaps depend on their own liquidity and contract configuration. These limitations must not be conflated with the operational status of SOBYA Mainnet or its EVM.
 
 ## Security
 
-Never commit or share mnemonics, private keys, keyring directories, priv_validator_key.json, or node_key.json. Each operator generates and retains their own keys. Applicants must never send secrets through GitHub Issues.
-
+Never commit or share mnemonics, private keys, keyring directories, `priv_validator_key.json`, or `node_key.json`. Each operator generates and retains their own keys. Use only verified release binaries and official network endpoints.
