@@ -193,7 +193,8 @@ async function issueCertificate() {
   state.certificateId = metadata.certificateId;
   saveCertificateRecord(metadata, tx, "PENDING CONFIRMATION — VERIFY AFTER BLOCK");
   // Reveal and persist the certificate before optional QR generation or receipt polling.
-  await displayCertificatePreview(metadata, tx, "PENDING CONFIRMATION — VERIFY AFTER BLOCK");
+  try { await displayCertificatePreview(metadata, tx, "PENDING CONFIRMATION — VERIFY AFTER BLOCK"); }
+  catch (error) { console.warn("QR generation failed; showing certificate details without QR:", error); }
   say("certificate-issue-result", "Certificate transaction submitted. Save the certificate ID and transaction hash shown below. Transaction: " + tx, "success");
   let receipt = null;
   try { receipt = await rpc("eth_getTransactionReceipt", [tx]); } catch (error) { console.warn("Receipt lookup delayed:", error); }
