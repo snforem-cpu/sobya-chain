@@ -1,6 +1,6 @@
 # SOBYA Proof Suite
 
-SOBYA Proof Suite is the unified product family for document integrity and digital verification on SOBYA Mainnet. The current live-capable service is SOBYA Proof; Invoice Proof, Certificate, and Verify API are clearly marked as planned until their implementations pass testing and are released.
+SOBYA Proof Suite is the unified product family for document integrity and digital verification on SOBYA Mainnet. The current live-capable service is SOBYA Proof; Invoice Proof is a phase 2 release candidate pending CI and merge; Certificate and Verify API remain planned.
 
 SOBYA Proof is a simple browser-based tool for recording and verifying document fingerprints on SOBYA Mainnet.
 
@@ -47,9 +47,9 @@ The Proof Registry emits a `ProofRecorded` event identifying the wallet address 
 - The Proof Registry contract is deployed at `0x9B1C6Cc504DEb8FA7aB9DAe499aB3D042fEC97b9`. Verification checks the contract call, exact 1 SOBY fee, successful receipt, and matching `ProofRecorded` event.
 - Verification depends on access to a configured public SOBYA EVM RPC endpoint.
 - A blockchain record proves the fingerprint was recorded; it does not certify the document's contents or confer legal status.
-- Invoice Proof, Certificate, and Verify API are planned phases of the SOBYA Proof Suite and are not available in the current release.
+- Invoice Proof is implemented under `invoice-proof/` as a release candidate and must not be used until its PR is merged and Pages deployment succeeds. Certificate and Verify API remain planned.
 
-## Service fee
+## Invoice Proof details\n\nInvoice Proof uses the same deployed Proof Registry and the same 1 SOBY service fee. It binds the invoice file digest to a normalized invoice reference, issue date, total, currency, and optional issuer/recipient labels. All invoice bytes and entered metadata remain local; only the final combined SHA-256 digest is public on-chain. Because that digest is public, a party with a known invoice copy may be able to compare it against the chain record. A matching record does not prove payment, delivery, issuer identity, tax compliance, or legal validity.\n\n## Service fee
 
 - Fixed fee: `1 SOBY` per proof (`1000000000000000000` wei; SOBY has 18 decimals).
 - Recipient: `0xd316993423Fc6268038F4EE3EA7C0C5038513C18`.
