@@ -1,24 +1,22 @@
 # SOBYA Validator Recruitment — Publication Pack
 
-**Current wording: recruiting expressions of interest for a SOBYA mainnet launch.** Do not say the mainnet is live, applications are approved, or rewards are guaranteed. Add official contact/channel links only after the project owner confirms them.
+**Current wording: SOBYA Mainnet is live. This publication pack invites independent operators to join the existing network.**\n\n## X post (English)
 
-## X post (English)
-
-SOBYA is preparing its public mainnet launch and inviting expressions of interest from experienced Cosmos SDK / CometBFT operators.
+SOBYA Mainnet is live (CometBFT chain ID `sobya-1`, EVM chain ID `357812033857`). We invite experienced Cosmos SDK / CometBFT operators to join the existing network as independent validators or full nodes.
 
 We are looking for operators who control their own Linux infrastructure, can maintain reliable uptime, and can provide public P2P connectivity. Validators keep their own signing keys; SOBYA will never ask for seed phrases or private keys.
 
-This is pre-launch operator recruitment—not a live network or investment offer. The protocol validator reserve and eligibility rules are documented in sobya/TOKENOMICS.md; participation does not promise fiat income, reimbursement, market price, liquidity, or exchange listing.
+This is an invitation to join an operational network, not an investment offer. The protocol validator reserve and eligibility rules are documented in sobya/TOKENOMICS.md; participation does not promise fiat income, reimbursement, market price, liquidity, or exchange listing.
 
 Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/blob/main/docs/STAGE_THREE_OPERATOR_KIT.md
 
 ## X post (Arabic)
 
-تستعد SOBYA لإطلاق شبكتها الرئيسية العامة بالاعتماد على مدققين مستقلين، ونفتح باب إبداء الاهتمام للمشغلين ذوي الخبرة في Cosmos SDK وCometBFT.
+شبكة SOBYA الرئيسية تعمل ومنشورة بالفعل (معرّف CometBFT: `sobya-1`، ومعرّف EVM: `357812033857`). نفتح باب الانضمام للمشغلين ذوي الخبرة في Cosmos SDK وCometBFT لتشغيل مدققين وعقد مستقلة ضمن الشبكة الحالية.
 
 نبحث عن مشغلين يمتلكون خوادم Linux مستقلة واتصالاً مستقراً وإمكانية فتح اتصال P2P. يحتفظ كل مدقق بمفاتيح التوقيع لديه، ولن نطلب أبداً العبارة السرية أو المفتاح الخاص.
 
-هذه مرحلة ما قبل الإطلاق وليست شبكة حية أو عرضاً استثمارياً. توجد مخصصات ومواعيد لاستحقاق مكافآت المدققين وفق قواعد البروتوكول المنشورة، لكنها لا تضمن دخلاً نقدياً أو سعراً سوقياً أو سيولة أو إدراجاً في منصة.
+هذه دعوة للانضمام إلى شبكة عاملة وليست عرضاً استثمارياً. توجد مخصصات ومواعيد لاستحقاق مكافآت المدققين وفق قواعد البروتوكول المنشورة، لكنها لا تضمن دخلاً نقدياً أو سعراً سوقياً أو سيولة أو إدراجاً في منصة.
 
 دليل المشغلين: https://github.com/snforem-cpu/sobya-chain/blob/main/docs/STAGE_THREE_OPERATOR_KIT.md
 
@@ -26,7 +24,7 @@ Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/
 
 **مرحباً بمهتمي تشغيل عقد SOBYA**
 
-نستقبل حالياً طلبات إبداء الاهتمام لتشغيل عقد مستقلة ضمن الشبكة الرئيسية قبل الإطلاق.
+شبكة SOBYA الرئيسية تعمل حالياً. نستقبل طلبات المشغلين الراغبين في الانضمام إلى الشبكة القائمة بعقد مستقلة.
 
 الأدوار المطلوبة:
 - Validator: عقدة تشارك في الإجماع.
@@ -35,7 +33,7 @@ Read the operator preparation guide: https://github.com/snforem-cpu/sobya-chain/
 
 يرجى إرسال معلومات عامة فقط: اسم المشغل، وسيلة التواصل، المنطقة الجغرافية العامة، مواصفات الخادم، نظام Linux، الخبرة السابقة، والدور المطلوب. لا ترسلوا كلمات مرور أو مفاتيح أو عبارات استرداد أو ملفات keyring أو ملفات validator.
 
-لن يبدأ تشغيل الشبكة الرئيسية إلا بعد اعتماد نسخة البرنامج ومعرّفي الشبكة وملف Genesis النهائي وبصمته SHA-256 وقائمة الأقران وموعد الإطلاق. لا تستخدموا chain ID أو Genesis تجريبياً من عندكم.
+الشبكة الرئيسية قائمة بالفعل. ينضم المدقق الجديد إلى السلسلة الحالية بعد مزامنة العقدة والتحقق من الإصدار ومعلمات Staking والأقران. لا تنشئوا Genesis جديداً ولا تستخدموا معرّفات CI أو عناوين أقران قديمة.
 
 تخضع مكافآت المدققين لمخصصات البروتوكول وشرط الاستحقاق؛ ولا يوجد ضمان لقيمة سوقية أو دخل نقدي أو تعويض تكاليف. دليل الانضمام: https://github.com/snforem-cpu/sobya-chain/blob/main/docs/STAGE_THREE_OPERATOR_KIT.md
 
@@ -56,7 +54,7 @@ Do not include credentials, account IDs, private keys, mnemonics, seed phrases, 
 
 ## FAQ
 
-**Is SOBYA mainnet live now?** No. This is preparation and recruitment only. A mainnet-live announcement requires the published launch bundle and successful independent-host consensus checks.
+**Is SOBYA Mainnet live?** Yes. The production network is live with CometBFT chain ID `sobya-1` and EVM chain ID `357812033857`. New validators join the existing chain.
 
 **Do I need to send my validator key to the project?** Never. Generate and retain it locally. Only public details and the signed gentx are shared when the official ceremony begins.
 
@@ -64,7 +62,7 @@ Do not include credentials, account IDs, private keys, mnemonics, seed phrases, 
 
 **Can I use a GitHub Actions runner as my validator?** No. CI runners are temporary and are for tests/builds only.
 
-**Can I start with the sample chain ID or EVM ID 777777?** No. Wait for the official launch bundle. 777777 is development/CI only.
+**Can I use EVM ID 777777?** No. It is reserved for local development/CI. SOBYA Mainnet uses EVM chain ID `357812033857`.
 
 ## Before publishing
 
