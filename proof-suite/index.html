@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="SOBYA Proof Suite — one platform for document proofs, invoice records, digital certificates and developer verification on SOBYA Mainnet.">
+  <meta name="description" content="SOBYA Proof Suite — one platform for document proofs, invoice records and developer verification on SOBYA Mainnet.">
   <title>SOBYA Proof Suite — Trust, Proof & Verification on SOBYA</title>
   <link rel="icon" type="image/png" href="../assets/logo/sobya-coin-128.png">
   <link rel="stylesheet" href="./styles.css">
@@ -34,7 +34,7 @@
 
     <section class="suite-overview" aria-labelledby="suite-title">
       <div class="suite-heading">
-        <p class="step" data-en="ONE PLATFORM · FOUR CONNECTED SERVICES" data-ar="منصة واحدة · أربع خدمات مترابطة">ONE PLATFORM · FOUR CONNECTED SERVICES</p>
+        <p class="step" data-en="ONE PLATFORM · THREE CONNECTED SERVICES" data-ar="منصة واحدة · ثلاث خدمات مترابطة">ONE PLATFORM · FOUR CONNECTED SERVICES</p>
         <h2 id="suite-title" data-en="The SOBYA Proof Suite" data-ar="منظومة SOBYA Proof Suite">The SOBYA Proof Suite</h2>
         <p data-en="A shared verification platform built on SOBYA Mainnet. Each service will become available only after its own implementation and testing are complete." data-ar="منصة تحقق موحدة مبنية على شبكة SOBYA. ستتاح كل خدمة بعد اكتمال تطويرها واختبارها بصورة مستقلة.">A shared verification platform built on SOBYA Mainnet. Each service will become available only after its own implementation and testing are complete.</p>
       </div>
@@ -51,16 +51,10 @@
           <p data-en="Privately bind an invoice file to its reference, date, amount and currency, then verify the registered fingerprint." data-ar="اربط ملف الفاتورة برقمها وتاريخها ومبلغها وعملتها ببصمة خاصة، ثم تحقق من البصمة المسجلة.">Privately bind an invoice file to its reference, date, amount and currency, then verify the registered fingerprint.</p>
           <a class="suite-link" href="#invoice-register" data-en="Use Invoice Proof ↓" data-ar="استخدم إثبات الفواتير ↓">Use Invoice Proof ↓</a>
         </article>
-        <article class="suite-card active">
-          <div class="suite-card-top"><span class="suite-number">03</span><span class="suite-status live" data-en="PHASE 3 · INTEGRATED" data-ar="المرحلة الثالثة · مدمجة">PHASE 3 · INTEGRATED</span></div>
-          <h3>SOBYA Certificate</h3>
-          <p data-en="Issue digital certificates with unique IDs, QR codes and public verification pages." data-ar="إصدار شهادات رقمية بمعرّفات فريدة ورموز QR وصفحات تحقق عامة.">Issue digital certificates with unique IDs, QR codes and public verification pages.</p>
-          <a class="suite-link" href="#certificate-issue" data-en="Issue a certificate ↓" data-ar="أصدر شهادة ↓">Issue a certificate ↓</a>
-        </article>
         <article class="suite-card planned">
           <div class="suite-card-top"><span class="suite-number">04</span><span class="suite-status planned-label" data-en="PLANNED · PHASE 4" data-ar="مخطط · المرحلة الرابعة">PLANNED · PHASE 4</span></div>
           <h3>SOBYA Verify API</h3>
-          <p data-en="Developer tools for automated verification of files, invoices and certificates." data-ar="أدوات للمطورين للتحقق الآلي من الملفات والفواتير والشهادات.">Developer tools for automated verification of files, invoices and certificates.</p>
+          <p data-en="Developer API for automated verification of SOBYA Proof and Invoice Proof records." data-ar="واجهة للمطورين للتحقق الآلي من سجلات إثبات الملفات والفواتير.">Developer tools for automated verification of files, invoices and certificates.</p>
           <span class="suite-note" data-en="Not available yet" data-ar="غير متاحة حالياً">Not available yet</span>
         </article>
       </div>
@@ -146,55 +140,7 @@
 </section>
 
 
-<section class="panel certificate-app" id="certificate-issue" aria-labelledby="certificate-issue-title">
-  <div class="section-heading"><div><p class="step">03 · CERTIFICATE</p><h2 id="certificate-issue-title" data-en="Issue a digital certificate" data-ar="إصدار شهادة رقمية">Issue a digital certificate</h2></div><span class="tag">SHA-256 · QR</span></div>
-  <p class="certificate-intro" data-en="Create a tamper-evident certificate record on SOBYA Mainnet. The certificate details stay in your browser; only their fingerprint is recorded on-chain." data-ar="أنشئ سجلاً موثقاً للشهادة على شبكة SOBYA. تبقى بيانات الشهادة في متصفحك، ولا تُسجل على السلسلة إلا بصمتها الرقمية.">Create a tamper-evident certificate record on SOBYA Mainnet. The certificate details stay in your browser; only their fingerprint is recorded on-chain.</p>
-  <div class="certificate-grid">
-    <div class="field"><label for="cert-issuer" data-en="Issuing organization" data-ar="الجهة المصدرة">Issuing organization</label><input id="cert-issuer" maxlength="160" placeholder="Organization name"></div>
-    <div class="field"><label for="cert-recipient" data-en="Recipient name" data-ar="اسم المستفيد">Recipient name</label><input id="cert-recipient" maxlength="160" placeholder="Full name"></div>
-    <div class="field"><label for="cert-title" data-en="Certificate title" data-ar="عنوان الشهادة">Certificate title</label><input id="cert-title" maxlength="180" placeholder="Certificate of Completion"></div>
-    <div class="field"><label for="cert-issue-date" data-en="Issue date" data-ar="تاريخ الإصدار">Issue date</label><input id="cert-issue-date" type="date"></div>
-    <div class="field"><label for="cert-expiry-date" data-en="Expiry date (optional)" data-ar="تاريخ الانتهاء (اختياري)">Expiry date (optional)</label><input id="cert-expiry-date" type="date"></div>
-    <div class="field"><label for="cert-notes" data-en="Additional details (optional)" data-ar="تفاصيل إضافية (اختياري)">Additional details (optional)</label><textarea id="cert-notes" maxlength="1000" rows="3"></textarea></div>
-  </div>
-  <div class="fee certificate-fee"><div><span data-en="Certificate service fee" data-ar="رسوم خدمة الشهادة">Certificate service fee</span><small data-en="One-time fee per certificate. Network gas is separate." data-ar="رسوم لمرة واحدة لكل شهادة. غاز الشبكة منفصل.">One-time fee per certificate. Network gas is separate.</small></div><strong>1 SOBY</strong></div>
-  <p class="wallet-state" id="certificate-wallet-state" aria-live="polite" data-en="Connect your wallet once in the SOBYA Proof section above to issue a certificate." data-ar="اربط محفظتك مرة واحدة من قسم SOBYA Proof أعلاه لإصدار الشهادة.">Connect your wallet once in the SOBYA Proof section above to issue a certificate.</p>
-  <div class="button-row"><button class="button primary" id="certificate-issue-button" type="button" data-en="Issue certificate · 1 SOBY" data-ar="أصدر الشهادة · 1 SOBY">Issue certificate · 1 SOBY</button></div>
-  <div class="result" id="certificate-issue-result" aria-live="polite" hidden></div>
-  <section class="certificate-preview" id="certificate-preview" hidden>
-    <div class="certificate-print">
-      <div class="certificate-brand"><img src="../assets/logo/sobya-coin-128.png" alt="Official SOBYA logo"><span>SOBYA <small>VERIFIABLE CERTIFICATE</small></span></div>
-      <p class="certificate-kicker" data-en="DIGITAL CREDENTIAL" data-ar="اعتماد رقمي">DIGITAL CREDENTIAL</p>
-      <h2 id="certificate-preview-title">Certificate of Completion</h2>
-      <p data-en="This certificate is issued to" data-ar="تُمنح هذه الشهادة إلى">This certificate is issued to</p>
-      <h3 id="certificate-preview-recipient"></h3>
-      <p data-en="Issued by" data-ar="صادرة عن">Issued by</p>
-      <strong id="certificate-preview-issuer"></strong>
-      <p class="certificate-details"><span data-en="Issued" data-ar="تاريخ الإصدار">Issued</span>: <span id="certificate-preview-issue-date"></span> <span id="certificate-preview-expiry"></span></p>
-      <p id="certificate-preview-notes"></p>
-      <div class="certificate-footer"><div><small data-en="CERTIFICATE ID" data-ar="معرّف الشهادة">CERTIFICATE ID</small><code id="certificate-preview-id"></code><small data-en="SOBYA MAINNET RECORD" data-ar="سجل شبكة SOBYA">SOBYA MAINNET RECORD</small><code id="certificate-preview-tx"></code><small id="certificate-preview-status">PENDING CONFIRMATION</small></div><canvas id="certificate-qr" width="160" height="160"></canvas></div>
-      <p class="certificate-disclaimer" data-en="The SOBYA blockchain record verifies that this certificate fingerprint was recorded at a specific time. It does not independently certify the issuer's identity, the truth of the claims, or legal accreditation." data-ar="يثبت سجل شبكة SOBYA أن بصمة هذه الشهادة سُجلت في وقت محدد، لكنه لا يتحقق بصورة مستقلة من هوية الجهة المصدرة أو صحة الادعاءات أو الاعتماد القانوني.">The SOBYA blockchain record verifies that this certificate fingerprint was recorded at a specific time. It does not independently certify the issuer's identity, the truth of the claims, or legal accreditation.</p>
-    </div>
-    <div class="button-row certificate-print-actions"><button class="button primary" id="certificate-print-button" type="button" data-en="Print / Save as PDF" data-ar="طباعة / حفظ PDF">Print / Save as PDF</button></div>
-  </section>
-</section>
-<section class="panel certificate-app" id="certificate-verify" aria-labelledby="certificate-verify-title">
-  <div class="section-heading"><div><p class="step">04 · PUBLIC VERIFICATION</p><h2 id="certificate-verify-title" data-en="Verify a certificate" data-ar="التحقق من شهادة">Verify a certificate</h2></div><span class="tag">READ-ONLY</span></div>
-  <p class="certificate-intro" data-en="Scan the certificate QR code or enter its transaction hash and certificate details. The details are compared with the fingerprint stored on SOBYA Mainnet." data-ar="امسح رمز QR للشهادة أو أدخل معرّف معاملتها وبياناتها. تتم مقارنة البيانات بالبصمة المخزنة على شبكة SOBYA.">Scan a certificate QR code or enter its record details.</p>
-  <div class="certificate-grid">
-    <div class="field"><label for="verify-cert-tx" data-en="SOBYA transaction hash" data-ar="معرّف معاملة SOBYA">SOBYA transaction hash</label><input id="verify-cert-tx" placeholder="0x…" autocomplete="off" spellcheck="false"></div>
-    <div class="field"><label for="verify-cert-issuer" data-en="Issuing organization" data-ar="الجهة المصدرة">Issuing organization</label><input id="verify-cert-issuer" maxlength="160"></div>
-    <div class="field"><label for="verify-cert-recipient" data-en="Recipient name" data-ar="اسم المستفيد">Recipient name</label><input id="verify-cert-recipient" maxlength="160"></div>
-    <div class="field"><label for="verify-cert-title" data-en="Certificate title" data-ar="عنوان الشهادة">Certificate title</label><input id="verify-cert-title" maxlength="180"></div>
-    <div class="field"><label for="verify-cert-issue-date" data-en="Issue date" data-ar="تاريخ الإصدار">Issue date</label><input id="verify-cert-issue-date" type="date"></div>
-    <div class="field"><label for="verify-cert-expiry-date" data-en="Expiry date (optional)" data-ar="تاريخ الانتهاء (اختياري)">Expiry date (optional)</label><input id="verify-cert-expiry-date" type="date"></div>
-    <div class="field"><label for="verify-cert-notes" data-en="Additional details (if present)" data-ar="تفاصيل إضافية (إن وجدت)">Additional details (if present)</label><textarea id="verify-cert-notes" maxlength="1000" rows="3"></textarea></div>
-  </div>
-  <div class="button-row"><button class="button secondary" id="certificate-verify-button" type="button" data-en="Verify certificate" data-ar="تحقق من الشهادة">Verify certificate</button></div>
-  <div class="result" id="certificate-verify-result" aria-live="polite" hidden></div>
-</section>
-
-    <section class="notice" aria-labelledby="record-scope-title">
+<section class="notice" aria-labelledby="record-scope-title">
       <strong id="record-scope-title" data-en="What this record confirms" data-ar="ما الذي يؤكده هذا السجل">What this record confirms</strong>
       <p data-en="A successful SOBYA transaction records the file's SHA-256 fingerprint and the submitting wallet address at a specific block. If a selected file has the same fingerprint, its bytes match the recorded file fingerprint." data-ar="تسجل معاملة SOBYA الناجحة بصمة SHA-256 للملف وعنوان المحفظة المرسلة في كتلة محددة. إذا تطابقت بصمة ملف مختار، فهذا يعني أن محتواه مطابق للملف المسجل.">A successful SOBYA transaction records the file's SHA-256 fingerprint and the submitting wallet address at a specific block. If a selected file has the same fingerprint, its bytes match the recorded file fingerprint.</p>
       <p data-en="The wallet address is public, but this record does not independently identify the person controlling it, prove who created the document, verify its contents, or establish legal ownership." data-ar="عنوان المحفظة عام، لكن هذا السجل لا يحدد بصورة مستقلة هوية الشخص الذي يتحكم بها، ولا يثبت منشئ المستند أو صحة محتواه أو الملكية القانونية.">The wallet address is public, but this record does not independently identify the person controlling it, prove who created the document, verify its contents, or establish legal ownership.</p>
@@ -210,6 +156,6 @@
   </main>
   <script type="module" src="./app.js"></script>
   <script type="module" src="./invoice-proof/app.js"></script>
-  <script type="module" src="./certificate/app.js"></script>
+  
 </body>
 </html>
