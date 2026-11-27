@@ -82,7 +82,15 @@
       <section class="panel">
         <p class="step">للمطورين والشركات</p>
         <h2>اربط التحقق بموقعك أو تطبيقك</h2>
-        <p>تتضمن المنظومة أيضاً HTTP API للطلبات الآلية بصيغة JSON. الخادم الخلفي قيد إعداد النشر؛ ستُعرض نقطة الاتصال العامة هنا بعد نشرها واجتياز اختبار الصحة الفعلي.</p>
+        <p>أصبحت خدمة HTTP API منشورة على Cloudflare Workers، ويمكن لموقعك أو تطبيقك إرسال طلبات تحقق آلية بصيغة JSON دون ربط محفظة أو رفع الملفات.</p>
+        <p><strong>عنوان API الأساسي:</strong><br><a class="suite-link" href="https://sobya-verify-api.snforem.workers.dev">https://sobya-verify-api.snforem.workers.dev</a></p>
+        <p><strong>فحص حالة الخدمة:</strong><br><a class="suite-link" href="https://sobya-verify-api.snforem.workers.dev/v1/health">GET /v1/health</a></p>
+        <p><strong>مسارات التحقق:</strong></p>
+        <ul>
+          <li><code>POST /v1/verify/proof</code> — التحقق من إثبات ملف.</li>
+          <li><code>POST /v1/verify/invoice</code> — التحقق من إثبات فاتورة وبياناتها.</li>
+        </ul>
+        <p>يرسل تطبيقك بصمة SHA-256 فقط، ولا يرسل الملف نفسه. لا تحتاج إلى مفتاح API أو توقيع محفظة في النسخة الحالية.</p>
         <p><a class="suite-link" href="README.md">اقرأ توثيق API وأمثلة التكامل</a></p>
       </section>
     </div>
