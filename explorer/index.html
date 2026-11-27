@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071326">
+<meta name="description" content="Explore the live SOBYA Mainnet: search transactions, blocks and wallet addresses using the official EVM RPC.">
+<meta property="og:title" content="SOBYA Explorer">
+<meta property="og:description" content="Official SOBYA Mainnet block explorer.">
+<link rel="icon" href="../assets/logo/sobya-coin-128.png">
+<link rel="stylesheet" href="./styles.css">
+<title>SOBYA Explorer — Mainnet</title>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="../"><img src="../assets/logo/sobya-coin-128.png" alt="SOBYA"><span>SOBYA<small>MAINNET EXPLORER</small></span></a><div class="network"><i></i><span id="networkStatus">Connecting to Mainnet…</span></div></header>
+<main class="shell">
+<section class="hero"><p class="eyebrow">OFFICIAL SOBYA MAINNET BLOCK EXPLORER</p><h1>Explore the <em>SOBYA</em> network.</h1><p class="intro">Search transaction hashes, wallet addresses and block numbers directly on SOBYA Mainnet.</p>
+<form id="searchForm" class="search"><span aria-hidden="true">⌕</span><input id="searchInput" autocomplete="off" spellcheck="false" placeholder="Search by transaction hash, address or block number" aria-label="Search transaction, address or block number"><button type="submit">Search</button></form><p class="search-hint">Try a transaction hash, 0x wallet address, or block height.</p></section>
+<section class="stats" aria-label="Network statistics"><article class="stat"><span>Latest block</span><strong id="latestBlock">—</strong><small id="blockAge">Waiting for RPC</small></article><article class="stat"><span>Chain ID</span><strong>357812033857</strong><small>SOBYA Mainnet</small></article><article class="stat"><span>Native currency</span><strong>SOBY</strong><small>18 decimal places</small></article><article class="stat"><span>RPC status</span><strong id="rpcState">Checking</strong><small id="rpcLatency">Live endpoint check</small></article></section>
+<section id="resultSection" class="panel hidden" aria-live="polite"><div class="section-title"><div><p class="eyebrow">SEARCH RESULT</p><h2 id="resultTitle">Details</h2></div><button id="clearResult" class="quiet" type="button">Clear</button></div><div id="resultContent"></div></section>
+<section class="panel"><div class="section-title"><div><p class="eyebrow">NETWORK ACTIVITY</p><h2>Latest blocks</h2><p class="muted">Recent blocks read directly from SOBYA Mainnet.</p></div><button id="refreshBlocks" class="quiet" type="button">Refresh ↻</button></div><div id="blocks" class="blocks"><div class="empty">Loading latest blocks…</div></div></section>
+<section class="note"><strong>Data transparency</strong><p>This explorer reads live EVM data from the public SOBYA RPC. Transaction lookup, block details, native balances and nonce are available directly. A complete historical wallet transaction timeline requires a dedicated indexer and is not implied by this RPC-only version.</p></section>
+</main>
+<footer><span>© SOBYA · Official Mainnet Explorer</span><span><a href="https://sobya-evm-rpc.nodesafe-dapp.xyz" target="_blank" rel="noopener">EVM RPC</a> · <a href="https://explorer.nodesafe-app.xyz/sobya" target="_blank" rel="noopener">NodeSafe Explorer</a> · <a href="../">SOBYA website</a></span></footer>
+<script type="module" src="./app.js"></script>
+</body></html>
