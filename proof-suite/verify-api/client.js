@@ -6,6 +6,7 @@ import {
 
 const registryInterface = new Interface([
   "function recordProof(bytes32 documentHash) payable",
+  "function feeRecipient() view returns (address)",
   "event ProofRecorded(address indexed submitter,bytes32 indexed documentHash,uint256 fee,uint256 timestamp)"
 ]);
 
@@ -45,15 +46,20 @@ export function createSobyaVerifyClient({ rpcUrls, fetchImpl = globalThis.fetch,
 
   async function verifyRecord(txHash, expectedFingerprint = null) {
     if (!isTransactionHash(txHash)) throw new TypeError("A valid 32-byte transaction hash is required.");
-    const [chainId, tx, receipt] = await Promise.all([
+    const [chainId, tx, receipt, registryCode, feeRecipientData] = await Promise.all([
       rpc("eth_chainId"),
       rpc("eth_getTransactionByHash", [txHash]),
-      rpc("eth_getTransactionReceipt", [txHash])
+      rpc("eth_getTransactionReceipt", [txHash]),
+      rpc("eth_getCode", [VERIFY_CONFIG.registry, "latest"]),
+      rpc("eth_call", [{ to: VERIFY_CONFIG.registry, data: registryInterface.encodeFunctionData("feeRecipient") }, "latest"])
     ]);
     if (BigInt(chainId) !== VERIFY_CONFIG.chainId) throw new Error("RPC endpoint is not connected to SOBYA Mainnet.");
     if (!tx) throw new Error("Transaction not found.");
     if (!receipt) throw new Error("Transaction is not confirmed yet.");
     if (receipt.status !== "0x1") throw new Error("Transaction failed on-chain.");
+    if (!registryCode || registryCode === "0x") throw new Error("The configured SOBYA Proof Registry contract is unavailable.");
+    const feeRecipient = String(registryInterface.decodeFunctionResult("feeRecipient", feeRecipientData)[0]);
+    if (feeRecipient.toLowerCase() !== VERIFY_CONFIG.serviceWallet.toLowerCase()) throw new Error("The registry fee recipient does not match the official SOBYA service wallet.");
     let decodedCall = null;
     try {
       const parsed = registryInterface.parseTransaction({ data: tx.input || tx.data, value: tx.value });
@@ -70,7 +76,7 @@ export function createSobyaVerifyClient({ rpcUrls, fetchImpl = globalThis.fetch,
         }
       } catch {}
     }
-    if (!isValidRegistryRecord({ tx, receipt, decodedCall, recordedEvent })) {
+    if (!isValidRegistryRecord({ tx, receipt, decodedCall, recordedEvent, feeRecipient })) {
       throw new Error("Transaction is not a valid SOBYA Proof Registry record.");
     }
     const fingerprint = String(decodedCall.args[0]).toLowerCase();
