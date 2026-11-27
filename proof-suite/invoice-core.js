@@ -8,7 +8,9 @@ export function normalizeInvoiceMetadata(input) {
   const currency = String(input?.currency ?? "").trim().toUpperCase();
   const amount = String(input?.amount ?? "").trim();
   if (!invoiceRef || invoiceRef.length > 120) throw new TypeError("Enter an invoice reference (1–120 characters).");
-  if (!DATE_RE.test(issueDate) || Number.isNaN(Date.parse(issueDate + "T00:00:00Z"))) throw new TypeError("Enter a valid invoice date in YYYY-MM-DD format.");
+  if (!DATE_RE.test(issueDate)) throw new TypeError("Enter a valid invoice date in YYYY-MM-DD format.");
+  const parsedDate = new Date(issueDate + "T00:00:00Z");
+  if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== issueDate) throw new TypeError("Enter a valid invoice date in YYYY-MM-DD format.");
   if (!/^[A-Z]{3}$/.test(currency)) throw new TypeError("Enter a three-letter currency code, such as USD.");
   if (!AMOUNT_RE.test(amount) || Number(amount) <= 0) throw new TypeError("Enter a positive amount with up to 6 decimal places.");
   return { invoiceRef, issueDate, currency, amount };
