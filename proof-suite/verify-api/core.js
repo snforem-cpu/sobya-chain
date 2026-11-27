@@ -8,8 +8,8 @@ export const VERIFY_CONFIG = Object.freeze({
   serviceWallet: "0xd316993423Fc6268038F4EE3EA7C0C5038513C18",
   feeWei: 1000000000000000000n,
   rpcUrls: Object.freeze([
-    "https://sobya-evm-rpc.nodesafe-app.xyz",
-    "https://sobya-evm-rpc.nodesafe-dapp.xyz"
+    "https://sobya-evm-rpc.nodesafe-dapp.xyz",
+    "https://sobya-evm-rpc.nodesafe-app.xyz"
   ])
 });
 
