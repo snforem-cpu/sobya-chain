@@ -4,15 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="Create and verify SHA-256 document proofs on SOBYA Mainnet without uploading your files.">
-  <title>SOBYA Proof — Verifiable Document Records</title>
+  <meta name="description" content="SOBYA Proof Suite — one platform for document proofs, invoice records, digital certificates and developer verification on SOBYA Mainnet.">
+  <title>SOBYA Proof Suite — Trust, Proof & Verification on SOBYA</title>
   <link rel="icon" type="image/png" href="../assets/logo/sobya-coin-128.png">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./suite.css">
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <a class="brand" href="../"><img src="../assets/logo/sobya-coin-128.png" alt="SOBYA official logo"><span>SOBYA <i>PROOF</i></span></a>
+      <a class="brand" href="../" aria-label="SOBYA official website"><img src="../assets/logo/sobya-coin-128.png" alt="Official SOBYA crystal and gold orbit logo"><span>SOBYA <i>PROOF SUITE</i></span></a>
       <div class="top-actions">
         <span class="network-pill">SOBYA MAINNET</span>
         <button class="lang-button" id="language" type="button" aria-label="Switch language">العربية</button>
@@ -27,7 +28,43 @@
         <span data-en="✓ No file uploads" data-ar="✓ لا رفع للملفات">✓ No file uploads</span>
         <span data-en="✓ Wallet-signed record" data-ar="✓ تسجيل بتوقيع محفظتك">✓ Wallet-signed record</span>
         <span data-en="✓ Public verification" data-ar="✓ تحقق عام">✓ Public verification</span>
+
       </div>
+    </section>
+
+    <section class="suite-overview" aria-labelledby="suite-title">
+      <div class="suite-heading">
+        <p class="step" data-en="ONE PLATFORM · FOUR CONNECTED SERVICES" data-ar="منصة واحدة · أربع خدمات مترابطة">ONE PLATFORM · FOUR CONNECTED SERVICES</p>
+        <h2 id="suite-title" data-en="The SOBYA Proof Suite" data-ar="منظومة SOBYA Proof Suite">The SOBYA Proof Suite</h2>
+        <p data-en="A shared verification platform built on SOBYA Mainnet. Each service will become available only after its own implementation and testing are complete." data-ar="منصة تحقق موحدة مبنية على شبكة SOBYA. ستتاح كل خدمة بعد اكتمال تطويرها واختبارها بصورة مستقلة.">A shared verification platform built on SOBYA Mainnet. Each service will become available only after its own implementation and testing are complete.</p>
+      </div>
+      <div class="suite-grid">
+        <article class="suite-card active">
+          <div class="suite-card-top"><span class="suite-number">01</span><span class="suite-status live" data-en="AVAILABLE NOW" data-ar="متاح الآن">AVAILABLE NOW</span></div>
+          <h3>SOBYA Proof</h3>
+          <p data-en="Create and verify SHA-256 fingerprints for files and documents. Files stay on your device." data-ar="إنشاء والتحقق من بصمات SHA-256 للملفات والوثائق، مع بقاء الملفات على جهازك.">Create and verify SHA-256 fingerprints for files and documents. Files stay on your device.</p>
+          <a class="suite-link" href="#create-title" data-en="Create a proof ↓" data-ar="أنشئ إثباتاً ↓">Create a proof ↓</a>
+        </article>
+        <article class="suite-card planned">
+          <div class="suite-card-top"><span class="suite-number">02</span><span class="suite-status planned-label" data-en="PLANNED · PHASE 2" data-ar="مخطط · المرحلة الثانية">PLANNED · PHASE 2</span></div>
+          <h3>SOBYA Invoice Proof</h3>
+          <p data-en="Register invoice fingerprints with unique references and verifiable timestamps." data-ar="تسجيل بصمات الفواتير بمعرّفات فريدة وتواريخ تسجيل قابلة للتحقق.">Register invoice fingerprints with unique references and verifiable timestamps.</p>
+          <span class="suite-note" data-en="Not available yet" data-ar="غير متاحة حالياً">Not available yet</span>
+        </article>
+        <article class="suite-card planned">
+          <div class="suite-card-top"><span class="suite-number">03</span><span class="suite-status planned-label" data-en="PLANNED · PHASE 3" data-ar="مخطط · المرحلة الثالثة">PLANNED · PHASE 3</span></div>
+          <h3>SOBYA Certificate</h3>
+          <p data-en="Issue digital certificates with unique IDs, QR codes and public verification pages." data-ar="إصدار شهادات رقمية بمعرّفات فريدة ورموز QR وصفحات تحقق عامة.">Issue digital certificates with unique IDs, QR codes and public verification pages.</p>
+          <span class="suite-note" data-en="Not available yet" data-ar="غير متاحة حالياً">Not available yet</span>
+        </article>
+        <article class="suite-card planned">
+          <div class="suite-card-top"><span class="suite-number">04</span><span class="suite-status planned-label" data-en="PLANNED · PHASE 4" data-ar="مخطط · المرحلة الرابعة">PLANNED · PHASE 4</span></div>
+          <h3>SOBYA Verify API</h3>
+          <p data-en="Developer tools for automated verification of files, invoices and certificates." data-ar="أدوات للمطورين للتحقق الآلي من الملفات والفواتير والشهادات.">Developer tools for automated verification of files, invoices and certificates.</p>
+          <span class="suite-note" data-en="Not available yet" data-ar="غير متاحة حالياً">Not available yet</span>
+        </article>
+      </div>
+      <p class="suite-privacy" data-en="Shared foundation: local SHA-256 processing · wallet-signed transactions · SOBYA Mainnet records · public read-only verification." data-ar="البنية المشتركة: معالجة SHA-256 محلياً · معاملات بتوقيع المحفظة · سجلات على شبكة SOBYA · تحقق عام للقراءة فقط.">Shared foundation: local SHA-256 processing · wallet-signed transactions · SOBYA Mainnet records · public read-only verification.</p>
     </section>
 
     <section class="panel" aria-labelledby="create-title">

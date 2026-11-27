@@ -1,0 +1,23 @@
+.brand img{width:46px;height:46px;border-radius:13px;object-fit:contain;box-shadow:0 0 24px rgba(102,160,255,.18)}
+.brand i{font-size:.72em;letter-spacing:.08em}
+.suite-overview{margin:34px 0 26px;padding:26px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,rgba(17,43,75,.72),rgba(8,23,42,.82))}
+.suite-heading{max-width:720px;margin-bottom:22px}
+.suite-heading h2{font-size:clamp(26px,4vw,34px);line-height:1.15;margin:7px 0 9px;letter-spacing:-.025em}
+.suite-heading>p:last-child{margin:0;color:var(--muted);font-size:14px}
+.suite-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.suite-card{display:flex;flex-direction:column;align-items:flex-start;min-height:190px;padding:19px;border:1px solid var(--line);border-radius:15px;background:rgba(5,17,32,.48)}
+.suite-card.active{border-color:rgba(102,224,232,.38);background:linear-gradient(145deg,rgba(23,65,91,.42),rgba(5,17,32,.56))}
+.suite-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-bottom:13px}
+.suite-number{color:var(--cyan);font-size:12px;font-weight:900;letter-spacing:.14em}
+.suite-status{font-size:9px;font-weight:850;letter-spacing:.08em;border-radius:999px;padding:5px 8px;white-space:nowrap}
+.suite-status.live{color:#9de8c8;background:rgba(83,208,157,.12);border:1px solid rgba(83,208,157,.26)}
+.suite-status.planned-label{color:#c0cce0;background:rgba(157,190,235,.08);border:1px solid var(--line)}
+.suite-card h3{margin:0 0 7px;font-size:17px;line-height:1.25}
+.suite-card>p{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.6}
+.suite-link{margin-top:auto;color:var(--cyan);font-size:12px;font-weight:800;text-decoration:none}
+.suite-link:hover{text-decoration:underline}
+.suite-note{margin-top:auto;color:#8295af;font-size:11px;font-weight:700}
+.suite-privacy{margin:18px 0 0;padding-top:15px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.6}
+body[dir=rtl] .suite-heading,body[dir=rtl] .suite-card{text-align:right}
+body[dir=rtl] .suite-card-top{flex-direction:row-reverse}
+@media(max-width:620px){.brand img{width:40px;height:40px}.brand{gap:8px;font-size:13px}.brand i{font-size:.68em}.suite-overview{padding:18px}.suite-grid{grid-template-columns:1fr}.suite-card{min-height:160px}}

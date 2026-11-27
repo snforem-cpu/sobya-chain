@@ -1,6 +1,23 @@
-# SOBYA Proof — MVP
+# SOBYA Proof Suite
+
+SOBYA Proof Suite is the unified product family for document integrity and digital verification on SOBYA Mainnet. The current live-capable service is SOBYA Proof; Invoice Proof, Certificate, and Verify API are clearly marked as planned until their implementations pass testing and are released.
 
 SOBYA Proof is a simple browser-based tool for recording and verifying document fingerprints on SOBYA Mainnet.
+
+## Product roadmap
+
+| Service | Status | Scope |
+| --- | --- | --- |
+| SOBYA Proof | Phase 1 — current service | SHA-256 file/document fingerprints and public transaction verification. |
+| SOBYA Invoice Proof | Planned — Phase 2 | Invoice references, fingerprints, and verifiable registration timestamps. |
+| SOBYA Certificate | Planned — Phase 3 | Digital certificates with unique IDs, QR codes, and public verification pages. |
+| SOBYA Verify API | Planned — Phase 4 | Developer interfaces for automated verification of all supported proof types. |
+
+All services share the SOBYA Proof Suite identity and are intended to reuse common fingerprinting, record-verification, wallet, and network infrastructure. Future services must not be presented as available until implemented and tested.
+
+## Brand assets
+
+The interface uses the official SOBYA logo at `../assets/logo/sobya-coin-128.png`. Preserve the square artwork and the complete gold orbital ring; do not crop or overlay text on the mark.
 
 ## How it works
 
@@ -30,7 +47,7 @@ The Proof Registry emits a `ProofRecorded` event identifying the wallet address 
 - The Proof Registry contract is deployed at `0x9B1C6Cc504DEb8FA7aB9DAe499aB3D042fEC97b9`. Verification checks the contract call, exact 1 SOBY fee, successful receipt, and matching `ProofRecorded` event.
 - Verification depends on access to a configured public SOBYA EVM RPC endpoint.
 - A blockchain record proves the fingerprint was recorded; it does not certify the document's contents or confer legal status.
-- Invoice Proof, Certificate, and Verify API are separate future products and are not part of this MVP.
+- Invoice Proof, Certificate, and Verify API are planned phases of the SOBYA Proof Suite and are not available in the current release.
 
 ## Service fee
 
