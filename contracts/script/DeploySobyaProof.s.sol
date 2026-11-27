@@ -6,6 +6,7 @@ import "../src/SobyaProofRegistry.sol";
 interface VmProofDeploy {
     function startBroadcast() external;
     function stopBroadcast() external;
+    function envAddress(string calldata name) external returns (address);
 }
 
 /// @notice Deploys the standalone SOBYA Proof registry from a locally controlled wallet.
