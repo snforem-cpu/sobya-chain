@@ -134,12 +134,28 @@ async function issueCertificate() {
   if (!state.provider || !state.account) throw new Error("Connect your wallet in the SOBYA Proof section above first.");
   const metadata = issueMetadata();
   const hash = await computeCertificateHash(metadata);
-  await ensureNetwork(state.provider);
+  const activeProvider = state.provider;
+  if (!activeProvider?.request) throw new Error("Wallet provider is unavailable. Reconnect MetaMask in the SOBYA Proof section.");
+  await ensureNetwork(activeProvider);
+  // Re-read the authorized account immediately before sending; never pass null as transaction.from.
+  const accounts = await activeProvider.request({ method: "eth_accounts", params: [] });
+  const activeAccount = Array.isArray(accounts) ? accounts.find(account => typeof account === "string" && /^0x[a-fA-F0-9]{40}$/.test(account)) : null;
+  if (!activeAccount) {
+    state.account = null;
+    throw new Error("Your wallet is not connected to this page. Press Connect wallet in the SOBYA Proof section, approve the connection, then try again.");
+  }
+  state.account = activeAccount;
   await checkRegistry();
   setWallet("Opening MetaMask approval… Review the 1 SOBY service fee and network gas.");
-  const tx = await state.provider.request({
+  const transaction = {
+    from: activeAccount,
+    to: REGISTRY,
+    value: "0x" + FEE.toString(16),
+    data: abi.encodeFunctionData("recordProof", [hash])
+  };
+  const tx = await activeProvider.request({
     method: "eth_sendTransaction",
-    params: [{ from: state.account, to: REGISTRY, value: "0x" + FEE.toString(16), data: abi.encodeFunctionData("recordProof", [hash]) }]
+    params: [transaction]
   });
   if (!isTransactionHash(tx)) throw new Error("MetaMask did not return a valid transaction hash.");
   state.certificateId = metadata.certificateId;
