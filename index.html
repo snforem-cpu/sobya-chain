@@ -172,7 +172,7 @@
 
 <script>
 (function(){
- const endpoint='https://sobya-buy-api.sobya.workers.dev/v1/price';
+ const endpoint='https://sobya-buy-api.snforem.workers.dev/v1/price';
  const targets=[{price:'soby-live-price',updated:'soby-live-updated',status:'soby-live-status',dot:'soby-live-dot'},{price:'soby-live-price-ar',updated:'soby-live-updated-ar',status:'soby-live-status-ar',dot:'soby-live-dot-ar'}];
  const formatPrice=value=>{const n=Number(value);return Number.isFinite(n)&&n>0?n.toLocaleString('en-US',{maximumFractionDigits:18})+' USDT':null;};
  async function refresh(){
