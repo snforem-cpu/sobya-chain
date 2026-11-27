@@ -36,8 +36,8 @@ func defaultAppConfig() *evmserverconfig.Config {
 	srvCfg.Mempool.MaxTxs = 5000
 
 	evmCfg := evmserverconfig.DefaultEVMConfig()
-	// Development-only EVM chain ID. A production ID must be explicitly selected
-	// before generating a public genesis.
+	// Local development-home default. The production SOBYA Mainnet configuration
+	// uses EVM chain ID 357812033857; never use this local default for Mainnet.
 	evmCfg.EVMChainID = 777777
 
 	jsonRPC := evmserverconfig.DefaultJSONRPCConfig()
