@@ -1,10 +1,6 @@
 # SOBYA Independent Validator Recruitment
 
-**Status: expressions of interest may be invited; the SOBYA mainnet is not live yet.**
-
-SOBYA is preparing its public mainnet launch, operated by independent validators. The project does not require a founder-owned validator host. Each participating operator controls and maintains their own Linux host and keeps their own signing keys.
-
-## Recruitment target
+**Status: SOBYA Mainnet is live. This document describes joining the existing network, not pre-launch recruitment.**\n\nSOBYA operates a public Cosmos SDK / CometBFT mainnet with Cosmos EVM enabled. Independent operators may apply to join as additional validators or full nodes. Each operator controls their own Linux host and keeps their own signing keys.\n\n## Recruitment target
 
 The initial target is four independent validator operators, plus one non-validator RPC/full-node operator. A separate seed node is useful. Operators should be distributed across providers/networks where practical.
 
@@ -20,11 +16,11 @@ The operator pays for and controls their own infrastructure. No reimbursement, f
 
 Each operator creates account, node, and private-validator keys locally. Never send mnemonic phrases, private keys, keyring directories, `priv_validator_key.json`, or `node_key.json` to the project. During the official genesis ceremony, only public account information, node ID, public P2P endpoint, and signed gentx material are exchanged.
 
-## What can be done now
+## Joining the live network
 
-Interested operators may submit an expression of interest using the public application template in [the recruitment publication pack](ANNOUNCEMENTS.md). Host preparation and questions are welcome. Do not create production gentxs or start nodes until the official versioned launch bundle is published.
+Interested operators may submit an expression of interest using the public application template in [the recruitment publication pack](ANNOUNCEMENTS.md). Application review is manual and does not itself create a validator.
 
-The launch bundle must include the exact source commit and binary checksums, approved CometBFT and EVM chain IDs, final genesis and SHA-256, tested self-bond/gentx procedure, peer list, gas policy, launch UTC time, and support/incident contact.
+SOBYA Mainnet is already running. A new operator must use the existing live chain, synchronize from verified peers, confirm the current release and on-chain staking parameters, and create its validator with the supported live-chain transaction. Do not create production gentxs, propose a replacement genesis, or start a separate chain.
 
 ## Required reading
 
@@ -34,6 +30,4 @@ The launch bundle must include the exact source commit and binary checksums, app
 - [Ready-to-publish X and Telegram messages](ANNOUNCEMENTS.md)
 - [P2P/RPC security and connectivity](testnet/NETWORK_CONNECTIVITY_STAGE_TWO.md)
 
-## Mainnet activation gate
-
-The SOBYA mainnet may be described as live only after independent hosts connect over public P2P, report the same chain ID and advancing height, commit blocks, and complete cross-node transactions. Public RPC/EVM endpoints require separate external health and security checks. No placeholder IDs, peer addresses, genesis files, or RPC URLs may be presented as live.
+## Live-network operating checks\n\nBefore an operator creates a validator, verify the current binary release, CometBFT chain ID `sobya-1`, EVM chain ID `357812033857`, public peer information, current staking parameters, minimum self-delegation and transaction fees. Public endpoints are listed in the repository [README](../README.md).\n\nNo placeholder IDs, peer addresses, genesis files or RPC URLs may be presented as live. Validator rewards follow protocol rules and are not a promise of fiat income, market price, liquidity, exchange listing or infrastructure reimbursement.\n
