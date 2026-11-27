@@ -86,10 +86,12 @@ function bindWalletEvents(provider) {
     state.account = accounts?.[0] || null;
     setWallet(state.account ? `Connected: ${state.account}` : "Wallet disconnected. Reconnect to continue.");
     $("record-button").disabled = !state.hash || !state.account;
+    window.dispatchEvent(new CustomEvent("sobya:wallet", { detail: { provider, account: state.account } }));
   });
   provider.on("chainChanged", () => {
     state.account = null;
     $("record-button").disabled = true;
+    window.dispatchEvent(new CustomEvent("sobya:wallet", { detail: { provider, account: null } }));
     setWallet("Network changed. Reconnect to SOBYA Mainnet.");
   });
 }
@@ -162,6 +164,7 @@ async function connectWallet() {
   await ensureSobyaNetwork(provider);
   const currentAccounts = await provider.request({ method: "eth_accounts", params: [] });
   state.account = currentAccounts?.[0] || accounts[0];
+  window.dispatchEvent(new CustomEvent("sobya:wallet", { detail: { provider, account: state.account } }));
   bindWalletEvents(provider);
   setWallet(`Connected: ${state.account}`);
   $("record-button").disabled = !state.hash;
@@ -370,6 +373,7 @@ async function restoreWalletSession() {
     if (!accounts || !accounts.length) return;
     state.wallet = provider;
     state.account = accounts[0];
+    window.dispatchEvent(new CustomEvent("sobya:wallet", { detail: { provider, account: state.account } }));
     bindWalletEvents(provider);
     setWallet(`Connected: ${state.account}`);
     $("record-button").disabled = !state.hash;
