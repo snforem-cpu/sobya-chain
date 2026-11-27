@@ -11,7 +11,7 @@ export function normalizeInvoiceMetadata(input) {
   const issuer = clean(input.issuer);
   const recipient = clean(input.recipient);
   if (!reference) throw new TypeError("Invoice reference is required.");
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(issueDate) || Number.isNaN(Date.parse(issueDate + "T00:00:00Z"))) throw new TypeError("Enter a valid invoice issue date.");
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(issueDate) || Number.isNaN(Date.parse(issueDate + "T00:00:00Z")) || new Date(issueDate + "T00:00:00Z").toISOString().slice(0, 10) !== issueDate) throw new TypeError("Enter a valid invoice issue date.");
   if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(amount)) throw new TypeError("Enter an amount using digits and an optional decimal point (up to 6 decimal places).");
   if (!/^[A-Z]{3}$/.test(currency)) throw new TypeError("Enter a three-letter currency code, such as USD or EUR.");
   return { version: 1, reference, issueDate, amount, currency, issuer, recipient };
