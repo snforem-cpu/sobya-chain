@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 
-// Run the SDK in a real Chromium page against the live SOBYA RPC.\nconst root = process.cwd();
+// Run the SDK in a real Chromium page against the live SOBYA RPC.
+const root = process.cwd();
 const mime = {".html":"text/html",".js":"text/javascript",".css":"text/css",".png":"image/png"};
 const server = createServer(async (req,res) => {
   try {
