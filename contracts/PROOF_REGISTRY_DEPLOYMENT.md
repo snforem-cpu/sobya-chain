@@ -26,19 +26,21 @@ forge test --match-contract SobyaProofRegistryTest -vv
 
 The GitHub Actions contract workflow also compiles and runs the full Solidity regression suite.
 
-## Deploy with MetaMask (no private key shared)
+## Deploy with the official mobile MetaMask deployer
 
-1. Open the official Remix IDE at https://remix.ethereum.org/ and create `SobyaProofRegistry.sol`.
-2. Copy the exact source from `contracts/src/SobyaProofRegistry.sol` in this repository.
-3. Compile with Solidity `0.8.24` (optimizer enabled, 200 runs).
-4. In Deploy & Run Transactions, choose **Injected Provider - MetaMask**.
-5. Confirm MetaMask is connected to **SOBYA Mainnet**, EVM chain ID `357812033857`.
-6. Select `SobyaProofRegistry` and enter this constructor argument:
-   `0xd316993423Fc6268038F4EE3EA7C0C5038513C18`.
-7. Click Deploy and review the network gas fee in MetaMask. Confirm only if the network and constructor argument are correct.
-8. Copy the deployed contract address and transaction hash. Verify the deployed bytecode and constructor configuration before configuring the website.
+After GitHub Pages has completed its build, open:
 
-Never enter a seed phrase or private key into Remix or share it with anyone. MetaMask should display and sign the deployment transaction itself.
+`https://snforem-cpu.github.io/sobya-chain/proof-suite/deploy/`
+
+1. Press **Connect MetaMask** and approve the wallet connection.
+2. Confirm the page reports SOBYA Mainnet, chain ID `357812033857`, and a valid artifact checksum.
+3. Review the service wallet shown on the page: `0xd316993423Fc6268038F4EE3EA7C0C5038513C18`.
+4. Press **Deploy Proof Registry**. MetaMask will show the contract-creation transaction and its gas fee.
+5. Verify the network and approve only if the transaction is a contract deployment from your own wallet.
+6. Wait for confirmation. The page verifies deployed bytecode and reads back the immutable fee recipient.
+7. Send the resulting contract address and transaction hash for the website integration step.
+
+The page uses MetaMask Connect and a reproducible Foundry artifact; it never asks for a private key or recovery phrase. If GitHub Pages has not yet published the artifact, wait for the Pages workflow to finish before opening the deployer.
 
 ## Important release gate
 
