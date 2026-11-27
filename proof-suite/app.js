@@ -1,3 +1,4 @@
+import { BrowserProvider } from "https://esm.sh/ethers@6.13.5";
 import { encodeProofPayload, decodeProofPayload, isTransactionHash, isPaidProofRecord } from "./proof-core.js";
 
 const CHAIN_ID = 357812033857n;
@@ -9,7 +10,7 @@ const RPCS = [
   "https://sobya-evm-rpc.nodesafe-app.xyz"
 ];
 const $ = id => document.getElementById(id);
-const state = { wallet: null, account: null, file: null, hash: null, lang: "en" };
+const state = { wallet: null, ethersProvider: null, signer: null, account: null, file: null, hash: null, lang: "en" };
 
 function message(element, text, kind = "") {
   element.textContent = text;
@@ -76,11 +77,15 @@ function bindWalletEvents(provider) {
   boundProvider = provider;
   provider.on("accountsChanged", accounts => {
     state.account = accounts?.[0] || null;
+    state.signer = null;
+    state.ethersProvider = null;
     setWallet(state.account ? `Connected: ${state.account}` : "Wallet disconnected. Reconnect to continue.");
     $("record-button").disabled = !state.hash || !state.account;
   });
   provider.on("chainChanged", () => {
     state.account = null;
+    state.signer = null;
+    state.ethersProvider = null;
     $("record-button").disabled = true;
     setWallet("Network changed. Reconnect to SOBYA Mainnet.");
   });
@@ -112,31 +117,38 @@ async function ensureSobyaNetwork(provider) {
   }
 }
 async function connectWallet() {
-  let provider = findInjectedProvider();
+  let provider = null;
   let accounts = [];
 
-  // Match SOBYA Auto Exchange: use the injected MetaMask provider first.
-  if (provider && typeof provider.request === "function") {
-    connectedViaSdk = false;
-    accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
-  } else {
+  // Follow SOBYA Auto Exchange: MetaMask Connect SDK first, injected provider fallback.
+  try {
     const client = await Promise.race([
       connectorPromise,
       new Promise(resolve => setTimeout(() => resolve(null), 7000))
     ]);
-    if (!client) {
+    if (client) {
+      const session = await client.connect({ chainIds: [CHAIN_HEX], forceRequest: true });
+      provider = client.getProvider();
+      connectedViaSdk = Boolean(provider);
+      const sessionAccounts = session && Array.isArray(session.accounts) ? session.accounts : [];
+      accounts = sessionAccounts
+        .map(item => typeof item === "string" ? item : (item && typeof item.address === "string" ? item.address : null))
+        .filter(Boolean);
+      if (!accounts.length && provider) {
+        accounts = await provider.request({ method: "eth_accounts", params: [] });
+      }
+    }
+  } catch (error) {
+    console.warn("MetaMask Connect flow unavailable; trying injected wallet fallback:", error);
+  }
+
+  if (!provider || !accounts?.[0]) {
+    provider = findInjectedProvider();
+    connectedViaSdk = false;
+    if (!provider || typeof provider.request !== "function") {
       throw new Error("MetaMask connection is unavailable. Open MetaMask or use its in-app browser, then try again.");
     }
-    const session = await client.connect({ chainIds: [CHAIN_HEX], forceRequest: true });
-    provider = client.getProvider();
-    connectedViaSdk = true;
-    const sessionAccounts = session && Array.isArray(session.accounts) ? session.accounts : [];
-    accounts = sessionAccounts
-      .map(item => typeof item === "string" ? item : (item && typeof item.address === "string" ? item.address : null))
-      .filter(Boolean);
-    if (!accounts.length && provider) {
-      accounts = await provider.request({ method: "eth_accounts", params: [] });
-    }
+    accounts = await provider.request({ method: "eth_requestAccounts", params: [] });
   }
 
   if (!provider || !accounts?.[0]) {
@@ -147,6 +159,8 @@ async function connectWallet() {
   await ensureSobyaNetwork(provider);
   const currentAccounts = await provider.request({ method: "eth_accounts", params: [] });
   state.account = currentAccounts?.[0] || accounts[0];
+  state.ethersProvider = new BrowserProvider(provider);
+  state.signer = await state.ethersProvider.getSigner(state.account);
   bindWalletEvents(provider);
   setWallet(`Connected: ${state.account}`);
   $("record-button").disabled = !state.hash;
@@ -192,28 +206,27 @@ async function recordProof() {
   }
   await ensureSobyaNetwork(state.wallet);
   const data = encodeProofPayload(state.hash);
-  // Let MetaMask Connect / MetaMask Mobile estimate gas and prepare the
-  // approval request. A separate RPC eth_estimateGas preflight can fail or
-  // interrupt the mobile handoff before eth_sendTransaction is ever invoked.
-  const txRequest = {
-    from: state.account,
-    to: SERVICE_WALLET,
-    value: "0x" + SERVICE_FEE_WEI.toString(16),
-    data
-  };
+  // Use the same ethers BrowserProvider + signer flow as SOBYA Auto Exchange.
+  // MetaMask handles gas estimation and presents the transaction approval UI.
+  if (!state.signer) {
+    state.ethersProvider = new BrowserProvider(state.wallet);
+    state.signer = await state.ethersProvider.getSigner(state.account);
+  }
   setWallet("Opening MetaMask transaction approval…");
-  let txHash;
+  let transaction;
   try {
-    txHash = await state.wallet.request({
-      method: "eth_sendTransaction",
-      params: [txRequest]
+    transaction = await state.signer.sendTransaction({
+      to: SERVICE_WALLET,
+      value: SERVICE_FEE_WEI,
+      data
     });
   } catch (error) {
-    const detail = error?.data?.message || error?.message || "MetaMask did not approve the transaction request.";
-    if (error?.code === 4001) throw new Error("Transaction approval was rejected in MetaMask.");
+    const detail = error?.shortMessage || error?.info?.error?.message || error?.message || "MetaMask did not approve the transaction.";
+    if (error?.code === 4001 || error?.code === "ACTION_REJECTED") throw new Error("Transaction approval was rejected in MetaMask.");
     if (error?.code === -32002) throw new Error("A MetaMask request is already pending. Open MetaMask and finish or cancel it.");
     throw new Error(`MetaMask did not submit the transaction: ${detail}`);
   }
+  const txHash = transaction.hash;
   $("tx-hash").value = txHash;
   const result = $("verify-result");
   message(result, `1 SOBY service fee submitted to ${SERVICE_WALLET}. Wait for confirmation, then verify your paid proof here. Transaction: ${txHash}`);
@@ -332,6 +345,8 @@ async function restoreWalletSession() {
     if (!accounts || !accounts.length) return;
     state.wallet = provider;
     state.account = accounts[0];
+    state.ethersProvider = new BrowserProvider(provider);
+    state.signer = await state.ethersProvider.getSigner(state.account);
     bindWalletEvents(provider);
     setWallet(`Connected: ${state.account}`);
     $("record-button").disabled = !state.hash;
