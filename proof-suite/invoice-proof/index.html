@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071426">
+<meta name="description" content="SOBYA Invoice Proof — privately fingerprint and verify commercial invoices on SOBYA Mainnet.">
+<title>SOBYA Invoice Proof — SOBYA Proof Suite</title>
+<link rel="icon" type="image/png" href="../../assets/logo/sobya-coin-128.png"><link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main class="shell">
+<header class="topbar"><a class="brand" href="../" aria-label="SOBYA Proof Suite"><img src="../../assets/logo/sobya-coin-128.png" alt="Official SOBYA logo"><span>SOBYA <i>INVOICE PROOF</i></span></a><div class="actions"><span class="pill">SOBYA MAINNET</span><button class="lang" id="language" type="button">العربية</button></div></header>
+<section class="hero"><p class="eyebrow" data-en="PRIVATE INVOICE FINGERPRINT · PUBLIC VERIFICATION" data-ar="بصمة فاتورة خاصة · تحقق عام">PRIVATE INVOICE FINGERPRINT · PUBLIC VERIFICATION</p><h1 data-en="Proof for every invoice." data-ar="إثبات موثوق لكل فاتورة.">Proof for every invoice.</h1><p data-en="Create a tamper-evident fingerprint that binds your invoice file to its reference, date and amount. Your invoice and its business details stay on your device." data-ar="أنشئ بصمة تكشف أي تغيير في ملف الفاتورة وتربطه برقمها وتاريخها ومبلغها. تبقى الفاتورة وبياناتها التجارية على جهازك.">Create a tamper-evident fingerprint that binds your invoice file to its reference, date and amount. Your invoice and its business details stay on your device.</p></section>
+<section class="panel">
+<div class="heading"><div><p class="step">01 · REGISTER</p><h2 data-en="Register an invoice proof" data-ar="تسجيل إثبات فاتورة">Register an invoice proof</h2></div><span class="tag">SHA-256</span></div>
+<div class="field"><label for="invoice-file" data-en="Invoice file (PDF, image or original document)" data-ar="ملف الفاتورة (PDF أو صورة أو مستند)">Invoice file (PDF, image or original document)</label><input id="invoice-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.csv"></div>
+<div class="grid">
+<div class="field"><label for="reference" data-en="Invoice number / reference" data-ar="رقم الفاتورة / المرجع">Invoice number / reference</label><input id="reference" maxlength="120" autocomplete="off" placeholder="INV-2026-0042" required></div>
+<div class="field"><label for="issue-date" data-en="Issue date" data-ar="تاريخ الإصدار">Issue date</label><input id="issue-date" type="date" required></div>
+<div class="field"><label for="amount" data-en="Invoice total" data-ar="إجمالي الفاتورة">Invoice total</label><input id="amount" inputmode="decimal" placeholder="1250.50" required></div>
+<div class="field"><label for="currency" data-en="Currency (3-letter code)" data-ar="العملة (رمز من 3 أحرف)">Currency (3-letter code)</label><input id="currency" maxlength="3" value="USD" autocomplete="off" required></div>
+<div class="field"><label for="issuer" data-en="Issuer / supplier (optional)" data-ar="الجهة المصدرة / المورد (اختياري)">Issuer / supplier (optional)</label><input id="issuer" maxlength="160" autocomplete="off"></div>
+<div class="field"><label for="recipient" data-en="Recipient / customer (optional)" data-ar="المستلم / العميل (اختياري)">Recipient / customer (optional)</label><input id="recipient" maxlength="160" autocomplete="off"></div>
+</div>
+<p class="help" data-en="These fields are included in the private fingerprint calculation. They are not sent to the blockchain or to a server." data-ar="تُستخدم هذه الحقول في حساب البصمة الخاصة، ولا تُرسل إلى البلوكشين أو أي خادم.">These fields are included in the private fingerprint calculation. They are not sent to the blockchain or to a server.</p>
+<div class="fee"><div><span data-en="Invoice Proof service fee" data-ar="رسوم خدمة Invoice Proof">Invoice Proof service fee</span><small data-en="One-time fee for this invoice record. Network gas is separate." data-ar="رسوم تسجيل لمرة واحدة لهذه الفاتورة. غاز الشبكة منفصل.">One-time fee for this invoice record. Network gas is separate.</small></div><strong>1 SOBY</strong></div>
+<div class="buttons"><button class="button" id="connect" type="button" data-en="Connect wallet" data-ar="ربط المحفظة">Connect wallet</button><button class="button primary" id="register" type="button" disabled data-en="Register invoice · 1 SOBY" data-ar="سجّل الفاتورة · 1 SOBY">Register invoice · 1 SOBY</button></div>
+<p class="state" id="wallet-state" aria-live="polite" data-en="Choose an invoice file and connect your wallet." data-ar="اختر ملف الفاتورة واربط محفظتك.">Choose an invoice file and connect your wallet.</p><div class="result" id="register-result" aria-live="polite" hidden></div>
+</section>
+<section class="panel">
+<div class="heading"><div><p class="step">02 · VERIFY</p><h2 data-en="Verify an invoice proof" data-ar="التحقق من إثبات فاتورة">Verify an invoice proof</h2></div><span class="tag">READ-ONLY</span></div>
+<div class="field"><label for="tx-hash" data-en="SOBYA transaction hash" data-ar="معرّف معاملة SOBYA">SOBYA transaction hash</label><input id="tx-hash" placeholder="0x…" autocomplete="off" spellcheck="false"></div>
+<div class="field"><label for="verify-file" data-en="Original invoice file" data-ar="ملف الفاتورة الأصلي">Original invoice file</label><input id="verify-file" type="file"></div>
+<div class="grid">
+<div class="field"><label for="verify-reference" data-en="Invoice number / reference" data-ar="رقم الفاتورة / المرجع">Invoice number / reference</label><input id="verify-reference" autocomplete="off"></div>
+<div class="field"><label for="verify-date" data-en="Issue date" data-ar="تاريخ الإصدار">Issue date</label><input id="verify-date" type="date"></div>
+<div class="field"><label for="verify-amount" data-en="Invoice total" data-ar="إجمالي الفاتورة">Invoice total</label><input id="verify-amount" inputmode="decimal"></div>
+<div class="field"><label for="verify-currency" data-en="Currency" data-ar="العملة">Currency</label><input id="verify-currency" maxlength="3"></div>
+<div class="field"><label for="verify-issuer" data-en="Issuer / supplier (if used)" data-ar="الجهة المصدرة (إن استُخدمت)">Issuer / supplier (if used)</label><input id="verify-issuer"></div>
+<div class="field"><label for="verify-recipient" data-en="Recipient / customer (if used)" data-ar="المستلم / العميل (إن استُخدم)">Recipient / customer (if used)</label><input id="verify-recipient"></div>
+</div>
+<p class="help" data-en="Enter the same invoice details used at registration. Verification runs locally and reads the transaction from SOBYA Mainnet." data-ar="أدخل بيانات الفاتورة نفسها المستخدمة عند التسجيل. يتم التحقق محلياً وقراءة المعاملة من شبكة SOBYA الرئيسية.">Enter the same invoice details used at registration. Verification runs locally and reads the transaction from SOBYA Mainnet.</p>
+<button class="button primary" id="verify" type="button" data-en="Verify invoice" data-ar="تحقق من الفاتورة">Verify invoice</button><div class="result" id="verify-result" aria-live="polite" hidden></div>
+</section>
+<section class="privacy"><strong data-en="Privacy and evidence scope" data-ar="الخصوصية ونطاق الإثبات">Privacy and evidence scope</strong><p data-en="The invoice file, invoice number, date, amount, currency and party names are processed in your browser only. The blockchain receives a one-way SHA-256 fingerprint, the submitting wallet address and the transaction timestamp. A match proves that the supplied file and details reproduce the registered fingerprint; it does not prove payment, delivery, tax compliance, authenticity of the issuer or legal validity." data-ar="تتم معالجة ملف الفاتورة ورقمها وتاريخها ومبلغها وعملتها وأسماء الأطراف داخل متصفحك فقط. تستقبل البلوكشين بصمة SHA-256 أحادية الاتجاه وعنوان المحفظة ووقت المعاملة. التطابق يثبت أن الملف والبيانات المقدمة ينتجان البصمة المسجلة؛ ولا يثبت الدفع أو التسليم أو الامتثال الضريبي أو صحة هوية المصدر أو الصلاحية القانونية.">The invoice file, invoice number, date, amount, currency and party names are processed in your browser only. The blockchain receives a one-way SHA-256 fingerprint, the submitting wallet address and the transaction timestamp. A match proves that the supplied file and details reproduce the registered fingerprint; it does not prove payment, delivery, tax compliance, authenticity of the issuer or legal validity.</p></section>
+<footer><a href="../">← SOBYA Proof Suite</a><a href="https://explorer.nodesafe-app.xyz/sobya" target="_blank" rel="noopener">SOBYA Explorer ↗</a><span>Powered by SOBYA Mainnet</span></footer>
+</main><script type="module" src="./app.js"></script>
+</body></html>
